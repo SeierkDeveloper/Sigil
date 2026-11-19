@@ -38,7 +38,11 @@ export function SealList({ limit = 12 }: { limit?: number }) {
     );
   }
   if (state.status === "error") {
-    return <p className="notice notice-error">The seals could not be loaded right now. Please try again later.</p>;
+    return (
+      <p className="notice notice-error" role="alert">
+        <span>The seals could not be loaded right now. Please try again later.</span>
+      </p>
+    );
   }
   if (state.seals.length === 0) {
     return (

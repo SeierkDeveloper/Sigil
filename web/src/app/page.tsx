@@ -35,7 +35,9 @@ export default function Home() {
         <div className="container hero-inner">
           <div>
             <p className="eyebrow">A memory vault for every AI you use</p>
-            <h1 className="hero-title">Your AI self, owned by you, forever.</h1>
+            <h1 className="hero-title">
+              Your AI self, owned by you, <em>forever.</em>
+            </h1>
             <p className="hero-lead">
               Sigil keeps what your AI apps should know about you in one vault that is encrypted on your own device. You decide which app may read
               which part, and you can see every read.
@@ -90,6 +92,11 @@ export default function Home() {
           <div className="section-header">
             <p className="eyebrow">How it works</p>
             <h2 className="section-title">Four steps, then it simply works in the background</h2>
+            <p className="section-aside">
+              <Link href="/how-it-works" className="arrow-link">
+                The full walk-through <ArrowIcon />
+              </Link>
+            </p>
           </div>
           <ol className="steps">
             {steps.map((s) => (
@@ -99,9 +106,6 @@ export default function Home() {
               </li>
             ))}
           </ol>
-          <p className="card-link">
-            <Link href="/how-it-works">The full walk-through</Link>
-          </p>
         </div>
       </section>
 
@@ -167,7 +171,9 @@ export default function Home() {
               conversation becomes a memory you can search, edit or share with another app.
             </p>
             <p className="card-link">
-              <Link href="/docs#import">How to import</Link>
+              <Link href="/docs#import" className="arrow-link">
+                How to import <ArrowIcon />
+              </Link>
             </p>
           </article>
           <article className="card">
@@ -180,7 +186,9 @@ export default function Home() {
               entry in your log is part of its seal, without showing anyone else what was read.
             </p>
             <p className="card-link">
-              <Link href="/security#seals">How seals work</Link>
+              <Link href="/security#seals" className="arrow-link">
+                How seals work <ArrowIcon />
+              </Link>
             </p>
           </article>
         </div>

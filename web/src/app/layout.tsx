@@ -1,8 +1,38 @@
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { site } from "@/lib/site";
 import "./globals.css";
+
+// Self-hosted faces (the content security policy allows no third-party font hosts).
+const display = localFont({
+  src: [
+    { path: "../fonts/display-roman.woff2", style: "normal", weight: "400 900" },
+    { path: "../fonts/display-italic.woff2", style: "italic", weight: "400 900" },
+  ],
+  variable: "--face-display",
+  display: "swap",
+  fallback: ["Didot", "Georgia", "serif"],
+});
+const sans = localFont({
+  src: [
+    { path: "../fonts/sans-roman.woff2", style: "normal", weight: "400 700" },
+    { path: "../fonts/sans-italic.woff2", style: "italic", weight: "400 700" },
+  ],
+  variable: "--face-sans",
+  display: "swap",
+  fallback: ["system-ui", "Helvetica Neue", "Arial", "sans-serif"],
+});
+const mono = localFont({
+  src: [
+    { path: "../fonts/mono-400.woff2", style: "normal", weight: "400" },
+    { path: "../fonts/mono-500.woff2", style: "normal", weight: "500" },
+  ],
+  variable: "--face-mono",
+  display: "swap",
+  fallback: ["ui-monospace", "Menlo", "Consolas", "monospace"],
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
@@ -10,12 +40,12 @@ export const metadata: Metadata = {
   description: site.description,
   applicationName: site.name,
   openGraph: { title: site.name, description: site.description, siteName: site.name, type: "website" },
-  twitter: { card: "summary", title: site.name, description: site.description },
+  twitter: { card: "summary_large_image", title: site.name, description: site.description },
   robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#050506",
+  themeColor: "#060607",
   colorScheme: "dark",
   width: "device-width",
   initialScale: 1,
@@ -23,7 +53,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body>
         <a className="skip-link" href="#main">
           Skip to content

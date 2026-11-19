@@ -5,7 +5,7 @@ Everything the visual design pass has to style. The product works and every page
 ## Ground rules
 
 - **Look:** black, with silver and white details. Near-black backgrounds, white type, silver as the only accent (fine lines, an engraved or etched feel, subtle metallic gradients on key marks). A seal motif fits the name. No colour accents beyond black, silver, white and greys, including for errors and success.
-- **Hero motion:** something that feels like a seal being formed or engraved (canvas or WebGL is fine), calm, smooth, not busy. It replaces the static drawing in `web/src/components/SealMark.tsx`. Respect `prefers-reduced-motion` with a still frame.
+- **Hero motion:** something that feels like a seal being formed or engraved (canvas or WebGL is fine), calm, smooth, not busy. It lives in `web/src/components/SealMark.tsx`, with the static drawing kept as the fallback. Respect `prefers-reduced-motion` with a still frame.
 - **Chrome stays:** full-width header with the logo top left, section nav, GitHub and X icons top right and the Open vault button; a footer. No left sidebar.
 - **Copy stays:** do not add em dashes, emoji, or labels such as "demo" or "sample". `web/test/content.test.ts` checks this.
 - **Logo:** `web/src/components/Logo.tsx` renders the text wordmark. When the logo file exists, set `logoSrc` in `web/src/lib/site.ts`; nothing else changes.
@@ -14,7 +14,7 @@ Everything the visual design pass has to style. The product works and every page
 ## Where styling lives
 
 - One stylesheet: `web/src/app/globals.css`. Tokens are on `:root` (colour, type, space, radius, container, header height, shadow). Restyle tokens first.
-- Fonts are system stacks in `--font-sans`, `--font-display`, `--font-mono`. Self-host any new font (the content security policy blocks third-party font hosts) via `next/font/local` or files in `web/public`.
+- Fonts are self-hosted and exposed as `--font-sans`, `--font-display`, `--font-mono`. Self-host any new font (the content security policy blocks third-party font hosts) via `next/font/local` or files in `web/public`.
 - The CSP in `web/next.config.ts` allows only same-origin scripts, styles, images and fonts. Inline styles are allowed.
 - Icons are inline SVG in `web/src/components/icons.tsx` and use `currentColor`. Brand marks (Claude, ChatGPT, Cursor, MCP, GitHub, X) are their official monochrome shapes.
 - Screenshots of the current state: `docs/screenshots/` (`<page>-<desktop|phone>-<top|middle|bottom>.png`, `vault-<state>-<desktop|phone>-*.png`). Regenerate with `npx playwright test -c playwright.shots.config.ts` in `e2e/` after `npm run build`.
@@ -94,8 +94,15 @@ All files in `web/src/vault/`. The wrapper is `.vault[data-phase]` with phases `
 | Import | `tabs/Import.tsx` | `.dropzone[data-dragging]` idle and reading; two help cards (`.import-help`); preview (counts, duplicates skipped, target folder); progress; done; error |
 | Settings | `tabs/Settings.tsx` | sign-in methods list with Remove confirmation and Replace for the phrase; Add a passkey / Add a wallet (busy text); new phrase confirmation and the phrase screen; Export; This device (Lock, Sign out); `.danger-zone` with typed confirmation |
 
-## Not yet designed at all
+## The design as built
 
-- The hero motion piece.
-- An Open Graph image (`app/opengraph-image`), 1200 by 630.
-- A logo mark for the favicon.
+- **Direction:** black, silver and white. Hairlines, the double ring of a seal around icons and numbers, a small diamond as the mark between things, and brushed metal only on the primary button, the selected tab or switch and the built stages of the roadmap.
+- **Fonts (self-hosted in `web/src/fonts`, loaded with `next/font/local` in `app/layout.tsx`):** Bodoni Moda for display (`--font-display`, with `--display-cut` setting a sturdier optical size), Instrument Sans for text (`--font-sans`), DM Mono for labels, numbers and code (`--font-mono`). All three are under the SIL Open Font License; the licence texts sit next to the files.
+- **Hero motion:** `components/SealMark.tsx`. The seal is drawn once on a 2D canvas (rings, the legend, 120 hour marks, a woven band, the seven-pointed mark) and used as a height map in one small WebGL shader: a dark brushed disc, lines cut in order over about seven seconds, then a slow lean, a moving light and bands that turn at their own pace. Capped at 30 frames a second, paused off screen and in hidden tabs, one finished frame with reduced motion, and the still SVG when WebGL is missing.
+- **Other motion:** sections rise as they scroll in (only where scroll-driven animations exist), seal rows come in one after another, the Sealed badge stamps in, the primary button has a sheen on hover. All of it is off with reduced motion.
+- **Share image:** `app/opengraph-image.png` and `app/twitter-image.png` (1200 by 630), a still of the finished hero.
+- **States without colour:** errors and confirmations are white on a lighter plate with an icon and a plain label ("Error", "Done"); waiting and revoked states use dashed outlines; allowed and sealed states use a filled mark.
+
+## Not yet designed
+
+- A logo mark for the favicon (`app/icon.svg` is unchanged; set `logoSrc` when the logo file exists).

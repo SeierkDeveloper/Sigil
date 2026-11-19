@@ -52,6 +52,8 @@ for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
     for (const [name, url] of PAGES) {
       await page.goto(url);
       await page.waitForLoadState("networkidle");
+      // The hero seal is engraved over a few seconds; shoot it once it is whole.
+      if (name === "home") await page.waitForTimeout(9_000);
       await shoot(page, `${name}-${vp}`);
     }
     if (vp === "phone") {
@@ -62,6 +64,27 @@ for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
     await context.close();
   });
 }
+
+// A few moments of the hero motion, so it can be judged from stills.
+test("hero motion frames", async ({ browser }) => {
+  const { context, page } = await newPage(browser, "desktop");
+  await page.goto("/");
+  await page.locator('.seal[data-live="true"]').waitFor();
+  const start = Date.now();
+  const moments = [600, 1800, 3000, 4400, 6000, 8000, 12000, 16500];
+  for (const [i, at] of moments.entries()) {
+    await page.waitForTimeout(Math.max(0, at - (Date.now() - start)));
+    await page.screenshot({ path: path.join(OUT, `hero-${String(i + 1).padStart(2, "0")}.png`) });
+  }
+  await context.close();
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+  const stillPage = await still.newPage();
+  await stillPage.goto("/");
+  await stillPage.locator('.seal[data-live="true"]').waitFor();
+  await stillPage.waitForTimeout(500);
+  await stillPage.screenshot({ path: path.join(OUT, "hero-reduced-motion.png") });
+  await still.close();
+});
 
 test("vault states", async ({ browser, baseURL }) => {
   for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
