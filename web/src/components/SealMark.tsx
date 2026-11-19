@@ -126,16 +126,19 @@ function buildArt(size: number, fontFamily: string): Art | null {
     const widths = chars.map((ch) => mask.measureText(ch).width + tracking);
     const total = widths.reduce((a, b) => a + b, 0);
     const centre = (k / LEGEND.length) * Math.PI * 2;
-    let at = centre - total / (legendR * U) / 2;
+    // The phrase at the foot of the seal is set inside the arc, so it reads upright, left to right.
+    const foot = Math.cos(centre) < -0.5;
+    const dir = foot ? -1 : 1;
+    let at = centre - (dir * total) / (legendR * U) / 2;
     chars.forEach((ch, i) => {
-      const a = at + widths[i] / (legendR * U) / 2;
-      at += widths[i] / (legendR * U);
+      const a = at + (dir * widths[i]) / (legendR * U) / 2;
+      at += (dir * widths[i]) / (legendR * U);
       const turn = a / (Math.PI * 2);
       const o = 0.08 + 0.42 * (((turn % 1) + 1) % 1);
       for (const ctx of [mask, order]) {
         ctx.save();
         ctx.translate(C + legendR * U * Math.sin(a), C - legendR * U * Math.cos(a));
-        ctx.rotate(a);
+        ctx.rotate(foot ? a + Math.PI : a);
         if (ctx === mask) {
           ctx.fillStyle = grey(1);
           ctx.fillText(ch, 0, fontPx * 0.04);
@@ -295,12 +298,13 @@ void main() {
   vec3 V = vec3(dot(-dir, ex), dot(-dir, ey), dot(-dir, n));
   vec3 H = normalize(L + V);
 
-  // Each band turns at its own pace, and turns into place while it is cut.
+  // Each band turns into place while it is cut. The legend then rests, so it stays readable;
+  // the inner bands keep turning at their own pace.
   float settle = 1.0 - smoothstep(0.0, 1.0, uProgress);
   settle = settle * settle;
   float ang;
   float tone;
-  if (r > 0.862) { ang = 0.016 * uTime + 0.9 * settle; tone = 1.0; }
+  if (r > 0.862) { ang = 0.9 * settle; tone = 1.0; }
   else if (r > 0.778) { ang = -0.024 * uTime - 1.3 * settle; tone = 0.72; }
   else if (r > 0.544) { ang = 0.011 * uTime + 0.7 * settle; tone = 0.5; }
   else { ang = -0.007 * uTime - 0.5 * settle; tone = 0.86; }
