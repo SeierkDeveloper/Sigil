@@ -94,7 +94,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   const readRow = page.locator(".log-row", { hasText: 'Read "Planning a garden"' });
   await expect(readRow).toHaveAttribute("data-sealed", "true");
   await readRow.getByRole("button", { name: "Verify" }).click();
-  await expect(readRow.getByTestId("verified")).toContainText("Verified: this entry is part of seal");
+  await expect(readRow.getByTestId("verified")).toContainText("Verified: part of the seal for");
 
   // ---- revoke, and the very next read fails
   await page.getByRole("tab", { name: "Apps" }).click();

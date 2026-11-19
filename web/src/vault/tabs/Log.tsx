@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SealIcon } from "@/components/icons";
-import { formatDateTime, formatSealPeriod, plural, shortHash } from "@/lib/format";
+import { formatDateTime, formatSealPeriod, formatTime, plural, shortHash } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { Empty, Notice, Spinner } from "../ui";
@@ -118,13 +118,13 @@ export function LogTab() {
                 <div className="list-row-main">
                   <p className="list-row-title">{describe(e)}</p>
                   <p className="list-row-meta">
-                    {appName.get(e.appId) ?? "Removed app"}, {formatDateTime(e.at)}.{" "}
-                    {e.sealed ? `Sealed in ${formatSealPeriod(e.hour, log.periodSeconds)}.` : `Will be sealed after ${formatDateTime(sealsAt(e))}.`}
+                    {appName.get(e.appId) ?? "Removed app"}, {formatDateTime(e.at)}.
+                    {e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
                   </p>
                   {check && "ok" in check ? (
                     check.ok ? (
                       <p className="small log-verified" data-testid="verified">
-                        Verified: this entry is part of seal {shortHash(check.root, 8)}.
+                        Verified: part of the seal for {formatSealPeriod(check.hour, log.periodSeconds)}, root {shortHash(check.root, 8)}.
                       </p>
                     ) : (
                       <p className="small log-unverified">Not verified: {check.reason}</p>

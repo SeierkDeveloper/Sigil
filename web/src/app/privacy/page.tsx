@@ -27,7 +27,7 @@ const stored: [string, string, string][] = [
 export default function Privacy() {
   return (
     <div className="page">
-      <div className="container">
+      <div className="container container-narrow">
         <PageHeader
           eyebrow="Privacy"
           title="Privacy notice"

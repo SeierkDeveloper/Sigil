@@ -13,7 +13,7 @@ const LAST_UPDATED = "19 November 2026";
 export default function Terms() {
   return (
     <div className="page">
-      <div className="container">
+      <div className="container container-narrow">
         <PageHeader eyebrow="Terms" title="Terms of use" lead="Short and plain. By using Sigil you agree to these terms." />
         <div className="prose">
           <p className="meta">Last updated {LAST_UPDATED}</p>

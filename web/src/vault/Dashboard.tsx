@@ -64,6 +64,20 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
     };
   }, [api, vault]);
 
+  // The encrypted size comes from the server; refresh it whenever the contents change.
+  const memories = data?.memories;
+  useEffect(() => {
+    if (!memories) return;
+    let alive = true;
+    api
+      .get<ops.VaultData["usage"]>("usage")
+      .then((usage) => alive && setData((d) => (d && (d.usage.bytes !== usage.bytes || d.usage.memories !== usage.memories) ? { ...d, usage } : d)))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [api, memories]);
+
   const goTo = useCallback((t: TabId) => {
     setTab(t);
     window.history.replaceState(null, "", `#${t}`);

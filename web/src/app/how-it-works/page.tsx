@@ -130,7 +130,7 @@ const onlyYouSee = [
 export default function HowItWorks() {
   return (
     <div className="page">
-      <div className="container">
+      <div className="container container-narrow">
         <PageHeader
           eyebrow="How it works"
           title="Your memory, your keys, your rules"

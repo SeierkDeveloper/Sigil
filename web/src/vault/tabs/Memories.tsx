@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { search, type Memory } from "@sigil/core";
 import { PlusIcon, SearchIcon, ImportIcon } from "@/components/icons";
 import { formatDate, formatDateTime } from "@/lib/format";
@@ -158,6 +158,12 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+
+  // On narrow screens the editor sits below the list; bring it into view when it opens.
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 900px)").matches) form.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const tagList = tags
     .split(",")
@@ -199,7 +205,7 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
   };
 
   return (
-    <form className="editor" onSubmit={save} aria-label={memory ? "Edit memory" : "New memory"}>
+    <form ref={form} className="editor" onSubmit={save} aria-label={memory ? "Edit memory" : "New memory"}>
       {error ? <Notice kind="error">{error}</Notice> : null}
       <div className="field">
         <label className="field-label" htmlFor="m-title">

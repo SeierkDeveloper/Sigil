@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function Security() {
   return (
     <div className="page">
-      <div className="container">
+      <div className="container container-narrow">
         <PageHeader
           eyebrow="Security and privacy"
           title="Built so that we cannot read your vault"

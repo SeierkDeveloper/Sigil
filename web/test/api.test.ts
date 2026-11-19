@@ -166,6 +166,9 @@ describe("memories", () => {
     expect(saved).toHaveLength(450);
     expect(progress).toEqual([200, 400, 450]);
     expect((await ops.loadVault(b.api, vault)).memories).toHaveLength(450);
+    const usage = await b.api.get<{ memories: number; bytes: number }>("usage");
+    expect(usage.memories).toBe(450);
+    expect(usage.bytes).toBeGreaterThan(450 * 100);
   });
 
   it("keeps accounts apart", async () => {

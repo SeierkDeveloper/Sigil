@@ -73,6 +73,11 @@ describe("folders and memories", () => {
     expect((await openFolder(vk, { ...stored, meta })).name).toBe("New");
   });
 
+  it("snippets read cleanly for imported conversations", () => {
+    expect(makeSnippet("### You\n\nWhich vegetables grow in shade?\n\n### ChatGPT\n\n```\nplant('kale')\n```")).toBe("You: Which vegetables grow in shade? ChatGPT: plant('kale')");
+    expect(makeSnippet("## Heading\nText")).toBe("Heading Text");
+  });
+
   it("snippets and tags are bounded", () => {
     expect(makeSnippet("a ".repeat(500)).length).toBeLessThanOrEqual(240);
     expect(cleanTags(Array.from({ length: 50 }, (_, i) => `t${i}`))).toHaveLength(32);

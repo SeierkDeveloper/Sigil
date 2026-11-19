@@ -295,6 +295,8 @@ route("GET", "vault", (ctx) => {
   });
 });
 
+route("GET", "usage", (ctx) => json(vaultUsage(ctx.db, userOf(ctx))));
+
 route("POST", "folders", async (ctx) => {
   const userId = userOf(ctx);
   createFolder(ctx.db, userId, parse(folderShape, await readJson(ctx.req, 16 * KB)));

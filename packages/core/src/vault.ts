@@ -89,7 +89,13 @@ export const MAX_TAGS = 32;
 export const MAX_TAG_LENGTH = 48;
 
 export function makeSnippet(body: string): string {
-  const flat = body.replace(/\s+/g, " ").trim();
+  const flat = body
+    // "### You" speaker headings from imports read better as "You:".
+    .replace(/^#{1,6}[ \t]+(You|ChatGPT|Claude)[ \t]*$/gm, "$1:")
+    .replace(/^#{1,6}[ \t]+/gm, "")
+    .replace(/^```.*$/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return flat.length > SNIPPET_LENGTH ? `${flat.slice(0, SNIPPET_LENGTH - 1).trimEnd()}…` : flat;
 }
 
