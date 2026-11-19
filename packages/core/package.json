@@ -1,0 +1,25 @@
+{
+  "name": "@sigil/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sigil client-side cryptography, Merkle seals, search and import parsers.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "@scure/bip39": "^2.4.0",
+    "fflate": "^0.8.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1",
+    "@types/node": "^26.6.6",
+    "viem": "^2.58.1"
+  }
+}

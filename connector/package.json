@@ -1,0 +1,28 @@
+{
+  "name": "sigil-connector",
+  "version": "0.1.0",
+  "description": "Lets Claude, ChatGPT, Cursor and other MCP clients search and read your Sigil vault, with the permissions you grant. Decrypts on your machine.",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "sigil-connector": "dist/index.js"
+  },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@sigil/core": "*",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}

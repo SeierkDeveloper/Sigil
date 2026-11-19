@@ -1,0 +1,19 @@
+{
+  "name": "@sigil/e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "screenshots": "node --experimental-strip-types screenshots.ts"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "@playwright/test": "^1.65.1",
+    "@sigil/core": "*",
+    "@types/node": "^26.6.6",
+    "fflate": "^0.8.3",
+    "typescript": "^5.9.3",
+    "viem": "^2.58.1"
+  }
+}
