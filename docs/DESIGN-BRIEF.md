@@ -4,8 +4,8 @@ Everything the visual design pass has to style. The product works and every page
 
 ## Ground rules
 
-- **Look:** black, with silver and white details. Near-black backgrounds, white type, silver as the only accent (fine lines, an engraved or etched feel, subtle metallic gradients on key marks). A seal motif fits the name. No colour accents beyond black, silver, white and greys, including for errors and success.
-- **Hero motion:** something that feels like a seal being formed or engraved (canvas or WebGL is fine), calm, smooth, not busy. It lives in `web/src/components/SealMark.tsx`, with the static drawing kept as the fallback. Respect `prefers-reduced-motion` with a still frame.
+- **Look:** black, with silver and white details. Near-black backgrounds, white type, silver as the only accent (fine lines, subtle metallic gradients on the few surfaces that matter). No colour accents beyond black, silver, white and greys, including for errors and success.
+- **Hero piece:** calm, specific to what Sigil does, never a badge. No coins, medallions, stars, rim lettering, woven bands, glowing orbs or node webs. It lives in `web/src/components/hero/`. Respect `prefers-reduced-motion` with a still frame, cap frame work and stop off screen.
 - **Chrome stays:** full-width header with the logo top left, section nav, GitHub and X icons top right and the Open vault button; a footer. No left sidebar.
 - **Copy stays:** do not add em dashes, emoji, or labels such as "demo" or "sample". `web/test/content.test.ts` checks this.
 - **Logo:** `web/src/components/Logo.tsx` renders the text wordmark. When the logo file exists, set `logoSrc` in `web/src/lib/site.ts`; nothing else changes.
@@ -17,7 +17,7 @@ Everything the visual design pass has to style. The product works and every page
 - Fonts are self-hosted and exposed as `--font-sans`, `--font-display`, `--font-mono`. Self-host any new font (the content security policy blocks third-party font hosts) via `next/font/local` or files in `web/public`.
 - The CSP in `web/next.config.ts` allows only same-origin scripts, styles, images and fonts. Inline styles are allowed.
 - Icons are inline SVG in `web/src/components/icons.tsx` and use `currentColor`. Brand marks (Claude, ChatGPT, Cursor, MCP, GitHub, X) are their official monochrome shapes.
-- Screenshots of the current state: `docs/screenshots/` (`<page>-<desktop|phone>-<top|middle|bottom>.png`, `vault-<state>-<desktop|phone>-*.png`). Regenerate with `npx playwright test -c playwright.shots.config.ts` in `e2e/` after `npm run build`.
+- Screenshots of the current state: `docs/screenshots/` (`<page>-<desktop|phone>-<top|middle|bottom>.png`, `vault-<state>-<desktop|phone>-*.png`, `hero-<a|b|c>-*.png`). Regenerate with `npx playwright test -c playwright.shots.config.ts` in `e2e/` after `npm run build`.
 
 ## Site chrome
 
@@ -52,7 +52,7 @@ Everything the visual design pass has to style. The product works and every page
 
 | Route | File | Sections and notes |
 | --- | --- | --- |
-| `/` | `app/page.tsx` | `.hero` (`.hero-inner`, `.hero-title`, `.hero-lead`, `.hero-actions`, `.hero-visual` for the motion piece); `.works-with` row of AI apps; three promises (`.grid-3` of `.card`); four steps (`.steps`, `.step`); permissions split with the app permission illustration (`.split`, `.permission-card`, `.permission-item[data-allowed]`, `.checklist`); import and seal cards (`.grid-2`); roadmap teaser; final `.cta-band` |
+| `/` | `app/page.tsx` | `.hero` (`.hero-inner`, `.hero-title`, `.hero-lead`, `.hero-actions`, `.hero-visual[data-hero]` for the hero piece); `.works-with` row of AI apps; three promises (`.grid-3` of `.card`); four steps (`.steps`, `.step`); permissions split with the app permission illustration (`.split`, `.permission-card`, `.permission-item[data-allowed]`, `.checklist`); import and seal cards (`.grid-2`); roadmap teaser; final `.cta-band` |
 | `/how-it-works` | `app/how-it-works/page.tsx` | seven numbered prose sections; "Who can see what" two cards |
 | `/security` | `app/security/page.tsx` | table of contents chips; prose sections; live "Latest seals" list (all four states of `SealList`) |
 | `/docs` | `app/docs/page.tsx` | table of contents; eleven doc sections with code blocks and tables; the connector section switches between "build from source" and `npx` with `site.connectorPublished` |
@@ -96,11 +96,15 @@ All files in `web/src/vault/`. The wrapper is `.vault[data-phase]` with phases `
 
 ## The design as built
 
-- **Direction:** black, silver and white. Hairlines, the double ring of a seal around icons and numbers, a small diamond as the mark between things, and brushed metal only on the primary button, the selected tab or switch and the built stages of the roadmap.
+- **Direction:** black, silver and white. Hairlines, a double ring around icons and numbers, a small diamond as the mark between things, and brushed metal only on the primary button, the selected tab or switch and the built stages of the roadmap.
 - **Fonts (self-hosted in `web/src/fonts`, loaded with `next/font/local` in `app/layout.tsx`):** Bodoni Moda for display (`--font-display`, with `--display-cut` setting a sturdier optical size), Instrument Sans for text (`--font-sans`), DM Mono for labels, numbers and code (`--font-mono`). All three are under the SIL Open Font License; the licence texts sit next to the files.
-- **Hero motion:** `components/SealMark.tsx`. The seal is drawn once on a 2D canvas (rings, the legend, 120 hour marks, a woven band, the seven-pointed mark) and used as a height map in one small WebGL shader: a dark brushed disc, lines cut in order over about seven seconds, then a slow lean, a moving light and inner bands that turn at their own pace while the legend rests upright. Capped at 30 frames a second, paused off screen and in hidden tabs, one finished frame with reduced motion, and the still SVG when WebGL is missing.
+- **Hero piece:** `components/hero/`. Three directions are kept side by side for review; `HeroVisual.tsx` picks one from the address (`/?hero=a`, `/?hero=b`, `/?hero=c`) and `DEFAULT_HERO` there sets the one shown without it (now B). Once one is chosen, delete the other two files and their block in `globals.css`.
+  - **A, the vault at work** (`HeroFilm.tsx`, `.film-*`): the vault's own interface as a short film in five captioned steps. An app is given two of four folders, lists them, reads one memory (ciphertext turns to plain text), both reads land in the log, and the hour closes into one fingerprint. A timer moves the step; every movement is a CSS transition.
+  - **B, one vault, four readers** (`HeroViews.tsx`, `.views-*`): six lines of a vault set large in the display face, shown as you, Sigil's server, Claude and Cursor get them. Lines lock into ciphertext and open again only where that reader was given the folder. It cycles on its own and the four names are buttons.
+  - **C, the block** (`HeroSlab.tsx`, `.slab-*`): one block of polished black marble with a single silver inlay on a dark mirror, lit by soft studio lights that drift and follow the pointer (the page scroll on touch screens). One small WebGL fragment shader, 30 frames a second at most, with a still drawing when WebGL is missing.
+  - All three stop while off screen or in a hidden tab (`hero/clock.ts`) and hold one finished frame with reduced motion. On a phone A and B sit below the headline and buttons; C sits above the headline.
 - **Other motion:** sections rise as they scroll in (only where scroll-driven animations exist), seal rows come in one after another, the Sealed badge stamps in, the primary button has a sheen on hover. All of it is off with reduced motion.
-- **Share image:** `app/opengraph-image.png` and `app/twitter-image.png` (1200 by 630), a still of the finished hero.
+- **Share image:** `app/opengraph-image.png` and `app/twitter-image.png` (1200 by 630), the default hero at rest. Regenerate with the `share image` test in `e2e/shots/screens.spec.ts`.
 - **States without colour:** errors and confirmations are white on a lighter plate with an icon and a plain label ("Error", "Done"); waiting and revoked states use dashed outlines; allowed and sealed states use a filled mark.
 
 ## Not yet designed

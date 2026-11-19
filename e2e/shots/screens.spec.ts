@@ -52,8 +52,8 @@ for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
     for (const [name, url] of PAGES) {
       await page.goto(url);
       await page.waitForLoadState("networkidle");
-      // The hero seal is engraved over a few seconds; shoot it once it is whole.
-      if (name === "home") await page.waitForTimeout(9_000);
+      // The hero piece walks through its readers; shoot it on the third, where some lines are locked.
+      if (name === "home") await page.waitForTimeout(9_500);
       await shoot(page, `${name}-${vp}`);
     }
     if (vp === "phone") {
@@ -65,25 +65,82 @@ for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
   });
 }
 
-// A few moments of the hero motion, so it can be judged from stills.
-test("hero motion frames", async ({ browser }) => {
-  const { context, page } = await newPage(browser, "desktop");
+// The three hero directions (?hero=a|b|c): desktop and phone views, a few moments
+// of the motion, and the still frame shown with reduced motion.
+const HERO_MOMENTS = {
+  a: [1000, 3600, 6200, 9300, 11300, 15000],
+  b: [1500, 3650, 6000, 8450, 11000, 16000],
+  c: [500, 1200, 2200, 6000],
+} as const;
+
+for (const hero of ["a", "b", "c"] as const) {
+  test(`hero ${hero}`, async ({ browser }) => {
+    const shot = (page: Page, name: string) => page.screenshot({ path: path.join(OUT, `hero-${hero}-${name}.png`) });
+
+    const desktop = await newPage(browser, "desktop");
+    await desktop.page.goto(`/?hero=${hero}`);
+    await desktop.page.evaluate(() => document.fonts.ready);
+    const start = Date.now();
+    let n = 0;
+    for (const at of HERO_MOMENTS[hero]) {
+      await desktop.page.waitForTimeout(Math.max(0, at - (Date.now() - start)));
+      await shot(desktop.page, `frame-${++n}`);
+    }
+    if (hero === "c") {
+      // The light follows the pointer.
+      for (const [x, y] of [[260, 300], [1380, 640]]) {
+        await desktop.page.mouse.move(x, y, { steps: 12 });
+        await desktop.page.waitForTimeout(2600);
+        await shot(desktop.page, `frame-${++n}`);
+      }
+    }
+    await desktop.context.close();
+
+    // The settled view at both sizes: reduced motion holds each piece on its telling frame.
+    for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
+      const { width, height, ...rest } = VIEWPORTS[vp];
+      const context = await browser.newContext({ viewport: { width, height }, ...rest, reducedMotion: hero === "c" ? "no-preference" : "reduce" });
+      const page = await context.newPage();
+      await page.goto(`/?hero=${hero}`);
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(hero === "c" ? 6000 : 1200);
+      await shot(page, vp);
+      if (vp === "phone" && hero !== "c") {
+        await page.evaluate(() => {
+          const top = document.querySelector(".hero-visual")!.getBoundingClientRect().top + window.scrollY;
+          window.scrollTo({ top: top - 84, behavior: "instant" as ScrollBehavior });
+        });
+        await page.waitForTimeout(400);
+        await shot(page, "phone-piece");
+      }
+      await context.close();
+    }
+
+    const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+    const stillPage = await still.newPage();
+    await stillPage.goto(`/?hero=${hero}`);
+    await stillPage.evaluate(() => document.fonts.ready);
+    await stillPage.waitForTimeout(1500);
+    await shot(stillPage, "reduced-motion");
+    await still.close();
+  });
+}
+
+// The share image: the hero at rest, 1200 by 630.
+test("share image", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1, reducedMotion: "reduce" });
+  const page = await context.newPage();
   await page.goto("/");
-  await page.locator('.seal[data-live="true"]').waitFor();
-  const start = Date.now();
-  const moments = [600, 1800, 3000, 4400, 6000, 8000, 12000, 16500];
-  for (const [i, at] of moments.entries()) {
-    await page.waitForTimeout(Math.max(0, at - (Date.now() - start)));
-    await page.screenshot({ path: path.join(OUT, `hero-${String(i + 1).padStart(2, "0")}.png`) });
-  }
+  await page.evaluate(() => document.fonts.ready);
+  await page.addStyleTag({
+    content: `html { zoom: 0.84; } .site-header, .hero-actions, .works-with, .skip-link { display: none !important; }
+      .hero { min-height: 750px !important; padding: 0 !important; } main > :not(.hero) { display: none !important; }`,
+  });
+  await page.waitForTimeout(1200);
+  const app = path.join(ROOT, "web/src/app");
+  await page.screenshot({ path: path.join(app, "opengraph-image.png"), clip: { x: 0, y: 0, width: 1200, height: 630 } });
+  await page.screenshot({ path: path.join(app, "twitter-image.png"), clip: { x: 0, y: 0, width: 1200, height: 630 } });
   await context.close();
-  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
-  const stillPage = await still.newPage();
-  await stillPage.goto("/");
-  await stillPage.locator('.seal[data-live="true"]').waitFor();
-  await stillPage.waitForTimeout(500);
-  await stillPage.screenshot({ path: path.join(OUT, "hero-reduced-motion.png") });
-  await still.close();
 });
 
 test("vault states", async ({ browser, baseURL }) => {

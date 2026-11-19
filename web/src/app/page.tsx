@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AppMakers } from "@/components/AppMakers";
-import { SealMark } from "@/components/SealMark";
+import { HeroVisual } from "@/components/hero/HeroVisual";
 import { ArrowIcon, CheckIcon, ClaudeIcon, EyeIcon, ImportIcon, LockIcon, SealIcon } from "@/components/icons";
 
 const promises = [
@@ -51,9 +51,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <div className="hero-visual">
-            <SealMark />
-          </div>
+          <HeroVisual />
         </div>
       </section>
 
