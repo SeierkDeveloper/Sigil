@@ -1,0 +1,65 @@
+import { openDb, type Db } from "../src/server/db";
+import { handleApi } from "../src/server/api";
+import { createApi, type Api, type Fetcher } from "../src/vault/api";
+import { resetRateLimits } from "../src/server/http";
+
+export const ORIGIN = "http://localhost:3000";
+
+export interface Harness {
+  db: Db;
+  /** A browser: keeps its own cookie, records every body it sends. */
+  browser(): Browser;
+  /** Raw request into the router. */
+  raw(method: string, path: string, init?: { body?: unknown; headers?: Record<string, string> }): Promise<Response>;
+  sent: string[];
+}
+
+export interface Browser {
+  api: Api;
+  cookie(): string | null;
+}
+
+export function harness(): Harness {
+  resetRateLimits();
+  const db = openDb(":memory:");
+  const sent: string[] = [];
+
+  const raw: Harness["raw"] = async (method, path, init = {}) => {
+    const body = init.body === undefined ? undefined : typeof init.body === "string" ? init.body : JSON.stringify(init.body);
+    if (body) sent.push(body);
+    const req = new Request(`${ORIGIN}/api/${path}`, { method, body, headers: init.headers });
+    return handleApi(req, path.split("?")[0].split("/"), db);
+  };
+
+  const browser = (): Browser => {
+    let cookie: string | null = null;
+    const fetcher: Fetcher = async (input, init = {}) => {
+      const url = new URL(input, ORIGIN);
+      const headers = new Headers(init.headers);
+      headers.set("origin", ORIGIN);
+      if (cookie) headers.set("cookie", `sigil_session=${cookie}`);
+      if (typeof init.body === "string") sent.push(init.body);
+      const req = new Request(url, { method: init.method, headers, body: init.body as string | undefined });
+      const res = await handleApi(req, url.pathname.replace(/^\/api\//, "").split("/"), db);
+      const setCookie = res.headers.get("set-cookie");
+      if (setCookie) {
+        const m = /sigil_session=([^;]*)/.exec(setCookie);
+        cookie = m && m[1] ? decodeURIComponent(m[1]) : null;
+      }
+      return res;
+    };
+    return { api: createApi(fetcher, ORIGIN), cookie: () => cookie };
+  };
+
+  return { db, browser, raw, sent };
+}
+
+/** Every text value stored in the database, for checking that no plaintext was written. */
+export function dumpDb(db: Db): string {
+  const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]).map((t) => t.name);
+  return tables.map((t) => JSON.stringify(db.prepare(`SELECT * FROM ${t}`).all())).join("\n");
+}
+
+export function count(db: Db, sql: string, ...params: (string | number)[]): number {
+  return Number((db.prepare(sql).get(...params) as { n: number }).n);
+}
