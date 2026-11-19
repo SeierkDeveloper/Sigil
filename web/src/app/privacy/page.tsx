@@ -1,0 +1,153 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
+import { site } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Privacy",
+  description: "What Sigil stores, what it cannot read, how deletion and export work, and your rights under the GDPR.",
+};
+
+const LAST_UPDATED = "19 November 2026";
+
+const stored: [string, string, string][] = [
+  ["Account", "A random account id and when it was created.", "Readable"],
+  ["Passkey sign-in", "The passkey's credential id, public key and signature counter.", "Readable"],
+  ["Wallet sign-in", "Your wallet address, so your vault can be found when you sign in.", "Readable"],
+  ["Sign-in tokens", "SHA-256 hashes of tokens made on your device. They cannot be turned back into the tokens or your keys.", "Hashed"],
+  ["Vault key copies", "Your vault key, locked with your passkey, wallet or recovery phrase.", "Encrypted"],
+  ["Sessions", "A hash of your session cookie and when it expires (30 days).", "Hashed"],
+  ["Folders", "Folder ids, encrypted names, encrypted folder keys, created and changed times.", "Encrypted, with readable ids and times"],
+  ["Memories", "Memory ids, which folder each is in, encrypted content, size, created and changed times.", "Encrypted, with readable ids, sizes and times"],
+  ["Connected apps", "App ids, encrypted names, encrypted app secrets, a hash of each app token, which folders each app may read, and when it was created, last used or revoked.", "Encrypted and hashed, with readable ids and times"],
+  ["Read log", "For every request by a connected app: which app, what kind of read, which memory id, how many items, when, and a random salt.", "Readable to the server"],
+  ["Seals", "One Merkle root per hour and the salted leaves it is made of. They contain no readable personal data.", "Hashes"],
+];
+
+export default function Privacy() {
+  return (
+    <div className="page">
+      <div className="container">
+        <PageHeader
+          eyebrow="Privacy"
+          title="Privacy notice"
+          lead="Sigil is built so that it cannot read what you keep in your vault. This notice lists exactly what it does store, why, and what you can do about it."
+        />
+        <div className="prose">
+          <p className="meta">Last updated {LAST_UPDATED}</p>
+
+          <h2>The short version</h2>
+          <ul>
+            <li>Everything you write, import or name in your vault is encrypted on your device before it is sent. Sigil stores ciphertext.</li>
+            <li>Sigil does store some metadata in readable form, listed in full below, because the service cannot work without it.</li>
+            <li>No analytics, no advertising, no tracking, no third-party scripts, and one cookie that keeps you signed in.</li>
+            <li>You can export everything and delete everything at any time, from your vault.</li>
+          </ul>
+
+          <h2>What is stored</h2>
+        </div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>What</th>
+                <th>Details</th>
+                <th>Form</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stored.map(([what, details, form]) => (
+                <tr key={what}>
+                  <td>{what}</td>
+                  <td>{details}</td>
+                  <td>{form}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="prose">
+          <p>
+            <strong>Never stored or seen by Sigil:</strong> your vault key, folder keys, app keys, recovery phrase, passkey PRF output, wallet
+            signatures, the titles, bodies and tags of memories, folder and app names, and what a connected app searched for.
+          </p>
+
+          <h2>Why, and on what legal basis</h2>
+          <p>
+            Sigil processes this data to provide the service you asked for: storing your vault, signing you in, letting the apps you choose read it,
+            and showing you who read what (GDPR Article 6(1)(b), performance of a contract). Short-lived counters of request rates, kept in memory for
+            about a minute and keyed by network address, protect the service from abuse (Article 6(1)(f), legitimate interest). Sigil does not use
+            your data for anything else, does not sell it, and does not use it to train AI models.
+          </p>
+          <p>
+            You may choose to keep sensitive information in your vault, such as health details. It is encrypted on your device like everything else,
+            Sigil cannot read it, and you decide which apps may.
+          </p>
+
+          <h2>Cookies</h2>
+          <p>
+            One cookie, <code>sigil_session</code>, keeps you signed in for up to 30 days. It is strictly necessary, so no consent banner is needed.
+            Your vault key is never stored in a cookie or in your browser&apos;s storage; it lives in the page&apos;s memory while the vault is open
+            and is gone when you close or reload it.
+          </p>
+
+          <h2>Connected AI apps</h2>
+          <p>
+            When you connect an app, the Sigil connector on your computer decrypts the folders you granted and hands their text to that app. From that
+            moment, the app and its provider process that text under their own privacy policies. Sigil records the read in your log but has no control
+            over what the app does next.
+          </p>
+
+          <h2>How long it is kept</h2>
+          <ul>
+            <li>Your vault, apps and read log: until you delete them, or your account.</li>
+            <li>Sessions: 30 days, or until you sign out. Sign-in challenges: 5 minutes.</li>
+            <li>
+              Seals: permanently, as they are a public record. They are built from salted hashes; your salts are deleted with your account, after
+              which nothing in a seal can be linked to you.
+            </li>
+          </ul>
+
+          <h2>Your rights</h2>
+          <ul>
+            <li>
+              <strong>Access and portability:</strong> Export in your vault&apos;s Settings downloads everything, decrypted, as one JSON file.
+            </li>
+            <li>
+              <strong>Correction:</strong> edit any memory, folder or app in your vault.
+            </li>
+            <li>
+              <strong>Erasure:</strong> delete memories, folders, apps or your whole account in your vault. Deletion removes the data from the database
+              and overwrites it on disk.
+            </li>
+            <li>
+              <strong>Objection and restriction:</strong> revoke any app, or contact us.
+            </li>
+            <li>You can also complain to the data protection authority where you live.</li>
+          </ul>
+
+          <h2>Where the data is</h2>
+          <p>
+            The data is held by the server that runs Sigil and by its hosting provider, which may keep standard request logs of its own. Sigil itself
+            does not write network addresses to its database. Seals are not published anywhere yet; when on-chain sealing is turned on, only the hourly
+            Merkle roots will be published, never personal data.
+          </p>
+
+          <h2>Contact and changes</h2>
+          <p>
+            Questions or requests can be sent through the{" "}
+            <a href={site.xUrl} target="_blank" rel="noopener noreferrer">
+              Sigil account on X
+            </a>{" "}
+            or the{" "}
+            <a href={site.githubUrl} target="_blank" rel="noopener noreferrer">
+              repository
+            </a>
+            ; please do not post personal details publicly. If this notice changes, the date above changes with it. See also the{" "}
+            <Link href="/security">security page</Link> and the <Link href="/terms">terms</Link>.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
