@@ -1107,3 +1107,385 @@ button.score-chip[aria-expanded="true"]::after {
   font-size: var(--text-base);
 }
 
+/* ------------------------------------------------------------------ /spec: the open standard */
+
+/* The document's own facts, on one plate under the title. */
+.spec-sheet {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: calc(-1 * var(--space-6)) 0 var(--space-8);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--plate), var(--color-surface);
+}
+
+.spec-sheet > div {
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 1px solid var(--color-line);
+}
+
+.spec-sheet > div:first-child {
+  border-left: 0;
+}
+
+.spec-sheet dt {
+  margin-bottom: var(--space-1);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.spec-sheet dd {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.spec-layout {
+  grid-template-columns: 264px minmax(0, 1fr);
+  gap: var(--space-8);
+}
+
+/* Contents: the parts, each with its sections numbered as in the text. */
+.spec-aside {
+  max-height: calc(100vh - var(--header-height) - var(--space-7));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+.spec-index {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: part -1;
+}
+
+.spec-index > li {
+  counter-increment: part;
+  counter-reset: section;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.spec-index > li:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.spec-index > li > a {
+  padding: 3px 0;
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.spec-index-sub {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.spec-index-sub:empty {
+  display: none;
+}
+
+.spec-index-sub li {
+  counter-increment: section;
+}
+
+.spec-index-sub a {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr);
+  padding: 3px 0;
+  color: var(--color-text-faint);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.spec-index-sub a::before {
+  content: counter(part) "." counter(section);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.6;
+}
+
+.spec-index > li:first-child .spec-index-sub a {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.spec-index > li:first-child .spec-index-sub a::before {
+  content: none;
+}
+
+.spec-index a:hover {
+  color: var(--color-text);
+}
+
+/* The text. */
+.spec-doc {
+  max-width: 780px;
+  counter-reset: part -1;
+}
+
+.spec-part {
+  position: relative;
+  counter-increment: part;
+  counter-reset: section;
+  padding: var(--space-8) 0 var(--space-7);
+}
+
+.spec-part:first-of-type {
+  padding-top: 0;
+}
+
+/* A new part opens under a hairline that carries a short cut of ribbon. */
+.spec-part:not(:first-of-type)::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: 64px;
+  height: 9px;
+  background: var(--ruled), var(--color-bg);
+  clip-path: var(--lean);
+}
+
+.prose.spec-doc .spec-part > h2 {
+  margin-bottom: var(--space-5);
+  font-size: clamp(1.875rem, 3.2vw, 2.625rem);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  line-height: 1.08;
+  scroll-margin-top: calc(var(--header-height) + var(--space-5));
+}
+
+.spec-doc p,
+.spec-doc li {
+  font-size: var(--text-base);
+  line-height: 1.7;
+}
+
+.spec-doc h3 {
+  counter-increment: section;
+  margin: var(--space-7) 0 var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-weight: 400;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  letter-spacing: -0.005em;
+}
+
+.spec-part:not(:first-of-type) h3::before {
+  content: counter(part) "." counter(section);
+  margin-right: var(--space-3);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  vertical-align: 0.3em;
+}
+
+.spec-doc h4 {
+  margin: var(--space-6) 0 var(--space-3);
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.spec-doc :is(h3, h4) code {
+  font-size: 0.8em;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.spec-doc :is(h3, h4):target {
+  color: var(--color-text);
+}
+
+.spec-doc a {
+  color: var(--color-text);
+}
+
+/* A table scrolls inside its own frame; the page never does. */
+.spec-page .prose table {
+  display: table;
+}
+
+.spec-doc .table-wrap {
+  border-radius: var(--radius-sm);
+}
+
+.spec-doc .table th,
+.spec-doc .table td {
+  padding: var(--space-3) var(--space-4);
+}
+
+.spec-doc .table td {
+  min-width: 9rem;
+}
+
+.spec-doc .table td:first-child {
+  font-weight: 500;
+}
+
+/* Formats and examples: a dark sheet with three fine lines down its left edge. */
+.spec-doc pre.code-block-pre {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) + 7px);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--ruled-edge-faint) left top / 7px 100% no-repeat, #060606;
+  line-height: 1.65;
+}
+
+.spec-source {
+  margin: var(--space-6) 0 0;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-align: right;
+}
+
+.prose .spec-source {
+  font-size: 0.75rem;
+  color: var(--color-text-faint);
+}
+
+.spec-source a {
+  color: var(--color-text-muted);
+}
+
+.spec-page .page-links {
+  margin-top: var(--space-7);
+}
+
+@media (max-width: 1000px) {
+  .spec-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-7);
+  }
+
+  /* The contents become a plain list of the parts above the text. */
+  .spec-aside {
+    position: static;
+    display: block;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .spec-index-sub {
+    display: none;
+  }
+
+  .spec-index {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--space-5);
+  }
+
+  .spec-index > li,
+  .spec-index > li:first-child {
+    padding: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .spec-index > li:nth-child(-n + 2) {
+    border-top: 0;
+  }
+
+  .spec-index > li > a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: var(--space-2) 0;
+  }
+
+  .spec-sheet {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .spec-sheet > div:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .spec-sheet > div:nth-child(n + 3) {
+    border-top: 1px solid var(--color-line);
+  }
+}
+
+@media (max-width: 640px) {
+  .spec-sheet {
+    margin-top: calc(-1 * var(--space-5));
+    margin-bottom: var(--space-7);
+  }
+
+  .spec-sheet > div {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .spec-index {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .spec-index > li:nth-child(2) {
+    border-top: 1px solid var(--color-line);
+  }
+
+  .spec-part {
+    padding: var(--space-7) 0 var(--space-6);
+  }
+
+  .spec-doc h3 {
+    margin-top: var(--space-6);
+    font-size: 1.3125rem;
+  }
+
+  .spec-part:not(:first-of-type) h3::before {
+    display: block;
+    margin: 0 0 var(--space-1);
+    vertical-align: baseline;
+  }
+
+  .spec-doc pre.code-block-pre {
+    font-size: 0.75rem;
+  }
+
+  /* A table of two columns fits the phone; wider ones scroll inside their frame. */
+  .spec-doc .table:not(:has(th:nth-child(3))) {
+    min-width: 0;
+  }
+
+  .spec-doc .table:not(:has(th:nth-child(3))) :is(th, td) {
+    min-width: 0;
+    padding: var(--space-3);
+  }
+
+  .spec-doc .table:not(:has(th:nth-child(3))) code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .spec-source {
+    text-align: left;
+  }
+}
