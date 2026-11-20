@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { hybridSearch, sourceLabel, type MatchKind, type Memory } from "@sigil/core";
-import { PlusIcon, SearchIcon, ImportIcon } from "@/components/icons";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { hybridSearch, sourceLabel, tokenize, type MatchKind, type Memory } from "@sigil/core";
+import { DeviceIcon, PlusIcon, SearchIcon, ImportIcon } from "@/components/icons";
 import { formatDate, formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
@@ -31,6 +31,32 @@ function semanticLine(s: SemanticStatus): string {
       return "Search by words. Search by meaning is not available here.";
   }
 }
+
+const startsWithTerm = (word: string, terms: string[]) => {
+  const t = tokenize(word)[0];
+  return !!t && terms.some((term) => t.startsWith(term));
+};
+
+/** The same text with the words the search matched set apart. */
+function Marked({ text, terms }: { text: string; terms: string[] }) {
+  if (terms.length === 0) return <>{text}</>;
+  return (
+    <>
+      {text.split(/([\p{L}\p{N}]+)/u).map((part, i) => (i % 2 && startsWithTerm(part, terms) ? <mark key={i}>{part}</mark> : <Fragment key={i}>{part}</Fragment>))}
+    </>
+  );
+}
+
+/** Where the words of the search were found in a memory, in plain words. */
+function wordPlaces(m: Memory, terms: string[]): string {
+  const has = (text: string) => tokenize(text).some((t) => terms.some((term) => t.startsWith(term)));
+  const places = [has(m.title) ? "title" : "", m.tags.some(has) ? "tags" : "", has(m.body) ? "text" : ""].filter(Boolean);
+  if (places.length === 0) return "";
+  return `Words in the ${places.length <= 1 ? places.join("") : `${places.slice(0, -1).join(", ")} and ${places[places.length - 1]}`}`;
+}
+
+/** How full the closeness meter is: empty at the lowest match there is, full at the same meaning. */
+const meterWidth = (similarity: number) => `${Math.round(Math.min(1, Math.max(0.08, (similarity - 0.3) / 0.7)) * 100)}%`;
 
 export function MemoriesTab() {
   const { data, goTo, focus, semantic } = useVault();
@@ -76,6 +102,7 @@ export function MemoriesTab() {
   }, [all, folder, query, queryVector, semantic.vectors]);
 
   const current = selected && selected !== "new" ? all.find((m) => m.id === selected) ?? null : null;
+  const terms = useMemo(() => [...new Set(tokenize(query))], [query]);
 
   if (all.length === 0 && selected !== "new") {
     return (
@@ -152,7 +179,13 @@ export function MemoriesTab() {
         </button>
       </div>
       <p className="small faint search-mode" data-state={semantic.status.state}>
-        {semanticLine(semantic.status)}
+        <DeviceIcon />
+        <span>{semanticLine(semantic.status)}</span>
+        {semantic.status.state === "indexing" && semantic.status.total > 0 ? (
+          <span className="search-mode-bar" aria-hidden="true">
+            <span style={{ width: `${Math.round((semantic.status.done / semantic.status.total) * 100)}%` }} />
+          </span>
+        ) : null}
       </p>
 
       {tidy ? <Duplicates onOpen={(id) => setSelected(id)} /> : null}
@@ -167,7 +200,7 @@ export function MemoriesTab() {
                 {query.trim() ? `${results.length} found` : `${plural(results.length, "memory", "memories")}, newest first`}
               </p>
               <ul className="memory-list">
-                {results.slice(0, shown).map(({ item: m, match }) => (
+                {results.slice(0, shown).map(({ item: m, match, similarity }) => (
                   <li key={m.id}>
                     <button
                       type="button"
@@ -176,19 +209,36 @@ export function MemoriesTab() {
                       aria-current={selected === m.id ? "true" : undefined}
                       onClick={() => setSelected(m.id)}
                     >
-                      <span className="memory-item-title">{m.title}</span>
+                      <span className="memory-item-title">
+                        <Marked text={m.title} terms={match === "meaning" ? [] : terms} />
+                      </span>
                       <span className="memory-item-meta">
                         <span>{folderName.get(m.folderId)}</span>
                         <span>{formatDate(m.editedAt)}</span>
                         {m.sharedFrom ? <span className="chip">Shared by {m.sharedFrom}</span> : null}
-                        {query.trim() && match !== "words" ? <span className="chip chip-strong">{matchLabel(match)}</span> : null}
                         {m.tags.slice(0, 3).map((t) => (
                           <span key={t} className="chip">
                             {t}
                           </span>
                         ))}
                       </span>
-                      <span className="memory-item-snippet">{m.snippet}</span>
+                      <span className="memory-item-snippet">
+                        <Marked text={m.snippet} terms={match === "meaning" ? [] : terms} />
+                      </span>
+                      {terms.length ? (
+                        <span className="memory-item-why">
+                          {match !== "words" ? <span className="chip chip-strong">{matchLabel(match)}</span> : null}
+                          {match !== "meaning" && wordPlaces(m, terms) ? <span className="why-words">{wordPlaces(m, terms)}</span> : null}
+                          {match !== "words" && similarity !== null ? (
+                            <span className="why-meaning">
+                              <span className="why-meter" aria-hidden="true">
+                                <span style={{ width: meterWidth(similarity) }} />
+                              </span>
+                              Closeness {similarity.toFixed(2)}
+                            </span>
+                          ) : null}
+                        </span>
+                      ) : null}
                     </button>
                   </li>
                 ))}

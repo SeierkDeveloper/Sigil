@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { OpenFolder } from "@sigil/core";
-import { GlobeIcon } from "@/components/icons";
+import { CheckIcon, CloseIcon, FolderIcon, GlobeIcon, LockIcon } from "@/components/icons";
+import { plural } from "@/lib/format";
 import type { Api } from "./api";
 import * as ops from "./ops";
 import { errorText } from "./context";
@@ -68,7 +69,9 @@ export function Consent({ api, vault, request }: { api: Api; vault: ops.Unlocked
 
   if (!request) {
     return (
-      <div className="vault-gate consent">
+      <div className="vault-gate consent" data-state="stopped">
+        <ConsentLink />
+        <p className="eyebrow">Sign in with Sigil</p>
         <h1 className="vault-gate-title">Sign in with Sigil</h1>
         <Notice kind="error">This request is incomplete. Go back to the app and start again.</Notice>
       </div>
@@ -76,7 +79,9 @@ export function Consent({ api, vault, request }: { api: Api; vault: ops.Unlocked
   }
   if (!hasOpener) {
     return (
-      <div className="vault-gate consent">
+      <div className="vault-gate consent" data-state="stopped">
+        <ConsentLink />
+        <p className="eyebrow">Sign in with Sigil</p>
         <h1 className="vault-gate-title">Sign in with Sigil</h1>
         <Notice kind="error">Open this window from the app that asks for access. On its own it cannot hand anything to an app.</Notice>
       </div>
@@ -84,7 +89,10 @@ export function Consent({ api, vault, request }: { api: Api; vault: ops.Unlocked
   }
   if (done) {
     return (
-      <div className="vault-gate consent" data-testid="consent-done">
+      <div className="vault-gate consent" data-state={done} data-testid="consent-done">
+        <span className="consent-stamp" aria-hidden="true">
+          {done === "allowed" ? <CheckIcon /> : <CloseIcon />}
+        </span>
         <h1 className="vault-gate-title">{done === "allowed" ? `${request.name} is connected` : "Nothing was shared"}</h1>
         <p className="muted">
           {done === "allowed" ? "You can change or revoke it at any time in your vault, under Apps. You can close this window." : "You can close this window."}
@@ -129,27 +137,39 @@ export function Consent({ api, vault, request }: { api: Api; vault: ops.Unlocked
     window.setTimeout(() => window.close(), 400);
   };
 
+  const counts = new Map<string, number>();
+  for (const m of data.memories) counts.set(m.folderId, (counts.get(m.folderId) ?? 0) + 1);
+
   return (
-    <div className="vault-gate consent" aria-labelledby="consent-title">
+    <div className="vault-gate consent" data-state="asking" aria-labelledby="consent-title">
+      <ConsentLink name={request.name} active={chosen.length > 0 || suggest} />
       <p className="eyebrow">Sign in with Sigil</p>
       <h1 id="consent-title" className="vault-gate-title">
         {request.name} asks to read your vault
       </h1>
-      <p className="consent-origin">
-        <GlobeIcon /> <span className="mono">{request.origin}</span>
-      </p>
-      <p className="muted">
+      <div className="consent-who">
+        <p className="consent-who-label">The answer goes only to</p>
+        <p className="consent-origin">
+          <GlobeIcon /> <span className="mono">{request.origin}</span>
+        </p>
+      </div>
+      <p className="muted consent-lead">
         Choose what it may read. It gets its own app key that opens only those folders; it decrypts them in your browser on its page, and every read
         goes into your read log. It can never change or delete a memory.
       </p>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <fieldset className="checkbox-list">
+      <fieldset className="consent-folders">
         <legend className="field-label">Folders it may read</legend>
         {data.folders.map((f) => (
-          <label key={f.id} className="checkbox">
-            <input type="checkbox" checked={selected.has(f.id)} onChange={(e) => toggle(f, e.target.checked)} />
-            <span>{f.name}</span>
-          </label>
+          <div key={f.id} className="consent-folder" data-on={selected.has(f.id) ? "true" : "false"}>
+            <label className="checkbox">
+              <input type="checkbox" checked={selected.has(f.id)} onChange={(e) => toggle(f, e.target.checked)} />
+              <span>{f.name}</span>
+            </label>
+            <span className="consent-folder-count" aria-hidden="true">
+              <FolderIcon /> {plural(counts.get(f.id) ?? 0, "memory", "memories")}
+            </span>
+          </div>
         ))}
       </fieldset>
       {request.suggest ? (
@@ -161,8 +181,34 @@ export function Consent({ api, vault, request }: { api: Api; vault: ops.Unlocked
           </span>
         </label>
       ) : null}
+      <div className="consent-terms">
+        <ul className="consent-list" data-kind="can" aria-label="What it can do">
+          <li>
+            <CheckIcon /> {chosen.length ? `Read ${chosen.length === 1 ? chosen[0].name : `${chosen.length} folders`}` : "Read the folders you tick"}
+          </li>
+          {request.suggest ? (
+            <li data-off={suggest ? undefined : "true"}>
+              <CheckIcon /> Suggest memories, if you allow it
+            </li>
+          ) : null}
+          <li>
+            <CheckIcon /> Show up in your read log, every time
+          </li>
+        </ul>
+        <ul className="consent-list" data-kind="cannot" aria-label="What it can never do">
+          <li>
+            <CloseIcon /> Change or delete a memory
+          </li>
+          <li>
+            <CloseIcon /> Open a folder you did not tick
+          </li>
+          <li>
+            <CloseIcon /> Keep reading after you revoke it
+          </li>
+        </ul>
+      </div>
       <Notice>Only allow apps you trust: once an app has read a memory, what it does with that text is up to the app.</Notice>
-      <div className="form-actions">
+      <div className="form-actions consent-actions">
         <button type="button" className="button button-primary" onClick={() => void allow()} disabled={busy || (chosen.length === 0 && !suggest)}>
           {busy ? "Connecting" : chosen.length ? `Allow reading ${chosen.length === 1 ? chosen[0].name : `${chosen.length} folders`}` : "Allow"}
         </button>
@@ -170,6 +216,28 @@ export function Consent({ api, vault, request }: { api: Api; vault: ops.Unlocked
           Deny
         </button>
       </div>
+      <p className="consent-foot">
+        <LockIcon /> Change or revoke it at any time in your vault, under Apps.
+      </p>
+    </div>
+  );
+}
+
+/** The app on one side, your vault on the other, and the line between them. */
+function ConsentLink({ name, active = false }: { name?: string; active?: boolean }) {
+  return (
+    <div className="consent-link" data-active={active ? "true" : "false"} aria-hidden="true">
+      <span className="consent-party">
+        <span className="consent-party-mark">{name ? <span className="consent-initial">{[...name][0]?.toUpperCase()}</span> : <GlobeIcon />}</span>
+        <span className="consent-party-name">{name ?? "An app"}</span>
+      </span>
+      <span className="consent-wire" />
+      <span className="consent-party">
+        <span className="consent-party-mark consent-party-vault">
+          <LockIcon />
+        </span>
+        <span className="consent-party-name">Your vault</span>
+      </span>
     </div>
   );
 }

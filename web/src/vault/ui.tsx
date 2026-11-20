@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { CheckIcon, CopyIcon } from "@/components/icons";
 
 export function Spinner({ label }: { label: string }) {
@@ -27,6 +27,20 @@ export function Empty({ icon, title, children, action }: { icon?: React.ReactNod
       {children ? <p className="empty-state-text">{children}</p> : null}
       {action}
     </div>
+  );
+}
+
+/** A vault fingerprint in its groups of four, set to be read aloud and compared. */
+export function Fingerprint({ value, className = "" }: { value: string; className?: string }) {
+  return (
+    <span className={`fingerprint mono ${className}`.trim()}>
+      {value.split(" ").map((group, i) => (
+        <Fragment key={i}>
+          {i ? " " : null}
+          <span className="fingerprint-group">{group}</span>
+        </Fragment>
+      ))}
+    </span>
   );
 }
 

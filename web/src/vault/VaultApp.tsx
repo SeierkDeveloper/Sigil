@@ -55,7 +55,7 @@ export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) 
   }, [api]);
 
   return (
-    <div className="vault" data-phase={phase.kind}>
+    <div className="vault" data-phase={phase.kind} data-consent={consent !== undefined ? "true" : undefined}>
       <div className="container">
         {phase.kind === "checking" ? <Spinner label="Checking your session" /> : null}
         {phase.kind === "offline" ? (

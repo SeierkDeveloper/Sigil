@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { parseVaultCode, vaultFingerprint, type OpenFolder } from "@sigil/core";
-import { FolderIcon, PlusIcon, ShareIcon } from "@/components/icons";
+import { CheckIcon, FolderIcon, KeyIcon, LockIcon, PlusIcon, ShareIcon } from "@/components/icons";
 import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
-import { CopyButton, Notice } from "../ui";
+import { CopyButton, Fingerprint, Notice } from "../ui";
 
 export function FoldersTab() {
   const { api, vault, data, update, reload } = useVault();
@@ -192,7 +192,27 @@ function ShareForm({ folder, onDone }: { folder: OpenFolder; onDone(): void }) {
   };
 
   return (
-    <form className="subpanel share-form" onSubmit={submit} aria-label={`Share ${folder.name}`}>
+    <form className="subpanel share-form" onSubmit={submit} aria-label={`Share ${folder.name}`} data-code={fingerprint ? "ok" : codeError ? "bad" : "empty"}>
+      <div className="share-form-head">
+        <span className="share-form-mark" aria-hidden="true">
+          <ShareIcon />
+        </span>
+        <div>
+          <p className="share-form-title">Share {folder.name} with another vault</p>
+          <p className="share-form-lead">The folder key is sealed for their vault alone. The server passes it on and cannot open it.</p>
+        </div>
+      </div>
+      <ol className="handshake-steps" aria-hidden="true">
+        <li data-state={fingerprint ? "done" : "now"}>
+          <span>01</span> Their code
+        </li>
+        <li data-state={fingerprint && !busy ? "now" : "next"}>
+          <span>02</span> Compare fingerprints
+        </li>
+        <li data-state={busy ? "now" : "next"}>
+          <span>03</span> Key sealed for them
+        </li>
+      </ol>
       {error ? <Notice kind="error">{error}</Notice> : null}
       <div className="field">
         <label className="field-label" htmlFor={`share-code-${folder.id}`}>
@@ -212,6 +232,21 @@ function ShareForm({ folder, onDone }: { folder: OpenFolder; onDone(): void }) {
           {codeError ?? (fingerprint ? `Fingerprint ${fingerprint}. Ask them to read theirs to you; they must match.` : "They find it in their vault, under Folders.")}
         </span>
       </div>
+      {fingerprint ? (
+        <div className="handshake" aria-hidden="true">
+          <div className="handshake-side">
+            <p className="handshake-label">This code belongs to</p>
+            <Fingerprint value={fingerprint} />
+          </div>
+          <span className="handshake-link">
+            <KeyIcon />
+          </span>
+          <div className="handshake-side">
+            <p className="handshake-label">Their screen must show</p>
+            <p className="handshake-text">The same five groups, under Your vault code.</p>
+          </div>
+        </div>
+      ) : null}
       <div className="grid grid-2">
         <div className="field">
           <label className="field-label" htmlFor={`share-label-${folder.id}`}>
@@ -269,9 +304,12 @@ function FolderShares({ folder }: { folder: OpenFolder }) {
       {error ? <Notice kind="error">{error}</Notice> : null}
       <ul className="share-list" aria-label={`${folder.name} is shared with`}>
         {shares.map((s) => (
-          <li key={s.id} className="share-row" data-accepted={s.acceptedAt ? "true" : "false"}>
+          <li key={s.id} className="share-row" data-accepted={s.acceptedAt ? "true" : "false"} data-verified={s.verified ? "true" : "false"}>
+            <span className="share-row-mark" aria-hidden="true">
+              {s.acceptedAt ? <CheckIcon /> : <ShareIcon />}
+            </span>
             <span className="share-row-text">
-              <ShareIcon /> Shared with <strong>{s.label}</strong>, {s.acceptedAt ? `accepted ${formatDateTime(s.acceptedAt)}` : "waiting for them to accept"}.
+              Shared with <strong>{s.label}</strong>, {s.acceptedAt ? `accepted ${formatDateTime(s.acceptedAt)}` : "waiting for them to accept"}.
               {!s.verified ? " The server holds a different key for this share than you entered; stop sharing to be safe." : ""}
             </span>
             {confirm === s.id ? (
@@ -326,12 +364,15 @@ function SharedWithYou() {
         Shared with you
       </h3>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <ul className="list">
+      <ul className="list shared-list">
         {incoming.map((s) => (
           <li key={s.id} className="list-row shared-row" data-accepted={s.acceptedAt ? "true" : "false"}>
+            <span className="shared-row-mark" aria-hidden="true">
+              {s.acceptedAt ? <FolderIcon /> : <LockIcon />}
+            </span>
             <div className="list-row-main">
               <p className="list-row-title">
-                <ShareIcon /> {s.folder ? s.folder.name : "A folder that could not be opened"}
+                {s.folder ? s.folder.name : "A folder that could not be opened"}
                 <span className="badge">{s.acceptedAt ? "Read only" : "New"}</span>
               </p>
               <p className="list-row-meta">
@@ -376,14 +417,30 @@ function VaultCode() {
         Your vault code
       </h3>
       <p className="small muted">Give this to someone who wants to share a folder with you. It holds only your vault&apos;s public key: it lets them encrypt for you, and nothing else.</p>
-      <div className="app-key" data-testid="vault-code">
-        {code.code}
-      </div>
-      <p className="small">
-        Fingerprint <span className="mono">{code.fingerprint}</span>
-      </p>
-      <div className="form-actions">
-        <CopyButton text={code.code} label="Copy vault code" />
+      <div className="vault-code-plate">
+        <div className="vault-code-side">
+          <p className="vault-code-label">
+            <span>01</span> Send them this code
+          </p>
+          <div className="app-key" data-testid="vault-code">
+            {code.code}
+          </div>
+          <div className="form-actions">
+            <CopyButton text={code.code} label="Copy vault code" />
+          </div>
+        </div>
+        <div className="vault-code-side vault-code-print">
+          <p className="vault-code-label">
+            <span>02</span> Read them this fingerprint
+          </p>
+          <p className="vault-code-fingerprint">
+            <span className="visually-hidden">Fingerprint </span>
+            <Fingerprint value={code.fingerprint} />
+          </p>
+          <p className="small muted">
+            If their screen shows the same five groups after they paste your code, it reached them unchanged.
+          </p>
+        </div>
       </div>
     </section>
   );
