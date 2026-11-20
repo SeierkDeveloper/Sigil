@@ -179,22 +179,7 @@ for (const hero of ["a", "b", "c"] as const) {
   });
 }
 
-// The share image: the hero at rest, 1200 by 630.
-test("share image", async ({ browser }) => {
-  const context = await browser.newContext({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1, reducedMotion: "reduce" });
-  const page = await context.newPage();
-  await page.goto("/");
-  await page.evaluate(() => document.fonts.ready);
-  await page.addStyleTag({
-    content: `html { zoom: 0.84; } .site-header, .hero-actions, .works-with, .skip-link { display: none !important; }
-      .hero { min-height: 750px !important; padding: 0 !important; } main > :not(.hero) { display: none !important; }`,
-  });
-  await page.waitForTimeout(1200);
-  const app = path.join(ROOT, "web/src/app");
-  await page.screenshot({ path: path.join(app, "opengraph-image.png"), clip: { x: 0, y: 0, width: 1200, height: 630 } });
-  await page.screenshot({ path: path.join(app, "twitter-image.png"), clip: { x: 0, y: 0, width: 1200, height: 630 } });
-  await context.close();
-});
+// The share image is not a screenshot: web/scripts/share-image.mjs draws it.
 
 test("vault states", async ({ browser, baseURL }) => {
   test.setTimeout(900_000);
