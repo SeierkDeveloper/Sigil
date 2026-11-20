@@ -26,7 +26,11 @@ const FILE = path.join(SPEC, "vectors.json");
 
 if (process.env.SIGIL_WRITE_VECTORS === "1") {
   it("writes the vectors", async () => {
-    writeFileSync(FILE, `${JSON.stringify({ format: "sigil-spec-vectors", version: SPEC_VERSION, input: INPUT, deterministic: await deterministic(), sealed: await sealed() }, null, 2)}\n`);
+    // Sealed vectors carry a fresh nonce, so making them again would change them: the ones already published are kept as they are.
+    const before = existsSync(FILE) ? (JSON.parse(readFileSync(FILE, "utf8")) as { sealed?: Record<string, unknown> }).sealed ?? {} : {};
+    const fresh = (await sealed()) as Record<string, unknown>;
+    const kept = Object.fromEntries(Object.keys(fresh).map((k) => [k, before[k] ?? fresh[k]]));
+    writeFileSync(FILE, `${JSON.stringify({ format: "sigil-spec-vectors", version: SPEC_VERSION, input: INPUT, deterministic: await deterministic(), sealed: kept }, null, 2)}\n`);
   });
 } else {
   describe("the open standard's test vectors", () => {

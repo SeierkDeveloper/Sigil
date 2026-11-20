@@ -56,6 +56,8 @@ export const AAD = {
   draft: (draftId: string) => `sigil:draft:${draftId}`,
   disclosure: (disclosureId: string) => `sigil:disclosure:${disclosureId}`,
   agreementOwner: (agreementId: string) => `sigil:agreement:${agreementId}`,
+  backupApp: (appId: string) => `sigil:backup-app:${appId}`,
+  captureNote: (captureId: string) => `sigil:capture-note:${captureId}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */

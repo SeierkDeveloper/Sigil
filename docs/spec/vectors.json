@@ -1,6 +1,6 @@
 {
   "format": "sigil-spec-vectors",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "input": {
     "vaultKey": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
     "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
@@ -343,6 +343,69 @@
       "agreementOwner": "sigil:agreement:agreement-01",
       "emergency": "sigil:emergency:card-0000001",
       "emergencyOwner": "sigil:emergency-owner:card-0000001"
+    },
+    "vaultBundle": {
+      "canonicalBody": "{\"createdAt\":\"2026-11-20T12:00:00.000Z\",\"folders\":[{\"createdAt\":\"2026-01-01T00:00:00.000Z\",\"id\":\"folder-00001\",\"meta\":\"v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA\",\"protected\":false,\"wrappedKey\":\"v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA\"}],\"keyslots\":[{\"authHash\":\"1111111111111111111111111111111111111111111111111111111111111111\",\"kind\":\"phrase\",\"ref\":\"00000000000000000000000000000000\",\"wrappedKey\":\"v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA\"}],\"log\":[],\"madeBy\":\"vault\",\"memories\":[],\"origin\":\"https://old.example\",\"parts\":{\"apps\":[],\"askLinks\":[],\"backups\":[],\"captureKeys\":[],\"certificates\":[],\"disclosures\":[],\"drafts\":[],\"emergency\":[],\"identity\":[],\"legacy\":[],\"nodes\":[],\"packs\":[],\"proposals\":[],\"publicSelf\":[],\"sessions\":[],\"spaces\":[],\"sync\":[]},\"periodSeconds\":3600,\"settings\":{},\"vault\":{\"boxPublicKey\":\"905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA\",\"boxWrappedSecret\":\"v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA\",\"createdAt\":\"2026-01-01T00:00:00.000Z\",\"signKey\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\"}}",
+      "hash": "0x40485c1055de5d3241f5edce90c5fe8f98ea08c606a379f2914013e4b0cae7af",
+      "signature": "N39XeJksxQmYllYTVy1BFuJdlfUFJY03GKzyP0G2pzm8eDnUUM53hRQG6eYVnmudqqY2oQk8dugG2lJkA43tDg"
+    },
+    "moveStatement": {
+      "canonicalStatement": "{\"bundle\":\"0x40485c1055de5d3241f5edce90c5fe8f98ea08c606a379f2914013e4b0cae7af\",\"format\":\"sigil-move\",\"from\":\"https://old.example\",\"id\":\"move-0000001\",\"issuedAt\":\"2026-11-20T12:00:00.000Z\",\"redirectDays\":30,\"to\":\"https://new.example\",\"v\":1,\"vault\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\"}",
+      "hash": "0x06c1c19dd9cea20fc58392b2496f9be5e3d624a065f12485436424221160edbc",
+      "signature": "dnc2GFJ_Kxbht0U8_jhGGZivnJUb9hukmrf9X0rBqIP5BbkN5ROvXRRXUB7GFHUIfjAcRqAvIXfxHZk97QuBAw"
+    },
+    "restoreStatement": {
+      "origin": "https://new.example",
+      "bundle": "0x40485c1055de5d3241f5edce90c5fe8f98ea08c606a379f2914013e4b0cae7af",
+      "issuedAt": "2026-11-20T12:05:00.000Z",
+      "message": "sigil-restore-v1\nhttps://new.example\n0x40485c1055de5d3241f5edce90c5fe8f98ea08c606a379f2914013e4b0cae7af\n2026-11-20T12:05:00.000Z",
+      "signature": "yhL26iCyEyMH7gRLzHjGpj3iX4l0GpZii2suI1LOInMjDJPgdF4BZjCe9f3CAU05VW6Ykd8AXRA0E5HocQtXAg"
+    },
+    "arrival": {
+      "moveId": "move-0000001",
+      "to": "https://new.example",
+      "bundle": "0x40485c1055de5d3241f5edce90c5fe8f98ea08c606a379f2914013e4b0cae7af",
+      "at": "2026-11-20T12:06:00.000Z",
+      "message": "sigil-arrived-v1\nmove-0000001\nhttps://new.example\n0x40485c1055de5d3241f5edce90c5fe8f98ea08c606a379f2914013e4b0cae7af\n2026-11-20T12:06:00.000Z",
+      "signature": "sipPI20K3Am0SnRFu2oFi5nEggwkZ6JLTW_bmC8-gYmicjQDuCeJqnHdpIxCFjdG-J4XPOHUbuEJ9y4fKZyEAQ"
+    },
+    "captureKey": {
+      "id": "cap-00000001",
+      "secret": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "key": "sigil_cap.cap-00000001.AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw",
+      "token": "nMb7h7BXuBp95G6dGb0qPi8KO66tquw9gx31M9WNIng",
+      "vaultPublicKey": "905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA",
+      "tag": "75b24947b77c8dfeead7a83c32c4729ee299f0edfa460da81252f907c0a08862"
+    },
+    "sessionToken": {
+      "secret": "AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw",
+      "token": "EVVg5lkEzUrv_xCiwzDtPaUdODRhqDibdwYTh-JOqWU"
+    },
+    "backupKey": {
+      "secret": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "key": "0a8fda530f11d2da20774af5ef511a3dfe24edf5cc64a49614eda94e403019d0"
+    },
+    "arweaveItem": {
+      "tags": [
+        {
+          "name": "Content-Type",
+          "value": "application/octet-stream"
+        },
+        {
+          "name": "App-Name",
+          "value": "Sigil"
+        }
+      ],
+      "serializedTags": "0418436f6e74656e742d54797065306170706c69636174696f6e2f6f637465742d73747265616d104170702d4e616d650a536967696c00",
+      "deepHashOfAbc": "71115a30152ebcffb6defbb643abc8ef76f01fe323f1d62340646085960f6e347cb2d8e9a46ddee655b3012c6131d4e0",
+      "deepHashOfList": "9f278255d2108736fbcd24b030a08c84bda932560777bbc25af5bf4b79157c20cd79443ecc7ee5f27c8abe8fb20ca10f"
+    },
+    "contexts": {
+      "backupApp": "sigil:backup-app:app-0000001",
+      "captureNote": "sigil:capture-note:cap-00000001",
+      "backupRun": "backup-run:run-00000001",
+      "sessionIntake": "session-intake:self-0000001:booking-00001",
+      "sessionTurn": "session-turn:booking-00001:1"
     }
   },
   "sealed": {

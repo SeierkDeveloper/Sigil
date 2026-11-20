@@ -38,8 +38,14 @@ For an answer of an AI self (`ask`, `public`) the entry also carries a note: the
 | `emergency` | A step of the emergency card (appId the card's id): `published`, `changed`, `reissued`, `revoked`, `opened` (part 9) |
 | `agreement` | A step of an agreement (appId the agreement's id), in both parties' logs: `proposed-<id>`, `declined-<id>`, `withdrawn-<id>`, and, once both signed, the agreement's hex32 hash with count 2 (part 10) |
 | `pack` | A step of a knowledge pack (appId the pack's id): `published-<version>` with the number of memories, `withdrawn`, and in a follower's log `followed-<version>`, `updated-<version>`, `unfollowed-<version>` (part 10) |
+| `backup` | A bundle of the vault was made and stored (appId `vault`, or the connector's app id); memoryId is the bundle's hex32 hash, count the number of places it went to (part 11) |
+| `node` | A step of restoring or moving the vault (appId `vault`, or the new node's origin for steps the old node takes for it): `restored-<hash>`, `move-signed-<move id>`, `move-cancelled-<move id>`, `bundle-sent-<move id>`, `arrived-<move id>`, `moved-<move id>`, `confirmed-<move id>` (part 11) |
+| `capture` | A capture key (appId its id) sent something to the inbox (memoryId the proposal's id), or was made (`key-made`) or revoked (`key-revoked`) (part 12) |
+| `session` | A step of a session with the public AI self (appId the public self's id): `booked-<booking>`, `turn-<booking>-<n>` with the sources cited and a sealed note, `ended-<booking>`, `blocked-<booking>` (part 12) |
 
-A vault that joins a team space, by making it or by accepting it, writes `space` with appId `vault` and memoryId `joined-<space id>`; a proof of membership rests on that entry.
+A vault that joins a team space, by making it or by accepting it, writes `space` with appId `vault` and memoryId `joined-<space id>`; a proof of membership rests on that entry. An heir who becomes a member of a shared memory writes `heir-<space id>` (part 12).
+
+An entry that came with a bundle from another node (part 11) keeps its id, salt, leaf and hour, and carries the proof it was sealed with on that node. It is not sealed again.
 
 ## The leaf
 

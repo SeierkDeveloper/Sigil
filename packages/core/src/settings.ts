@@ -10,10 +10,12 @@ import { AAD } from "./keys";
  * thinking  how the vault thinks             work      what the AI self holds for approval and how it learns
  * identity  the AI self's identity choices   wallet    the draft rules of its wallet
  * packs     the knowledge packs this vault follows
+ * backup    where the vault's bundles are stored, with the owner's storage tokens, and how often
+ * voice     whether the test chat listens and speaks
  */
-export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs";
+export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs" | "backup" | "voice";
 
-export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs"];
+export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs", "backup", "voice"];
 
 export function isSettingName(value: string): value is SettingName {
   return (SETTING_NAMES as readonly string[]).includes(value);
