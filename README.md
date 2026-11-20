@@ -36,7 +36,7 @@ Every AI app keeps its own memory of you, locked inside that app, readable by th
 - **Memory that thinks.** A weekly brief, memories that disagree, every duplicate group merged at once, and expiry dates with real deletion.
 - **Bring your history.** Import ChatGPT, Claude, Obsidian, Apple Notes, Gmail and Google Calendar, Notion and GitHub. Parsed and encrypted in the browser, with no app approvals.
 - **Legacy.** Name the people who receive your vault, the folders each gets and whether they may talk to your AI self. A legacy key is split in your browser and each share sealed to one person; they open it together, only after you have been away for the period you chose.
-- **Your phone and every device.** Install it like an app, add a device by QR code with the vault key sealed to that device only, revoke it, and capture text, links and photos into your inbox from the share sheet.
+- **Your phone and every device.** Install it like an app, add a device by QR code with the vault key sealed to that device only, revoke it, and capture text, links and photos into your inbox (from the share sheet on Android, from the capture screen anywhere).
 - **Agents get their own memory.** Agent vaults for Cursor, Claude Code and any MCP client: their own folder, read and write rules, remember, recall, forget and handoff notes, and team spaces shared by vaults and agents.
 - **Proof of a real life.** A certificate that your vault has months of continuous sealed history, checked in any browser against the seals, without a word of what is in it.
 - **Real delete.** Delete a memory, a folder or the whole account, and it is gone. Export everything, decrypted on your device, at any time.
@@ -354,7 +354,7 @@ sequenceDiagram
 - **Installable.** A web app manifest with icons from the mark, a service worker with an offline app shell, and a share target. Optionally an encrypted copy of the vault on the device (ciphertext and the locked vault key for the way you signed in there), readable offline.
 - **Add a device by QR code.** The new device makes a one-time X25519 key and shows it as a QR code (a link to `/vault/pair#...`) and a ten-character code made from the key. The signed-in device scans it, or the phone's camera opens it, or you type the code; it checks the key against the code, both screens show the same fingerprint, and it sends the vault key and a fresh device secret sealed to the one-time key through a relay that keeps the box ten minutes.
 - **Devices and revoke.** Each device has its own key slot. Revoke deletes it and ends its sessions at once; the device forgets its key the next time it reaches Sigil.
-- **Quick capture.** `/capture` and the share sheet seal text, a link or a photo on the phone to your vault's public key (checked against the key the device pinned) and put it in your inbox, without unlocking. Photos are shrunk on the device and kept inside the memory's encrypted body. Offline, captures wait sealed on the device.
+- **Quick capture.** `/capture`, and on Android the share sheet once installed, seal text, a link or a photo on the phone to your vault's public key (checked against the key the device pinned) and put it in your inbox, without unlocking. Photos are shrunk on the device and kept inside the memory's encrypted body. Offline, captures wait sealed on the device.
 
 ## Agents get their own memory
 

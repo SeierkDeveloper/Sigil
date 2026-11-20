@@ -31,7 +31,7 @@ export const releases: Release[] = [
       "An installable app with icons from the mark, an offline app shell and, when you turn it on, an encrypted copy of the vault to read offline",
       "Add a device: a one-time key and a QR code on the new device, a code made from its key, a fingerprint on both screens, and the vault key sent sealed through a relay that keeps it ten minutes",
       "A device list with revoke: the key slot and every session of that device end at once, and it forgets its key the next time it reaches Sigil",
-      "Quick capture and the share sheet: text, a link or a photo sealed on the phone to your vault's public key, without unlocking, queued while offline",
+      "Quick capture, and the share sheet on Android: text, a link or a photo sealed on the phone to your vault's public key, without unlocking, queued while offline",
       "Photos kept inside a memory's encrypted body, and every vault screen laid out for a 375 pixel phone",
     ],
   },

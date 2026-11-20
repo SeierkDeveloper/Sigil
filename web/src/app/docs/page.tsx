@@ -561,7 +561,7 @@ export default function Docs() {
             <h2>Phone and devices</h2>
             <p>
               Sigil installs as an app on a phone or a computer: in Safari use Share, Add to Home Screen; in Chrome use Install. The app shell
-              works offline, and once installed Sigil appears in the phone&apos;s share sheet.
+              works offline. Installed on Android, Sigil also appears in the share sheet; Safari on iPhone does not offer that to web apps, so there the capture screen is the way in.
             </p>
             <h3>Add a device by QR code</h3>
             <ol>

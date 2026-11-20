@@ -167,7 +167,7 @@ export function DevicesTab() {
         ) : null}
         <p className="small muted">
           <PhoneIcon /> On a phone, add Sigil to your home screen from the browser&apos;s share menu. It then opens like an app, works offline with the copy above, and shows up
-          in the share sheet so text, links and photos go straight to your inbox. Or use <Link href="/capture">quick capture</Link>.
+          on Android in the share sheet, so text, links and photos go straight to your inbox. On any phone, use <Link href="/capture">quick capture</Link>.
         </p>
       </section>
     </div>
