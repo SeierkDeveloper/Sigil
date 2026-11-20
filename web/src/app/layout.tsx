@@ -7,6 +7,7 @@ import { Motion, MOTION_BOOT } from "@/components/backdrop/Motion";
 import { site } from "@/lib/site";
 import { InstallWorker } from "@/components/InstallWorker";
 import "./globals.css";
+import "./identity.css";
 
 // Self-hosted faces (the content security policy allows no third-party font hosts).
 const display = localFont({

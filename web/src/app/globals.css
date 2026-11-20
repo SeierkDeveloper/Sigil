@@ -1,16 +1,18 @@
 /*
   Sigil site styles.
 
-  Black, silver and white. Everything is driven by the tokens in :root, and
-  every component uses the semantic class names listed in docs/DESIGN-BRIEF.md.
-  Motifs: fine silver hairlines, the double ring of a seal, a small diamond as
-  the mark between things, brushed metal on the few surfaces that matter.
+  White on neutral black, as in the logo. Everything is driven by the tokens in
+  :root, and every component uses the semantic class names listed in
+  docs/DESIGN-BRIEF.md. Motifs: fine hairlines, the double ring of a seal, a
+  small diamond on the line between steps, a white plate on the few surfaces
+  that matter. The logo's own line language is in identity.css, loaded after
+  this file.
 */
 
 /* ------------------------------------------------------------------ tokens */
 
 :root {
-  /* colour: black, greys, silver, white only */
+  /* colour: neutral black, greys and white only, every grey with equal red, green and blue */
   --color-bg: #040404;
   --color-surface: #080808;
   --color-surface-2: #0d0d0d;
@@ -30,8 +32,8 @@
   --color-overlay: rgba(0, 0, 0, 0.6);
 
   /* metal */
-  --metal: linear-gradient(180deg, #fdfdfd 0%, #d9d9d9 42%, #a9a9a9 100%);
-  --metal-hover: linear-gradient(180deg, #ffffff 0%, #ececec 42%, #c2c2c2 100%);
+  --metal: linear-gradient(180deg, #ffffff 0%, #ececec 50%, #cdcdcd 100%);
+  --metal-hover: linear-gradient(180deg, #ffffff 0%, #f8f8f8 50%, #e4e4e4 100%);
   --metal-text: linear-gradient(100deg, #ffffff 0%, #b4b4b4 38%, #f3f3f3 62%, #9a9a9a 100%);
   --hairline-fade: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26) 22%, rgba(255, 255, 255, 0.26) 78%, transparent);
   --plate: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
@@ -207,7 +209,7 @@ svg {
 }
 
 :focus-visible {
-  outline: 1px solid var(--color-focus);
+  outline: 3px double var(--color-focus);
   outline-offset: 3px;
 }
 
@@ -1743,7 +1745,7 @@ a.button:hover svg:last-child {
 }
 
 .views-tab:focus-visible {
-  outline: 1px solid var(--color-focus);
+  outline: 3px double var(--color-focus);
   outline-offset: 4px;
 }
 
@@ -4383,7 +4385,7 @@ input[type="search"]::-webkit-search-cancel-button {
 
 /*
   The ground behind every page (components/backdrop). Layered dark tones, the
-  engraved ciphertext and its drifting light on a canvas, two etched rules at
+  engraved ribbons and their drifting light on a canvas, two etched rules at
   the edges of the content, film grain and a vignette. Nothing here takes
   pointer events, and the type above it keeps its full contrast.
 */
@@ -10726,7 +10728,7 @@ body:has(.vault[data-consent]) .site-header-inner {
 }
 
 .import-source:has(input:focus-visible) {
-  outline: 1px solid var(--color-focus);
+  outline: 3px double var(--color-focus);
   outline-offset: 2px;
 }
 
