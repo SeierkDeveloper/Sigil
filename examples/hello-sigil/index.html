@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello Sigil</title>
+    <style>
+      :root { color-scheme: light; }
+      body { max-width: 640px; margin: 48px auto; padding: 0 16px; font: 16px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: #18181b; background: #fafafa; }
+      h1 { margin-bottom: 4px; }
+      label { display: block; margin: 16px 0 4px; font-weight: 600; }
+      input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #d4d4d8; border-radius: 6px; font: inherit; box-sizing: border-box; }
+      button { min-height: 40px; margin-top: 12px; padding: 0 16px; border: 1px solid #18181b; border-radius: 6px; background: #18181b; color: #fff; font: inherit; cursor: pointer; }
+      button.quiet { background: transparent; color: #18181b; }
+      .muted { color: #71717a; }
+      ul { padding-left: 20px; }
+      li { margin: 6px 0; }
+      pre { white-space: pre-wrap; padding: 12px; border: 1px solid #e4e4e7; border-radius: 6px; background: #fff; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <h1>Hello Sigil</h1>
+    <p class="muted">A tiny web app that asks for read access to your Sigil vault. What you allow is decrypted here, in this tab.</p>
+
+    <section id="signed-out">
+      <label for="vault">Address of your Sigil site</label>
+      <input id="vault" type="url" value="http://localhost:3000" />
+      <button type="button" id="connect">Sign in with Sigil</button>
+    </section>
+
+    <section id="signed-in" hidden>
+      <p id="who"></p>
+      <h2>Folders you shared</h2>
+      <ul id="folders"></ul>
+      <label for="query">Search them</label>
+      <input id="query" type="search" placeholder="Words to look for" />
+      <ul id="results"></ul>
+      <pre id="memory" hidden></pre>
+      <button type="button" class="quiet" id="disconnect">Forget the key in this tab</button>
+    </section>
+
+    <p id="status" role="status" class="muted"></p>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

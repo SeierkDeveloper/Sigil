@@ -1,0 +1,28 @@
+{
+  "name": "@sigil/sdk",
+  "version": "0.1.0",
+  "description": "Sign in with Sigil: let people give your web app read access to chosen folders of their Sigil vault, decrypted in their browser.",
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/sigil.js",
+  "module": "dist/sigil.js",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/sigil.js"
+    }
+  },
+  "files": ["dist", "src", "README.md"],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@sigil/core": "*",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}
