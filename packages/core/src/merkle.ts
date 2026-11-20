@@ -70,7 +70,10 @@ export const fromHex32 = (hex: string) => {
 
 // ---------------------------------------------------------------- read log leaves
 
-export type ReadKind = "folders" | "index" | "read";
+/** What an entry records: an app listing folders, reading the index or a memory, suggesting a memory, or another vault opening a shared folder. */
+export type ReadKind = "folders" | "index" | "read" | "propose" | "shared";
+
+export const READ_KINDS: readonly ReadKind[] = ["folders", "index", "read", "propose", "shared"];
 
 export interface ReadEntryFields {
   id: string;

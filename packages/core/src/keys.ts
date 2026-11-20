@@ -8,9 +8,12 @@
 //     wraps each folder key (32 random bytes per folder)
 //       folder key encrypts that folder's name and every memory in it
 //       folder key is also wrapped for each app the folder is shared with
+//     wraps the vault's X25519 box key (see box.ts), whose public half lets
+//       apps, the browser extension and other vaults seal data to this vault
 //   app secret (32 random bytes per connected app, shown to the user once)
 //     -> app auth token (the server keeps only its SHA-256)
 //     -> app wrap key (unwraps the folder keys granted to that app)
+//     -> app tag key (lets the app check the vault public key it is given)
 
 import { sha256 } from "@noble/hashes/sha2.js";
 import { generateMnemonic, mnemonicToEntropy, validateMnemonic } from "@scure/bip39";
@@ -29,6 +32,8 @@ export const AAD = {
   appMeta: (appId: string) => `sigil:app-meta:${appId}`,
   appSecret: (appId: string) => `sigil:app-secret:${appId}`,
   appFolderKey: (appId: string, folderId: string) => `sigil:app-folder-key:${appId}:${folderId}`,
+  shareNote: (shareId: string) => `sigil:share-note:${shareId}`,
+  embedding: (model: string, key: string) => `sigil:embedding:${model}:${key}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */

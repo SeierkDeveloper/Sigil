@@ -1,0 +1,17 @@
+{
+  "model": "sigil/tiny-embedder",
+  "dims": 16,
+  "noise": 0.15,
+  "concepts": {
+    "vehicle": ["car", "cars", "automobile", "vehicle", "truck", "drive", "driving", "garage", "brakes"],
+    "food": ["pasta", "recipe", "recipes", "cooking", "dinner", "food", "kitchen", "meal", "tomatoes", "basil", "bread"],
+    "pet": ["dog", "puppy", "pet", "cat", "kitten", "vet"],
+    "travel": ["trip", "travel", "flight", "flew", "vacation", "holiday", "journey", "rome", "paris"],
+    "health": ["doctor", "medication", "medicine", "pills", "health", "allergy", "allergic", "penicillin"],
+    "work": ["launch", "project", "meeting", "deadline", "work", "office", "plan"],
+    "music": ["guitar", "music", "song", "piano"],
+    "garden": ["garden", "vegetables", "plants", "shade", "flowers"],
+    "sailing": ["sail", "sailing", "boat", "sea"]
+  },
+  "stop": ["the", "a", "an", "my", "for", "and", "of", "to", "in", "on", "is", "i", "we", "it", "at", "with", "about", "what", "which"]
+}

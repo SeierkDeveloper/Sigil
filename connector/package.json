@@ -7,15 +7,22 @@
   "bin": {
     "sigil-connector": "dist/index.js"
   },
-  "files": ["dist", "README.md"],
-  "engines": { "node": ">=20" },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "node build.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@huggingface/tokenizers": "^0.2.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
+    "onnxruntime-web": "^1.31.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

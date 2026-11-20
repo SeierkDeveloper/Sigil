@@ -5,12 +5,31 @@
 import { decryptBytes, decryptJson, encryptBytes, encryptJson, importKey, randomBytes, randomId } from "./crypto";
 import { AAD, appKeys, formatAppKey, newAppSecret, tokenHash } from "./keys";
 
-export type SourceKind = "note" | "chatgpt" | "claude";
+/**
+ * Where a memory came from: written in the vault, imported from an export,
+ * suggested by a connected app and approved, saved from a web page with the
+ * browser extension, or the Self card.
+ */
+export type SourceKind = "note" | "chatgpt" | "claude" | "app" | "web" | "profile";
 
 export interface MemorySource {
   kind: SourceKind;
-  /** Where it came from in the original export, for example a conversation id. */
+  /** Where it came from: a conversation id for imports, the app's name for suggestions, the address for web pages. */
   ref?: string;
+}
+
+export const SOURCE_LABELS: Record<SourceKind, string> = {
+  note: "Written in Sigil",
+  chatgpt: "Imported from ChatGPT",
+  claude: "Imported from Claude",
+  app: "Suggested by an app",
+  web: "Saved from the web",
+  profile: "Self card",
+};
+
+export function sourceLabel(source: MemorySource): string {
+  if (source.kind === "app" && source.ref) return `Suggested by ${source.ref}`;
+  return SOURCE_LABELS[source.kind] ?? "Saved";
 }
 
 export interface MemoryHead {
@@ -65,11 +84,15 @@ export interface StoredApp {
   grants: StoredGrant[];
 }
 
+export type FolderKind = "profile";
+
 export interface FolderMeta {
   name: string;
+  /** "profile" marks the folder that holds the Self card. Encrypted like the name, so the server cannot tell. */
+  kind?: FolderKind;
 }
 
-export type AppKind = "claude-desktop" | "cursor" | "chatgpt" | "other";
+export type AppKind = "claude-desktop" | "cursor" | "chatgpt" | "other" | "extension" | "web";
 
 export interface AppMeta {
   name: string;
@@ -81,6 +104,7 @@ export interface OpenFolder {
   name: string;
   key: CryptoKey;
   raw: Uint8Array;
+  kind?: FolderKind;
 }
 
 export const SNIPPET_LENGTH = 240;
@@ -115,16 +139,26 @@ export async function vaultCryptoKey(vaultKey: Uint8Array): Promise<CryptoKey> {
 
 // ---------------------------------------------------------------- folders
 
-export async function createFolder(vaultKey: CryptoKey, name: string, id = randomId()): Promise<{ stored: StoredFolder; folder: OpenFolder }> {
+function folderMeta(name: string, kind?: FolderKind): FolderMeta {
+  const clean = name.trim().slice(0, 120) || "Untitled";
+  return kind ? { name: clean, kind } : { name: clean };
+}
+
+export async function createFolder(
+  vaultKey: CryptoKey,
+  name: string,
+  id = randomId(),
+  kind?: FolderKind,
+): Promise<{ stored: StoredFolder; folder: OpenFolder }> {
   const raw = randomBytes(32);
   const key = await importKey(raw);
-  const clean = name.trim().slice(0, 120) || "Untitled";
+  const meta = folderMeta(name, kind);
   const stored: StoredFolder = {
     id,
-    meta: await encryptJson(key, { name: clean } satisfies FolderMeta, AAD.folderMeta(id)),
+    meta: await encryptJson(key, meta, AAD.folderMeta(id)),
     wrappedKey: await encryptBytes(vaultKey, raw, AAD.folderKey(id)),
   };
-  return { stored, folder: { id, name: clean, key, raw } };
+  return { stored, folder: { id, name: meta.name, key, raw, ...(kind ? { kind } : {}) } };
 }
 
 export async function openFolder(vaultKey: CryptoKey, stored: StoredFolder): Promise<OpenFolder> {
@@ -135,11 +169,12 @@ export async function openFolder(vaultKey: CryptoKey, stored: StoredFolder): Pro
 export async function openFolderWithRaw(stored: Pick<StoredFolder, "id" | "meta">, raw: Uint8Array): Promise<OpenFolder> {
   const key = await importKey(raw);
   const meta = await decryptJson<FolderMeta>(key, stored.meta, AAD.folderMeta(stored.id));
-  return { id: stored.id, name: meta.name, key, raw };
+  return { id: stored.id, name: meta.name, key, raw, ...(meta.kind === "profile" ? { kind: meta.kind } : {}) };
 }
 
-export async function renameFolder(folder: OpenFolder, name: string): Promise<string> {
-  return encryptJson(folder.key, { name: name.trim().slice(0, 120) || "Untitled" } satisfies FolderMeta, AAD.folderMeta(folder.id));
+/** The folder's name (and kind) encrypted under its own key. Renaming keeps the kind. */
+export async function renameFolder(folder: Pick<OpenFolder, "id" | "key" | "kind">, name: string): Promise<string> {
+  return encryptJson(folder.key, folderMeta(name, folder.kind), AAD.folderMeta(folder.id));
 }
 
 // ---------------------------------------------------------------- memories
@@ -236,4 +271,53 @@ export async function openAppSecret(vaultKey: CryptoKey, app: Pick<StoredApp, "i
 /** Used by the connector: turns a grant back into the folder key with the app's own secret. */
 export async function openGrant(appId: string, wrapKey: CryptoKey, grant: StoredGrant): Promise<Uint8Array> {
   return decryptBytes(wrapKey, grant.wrappedKey, AAD.appFolderKey(appId, grant.folderId));
+}
+
+// ---------------------------------------------------------------- the Self card
+
+/** The Self card lives alone in its own folder, so it can be granted to apps like any folder. */
+export const PROFILE_FOLDER_NAME = "Self card";
+export const PROFILE_TITLE = "Self card";
+
+export interface ProfileSections {
+  who: string;
+  answers: string;
+  projects: string;
+}
+
+export const PROFILE_HEADINGS: Record<keyof ProfileSections, string> = {
+  who: "Who I am",
+  answers: "How I like answers",
+  projects: "Current projects",
+};
+
+export const PROFILE_LIMIT = 4000;
+
+export function buildProfileBody(sections: ProfileSections): string {
+  return (Object.keys(PROFILE_HEADINGS) as (keyof ProfileSections)[])
+    .map((k) => `## ${PROFILE_HEADINGS[k]}\n\n${sections[k].trim().slice(0, PROFILE_LIMIT)}`)
+    .join("\n\n");
+}
+
+/** Reads the three sections back out of a Self card body. Text outside them goes to "Who I am". */
+export function parseProfileBody(body: string): ProfileSections {
+  const out: ProfileSections = { who: "", answers: "", projects: "" };
+  const byHeading = new Map(Object.entries(PROFILE_HEADINGS).map(([k, v]) => [v.toLowerCase(), k as keyof ProfileSections]));
+  let current: keyof ProfileSections = "who";
+  const lines: Record<keyof ProfileSections, string[]> = { who: [], answers: [], projects: [] };
+  for (const line of body.split("\n")) {
+    const m = /^##\s+(.+?)\s*$/.exec(line);
+    const key = m ? byHeading.get(m[1].toLowerCase()) : undefined;
+    if (key) {
+      current = key;
+      continue;
+    }
+    lines[current].push(line);
+  }
+  for (const k of Object.keys(out) as (keyof ProfileSections)[]) out[k] = lines[k].join("\n").trim();
+  return out;
+}
+
+export function isProfileMemory(m: Pick<MemoryHead, "source">): boolean {
+  return m.source.kind === "profile";
 }
