@@ -42,8 +42,9 @@ if (process.env.SIGIL_WRITE_VECTORS === "1") {
     });
 
     it("match what the code computes, value for value", async () => {
-      const now = JSON.parse(JSON.stringify(await deterministic()));
-      for (const key of Object.keys(now)) expect(vectors.deterministic[key as keyof typeof now], key).toEqual(now[key]);
+      const now = JSON.parse(JSON.stringify(await deterministic())) as Record<string, unknown>;
+      const stored = vectors.deterministic as unknown as Record<string, unknown>;
+      for (const key of Object.keys(now)) expect(stored[key], key).toEqual(now[key]);
       expect(Object.keys(vectors.deterministic).sort()).toEqual(Object.keys(now).sort());
     });
 
