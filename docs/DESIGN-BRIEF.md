@@ -4,16 +4,17 @@ Everything the visual design pass has to style. The product works and every page
 
 ## Ground rules
 
-- **Look:** black, with silver and white details. Near-black backgrounds, white type, silver as the only accent (fine lines, subtle metallic gradients on the few surfaces that matter). No colour accents beyond black, silver, white and greys, including for errors and success.
-- **Hero piece:** calm, specific to what Sigil does, never a badge. No coins, medallions, stars, rim lettering, woven bands, glowing orbs or node webs. It lives in `web/src/components/hero/`. Respect `prefers-reduced-motion` with a still frame, cap frame work and stop off screen.
+- **Look:** the logo sets it. Pure white on neutral black, with neutral greys between them: no warm tint, no blue tint, no colour accents, including for errors and success. Every grey has equal red, green and blue.
+- **Line language:** the logo is an S drawn as a folded ribbon of many fine parallel lines with angled cuts at its ends. The site uses the same three things and nothing else as ornament: bundles of fine parallel lines, the angled cut (a parallelogram, or a plate with its top left and bottom right corners cut), and one bend of a ribbon. It should feel engraved and precise, never busy: one such detail per component at most. See "The identity" below.
+- **Hero piece:** calm, specific to what Sigil does, never a badge. No coins, medallions, stars, rim lettering, woven bands, glowing orbs, node webs or circuit lines. It lives in `web/src/components/hero/`. Respect `prefers-reduced-motion` with a still frame, cap frame work and stop off screen.
 - **Chrome stays:** full-width header with the logo top left, four grouped menus (Product, Trust, Developers, Vision), GitHub and X icons top right and the Open vault button; a footer with the same four groups. No left sidebar. The menus, the phone menu and the footer all read `navGroups` in `web/src/lib/site.ts`: add a page there and it appears in all three.
 - **Copy stays:** do not add em dashes, emoji, or labels such as "demo" or "sample". `web/test/content.test.ts` checks this.
-- **Logo:** `web/src/components/Logo.tsx` renders the text wordmark. When the logo file exists, set `logoSrc` in `web/src/lib/site.ts`; nothing else changes.
-- **Phone first-class:** 390 px wide with a 16 px gutter, no horizontal scroll, 44 px touch targets, inputs at 16 px or more (no iOS zoom).
+- **Logo:** the one source is `web/brand/sigil-logo.png`. `web/scripts/icons.mjs` makes `web/public/logo.png` (the mark on a clear ground), the favicon and the app icons from it. `web/src/components/Logo.tsx` shows the mark alone in the header (40 px, 36 px on a phone) and the mark with the name in the footer (48 px). Never redraw the mark, tint it or set it on anything but black.
+- **Phone first-class:** 375 to 390 px wide with a 16 px gutter, no horizontal scroll, 44 px touch targets, inputs at 16 px or more (no iOS zoom).
 
 ## Where styling lives
 
-- One stylesheet: `web/src/app/globals.css`. Tokens are on `:root` (colour, type, space, radius, container, header height, shadow). Restyle tokens first.
+- Two stylesheets. `web/src/app/globals.css` holds the tokens on `:root` (colour, type, space, radius, container, header height, shadow) and every component. `web/src/app/identity.css` loads after it and holds the logo's line language: the `--ruled`, `--lean`, `--chamfer` and `--ribbon` tokens and the rules that apply them. Restyle tokens first.
 - Fonts are self-hosted and exposed as `--font-sans`, `--font-display`, `--font-mono`. Self-host any new font (the content security policy blocks third-party font hosts) via `next/font/local` or files in `web/public`.
 - The CSP in `web/next.config.ts` allows only same-origin scripts, styles, images and fonts. Inline styles are allowed.
 - Icons are inline SVG in `web/src/components/icons.tsx` and use `currentColor`. Brand marks (Claude, ChatGPT, Cursor, MCP, GitHub, X) are their official monochrome shapes.
@@ -25,7 +26,7 @@ Everything the visual design pass has to style. The product works and every page
 | --- | --- | --- | --- |
 | Header | `components/Header.tsx` | `.site-header`, `.site-header-inner`, `.site-brand`, `.site-nav`, `.site-nav-group[data-open]`, `.site-nav-link` (a button, `[data-current]` when one of its pages is open), `.site-nav-chevron`, `.nav-panel` (`.nav-panel-head`, `.nav-panel-label`, `.nav-panel-lead`, `.nav-panel-list`, `.nav-panel-link`, `.nav-panel-title`, `.nav-panel-text`), `.site-actions`, `.icon-link`, `.site-cta`, `.site-menu-button` | sticky; a menu opens on hover, click or keyboard and closes on Escape, outside click or navigation; phone (at 820 px and below) hides the menus, shows the menu button |
 | Phone menu | same | `.site-menu`, `.site-menu-group`, `.site-menu-label`, `.site-menu-list`, `.site-menu-link`, `.site-menu-cta`; `.site-header[data-open="true"]` | open and closed; scrolls inside itself |
-| Logo | `components/Logo.tsx` | `.logo`, `.logo-word`, `.logo-image` | wordmark now, image later |
+| Logo | `components/Logo.tsx` | `.logo`, `.logo-image`, `.logo-word` | the mark alone in the header; the mark and the name in the footer |
 | Footer | `components/Footer.tsx` | `.site-footer`, `.site-footer-inner`, `.site-footer-brand`, `.site-footer-tagline`, `.site-footer-social`, `.site-footer-nav`, `.site-footer-group`, `.site-footer-label`, `.site-footer-legal`, `.site-footer-legal-links` | desktop brand plus four columns, phone two by two |
 | Page ground | `components/backdrop/Backdrop.tsx` | `.backdrop`, `.backdrop-canvas`, `.backdrop-rules`, `.backdrop-grain` | moving, and one still frame with reduced motion |
 | Skip link | `app/layout.tsx` | `.skip-link` | hidden until focused |
@@ -81,7 +82,7 @@ Everything the visual design pass has to style. The product works and every page
 | `/ask/<id>` | `app/ask/[id]/page.tsx`, `ask/AskApp.tsx` | the public page of an ask link: `.ask-page`, one sealed door `.vault-gate.ask-card[data-state="active|expired|revoked|used_up|broken"][data-online]` with `.ask-head` (the ringed `.ask-seal`, dashed when the link is not active, `.eyebrow`, `.page-title` with the AI self's name, `.page-lead` with the greeting), `.ask-status[data-online][data-state]` with `.ask-status-lamp`, the `.chat` conversation (`.chat-turn[data-status="waiting|answered|failed"]`, each answer under the name and an AI tag in `.chat-by`, a light along the top edge while waiting), `.chat-form`, and `.ask-fine`, three plain lines with icons; states: opening, link cannot be used (no key, wrong key, deleted), offline, turned off, expired, used up |
 | `/vault/authorize` | `app/vault/authorize/page.tsx`, `vault/Consent.tsx` | Sign in with Sigil. The wrapper carries `.vault[data-consent]`, which hides the menus and the footer so only the name stays. The vault gate, then `.vault-gate.consent[data-state="asking|allowed|denied|stopped"]`: `.consent-link` (the app, the wire and your vault; `[data-active]` once something is ticked), `.consent-who` with `.consent-origin`, `.consent-folders` of `.consent-folder[data-on]` with a memory count, the suggestions switch `.suggest-toggle`, `.consent-terms` (two `.consent-list`, can and never can), `.consent-actions`, `.consent-foot`; states: incomplete request, opened without an app, done (`.consent-stamp`, `data-testid="consent-done"`) |
 | 404 | `app/not-found.tsx` | |
-| favicon | `app/icon.svg` | replace with the logo mark later |
+| favicon | `app/icon.png`, `app/apple-icon.png` | made from the logo by `web/scripts/icons.mjs` |
 
 ## The vault (`/vault`)
 
@@ -129,20 +130,42 @@ All files in `web/src/vault/`. The wrapper is `.vault[data-phase]` with phases `
 
 ## The design as built
 
-- **Direction:** black, silver and white. Hairlines, a double ring around icons and numbers, a small diamond as the mark between things, and brushed metal only on the primary button, the selected tab or switch and the built stages of the roadmap.
+- **Direction:** white on neutral black, engraved. Hairlines everywhere; the logo's fine parallel lines and angled cuts where something needs a mark (see "The identity"); a double ring around icons and numbers and a small diamond on the line between steps inside the vault, where they stand for a seal. The white plate is kept for the primary button, the selected tab or switch and the built stages of the roadmap.
 - **Fonts (self-hosted in `web/src/fonts`, loaded with `next/font/local` in `app/layout.tsx`):** Bodoni Moda for display (`--font-display`, with `--display-cut` setting a sturdier optical size), Instrument Sans for text (`--font-sans`), DM Mono for labels, numbers and code (`--font-mono`). All three are under the SIL Open Font License; the licence texts sit next to the files.
 - **Hero piece:** `components/hero/`. Three directions are kept side by side for review; `HeroVisual.tsx` picks one from the address (`/?hero=a`, `/?hero=b`, `/?hero=c`) and `DEFAULT_HERO` there sets the one shown without it (now B). Once one is chosen, delete the other two files and their block in `globals.css`.
   - **A, the vault at work** (`HeroFilm.tsx`, `.film-*`): the vault's own interface as a short film in five captioned steps. An app is given two of four folders, lists them, reads one memory (ciphertext turns to plain text), both reads land in the log, and the hour closes into one fingerprint. A timer moves the step; every movement is a CSS transition.
   - **B, one vault, five readers** (`HeroViews.tsx`, `.views-*`): six lines of a vault set large in the display face, shown as you, Sigil's server, Claude, ChatGPT and Cursor get them. Lines lock into ciphertext and open again only where that reader was given the folder. It cycles on its own and the five names are buttons.
   - **C, the block** (`HeroSlab.tsx`, `.slab-*`): one block of polished black marble with a single silver inlay on a dark mirror, lit by soft studio lights that drift and follow the pointer (the page scroll on touch screens). One small WebGL fragment shader, 30 frames a second at most, with a still drawing when WebGL is missing.
   - All three stop while off screen or in a hidden tab (`hero/clock.ts`) and hold one finished frame with reduced motion. On a phone A and B sit below the headline and buttons; C sits above the headline.
-- **The page ground** (`components/backdrop/Backdrop.tsx`, behind every page): layered dark tones from charcoal to near-black, film grain, a vignette and two etched vertical rules at the edges of the content on wide screens. On top of that one 2D canvas draws rows of ciphertext engraved in the mono face. A soft light drifts slowly across the page and a second one follows the pointer; the engraving shows only where the light falls, and now and then a few characters resolve into a plain word and lock again. The engraving moves a little slower than the page when scrolling. 30 frames a second at most, stopped in a hidden tab, one finished frame with reduced motion.
-- **Other motion** (`components/backdrop/Motion.tsx` and the last blocks of `globals.css`): sections, cards and rows rise in as they enter the screen, neighbours one after another; section hairlines draw in from the middle and carry a travelling highlight; small mono labels decode from ciphertext into their words; panels carry a soft light under the pointer; the rings of the seal turn slowly as brushed metal; the apps in "Reads into" light up in turn; the footer's outlined name carries a slow sheen; counters count up; the latest seal shows the time left in the running hour. All of it hangs on `html[data-motion="on"]`, set before first paint by a small inline script only when the visitor has not asked for less motion. Without it nothing is hidden and nothing moves.
+- **The page ground** (`components/backdrop/Backdrop.tsx`, behind every page): neutral black with film grain, a vignette and two etched vertical rules at the edges of the content on wide screens. On top of that one 2D canvas draws two ribbons of 24 fine parallel lines that cross the page, lean, bend and open and close very slowly, one edge brighter than the other as in the logo. A soft light drifts slowly across the page and a second one follows the pointer; the lines show only where the light falls. The ribbons move a little slower than the page when scrolling. 30 frames a second at most (the lines are redrawn at 15 unless the page scrolls), stopped in a hidden tab, one finished frame with reduced motion.
+- **Other motion** (`components/backdrop/Motion.tsx` and the last blocks of `globals.css`): sections, cards and rows rise in as they enter the screen, neighbours one after another; section hairlines draw in from the middle and carry a travelling highlight, then the short cut of ribbon on them opens; small mono labels decode from ciphertext into their words; panels carry a soft light under the pointer; the apps in "Reads into" light up in turn; the footer's outlined name carries a slow sheen; counters count up; the latest seal shows the time left in the running hour. All of it hangs on `html[data-motion="on"]`, set before first paint by a small inline script only when the visitor has not asked for less motion. Without it nothing is hidden and nothing moves.
 - **Marks:** `vault/marks.tsx` gives every app kind and every memory source a round `.mark` with its icon (`AppMark`, `SourceMark`); the inbox, the timeline and the Self card use them.
 - **Vault motion:** a suggestion is stamped and folds away when it is decided, timeline days rise one after another, the fingerprint groups set in turn, the wire in the consent window runs until something is ticked. All of it hangs on `html[data-motion="on"]` like the rest.
 - **Live data:** `components/live/` reads the public endpoints (`/api/stats`, `/api/status`, `/api/seals`). Numbers are real; zero is shown as zero.
 - **Share image:** `app/opengraph-image.png` and `app/twitter-image.png` (1200 by 630), the default hero at rest. Regenerate with the `share image` test in `e2e/shots/screens.spec.ts`.
 - **States without colour:** errors and confirmations are white on a lighter plate with an icon and a plain label ("Error", "Done"); waiting and revoked states use dashed outlines; allowed and sealed states use a filled mark.
+
+## The identity
+
+The rules in `web/src/app/identity.css`, all drawn from the logo. Use these before inventing anything new.
+
+| Where | What | Classes |
+| --- | --- | --- |
+| Tokens | `--ruled` (a line every 2 px), `--ruled-wide` (every 6 px), `--ruled-faint` (for fills), `--lean` (a parallelogram clip, its slant set by `--cut`), `--chamfer` (top left and bottom right corners cut by `--cut`), `--ribbon` (one bend of 22 lines, an inline SVG) | `:root` |
+| Focus | two fine parallel lines (`outline: 3px double`); on the cut white plate the two lines are engraved inside the edge | `:focus-visible`, `.button-primary:focus-visible` |
+| Section divider | the hairline carries five lines with angled ends in place of the diamond | `.section::after` |
+| Labels and page headers | three lines with angled ends before a label; five under the page header rule | `.eyebrow::before`, `.page-header::after` |
+| Header | the open menu and the current page are marked by three lines on the header's edge | `.site-nav-link::after` |
+| Footer | a short bundle of lines on its top edge; the name beside the mark is plain white | `.site-footer::before`, `.logo-word` |
+| Primary button, strong badge | a white plate with its top left and bottom right corners cut | `.button-primary`, `.badge-strong` |
+| Other buttons | fill with fine lines under the pointer | `.button:hover` |
+| Cards | three short lines hatch the bottom right corner and brighten under the pointer | `.card` |
+| Inner pages and the hero | one bend of the ribbon in the top right corner, fading out | `.page::before`, `.hero::after` |
+| Hero piece | its label runs out into a bundle of lines with an angled end | `.views-label::after` |
+| Closing call, the closed vault | a wide band of lines with angled ends behind the content | `.cta-band > .container::before`, `.vault:not([data-phase="open"])::before` |
+| Empty states | a short cut of ribbon, open in the middle where the icon sits | `.empty-state-icon` |
+
+Keep it quiet: lines are 1 px, the ribbon never sits above 50 percent opacity, nothing here moves except the page ground, and a component carries one of these details, not several.
 
 ## The extension
 
@@ -158,4 +181,5 @@ All files in `web/src/vault/`. The wrapper is `.vault[data-phase]` with phases `
 
 ## Not yet designed
 
-- A logo mark for the favicon (`app/icon.svg` is unchanged; set `logoSrc` when the logo file exists).
+- The share images (`app/opengraph-image.png`, `app/twitter-image.png`) still show the hero from before the logo.
+- The extension popup and options page have the neutral colours but not yet the line details.
