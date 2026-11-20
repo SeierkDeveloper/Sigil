@@ -12,6 +12,7 @@ import {
   fromHex,
   importKey,
   meetKey,
+  openCard,
   openMeetMessage,
   openSealedJson,
   toHex,
@@ -59,6 +60,7 @@ if (process.env.SIGIL_WRITE_VECTORS === "1") {
       const peer = boxKeyPairFromSecret(fromHex(INPUT.peerSecret));
       const key = meetKey(peer, s.meetMessage.ids.from, s.meetMessage.ids.meetId);
       expect(openMeetMessage(key, s.meetMessage.ids, s.meetMessage.box)).toEqual(s.meetMessage.message);
+      expect(await openCard(fromHex(s.emergencyCard.key), s.emergencyCard.cardId, s.emergencyCard.envelope)).toEqual(s.emergencyCard.opened);
     });
 
     it("are each described in the spec", () => {

@@ -30,7 +30,30 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
   await createWithWallet(page);
   await writeMemory(page, { title: "A memory with a rather long title that has to wrap on a phone", body: "Text." });
 
-  const tabs = ["Memories", "Inbox", "AI self", "Meet", "Review", "Timeline", "Self card", "Folders", "Apps", "Agents", "Devices", "Legacy", "Proof", "Read log", "Import", "Sync", "Settings"];
+  const tabs = [
+    "Memories",
+    "Inbox",
+    "AI self",
+    "Work",
+    "Identity",
+    "Meet",
+    "Agreements",
+    "Review",
+    "Timeline",
+    "Self card",
+    "Folders",
+    "Apps",
+    "Agents",
+    "Devices",
+    "Legacy",
+    "Proof",
+    "Emergency",
+    "Packs",
+    "Read log",
+    "Import",
+    "Sync",
+    "Settings",
+  ];
   for (const name of tabs) {
     await page.getByRole("tab", { name }).click();
     await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
@@ -38,6 +61,17 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
   }
 
   // The new forms, open.
+  await page.getByRole("tab", { name: "Agreements" }).click();
+  await page.getByRole("button", { name: "Draft an agreement" }).click();
+  await noSideScroll(page, "Agreement form");
+  await page.getByRole("tab", { name: "Identity" }).click();
+  await page.getByRole("button", { name: "Make the self's key" }).click();
+  await page.getByRole("button", { name: "Add a recipient" }).click();
+  await page.getByRole("button", { name: "Add a contract" }).click();
+  await noSideScroll(page, "Identity with rules");
+  await page.getByRole("tab", { name: "Emergency" }).click();
+  await page.getByRole("button", { name: "Add a person" }).click();
+  await noSideScroll(page, "Emergency card form");
   await page.getByRole("tab", { name: "Legacy" }).click();
   await page.getByRole("button", { name: "Add by invite link" }).click();
   await noSideScroll(page, "Legacy editor");

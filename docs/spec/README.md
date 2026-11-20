@@ -1,8 +1,8 @@
 # The Sigil open standard
 
-Version 1.0.0
+Version 1.1.0
 
-This is the format a Sigil vault keeps memories in, how its keys work, what a connector may do and how it asks, what the access log records, and how the log is sealed and proved. Anyone may build a vault, a connector or a checker from it. The reference code is in this repository (`packages/core`), and the test vectors in [`vectors.json`](vectors.json) are generated from that code; `packages/core/test/spec.test.ts` checks on every test run that the code still produces them.
+This is the format a Sigil vault keeps memories in, how its keys work, what a connector may do and how it asks, what the access log records, how the log is sealed and proved, and the signed documents a vault hands out: the AI self's identity, proofs of a fact, the emergency card, agreements and knowledge packs. Anyone may build a vault, a connector or a checker from it. The reference code is in this repository (`packages/core`), and the test vectors in [`vectors.json`](vectors.json) are generated from that code; `packages/core/test/spec.test.ts` checks on every test run that the code still produces them.
 
 ## Parts
 
@@ -14,6 +14,10 @@ This is the format a Sigil vault keeps memories in, how its keys work, what a co
 | [4. The access log](04-access-log.md) | The fields of an entry, its kinds, the leaf it is sealed as, and the privacy score |
 | [5. Seals and presence](05-seals.md) | The Merkle rules, the hourly seal, the contract, presence statements |
 | [6. Certificates](06-certificates.md) | The life certificate and how it is checked |
+| [7. The AI self's identity and wallet](07-identity.md) | The self key, the identity statement, the registry and wallet contracts, wallet rules |
+| [8. Proofs of a fact](08-proofs.md) | Field commitments, the four claims, the signed statement and its sealed entry, what each claim rests on |
+| [9. The emergency card](09-emergency.md) | The card, the key in the link, what an opening records |
+| [10. Agreements and knowledge packs](10-agreements-and-packs.md) | Two signatures over one hash, amendments, signed packs and following them |
 
 ## Conventions
 
@@ -22,7 +26,7 @@ This is the format a Sigil vault keeps memories in, how its keys work, what a co
 - Strings are UTF-8. JSON inside an envelope is compact, as `JSON.stringify` writes it.
 - Times are ISO 8601 in UTC with milliseconds (`2026-11-20T10:15:00.000Z`).
 - Ids are 8 to 64 characters of `A-Z a-z 0-9 _ -`. New ids are 16 random bytes in base64url.
-- All primitives are standard: AES-256-GCM, HKDF-SHA256, SHA-256, HMAC-SHA256, X25519, Ed25519 and XChaCha20-Poly1305.
+- All primitives are standard: AES-256-GCM, HKDF-SHA256, SHA-256, HMAC-SHA256, X25519, Ed25519 and XChaCha20-Poly1305; for the AI self's identity on EVM chains, also secp256k1 ECDSA, Keccak-256, EIP-55, EIP-191 and EIP-712.
 
 ## Test vectors
 
@@ -30,4 +34,4 @@ This is the format a Sigil vault keeps memories in, how its keys work, what a co
 
 ## Versioning
 
-The version follows semantic versioning. A change that makes data written by an older version unreadable, or makes a vector change, is a new major version, and the vectors are written again (`npm run vectors -w @sigil/core`). Every format string carries its own version (`v1.`, `s1.`, `r1.`, `m1.`, `sigil-read-v1`), so old and new data can be told apart.
+The version follows semantic versioning. A change that makes data written by an older version unreadable, or makes a vector change, is a new major version, and the vectors are written again (`npm run vectors -w @sigil/core`). Every format string carries its own version (`v1.`, `s1.`, `r1.`, `m1.`, `sigil-read-v1`), so old and new data can be told apart. A change that only adds formats is a new minor version: 1.1.0 added parts 7 to 10, new access log kinds and their vectors, and left every vector of 1.0.0 as it was.

@@ -1,6 +1,6 @@
 {
   "format": "sigil-spec-vectors",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "input": {
     "vaultKey": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
     "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
@@ -194,6 +194,155 @@
           1
         ]
       ]
+    },
+    "selfKey": {
+      "vaultKey": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
+      "address": "0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923"
+    },
+    "registerDigest": {
+      "chainId": "1",
+      "registry": "0x00000000000000000000000000000000005E1F01",
+      "owner": "0x000000000000000000000000000000000000dEaD",
+      "selfKey": "0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923",
+      "metadataURI": "https://vault.example/api/identity/at/self",
+      "deadline": "1900000000",
+      "digest": "0xfbcf4ca8f5c49a225326b9578da080895e4853b0f6e005663362e7a89bda1dac",
+      "signature": "0x952cb60d8beeb3f873e33855af41b3eacf02e3695cb0df598f9df83f60faa37f56d5924dd48057d92dddf371fb1c1aa623826da74a23c09307e489e537ce291f1c"
+    },
+    "executeDigest": {
+      "chainId": "1",
+      "wallet": "0x00000000000000000000000000000000005E1F02",
+      "target": "0x2222222222222222222222222222222222222222",
+      "value": "0",
+      "data": "0x21603f430000000000000000000000000000000000000000000000000000000000000003",
+      "nonce": "0",
+      "deadline": "1900000000",
+      "digest": "0xc6231f245bff07897480b774b56fb33e839faf5b0d18d640c2dcbbc8bcafdc51",
+      "signature": "0xb320e91c2fe74ac34928316dedf20c1d74a6dab0ea4510ae72345c4f12ebe055441be50bc7d8df3a59993e4f67562888fc0ae1d3cba82939958a327dc3ab212e1b"
+    },
+    "identityStatement": {
+      "message": "sigil-self-identity-v1\n{\"about\":\"Answers questions about my work.\",\"chain\":{\"chainId\":\"1\",\"registry\":\"0x00000000000000000000000000000000005E1F01\"},\"issuedAt\":\"2026-11-20T12:00:00.000Z\",\"name\":\"Sam's AI self\",\"origin\":\"https://vault.example\",\"owner\":\"0x000000000000000000000000000000000000dEaD\",\"selfKey\":\"0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923\",\"signingKey\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\",\"wallet\":\"0x00000000000000000000000000000000005E1F02\"}",
+      "vaultSignature": "hLpvihjKkiHs4121BM_YWkuB_Ox7CNVNefmLlBNYYfy7DbAb-BlO0qMj63Pxnl6E_wvJnINGvf91WFA20qRHDg",
+      "selfSignature": "0x73076c36f6986dada712236f373fb017c207ad7ce57be4b5fe359cefb549b955261c02d47248fbc4e2a3d0a87d39340a00f8d78947994d728b1d7e72d59844151b"
+    },
+    "walletRules": {
+      "rules": {
+        "perTx": "0.05",
+        "perDay": "0.2",
+        "expiresAt": "2027-06-01T00:00:00.000Z",
+        "recipients": [
+          {
+            "address": "0x1111111111111111111111111111111111111111",
+            "label": "A friend"
+          }
+        ],
+        "contracts": [
+          {
+            "address": "0x2222222222222222222222222222222222222222",
+            "label": "A shop",
+            "functions": [
+              "order(uint256)"
+            ]
+          }
+        ],
+        "tokens": [
+          {
+            "address": "0x3333333333333333333333333333333333333333",
+            "label": "Dollar",
+            "decimals": 6,
+            "perTx": "100",
+            "perDay": "250"
+          }
+        ]
+      },
+      "hash": "0x53b47aecb36602ce9944b291a57442b808faeb6802c899f22601e078d9354139",
+      "configure": {
+        "perTxCap": "50000000000000000",
+        "perDayCap": "200000000000000000",
+        "expiresAt": "1811808000",
+        "targets": [
+          "0x1111111111111111111111111111111111111111",
+          "0x2222222222222222222222222222222222222222",
+          "0x3333333333333333333333333333333333333333"
+        ],
+        "selectors": [
+          {
+            "target": "0x2222222222222222222222222222222222222222",
+            "selector": "0x21603f43"
+          },
+          {
+            "target": "0x3333333333333333333333333333333333333333",
+            "selector": "0xa9059cbb"
+          },
+          {
+            "target": "0x3333333333333333333333333333333333333333",
+            "selector": "0x095ea7b3"
+          }
+        ],
+        "tokens": [
+          {
+            "token": "0x3333333333333333333333333333333333333333",
+            "perTx": "100000000",
+            "perDay": "250000000"
+          }
+        ]
+      },
+      "calldata": "0x0cd6806600000000000000000000000000000000000000000000000000b1a2bc2ec5000000000000000000000000000000000000000000000000000002c68af0bb140000000000000000000000000000000000000000000000000000000000006bfdff0000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000140000000000000000000000000000000000000000000000000000000000000022000000000000000000000000000000000000000000000000000000000000000030000000000000000000000001111111111111111111111111111111111111111000000000000000000000000222222222222222222222222222222222222222200000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000000000003000000000000000000000000222222222222222222222222222222222222222221603f43000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333a9059cbb000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333095ea7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000ee6b280"
+    },
+    "fieldCommitment": {
+      "fields": [
+        {
+          "name": "Title",
+          "value": "Passport"
+        },
+        {
+          "name": "Born",
+          "value": "1990-04-02"
+        },
+        {
+          "name": "Nationality",
+          "value": "Example"
+        }
+      ],
+      "salts": [
+        "0101010101010101010101010101010101010101010101010101010101010101",
+        "0202020202020202020202020202020202020202020202020202020202020202",
+        "0303030303030303030303030303030303030303030303030303030303030303"
+      ],
+      "leaves": [
+        "0x7b93d80ea6db0d99b40ba0a9b5ba8d58e3787b3d6a9bcdd29189b234745c65f5",
+        "0xaa6011feacc0f6529d34b82c318cb88af655fff57055a79e0938fe25096336c8",
+        "0x307704f65f8468c4efd7420aac1ab6044f4b4da13629728f89cc2b6501a67637"
+      ],
+      "root": "0xf748e77e41438d5330e9b4d0f8d2ab54f0170ef5a6061560d69d7dd67c4a3ef0",
+      "proofOf2": [
+        "0x148007d320ab8ab53b88284f39764eedc9050e0b75e4b0d8f69f62038abcfa2d"
+      ]
+    },
+    "disclosure": {
+      "canonicalStatement": "{\"claim\":{\"commitment\":\"0xf748e77e41438d5330e9b4d0f8d2ab54f0170ef5a6061560d69d7dd67c4a3ef0\",\"kind\":\"field\",\"opening\":{\"index\":2,\"name\":\"Nationality\",\"proof\":[\"0x148007d320ab8ab53b88284f39764eedc9050e0b75e4b0d8f69f62038abcfa2d\"],\"salt\":\"0303030303030303030303030303030303030303030303030303030303030303\",\"value\":\"Example\"}},\"issuedAt\":\"2026-11-20T12:00:00.000Z\",\"origin\":\"https://vault.example\",\"periodSeconds\":3600,\"signingKey\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\"}",
+      "hash": "0xd3c4fe8d6ba091991fee8ec52776de124a55540b84d4b57efe28911f8fd75099",
+      "signature": "w7vUCQITYb0FUiPa93PQlK6sFTPYwNOzjI0SHyp0_s7BNeH-gb15GFCGM4_UAHQ-v1Yn-sQkvlOy_vQX-K77Aw"
+    },
+    "agreement": {
+      "canonicalDoc": "{\"createdAt\":\"2026-11-20T12:00:00.000Z\",\"nonce\":\"AAECAwQFBgcICQoLDA0ODw\",\"parties\":[{\"boxKey\":\"905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA\",\"name\":\"Sam\",\"signingKey\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\"},{\"boxKey\":\"D_gSWgXKc1fGjgs_fubTMK5XqfOYw1mvnEx0qlQYS3c\",\"name\":\"Robin\",\"signingKey\":\"vog3mSLB5Lb6OMFZ0vpetDTMST0LF50bNELy4wbdHfs\"}],\"previous\":null,\"text\":\"Sam lends Robin the camera until 1 December.\",\"title\":\"The camera\",\"version\":1}",
+      "hash": "0x5c7f8f7fe08edb04dc77eb7d505f0b610c19b92d906dd65fa6f4230e8dad3ea5",
+      "signatures": [
+        "Rr6DthZHcVtCI3vPuXsU3hLMD7HQ8_BU6pRd0lz1kKtc1OCN8KzNfwQ2IVuG9GPT6IZt4Fpp_iw9863H0_ulDQ",
+        "I4svSIEa-DKr7CZlsRw0JrZ4t4iFiYpZ_1s9yzXpo3vMfroohSOIFmWZIC6K4WD_rf4ApR0o37VARTt0iJjDCw"
+      ]
+    },
+    "knowledgePack": {
+      "canonicalBody": "{\"description\":\"How I bake.\",\"id\":\"pack-0000001\",\"items\":[{\"body\":\"Feed it twice a day.\",\"id\":\"memory-00001\",\"tags\":[\"bread\"],\"title\":\"Starter\"}],\"origin\":\"https://vault.example\",\"previous\":null,\"publishedAt\":\"2026-11-20T12:00:00.000Z\",\"publisher\":{\"name\":\"Sam\",\"signingKey\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\"},\"title\":\"Bread\",\"version\":1}",
+      "hash": "0x6338c80b6bf0fb302b5146a832c7a386802d28913cbb7572480b8f89cb90667e",
+      "signature": "SX8U_WHl180z7pPk-dvt5vDJ2H3LoE8sKRPSsKWBkgokQx9OhKZVzdoFFrzyHjZyOjOnGqTsqYtZSwl0KSIsCQ"
+    },
+    "recordAad": {
+      "draft": "sigil:draft:draft-000001",
+      "disclosure": "sigil:disclosure:proof-000001",
+      "agreementOwner": "sigil:agreement:agreement-01",
+      "emergency": "sigil:emergency:card-0000001",
+      "emergencyOwner": "sigil:emergency-owner:card-0000001"
     }
   },
   "sealed": {
@@ -201,12 +350,12 @@
       "key": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
       "aad": "sigil:folder-key:folder-00001",
       "plaintextHex": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
-      "envelope": "v1.3WcRc5valYWaDxdv.8SmelYl9CYIMHTX41OPef5X3NEQDmr0MfgvSe-FYY_Qe1ZNltqVI29wQOGvFs3rV"
+      "envelope": "v1.7CMsfA4RZ_4TcIux.rm7OImCJomUF4ivsWrBDwoIM0DvOZpE5gGFZOUVwH4_gj08FouyrEKCE2PqEhxsx"
     },
     "folder": {
       "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
       "id": "folder-00001",
-      "meta": "v1.4UWnmHtXm4hsWRqr.zbcpIZs_yDaly4H5MYpT8Zto0PjJSZdM1vih_fzpoIx-FAoMjtcOikB98jLkDacKTsq5pOYQxz6JmcgOmH4n3dh7bhqqGw",
+      "meta": "v1.tYaYaSjpi703dpAd.svRxLI7uc-HBXHlNartdbJCHc8fMuauSinvJzBWccMg_1GSmKvS7ev0cShsce-Y6plpvdj5Ipu-JjOE4YykQcK0Dp2wE5w",
       "opened": {
         "name": "Notes",
         "protect": "health",
@@ -220,8 +369,8 @@
       "stored": {
         "id": "memory-00001",
         "folderId": "folder-00001",
-        "head": "v1.vGvMZaXWQ7D0NMCV.CMtEFl2h88k2iLDvoST5lIgLODSmwX-mIPTryOn8wRyRrJX9OeSWIYTBCH9p4WMLYAo4ABz_7DOmz5NDHa-BMLmzYTCFvDLFs5hqVAn_BhwG6eTk_41kcxsn2xdHxj3z2_yt59R29uNFphduHvkPEZp8z23x-tiuoLr4K0GNDYOXuy4FOoQa9HtEc4h1MwSkexGiNkwrbxgXZkcj51kKs1fWoQVFa92Wv8XXEp8KIYrUCI9NuA",
-        "body": "v1.0sGifcO6gcKh1Iyy.2GVDrl1ThMaAp70BOkxgRwUfq5D5WGzDmR9W8B83f8fDQtzZSoqhx_KPwsg"
+        "head": "v1.qBXbRI8HjzclqOfS.hzjyIl7AZdKdKiWus9f2u5v5ORrZ5f22BYBoGT-KWiczKQ33RYRQXOevv5LvAaPqi0bLTzuwPNROTJhgUhuxjkkKsawotf2QA2XwZkVa-bDt-ct7FsrH7JGSokbRVecVfMigzmVK3-J1_IpjWvpReBYqyCmEmT-uOn1wi--0G8vTJ-e7IOOCipZGsx-UJsMSHsmFMnXoIdVrFdUpzO0MljVJu3-6cy4SGdCohKHZoB2VPUl7VQ",
+        "body": "v1.lf7MAeCS37-QL9q7.Db_e8J4ZuVH1QENgIlHrSQSeDC6XsWys3_LthkBZANxuAYkYshj4BWVC-jQ"
       },
       "opened": {
         "title": "Hello",
@@ -238,7 +387,7 @@
         "v": 1,
         "title": "A suggestion"
       },
-      "sealed": "s1.4oqpi8sjotrJcd0R966kpJuwh4mYwb_pqjUHUYdfcT4.awaZr4LYIfcdaMgY2mqkGlO1w8LsOG29.Ooa791BXCY2KsR6Gnw-K0gL9-HUuqsVs23WgU9nMrdm5F1yVI1McBT-BoC5DOQ"
+      "sealed": "s1.r0ZhIM6YUM4ikLR9jEtPssyWY_3TtZrulcFNkw6j4Dw.P4qTVD2pmNc9GwE5jM1_KrMBXTBsE6e8.R7PFn7qHDojKokmcpbewrxobXhFOZtDizLkjbpBq4mQhgu9bVauLEN5y6JlHhA"
     },
     "meetMessage": {
       "ids": {
@@ -251,7 +400,30 @@
         "text": "Tuesday at 14:00?",
         "done": false
       },
-      "box": "m1.xgaps95gqFmN3z49W-M9sLLBT-Pb9x69.YuOdS48M-dYz4Ld_Q4hFir1dsfnC1a-w4GhSp-0ls1KX4ttu2PHKEkB66tjnydEu3dZeOPVqazUT0pz3Mcp7"
+      "box": "m1.Sl5rXlJAD2ad0FiEwyXoI7Fpi9JyiiMT.cK_lcsjGbC2FMnM_OtY7lUdhRDOaMIKlSZURNCxQTA0rJmYaKC5_1-SJUDABzDxrD-Q-MuPcc43ZADTL_PEZ"
+    },
+    "emergencyCard": {
+      "key": "060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8df",
+      "cardId": "card-0000001",
+      "envelope": "v1.io2-b7O0Z-63jk59.RO9-fST6A5uH-JdfjPvs8lWN8ID8_b-PwQ4jsq3qNJKrN-GU63FQOeDOarYAR9VZ56BX0lfIKrgjZCDfu-UuKQpl52x_Ok_UahJDWnOxPJAf46rJ_OvpPQI6p-yHYRn0vNDt2JsFtZlmPCjRQRmXPgyXwnnkeXNBr1UOli75GlFVFF-xj21RStftE48CchdtnX9Qotg4TNHPa5pBs1ANYGedBvmztqhTn4ene_3l1MjycIMuChMbnB7J7RYd5Vcgq6RnYy_k-Mif-Ja09j_Mab0X2rJPWFvIS4KCdH8X8DqM1xqtssa-ZC4JngCDXHN-7unk2GSndn-ipcwSHV__1s9JWQ",
+      "opened": {
+        "v": 1,
+        "name": "Sam",
+        "bloodType": "O-",
+        "allergies": "Penicillin",
+        "medication": "",
+        "conditions": "",
+        "contacts": [
+          {
+            "name": "Robin",
+            "phone": "+46 70 000 00 00",
+            "relation": "partner"
+          }
+        ],
+        "language": "English",
+        "notes": "",
+        "updatedAt": "2026-11-20T12:00:00.000Z"
+      }
     }
   }
 }

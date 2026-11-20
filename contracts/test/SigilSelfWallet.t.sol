@@ -453,6 +453,37 @@ contract SigilSelfWalletTest is Test {
         assertEq(address(wallet).balance, 101 ether);
     }
 
+    // ---------------------------------------------------------------- the shared vector
+
+    /// Same values as the executeDigest vector in docs/spec/vectors.json, made by packages/core: the
+    /// self key signs order(3) on the device, a relayer submits it, and the wallet runs it.
+    function testVectorFromTypeScript() public {
+        address at = 0x00000000000000000000000000000000005E1F02;
+        address vectorSelf = 0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923;
+        address shopAt = 0x2222222222222222222222222222222222222222;
+        vm.chainId(1);
+        deployCodeTo("SigilSelfWallet.sol:SigilSelfWallet", abi.encode(owner, vectorSelf), at);
+        deployCodeTo("SigilSelfWallet.t.sol:Shop", shopAt);
+        SigilSelfWallet w = SigilSelfWallet(payable(at));
+        bytes memory data = hex"21603f430000000000000000000000000000000000000000000000000000000000000003";
+        assertEq(w.executeDigest(shopAt, 0, data, 0, 1_900_000_000), 0xc6231f245bff07897480b774b56fb33e839faf5b0d18d640c2dcbbc8bcafdc51);
+        address[] memory targets = new address[](1);
+        targets[0] = shopAt;
+        SigilSelfWallet.SelectorRule[] memory sels = new SigilSelfWallet.SelectorRule[](1);
+        sels[0] = SigilSelfWallet.SelectorRule(shopAt, ORDER);
+        vm.prank(owner);
+        w.configure(0, 0, 0, targets, sels, new SigilSelfWallet.TokenLimit[](0));
+        vm.prank(relayer);
+        w.executeWithSig(
+            shopAt,
+            0,
+            data,
+            1_900_000_000,
+            hex"b320e91c2fe74ac34928316dedf20c1d74a6dab0ea4510ae72345c4f12ebe055441be50bc7d8df3a59993e4f67562888fc0ae1d3cba82939958a327dc3ab212e1b"
+        );
+        assertEq(Shop(shopAt).orders(), 3);
+    }
+
     // ---------------------------------------------------------------- fuzzing
 
     /// Whatever the self key tries, no single call passes the cap per transaction and no day passes the cap per day.

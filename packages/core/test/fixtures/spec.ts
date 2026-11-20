@@ -46,7 +46,54 @@ import {
   vaultSigningKey,
   walletKeys,
   REDACT_RULES,
+  agreementHash,
+  cleanAgreementDoc,
+  commitFields,
+  executeDigest,
+  fieldLeaf,
+  identityMessage,
+  merkleProof as proofOf,
+  registerDigest,
+  sealCard,
+  selfIdentityKey,
+  signAgreement,
+  signDigest,
+  signDisclosure,
+  signIdentity,
+  signPack,
+  statementHash,
+  walletConfig,
+  walletRulesHash,
+  fieldClaim,
+  EMERGENCY_AAD,
+  EMERGENCY_OWNER_AAD,
+  type WalletRules,
 } from "../../src";
+import { encodeFunctionData, parseAbi } from "viem";
+
+/** Fixed addresses for the EVM vectors; the contract tests use the same ones. */
+export const EVM = {
+  chainId: 1n,
+  registry: "0x00000000000000000000000000000000005E1F01",
+  wallet: "0x00000000000000000000000000000000005E1F02",
+  owner: "0x000000000000000000000000000000000000dEaD",
+  target: "0x1111111111111111111111111111111111111111",
+  shop: "0x2222222222222222222222222222222222222222",
+  token: "0x3333333333333333333333333333333333333333",
+};
+
+export const RULES: WalletRules = {
+  perTx: "0.05",
+  perDay: "0.2",
+  expiresAt: "2027-06-01T00:00:00.000Z",
+  recipients: [{ address: EVM.target, label: "A friend" }],
+  contracts: [{ address: EVM.shop, label: "A shop", functions: ["order(uint256)"] }],
+  tokens: [{ address: EVM.token, label: "Dollar", decimals: 6, perTx: "100", perDay: "250" }],
+};
+
+const CONFIGURE_ABI = parseAbi([
+  "function configure(uint256 perTxCap, uint256 perDayCap, uint64 expiresAt, address[] targets, (address target, bytes4 selector)[] selectors, (address token, uint128 perTx, uint128 perDay)[] tokens)",
+]);
 
 export const H = (n: number, len = 32) => Uint8Array.from({ length: len }, (_, i) => (i * 7 + n) & 0xff);
 
@@ -176,6 +223,94 @@ export async function deterministic() {
       hash: publicCopyHash([{ id: "item-000001", title: "Talks", body: "I give talks.", tags: ["work"], editedAt: "2026-11-01T00:00:00.000Z" }]),
     },
     privacyScore: { score: score.score, level: score.level, parts: score.parts.map((p) => [p.key, p.points]) },
+    ...(await versionOneOne(vault, signing)),
+  };
+}
+
+/** Added in version 1.1: the self's key and identity, wallet rules, proofs of a fact, agreements and knowledge packs. */
+async function versionOneOne(vault: Uint8Array, signing: Awaited<ReturnType<typeof vaultSigningKey>>) {
+  const self = await selfIdentityKey(vault);
+  const register = { chainId: EVM.chainId, registry: EVM.registry, owner: EVM.owner, selfKey: self.address, metadataURI: "https://vault.example/api/identity/at/self", deadline: 1_900_000_000n };
+  const registerHash = registerDigest(register);
+  const callData = encodeFunctionData({ abi: parseAbi(["function order(uint256)"]), args: [3n] });
+  const execute = { chainId: EVM.chainId, wallet: EVM.wallet, target: EVM.shop, value: 0n, data: callData, nonce: 0n, deadline: 1_900_000_000n };
+  const executeHash = executeDigest(execute);
+  const identity = signIdentity(signing, self, { name: "Sam's AI self", about: "Answers questions about my work.", owner: EVM.owner, wallet: EVM.wallet, chain: { chainId: "1", registry: EVM.registry }, origin: "https://vault.example", issuedAt: "2026-11-20T12:00:00.000Z" });
+  const cfg = walletConfig(RULES);
+  const fields = [
+    { name: "Title", value: "Passport" },
+    { name: "Born", value: "1990-04-02" },
+    { name: "Nationality", value: "Example" },
+  ];
+  const salts = ["01", "02", "03"].map((b) => b.repeat(32));
+  const commitment = commitFields(fields, salts);
+  const statement = { origin: "https://vault.example", periodSeconds: 3600, signingKey: signing.publicKey, issuedAt: "2026-11-20T12:00:00.000Z", claim: fieldClaim(commitment, 2) };
+  const disclosure = signDisclosure(signing, statement);
+  const peerSigning = await vaultSigningKey(fromHex(INPUT.peerSecret));
+  const doc = cleanAgreementDoc({
+    title: "The camera",
+    text: "Sam lends Robin the camera until 1 December.",
+    parties: [
+      { name: "Sam", boxKey: encodeBoxPublicKey(boxKeyPairFromSecret(fromHex(INPUT.boxSecret)).publicKey), signingKey: signing.publicKey },
+      { name: "Robin", boxKey: encodeBoxPublicKey(boxKeyPairFromSecret(fromHex(INPUT.peerSecret)).publicKey), signingKey: peerSigning.publicKey },
+    ],
+    version: 1,
+    previous: null,
+    nonce: "AAECAwQFBgcICQoLDA0ODw",
+    createdAt: "2026-11-20T12:00:00.000Z",
+  });
+  const hash = agreementHash(doc);
+  const pack = signPack(signing, {
+    id: "pack-0000001",
+    title: "Bread",
+    description: "How I bake.",
+    version: 1,
+    previous: null,
+    publisher: { name: "Sam" },
+    items: [{ id: "memory-00001", title: "Starter", body: "Feed it twice a day.", tags: ["bread"] }],
+    origin: "https://vault.example",
+    publishedAt: "2026-11-20T12:00:00.000Z",
+  });
+  return {
+    selfKey: { vaultKey: INPUT.vaultKey, address: self.address },
+    registerDigest: { ...register, chainId: "1", deadline: "1900000000", digest: hex32(registerHash), signature: signDigest(self.secret, registerHash) },
+    executeDigest: { ...execute, chainId: "1", value: "0", nonce: "0", deadline: "1900000000", digest: hex32(executeHash), signature: signDigest(self.secret, executeHash) },
+    identityStatement: { message: identityMessage(identity.body), vaultSignature: identity.vaultSignature, selfSignature: identity.selfSignature },
+    walletRules: {
+      rules: RULES,
+      hash: walletRulesHash(RULES),
+      configure: {
+        perTxCap: cfg.perTxCap.toString(),
+        perDayCap: cfg.perDayCap.toString(),
+        expiresAt: cfg.expiresAt.toString(),
+        targets: cfg.targets,
+        selectors: cfg.selectors,
+        tokens: cfg.tokens.map((t) => ({ token: t.token, perTx: t.perTx.toString(), perDay: t.perDay.toString() })),
+      },
+      calldata: encodeFunctionData({
+        abi: CONFIGURE_ABI,
+        functionName: "configure",
+        args: [
+          cfg.perTxCap,
+          cfg.perDayCap,
+          cfg.expiresAt,
+          cfg.targets as `0x${string}`[],
+          cfg.selectors.map((x) => ({ target: x.target as `0x${string}`, selector: x.selector as `0x${string}` })),
+          cfg.tokens.map((t) => ({ token: t.token as `0x${string}`, perTx: t.perTx, perDay: t.perDay })),
+        ],
+      }),
+    },
+    fieldCommitment: { fields, salts, leaves: commitment.openings.map((o) => hex32(fieldLeaf(o))), root: commitment.root, proofOf2: proofOf(commitment.openings.map(fieldLeaf), 2).map(hex32) },
+    disclosure: { canonicalStatement: canonicalJson(statement), hash: statementHash(statement), signature: disclosure.signature },
+    agreement: { canonicalDoc: canonicalJson(doc), hash, signatures: [signAgreement(signing, hash), signAgreement(peerSigning, hash)] },
+    knowledgePack: { canonicalBody: canonicalJson(pack.body), hash: pack.hash, signature: pack.signature },
+    recordAad: {
+      draft: AAD.draft("draft-000001"),
+      disclosure: AAD.disclosure("proof-000001"),
+      agreementOwner: AAD.agreementOwner("agreement-01"),
+      emergency: EMERGENCY_AAD("card-0000001"),
+      emergencyOwner: EMERGENCY_OWNER_AAD("card-0000001"),
+    },
   };
 }
 
@@ -199,8 +334,27 @@ export async function sealed() {
       message: { v: 1, text: "Tuesday at 14:00?", done: false },
       box: sealMeetMessage(meetKey(box, encodeBoxPublicKey(peer.publicKey), INPUT.meetId), { meetId: INPUT.meetId, turn: 1, from: encodeBoxPublicKey(box.publicKey) }, { v: 1, text: "Tuesday at 14:00?", done: false }),
     },
+    emergencyCard: {
+      key: INPUT.linkSecret,
+      cardId: "card-0000001",
+      envelope: await sealCard(fromHex(INPUT.linkSecret), "card-0000001", EMERGENCY_CARD),
+      opened: EMERGENCY_CARD,
+    },
   };
 }
+
+const EMERGENCY_CARD = {
+  v: 1 as const,
+  name: "Sam",
+  bloodType: "O-",
+  allergies: "Penicillin",
+  medication: "",
+  conditions: "",
+  contacts: [{ name: "Robin", phone: "+46 70 000 00 00", relation: "partner" }],
+  language: "English",
+  notes: "",
+  updatedAt: "2026-11-20T12:00:00.000Z",
+};
 
 export async function decryptStoredMemory(folderKeyHex: string, stored: { id: string; folderId: string; head: string; body?: string }) {
   return decryptMemory({ key: await importKey(fromHex(folderKeyHex)) }, stored);

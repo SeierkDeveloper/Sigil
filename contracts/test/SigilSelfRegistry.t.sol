@@ -188,6 +188,29 @@ contract SigilSelfRegistryTest is Test {
         assertFalse(registry.isActive(key));
     }
 
+    // ---------------------------------------------------------------- the shared vector
+
+    /// Same values as the registerDigest vector in docs/spec/vectors.json, made by packages/core: the
+    /// self key derived from the vault key of the vectors signs on the device, and the contract agrees.
+    function testVectorFromTypeScript() public {
+        address at = 0x00000000000000000000000000000000005E1F01;
+        address vectorOwner = 0x000000000000000000000000000000000000dEaD;
+        address vectorSelf = 0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923;
+        string memory uri = "https://vault.example/api/identity/at/self";
+        vm.chainId(1);
+        deployCodeTo("SigilSelfRegistry.sol:SigilSelfRegistry", at);
+        SigilSelfRegistry r = SigilSelfRegistry(at);
+        assertEq(r.registerDigest(vectorOwner, vectorSelf, uri, 1_900_000_000), 0xfbcf4ca8f5c49a225326b9578da080895e4853b0f6e005663362e7a89bda1dac);
+        vm.prank(vectorOwner);
+        r.register(
+            vectorSelf,
+            uri,
+            1_900_000_000,
+            hex"952cb60d8beeb3f873e33855af41b3eacf02e3695cb0df598f9df83f60faa37f56d5924dd48057d92dddf371fb1c1aa623826da74a23c09307e489e537ce291f1c"
+        );
+        assertEq(r.identityOf(vectorSelf).owner, vectorOwner);
+    }
+
     // ---------------------------------------------------------------- fuzzing
 
     /// Any key, any owner, any metadata: the pair registers only with the key's own signature for that owner.

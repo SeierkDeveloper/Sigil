@@ -1,13 +1,13 @@
 # 4. The access log
 
-Every request an app or agent makes, every suggestion, every time another vault opens a shared folder, every answer of an AI self, every protected read and the owner's answer to it, every step of a conversation between two selves, and every step of a legacy plan and of a device is one entry of the owner's access log.
+Every request an app or agent makes, every suggestion, every time another vault opens a shared folder, every answer of an AI self, every protected read and the owner's answer to it, every step of a conversation between two selves, every step of a legacy plan and of a device, and every step of the AI self's identity and work, of proofs of a fact, of the emergency card, of agreements and of knowledge packs is one entry of the owner's access log.
 
 ## An entry
 
 | Field | Meaning |
 | --- | --- |
 | `id` | The entry's id |
-| `appId` | Who: an app id, an ask link id, the public self's id, a meet id, a share id, `vault`, `legacy`, `self` (the owner's test chat) or a trusted person's id |
+| `appId` | Who: an app id, an ask link id, the public self's id, a meet id, a share id, `vault`, `legacy`, `self` (the owner's AI self, and its test chat), a trusted person's id, an emergency card's id, an agreement's id or a knowledge pack's id |
 | `kind` | What (below) |
 | `memoryId` | The memory, or a step name for kinds that have no memory, or null |
 | `count` | How many: memories listed, sources cited, memories written |
@@ -32,6 +32,14 @@ For an answer of an AI self (`ask`, `public`) the entry also carries a note: the
 | `public` | The public AI self answered a visitor |
 | `meet` | A step of a meet: `invited`, `accepted`, `declined`, `stopped`, `done`, `turn-<n>`, and `used-<n>` (in the writer's own log) with the number of memories its self could use |
 | `sync` | A connector wrote (`wrote-<source id>`) or removed (`removed-<source id>`) memories of a live sync source in the background |
+| `identity` | A step of the AI self's identity (appId `self`): `key-made`, `statement-signed`, `statement-withdrawn`, `rules-saved` (part 7) |
+| `work` | A step of the AI self's work (appId `self`): `drafted-<kind>`, `approved-<kind>`, `discarded-<kind>` with kind `reply`, `plan` or `answer`; `learned`, `lesson-edited`, `lesson-deleted` |
+| `disclose` | A proof of a fact was made (appId `vault`, count 1); memoryId is the hex32 hash of its signed statement (part 8) |
+| `emergency` | A step of the emergency card (appId the card's id): `published`, `changed`, `reissued`, `revoked`, `opened` (part 9) |
+| `agreement` | A step of an agreement (appId the agreement's id), in both parties' logs: `proposed-<id>`, `declined-<id>`, `withdrawn-<id>`, and, once both signed, the agreement's hex32 hash with count 2 (part 10) |
+| `pack` | A step of a knowledge pack (appId the pack's id): `published-<version>` with the number of memories, `withdrawn`, and in a follower's log `followed-<version>`, `updated-<version>`, `unfollowed-<version>` (part 10) |
+
+A vault that joins a team space, by making it or by accepting it, writes `space` with appId `vault` and memoryId `joined-<space id>`; a proof of membership rests on that entry.
 
 ## The leaf
 
