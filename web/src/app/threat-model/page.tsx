@@ -30,7 +30,23 @@ const covered = [
   },
   {
     threat: "A connected app tries to write, change or delete",
-    answer: "The connector API is read only. There is no request that adds or changes a memory, so an AI app cannot plant false memories in your vault.",
+    answer:
+      "No request lets an app change or delete a memory. An app may only suggest one, and only if you turned that on for it; the suggestion waits in your inbox until you approve it, and each app may send 30 an hour.",
+  },
+  {
+    threat: "The server hands an app a public key of its own, to read suggestions",
+    answer:
+      "The app checks the vault public key against a tag your vault made with the app's own secret, which the server never has. A swapped key fails the check and nothing is sealed.",
+  },
+  {
+    threat: "Someone you shared a folder with keeps reading after you stop",
+    answer:
+      "Stopping gives the folder a new key on your device and encrypts every memory in it again. The old key opens nothing that is stored now. What they read before, they keep.",
+  },
+  {
+    threat: "The server swaps the vault code when you share",
+    answer:
+      "The folder key is sealed to the public key in the code the other person gave you, and you can compare fingerprints with them. The server only passes the sealed key on.",
   },
   {
     threat: "A leaked or stolen app key",

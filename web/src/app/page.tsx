@@ -50,7 +50,10 @@ const record: { field: string; you: string; seed: number; length: number }[] = [
 ];
 
 const guarantees = [
-  { title: "Apps can only read", text: "There is no way for a connected app to add, change or delete a memory. An AI cannot plant false memories in your vault." },
+  {
+    title: "Apps cannot change your memories",
+    text: "No connected app can change or delete a memory. An app you allow may suggest one; it waits in your inbox, sealed for your vault, until you approve it.",
+  },
   { title: "Revoke takes one click", text: "A revoked app key fails on its very next request, and the server deletes the folder keys that were wrapped for it." },
   { title: "Delete means deleted", text: "Deleting removes the rows, and the database overwrites deleted content on disk instead of just unlinking it." },
   { title: "No reset, no back door", text: "Lose every passkey, every wallet and the recovery phrase and nobody can open the vault, including Sigil." },
@@ -73,7 +76,7 @@ const faq = [
   },
   {
     q: "Can an AI app change or delete what is in my vault?",
-    a: "No. Connected apps are read only. They can list the folders you gave them, search them and read memories. Nothing else exists for them to call.",
+    a: "No. Connected apps can list the folders you gave them, search them and read memories. If you allow it, an app can also suggest a new memory, which waits in your inbox until you approve, merge or reject it. Nothing exists for an app to change or delete.",
   },
   {
     q: "What does an app see when I connect it?",
@@ -206,7 +209,7 @@ export default function Home() {
             <ul className="checklist">
               <li>
                 <CheckIcon />
-                <span>Read only. Connected apps can search and read, never write or delete.</span>
+                <span>Read, and suggest only if you allow it. Connected apps never change or delete a memory.</span>
               </li>
               <li>
                 <CheckIcon />
@@ -392,8 +395,8 @@ export default function Home() {
             <p className="eyebrow">For developers</p>
             <h2 className="section-title">One connector, a few lines of configuration</h2>
             <p className="section-lead">
-              The connector is a small MCP server that runs on your own machine and gives an AI app three read-only tools. Everything is open
-              source, and the API is small enough to read in one sitting.
+              The connector is a small MCP server that runs on your own machine and gives an AI app four tools that read and one that suggests
+              memories to your inbox. Web apps use Sign in with Sigil. Everything is open source, and the API is small enough to read in one sitting.
             </p>
             <ul className="link-list">
               <li>
@@ -460,13 +463,15 @@ export default function Home() {
             <li>
               <CheckIcon />
               <span>
-                <strong>Built:</strong> one connector for every MCP client, per-app permissions, revoke, the read log and hourly seals.
+                <strong>Built:</strong> one connector for every MCP client, per-app permissions, revoke, the read log and hourly seals, the memory
+                inbox, the browser extension, Sign in with Sigil and folders shared between vaults.
               </span>
             </li>
             <li>
               <CheckIcon />
               <span>
-                <strong>Next:</strong> a browser extension, seals published on chain, and the rest of your digital life in one place.
+                <strong>Started:</strong> memory that thinks, with search by meaning on your device, a timeline, duplicates found for you and a Self
+                card apps read first. <strong>Next:</strong> seals published on chain, and the rest of your digital life in one place.
               </span>
             </li>
           </ul>

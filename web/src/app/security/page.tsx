@@ -117,8 +117,16 @@ export default function Security() {
               request. On revoke the server also deletes that app&apos;s wrapped folder keys.
             </p>
             <p>
-              Connected apps are read only: the connector has no way to add, change or delete memories. This also means an AI app cannot plant false
-              memories in your vault.
+              Connected apps cannot change or delete memories. An app you allow may suggest one: the connector, the extension or the web app seals it
+              to your vault&apos;s public key on the user&apos;s side, and it becomes a memory only when you approve it in your inbox. The public key
+              comes with a tag your vault made with that app&apos;s own secret, so a server that swapped in a key of its own would be caught before
+              anything is sealed.
+            </p>
+            <p>
+              Sharing a folder with another vault seals the folder key to that vault&apos;s public key, taken from the code its owner gave you, never
+              from the server. Stopping a share gives the folder a new key on your device and encrypts the folder again, so the removed vault holds
+              only a key that opens nothing stored now. Search by meaning runs on your device; its vectors never reach the server and are kept in
+              your browser only encrypted.
             </p>
           </section>
 

@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "The thirteen stages from an encrypted memory vault to an AI self that works, earns and outlives you on your terms.",
 };
 
-type Status = "built" | "core" | "planned";
+type Status = "built" | "core" | "started" | "planned";
 
 interface Stage {
   title: string;
@@ -18,6 +18,7 @@ interface Stage {
 const STATUS_LABEL: Record<Status, string> = {
   built: "Built",
   core: "Core built",
+  started: "Started",
   planned: "Planned",
 };
 
@@ -36,15 +37,17 @@ const stages: Stage[] = [
   },
   {
     title: "Every AI, one memory",
-    status: "core",
+    status: "built",
     summary: "Every assistant you use reads the same vault, only where you allow it, and every read is on the record.",
     items: [
       { text: "One connector for Claude, Cursor, ChatGPT and any MCP client", built: true },
       { text: "Permissions per app and per folder, revoke at any time", built: true },
       { text: "A read log you can see, sealed every hour", built: true },
-      { text: "Seals published on chain" },
-      { text: "A browser extension for AI apps in the browser" },
-      { text: "Sign in with your Sigil, for other apps" },
+      { text: "Seal publishing on chain, written and tested, switched on once the contract is deployed", built: true },
+      { text: "A memory inbox: apps suggest, you approve", built: true },
+      { text: "A browser extension for selections, pages and ChatGPT and Claude conversations", built: true },
+      { text: "Sign in with Sigil, for web apps", built: true },
+      { text: "Folders shared with other vaults, read only, revoked by a new key", built: true },
     ],
   },
   {
@@ -60,11 +63,14 @@ const stages: Stage[] = [
   },
   {
     title: "Memory that thinks",
-    status: "planned",
+    status: "started",
     summary: "The vault stops being a filing cabinet and starts helping.",
     items: [
-      { text: "Search by meaning, run on your device" },
-      { text: "Self-cleaning: duplicates merged, stale facts flagged" },
+      { text: "Search by meaning, run on your device", built: true },
+      { text: "Duplicates found and merged", built: true },
+      { text: "A timeline of every memory, by date and source", built: true },
+      { text: "A Self card that apps read first", built: true },
+      { text: "Stale facts flagged" },
       { text: "Timelines of people, projects and places" },
       { text: "Briefs before meetings and decisions" },
       { text: "A fully local mode" },

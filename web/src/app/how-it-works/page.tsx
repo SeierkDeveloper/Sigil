@@ -70,11 +70,20 @@ const sections = [
     title: "5. Your AI reads what it needs",
     body: (
       <>
-        <p>The connector gives the AI three tools: list the folders it may read, search memories, and read one memory in full.</p>
+        <p>
+          The connector gives the AI four tools that read: your Self card, the folders it may read, a search, and one memory in full. A fifth tool
+          lets it suggest a memory, if you allow that app to.
+        </p>
         <p>
           When the AI searches, the connector downloads the encrypted titles, tags and first lines of the memories in its folders, decrypts them on
-          your computer and searches there. Your search words never reach Sigil. When the AI wants a whole memory, the connector asks for that one
-          memory, and the server writes the read to your log before it answers.
+          your computer and searches there, by words and by meaning, with a small model that also runs on your computer. Your search words never
+          reach Sigil. When the AI wants a whole memory, the connector asks for that one memory, and the server writes the read to your log before
+          it answers.
+        </p>
+        <p>
+          When the AI suggests a memory, the connector seals it on your computer to your vault&apos;s public key, after checking that your vault
+          vouched for that key. It waits in your <strong>Inbox</strong>, where only your vault can open it, until you approve, merge or reject it.
+          The browser extension and web apps that use Sign in with Sigil suggest the same way.
         </p>
       </>
     ),
@@ -105,8 +114,12 @@ const sections = [
           gives you everything, decrypted, as one file.
         </p>
         <p>
-          One honest limit: once an AI app has read a memory, what that app does with it is governed by that app, not by Sigil. Share folders with
-          apps you trust.
+          <strong>Share</strong> a folder with another Sigil vault by the code its owner gives you, and <strong>stop sharing</strong> whenever you
+          like: the folder then gets a new key on your device, so the vault you removed can open nothing that is stored now.
+        </p>
+        <p>
+          One honest limit: once an AI app or another person has read a memory, what they do with it is up to them, not Sigil. Share folders with
+          apps and people you trust.
         </p>
       </>
     ),
@@ -118,12 +131,14 @@ const serverSees = [
   "Which sign-in methods it has (a passkey's public key, a wallet address)",
   "How many folders and memories there are, their sizes and when they changed",
   "Which app read which memory, and when (the read log)",
+  "That an app suggested a memory, and that a folder is shared with another vault",
 ];
 
 const onlyYouSee = [
   "Every title, body, tag and folder name",
   "The names of your connected apps",
-  "Your search words",
+  "Your search words, and the search vectors made from your memories",
+  "What a suggestion says, and who you share with",
   "Your vault key, folder keys, app keys and recovery phrase",
 ];
 

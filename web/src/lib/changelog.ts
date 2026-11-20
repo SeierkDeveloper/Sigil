@@ -4,11 +4,72 @@ export interface Release {
   date: string; // ISO day
   title: string;
   summary: string;
-  area: "Site" | "Vault" | "Connector" | "Seals" | "Core";
+  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing";
   items: string[];
 }
 
 export const releases: Release[] = [
+  {
+    date: "2026-11-20",
+    title: "The memory inbox",
+    area: "Inbox",
+    summary: "Apps can suggest what to remember. Nothing becomes a memory until you approve it.",
+    items: [
+      "Every vault gets an X25519 key pair; its private half is wrapped by the vault key",
+      "A per-app switch, off by default: May suggest memories to your inbox",
+      "propose_memory in the connector seals each suggestion on your computer, after checking a tag your vault made for that app",
+      "An Inbox tab to edit, approve into a folder, merge into a memory or reject, with a hint when it is already in the vault",
+      "Suggestions in the read log, 30 per app per hour, up to 500 waiting",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Memory that understands",
+    area: "Search",
+    summary: "Search by meaning, run on your device, and the first tools that help keep a vault in order.",
+    items: [
+      "A small sentence model on WebAssembly, in a worker in the vault and in the connector, never on the server",
+      "Hybrid search by words and meaning in the vault and in search_memories",
+      "Vectors kept in the browser only encrypted, under names that do not show the text",
+      "Duplicates: the same text, nearly the same words or the same meaning, merged in one step",
+      "A Timeline by date written or last changed, filtered by source",
+      "The Self card, a short profile in its own folder, read by apps through get_profile",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "The browser extension",
+    area: "Extension",
+    summary: "Save a selection, a page or a whole ChatGPT or Claude conversation to your inbox, sealed in the browser.",
+    items: [
+      "Chrome, Manifest V3, built as an unpacked extension",
+      "Paired by an app key made under Apps; it checks the vault public key before sealing",
+      "Right-click menu, a toolbar popup, and a small button on chatgpt.com and claude.ai",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Sign in with Sigil",
+    area: "SDK",
+    summary: "Web apps can ask for read access to the folders you choose.",
+    items: [
+      "A consent window in the vault that answers only the page that asked",
+      "The @sigil/sdk package: requestAccess, then folders, search, read, the Self card and suggestions, decrypted in the browser",
+      "An example app in examples/hello-sigil",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Sharing between vaults",
+    area: "Sharing",
+    summary: "Share a folder with another Sigil vault, read only, and take it back.",
+    items: [
+      "Vault codes with a fingerprint to compare",
+      "Folder keys sealed to the other vault's public key; accept or decline on their side",
+      "Every opening of a shared folder in the owner's read log",
+      "Stop sharing gives the folder a new key and encrypts it again on the owner's device",
+    ],
+  },
   {
     date: "2026-11-20",
     title: "The full site, live numbers and public proofs",
@@ -67,7 +128,11 @@ export const releases: Release[] = [
     title: "The connector",
     area: "Connector",
     summary: "One MCP server for every AI app, running on the user's own machine.",
-    items: ["Three read-only tools: list_folders, search_memories and read_memory", "Stdio for apps that start it, HTTP for apps that need a URL", "Decrypts locally and keeps nothing between requests"],
+    items: [
+      "Three read-only tools: list_folders, search_memories and read_memory",
+      "Stdio for apps that start it, HTTP for apps that need a URL",
+      "Decrypts locally and keeps nothing between requests",
+    ],
   },
   {
     date: "2026-11-19",

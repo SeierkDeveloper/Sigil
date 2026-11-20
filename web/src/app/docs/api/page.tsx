@@ -104,6 +104,21 @@ const publicEndpoints: Endpoint[] = [
 }`,
     notes: "404 with code not_in_seal when the fingerprint is not part of that seal. A fingerprint is a salted hash and reveals nothing about the read behind it.",
   },
+  {
+    id: "semantic",
+    method: "GET",
+    path: "/api/semantic",
+    summary: "Whether search by meaning is on, and which sentence model the vault page loads. The model runs in the browser.",
+    response: `{ "enabled": true, "model": "Xenova/all-MiniLM-L6-v2" }`,
+  },
+  {
+    id: "models",
+    method: "GET",
+    path: "/models/<model>/<file>",
+    summary: "The files of that model: tokenizer.json, tokenizer_config.json and onnx/model_quantized.onnx. Public weights, the same for everyone.",
+    response: "The file itself, JSON or binary.",
+    notes: "Any other model or file is 404. Missing files are fetched once from the public model hub unless SIGIL_MODEL_FETCH is off.",
+  },
 ];
 
 const connectorEndpoints: Endpoint[] = [
@@ -150,6 +165,31 @@ const connectorEndpoints: Endpoint[] = [
 }`,
     notes: "Each memory found is logged as one read. Ids outside the granted folders come back under missing, without saying whether they exist.",
   },
+  {
+    id: "inbox",
+    method: "GET",
+    path: "/api/connector/v1/inbox",
+    summary: "The vault's public key and the tag the owner's device made for this app. Check the tag with the app secret before sealing anything.",
+    response: `{
+  "appId": "...",
+  "publicKey": "<32-byte X25519 key, base64url>",
+  "tag": "<HMAC-SHA256, hex>"
+}`,
+    notes: "403 with code propose_off unless the owner let this app suggest memories. Not logged: it reads no memory.",
+  },
+  {
+    id: "proposals",
+    method: "POST",
+    path: "/api/connector/v1/proposals",
+    summary: "Puts one suggested memory, sealed to the vault's public key, in the owner's inbox.",
+    params: [
+      ["id", "A new random id, 8 to 64 letters, digits, - or _."],
+      ["sealed", "The sealed box, s1.<ephemeral key>.<nonce>.<ciphertext>, sealed with the context proposal:<id>:<app id>."],
+    ],
+    response: `{ "appId": "...", "id": "...", "createdAt": "..." }`,
+    notes:
+      "Logged as: the app suggested a memory. 30 per app per hour (429, propose_limit), up to 500 waiting per vault (429, inbox_full). Anything that is not a sealed box is refused.",
+  },
 ];
 
 const errors: [string, string, string][] = [
@@ -157,10 +197,13 @@ const errors: [string, string, string][] = [
   ["401", "signed_out", "A vault request without a session."],
   ["401", "app_revoked", "The app key was revoked or never existed."],
   ["403", "origin", "A change to a vault that did not come from the site itself."],
+  ["403", "propose_off", "This app may not suggest memories; the owner turns it on under Apps."],
   ["404", "not_found", "No such endpoint. Also no_seal and not_in_seal on the seal endpoints."],
   ["405", "method", "The endpoint exists, the method does not."],
   ["409", "not_sealed", "A proof was asked for an entry whose hour has not been sealed yet."],
+  ["409", "stale", "A folder changed while its new key was being made. Reload and try again."],
   ["429", "rate_limited", "Too many requests. Wait a little and try again."],
+  ["429", "propose_limit", "The app sent 30 suggestions in the last hour."],
 ];
 
 function EndpointBlock({ e }: { e: Endpoint }) {
@@ -198,7 +241,7 @@ export default function ApiReference() {
         <PageHeader
           eyebrow="API reference"
           title="A small API, read only where it matters"
-          lead="Five public endpoints anyone can call, and three connector endpoints an app key can call. Connected apps cannot write. Everything a connector endpoint returns is encrypted."
+          lead="Public endpoints anyone can call, and connector endpoints an app key can call. Connected apps can read what they were given and, when allowed, suggest sealed memories; they cannot change one. Everything a connector endpoint returns is encrypted."
         />
 
         <div className="doc-layout">
@@ -261,7 +304,7 @@ export default function ApiReference() {
               </h2>
               <p className="section-lead">
                 An app key looks like <code>sigil_app.&lt;app id&gt;.&lt;secret&gt;</code>. The secret is 32 random bytes. It is never sent to the
-                server. Two things are derived from it with HKDF-SHA256 (salt <code>sigil/hkdf/v1</code>):
+                server. Three things are derived from it with HKDF-SHA256 (salt <code>sigil/hkdf/v1</code>):
               </p>
               <div className="table-wrap">
                 <table className="table">
@@ -289,12 +332,23 @@ export default function ApiReference() {
                       <td>The app wrap key</td>
                       <td>Opens the folder keys that were wrapped for this app. Stays on the caller&apos;s machine.</td>
                     </tr>
+                    <tr>
+                      <td>
+                        <code>sigil:tag:app-box</code>
+                      </td>
+                      <td>The tag key</td>
+                      <td>
+                        Checks the tag on the vault public key from <code>/inbox</code>: HMAC-SHA256 of <code>sigil-box-v1:&lt;public key&gt;</code>.
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
               <p className="endpoint-notes">
-                The connector does all of this for you. Use the endpoints directly only when you build your own reader; the envelope format and
-                every label are in the <Link href="/docs#encryption">encryption model</Link>.
+                The connector, the browser extension and the Sign in with Sigil SDK do all of this for you. Use the endpoints directly only when you
+                build your own reader; the envelope and sealed box formats and every label are in the{" "}
+                <Link href="/docs#encryption">encryption model</Link>. The connector endpoints answer any origin (they take a bearer token, never a
+                cookie), so a web app can call them from the browser.
               </p>
             </section>
 
@@ -302,7 +356,10 @@ export default function ApiReference() {
               <h2 id="connector-title" className="section-title">
                 Connector endpoints
               </h2>
-              <p className="section-lead">Read only, one bearer token per app, every call written to the vault owner&apos;s read log.</p>
+              <p className="section-lead">
+                One bearer token per app. Reads, and suggestions when the owner allows them; every read and every suggestion is written to the vault
+                owner&apos;s read log.
+              </p>
               {connectorEndpoints.map((e) => (
                 <EndpointBlock key={e.id} e={e} />
               ))}
@@ -345,8 +402,10 @@ export default function ApiReference() {
                 The vault session API
               </h2>
               <p className="section-lead">
-                The vault page itself talks to a session API: <code>/api/vault</code>, <code>/api/memories</code>, <code>/api/folders</code>,{" "}
-                <code>/api/apps</code>, <code>/api/log</code>, <code>/api/keyslots</code> and the sign-in routes under <code>/api/auth</code>. It
+                The vault page itself talks to a session API: <code>/api/vault</code>, <code>/api/memories</code>, <code>/api/folders</code>{" "}
+                (with <code>/rotate</code> for a new folder key), <code>/api/apps</code> (with <code>/inbox</code> for suggestions),{" "}
+                <code>/api/proposals</code>, <code>/api/shares</code>, <code>/api/log</code>, <code>/api/keyslots</code> and the sign-in routes under{" "}
+                <code>/api/auth</code>. It
                 accepts only encrypted payloads, only with a session cookie, and changes only from the site itself. It is not meant for other
                 programs; the whole router is one readable file, <code>web/src/server/api.ts</code>.
               </p>

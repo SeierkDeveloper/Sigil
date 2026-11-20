@@ -8,10 +8,28 @@ import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Connector",
-  description: "The Sigil connector: a small MCP server that runs on your computer, decrypts there and gives AI apps three read-only tools.",
+  description:
+    "The Sigil connector: a small MCP server that runs on your computer, decrypts there, searches by meaning there, and gives AI apps four tools that read and one that suggests memories to your inbox.",
 };
 
 const tools = [
+  {
+    name: "get_profile",
+    title: "Read the Sigil Self card",
+    text: "Your Self card: who you are, how you like answers and what you are working on. The app is told to call it first. Works only if it may read the Self card folder.",
+    args: [] as [string, string][],
+    logged: "The app read the index, then the card.",
+    example: `# Self card
+Edited: 2026-11-20
+
+## Who I am
+
+A designer who builds boats on weekends.
+
+## How I like answers
+
+Short, plain words, metric units.`,
+  },
   {
     name: "list_folders",
     title: "List Sigil folders",
@@ -25,7 +43,7 @@ const tools = [
   {
     name: "search_memories",
     title: "Search Sigil memories",
-    text: "Searches titles, tags and first lines, on your computer. An empty query lists the most recent. Returns ids for read_memory.",
+    text: "Searches by meaning and by the words in titles, tags and first lines, on your computer: a question about your car finds the note about the garage. An empty query lists the most recent. Returns ids for read_memory.",
     args: [
       ["query", "Words to look for, up to 500 characters. Empty for the most recent."],
       ["folder", "Optional. Only search this folder, by name."],
@@ -37,6 +55,10 @@ const tools = [
 1. Launch plan
    id: 9fK2mQx7Lw3d | folder: Work | tags: work | edited 2026-11-19
    Ship on a Tuesday.
+
+2. Release checklist
+   id: 4Qa8NcT1pZ0e | folder: Work | edited 2026-11-12 | matched by meaning
+   Freeze the build two days before.
 
 These are the first lines only. Call read_memory with an id for the full text.`,
   },
@@ -54,12 +76,29 @@ Created: 2026-11-19 | Edited: 2026-11-19
 
 Ship on a Tuesday.`,
   },
+  {
+    name: "propose_memory",
+    title: "Suggest a memory to Sigil",
+    text: "Suggests a memory to your inbox. It is sealed on your computer for your vault, and becomes a memory only when you approve it. Works only if you let this app suggest.",
+    args: [
+      ["title", "A short title, up to 300 characters."],
+      ["body", "The memory, in plain words."],
+      ["tags", "Optional. Up to 12 tags."],
+      ["folder", "Optional. The folder the app suggests, by name. You decide."],
+    ] as [string, string][],
+    logged: "The app suggested a memory.",
+    example: `Suggested "Prefers metric units" to the user's Sigil inbox. It becomes a memory only if they approve it.`,
+  },
 ];
 
 const settings: [string, string][] = [
   ["SIGIL_APP_KEY", "Required. The app key from your vault. It starts with sigil_app. Keep it private: it can read the folders you granted."],
   ["SIGIL_URL", `Required. The address of the Sigil site your vault lives on, for example ${site.url}.`],
   ["SIGIL_HTTP_TOKEN", "HTTP mode only. The secret last part of the address, 16 to 128 letters, digits, - or _. A random one is made when unset."],
+  ["SIGIL_SEMANTIC", "Search by meaning on your computer. On unless set to off."],
+  ["SIGIL_EMBED_MODEL", "The sentence model for search by meaning. Xenova/all-MiniLM-L6-v2 by default, about 23 MB."],
+  ["SIGIL_MODEL_DIR", "Where the model files are kept. .data/models in the repository, or ~/.sigil/models elsewhere."],
+  ["SIGIL_MODEL_FETCH", "Fetch missing model files once from the public model hub. Set to off to use only files already on disk."],
   ["--http", "Serve over HTTP instead of stdio."],
   ["--port, --host", "HTTP mode only. Default 8787 on 127.0.0.1."],
   ["--help, --version", "Print the usage, or the version."],
@@ -72,7 +111,7 @@ export default function ConnectorPage() {
         <PageHeader
           eyebrow="Connector"
           title="One small program between your vault and every AI app"
-          lead="The connector is an MCP server that runs on your own computer. It holds one app key, fetches the encrypted folders that key may read, and decrypts them locally. It keeps nothing between requests, and it cannot write."
+          lead="The connector is an MCP server that runs on your own computer. It holds one app key, fetches the encrypted folders that key may read, decrypts and searches them locally, and seals any memory it suggests for your vault alone. It keeps nothing between requests, and it cannot change a memory."
         />
 
         <section className="page-section" aria-labelledby="path-title">
@@ -94,7 +133,7 @@ export default function ConnectorPage() {
             </li>
             <li className="flow-step">
               <span className="flow-where">Connector, on your computer</span>
-              <p>Unwraps the folder keys, decrypts, searches locally and hands plain text to the app.</p>
+              <p>Unwraps the folder keys, decrypts, searches by words and by meaning locally, and hands plain text to the app.</p>
             </li>
           </ol>
         </section>
@@ -126,10 +165,11 @@ export default function ConnectorPage() {
         <section className="page-section" aria-labelledby="tools-title">
           <div className="section-header">
             <h2 id="tools-title" className="section-title">
-              Three tools, all read only
+              Four tools that read, one that suggests
             </h2>
             <p className="section-lead">
-              Each is marked read only for the AI app. The answers below are the plain text an app receives, in the connector&apos;s own format.
+              The four that read are marked read only for the AI app. The answers below are the plain text an app receives, in the connector&apos;s
+              own format.
             </p>
           </div>
           <div className="tools">
@@ -222,8 +262,11 @@ export default function ConnectorPage() {
           </h2>
           <div className="fact-grid">
             <div className="pillar">
-              <h3 className="pillar-title">It does not write</h3>
-              <p className="pillar-text">There is no tool and no server endpoint for adding, changing or deleting memories from an app.</p>
+              <h3 className="pillar-title">It does not write your memories</h3>
+              <p className="pillar-text">
+                No tool or endpoint lets an app change or delete a memory. A suggestion waits in your inbox, sealed, until you approve, merge or reject
+                it.
+              </p>
             </div>
             <div className="pillar">
               <h3 className="pillar-title">It does not remember</h3>
@@ -231,7 +274,9 @@ export default function ConnectorPage() {
             </div>
             <div className="pillar">
               <h3 className="pillar-title">It does not send your search</h3>
-              <p className="pillar-text">Search runs on your computer over the decrypted index. The server only learns that the index was read.</p>
+              <p className="pillar-text">
+                Search, by words and by meaning, runs on your computer over the decrypted index. The server only learns that the index was read.
+              </p>
             </div>
           </div>
         </section>

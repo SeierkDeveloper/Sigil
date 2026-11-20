@@ -1,6 +1,6 @@
 # sigil-connector
 
-Lets Claude Desktop, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose. It runs on your own machine and decrypts there.
+Lets Claude Desktop, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, and suggest memories to your inbox when you allow it. It runs on your own machine: it decrypts, searches and seals there.
 
 ## Setup
 
@@ -26,11 +26,17 @@ Build `dist/index.js` with `npm run build -w sigil-connector` from the repositor
 
 ## Tools
 
+- `get_profile`: the Self card, when this app may read its folder.
 - `list_folders`: the folders this app may read.
-- `search_memories`: search titles, tags and first lines, locally. Arguments: `query`, optional `folder` and `limit`.
+- `search_memories`: search by meaning and by the words in titles, tags and first lines, locally. Arguments: `query`, optional `folder` and `limit`.
 - `read_memory`: the full text of one memory by `id`.
+- `propose_memory`: suggest a memory to the vault's inbox (`title`, `body`, optional `tags` and `folder`). Sealed here for the vault; it becomes a memory only when the owner approves it. Needs "May suggest memories" on for this app.
 
-All tools are read only, and every request shows up in the vault's read log.
+No tool changes or deletes a memory, and every request shows up in the vault's read log.
+
+## Search by meaning
+
+A small sentence model (`Xenova/all-MiniLM-L6-v2` by default) runs here on WebAssembly. Its files are fetched once from the public model hub into `SIGIL_MODEL_DIR` (`.data/models` in the repository, `~/.sigil/models` elsewhere); vectors stay in memory and are never sent anywhere. `SIGIL_MODEL_FETCH=off` uses only files already on disk, and `SIGIL_SEMANTIC=off` searches by words only.
 
 ## HTTP mode
 

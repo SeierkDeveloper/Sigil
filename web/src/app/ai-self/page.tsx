@@ -16,7 +16,7 @@ const chapters = [
     title: "A memory that is yours",
     text: [
       "Every AI app you use is building a memory of you, and every one of them keeps it for itself. Change apps and you start again as a stranger. Leave an app and what it learned stays behind.",
-      "Sigil starts by turning that around. What your AI apps should know about you lives in one vault, encrypted on your own device. The apps come to you and ask to read, folder by folder, and every read goes on a record you can check.",
+      "Sigil starts by turning that around. What your AI apps should know about you lives in one vault, encrypted on your own device. The apps come to you and ask to read, folder by folder, and every read goes on a record you can check. They can suggest what to remember, and nothing is kept until you say so.",
     ],
   },
   {
@@ -25,7 +25,7 @@ const chapters = [
     title: "A memory that fills itself and thinks",
     text: [
       "A vault you fill by hand stays small. The plan is for it to fill from the places your life already happens, with your permission each time: mail, calendar, notes, code, meetings.",
-      "Then it starts to help: search by meaning that runs on your device, stale facts flagged, timelines of the people and projects in your life, a brief before a meeting. Still encrypted, still yours.",
+      "Then it starts to help. The first pieces are here: search by meaning that runs on your device, duplicates found for you, a timeline, and a Self card your apps read first. Still to come: stale facts flagged, timelines of the people and projects in your life, a brief before a meeting. Still encrypted, still yours.",
     ],
   },
   {

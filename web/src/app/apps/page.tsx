@@ -143,7 +143,7 @@ const guides: Guide[] = [
     steps: [
       "Any app that can start a local MCP server over stdio uses the command below with the two environment variables.",
       "Apps that only take a URL use HTTP mode, as described for ChatGPT.",
-      "The connector offers three read-only tools: list_folders, search_memories and read_memory.",
+      "The connector offers four tools that read (get_profile, list_folders, search_memories and read_memory) and propose_memory, which suggests a memory to your inbox when you allow it.",
     ],
     code: { code: shellCommand(EXAMPLE_KEY), label: "Terminal" },
     after: "If the client speaks MCP, it can read your vault, and every read lands in your log.",

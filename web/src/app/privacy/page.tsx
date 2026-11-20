@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "What Sigil stores, what it cannot read, how deletion and export work, and your rights under the GDPR.",
 };
 
-const LAST_UPDATED = "19 November 2026";
+const LAST_UPDATED = "20 November 2026";
 
 const stored: [string, string, string][] = [
   ["Account", "A random account id and when it was created.", "Readable"],
@@ -20,7 +20,11 @@ const stored: [string, string, string][] = [
   ["Folders", "Folder ids, encrypted names, encrypted folder keys, created and changed times.", "Encrypted, with readable ids and times"],
   ["Memories", "Memory ids, which folder each is in, encrypted content, size, created and changed times.", "Encrypted, with readable ids, sizes and times"],
   ["Connected apps", "App ids, encrypted names, encrypted app secrets, a hash of each app token, which folders each app may read, and when it was created, last used or revoked.", "Encrypted and hashed, with readable ids and times"],
-  ["Read log", "For every request by a connected app: which app, what kind of read, which memory id, how many items, when, and a random salt.", "Readable to the server"],
+  ["Vault public key", "Your vault's X25519 public key, so apps and other vaults can encrypt for it, and its private key locked with your vault key.", "Public key readable, private key encrypted"],
+  ["App permissions", "Whether each app may suggest memories, and a tag your device made over your vault's public key for that app.", "Readable flag, keyed tag"],
+  ["Suggestions", "Suggested memories waiting in your inbox: an id, which app sent it, when, and a sealed box only your vault can open. Removed once you decide.", "Encrypted, with readable ids and times"],
+  ["Shared folders", "Which folder is shared with which vault, the folder key sealed to that vault, your encrypted note on who it is, and when it was accepted.", "Encrypted, with readable ids and times"],
+  ["Read log", "For every request by a connected app, every suggestion and every time a vault opens a folder you share: which app or share, what kind, which memory or suggestion id, how many items, when, and a random salt.", "Readable to the server"],
   ["Seals", "One Merkle root per hour and the salted leaves it is made of. They contain no readable personal data.", "Hashes"],
 ];
 
@@ -69,7 +73,8 @@ export default function Privacy() {
         <div className="prose">
           <p>
             <strong>Never stored or seen by Sigil:</strong> your vault key, folder keys, app keys, recovery phrase, passkey PRF output, wallet
-            signatures, the titles, bodies and tags of memories, folder and app names, and what a connected app searched for.
+            signatures, the titles, bodies and tags of memories and suggestions, folder and app names, who you share with, what you or a connected
+            app searched for, and the search vectors made from your memories.
           </p>
 
           <h2>Why, and on what legal basis</h2>
@@ -88,7 +93,8 @@ export default function Privacy() {
           <p>
             One cookie, <code>sigil_session</code>, keeps you signed in for up to 30 days. It is strictly necessary, so no consent banner is needed.
             Your vault key is never stored in a cookie or in your browser&apos;s storage; it lives in the page&apos;s memory while the vault is open
-            and is gone when you close or reload it.
+            and is gone when you close or reload it. Search by meaning keeps vectors of your memories in your browser&apos;s own storage, encrypted
+            with a key derived from your vault key; they never leave the browser and are removed when you delete your vault there.
           </p>
 
           <h2>Connected AI apps</h2>

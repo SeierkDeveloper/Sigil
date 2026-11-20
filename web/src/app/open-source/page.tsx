@@ -14,7 +14,7 @@ const parts = [
   {
     path: "packages/core",
     title: "The cryptography",
-    text: "AES-256-GCM envelopes, HKDF key derivation, key slots, app keys, Merkle seals, search and the ChatGPT and Claude export parsers. The browser, the server and the connector all use this one package.",
+    text: "AES-256-GCM envelopes, HKDF key derivation, key slots, app keys, sealed boxes to a vault's public key, folder sharing and key rotation, Merkle seals, search by words and by meaning, and the ChatGPT and Claude export parsers. Every other part uses this one package.",
   },
   {
     path: "web",
@@ -24,7 +24,17 @@ const parts = [
   {
     path: "connector",
     title: "The connector",
-    text: "sigil-connector, the MCP server people run on their own machine. Stdio for apps that start it, HTTP for apps that need a URL.",
+    text: "sigil-connector, the MCP server people run on their own machine. Stdio for apps that start it, HTTP for apps that need a URL. Searches by meaning and seals suggestions there.",
+  },
+  {
+    path: "extension",
+    title: "The browser extension",
+    text: "A Chrome extension that saves a selection, a page or a ChatGPT or Claude conversation to the inbox, sealed in the browser. Built as an unpacked extension; not in a store.",
+  },
+  {
+    path: "packages/sdk",
+    title: "Sign in with Sigil",
+    text: "The SDK web apps use to ask for read access to chosen folders, with a small example app in examples/hello-sigil.",
   },
   {
     path: "contracts",
@@ -34,7 +44,7 @@ const parts = [
   {
     path: "e2e",
     title: "End-to-end tests",
-    text: "Playwright runs the whole product in Chrome against the built server: sign-up, import, connecting an app, reads, seals and revoke.",
+    text: "Playwright runs the whole product in Chrome against the built server: sign-up, import, connecting an app, reads, seals, revoke, the inbox, search by meaning, sharing and Sign in with Sigil.",
   },
   {
     path: "docs",
@@ -49,6 +59,10 @@ const settings: [string, string, string][] = [
   ["SIGIL_DATA_DIR", "web/.data", "Where the SQLite database lives."],
   ["SIGIL_SEALS", "on", "Seal the read log at the end of every hour."],
   ["SIGIL_ANCHOR", "off", "Publish seal roots to the SigilSeal contract. Needs an RPC address, the contract address and a sealer key."],
+  ["SIGIL_SEMANTIC", "on", "Search by meaning in the vault. The model runs in the browser; the server only hands out its files."],
+  ["SIGIL_EMBED_MODEL", "Xenova/all-MiniLM-L6-v2", "The sentence model for search by meaning."],
+  ["SIGIL_MODEL_DIR", "web/.data/models", "Where the model files are kept."],
+  ["SIGIL_MODEL_FETCH", "on", "Fetch missing model files once from the public model hub. Off serves only files already on disk."],
 ];
 
 export default function OpenSource() {
@@ -58,7 +72,7 @@ export default function OpenSource() {
         <PageHeader
           eyebrow="Open source"
           title="Read the code, run it yourself"
-          lead="A vault you cannot inspect asks for blind trust. Every line of Sigil is public under the MIT licence: the encryption, the server, the connector and the contract."
+          lead="A vault you cannot inspect asks for blind trust. Every line of Sigil is public under the MIT licence: the encryption, the server, the connector, the browser extension, the SDK and the contract."
         />
 
         <section className="page-section" aria-labelledby="repo-title">
@@ -70,7 +84,7 @@ export default function OpenSource() {
               <h2 id="repo-title" className="repo-title">
                 {site.githubUrl.replace("https://github.com/", "")}
               </h2>
-              <p className="repo-text">One repository, five packages, MIT licence. TypeScript throughout, Solidity for the contract.</p>
+              <p className="repo-text">One repository, seven packages, MIT licence. TypeScript throughout, Solidity for the contract.</p>
             </div>
             <a className="button button-primary" href={site.githubUrl} target="_blank" rel="noopener noreferrer">
               Open the repository <ArrowIcon />

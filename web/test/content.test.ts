@@ -6,8 +6,23 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
-const SCAN = ["web/src", "connector/src", "packages/core/src", "contracts/src", "contracts/test", "contracts/script", "README.md", "connector/README.md"];
-const EXT = /\.(ts|tsx|css|sol|md|json|svg)$/;
+const SCAN = [
+  "web/src",
+  "connector/src",
+  "packages/core/src",
+  "packages/sdk/src",
+  "extension/src",
+  "extension/static",
+  "examples",
+  "contracts/src",
+  "contracts/test",
+  "contracts/script",
+  "README.md",
+  "connector/README.md",
+  "packages/sdk/README.md",
+  "docs/DESIGN-BRIEF.md",
+];
+const EXT = /\.(ts|tsx|css|sol|md|json|svg|html|js|mjs)$/;
 
 function files(p: string): string[] {
   const full = path.join(ROOT, p);
