@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 interface Endpoint {
   id: string;
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "PUT";
   path: string;
   summary: string;
   params?: [string, string][];
@@ -214,6 +214,41 @@ const askEndpoints: Endpoint[] = [
     response: `{ "status": "answered", "answer": "r1..." }`,
     notes: "status is waiting, answered, or gone (no answer within two minutes, or the question expired). Questions are deleted a day after they were asked.",
   },
+  {
+    id: "public-page",
+    method: "GET",
+    path: "/api/public/at/:handle",
+    summary: "A public AI self: its name, greeting and published key, whether it is on and online, the titles of its public notes, and the answers its owner shows.",
+    response: `{
+  "id": "...",
+  "handle": "sam",
+  "name": "Sam's AI self",
+  "greeting": "Ask me about my talks.",
+  "publicKey": "<32-byte X25519 key, base64url>",
+  "enabled": true,
+  "online": true,
+  "perVisitorHour": 10,
+  "showAnswers": true,
+  "items": [{ "id": "...", "title": "Talks", "tags": [], "editedAt": "..." }],
+  "wall": [{ "id": "...", "question": "...", "answer": "...", "sources": [{ "id": "...", "title": "Talks" }], "createdAt": "..." }]
+}`,
+    notes: "GET /api/public/at/:handle/items/:id gives one public note in full. 404 no_public when there is no such page.",
+  },
+  {
+    id: "public-question",
+    method: "POST",
+    path: "/api/public/at/:handle/questions",
+    summary: "One question to a public AI self, sealed in the visitor's browser like an ask link question, with the conversation key made from the published key.",
+    params: [
+      ["id", "A new random id for the question."],
+      ["sessionId", "The conversation's random id."],
+      ["askerKey", "The visitor's X25519 public key for this conversation."],
+      ["sealed", "The relay box, r1.<nonce>.<ciphertext>."],
+    ],
+    response: `{ "id": "..." }`,
+    notes:
+      "Poll GET /api/public/at/:handle/questions/:id for the answer, a relay box holding { text, refused, sources }. 503 offline, 410 off, 429 visitor_limit over the owner's limit per visitor an hour (counted by a hash of the address and the page), 429 waiting.",
+  },
 ];
 
 const connectorEndpoints: Endpoint[] = [
@@ -377,6 +412,32 @@ const connectorEndpoints: Endpoint[] = [
     response: `{ "appId": "...", "spaces": [{ "id": "...", "meta": "v1...", "epoch": 2, "me": { "id": "...", "role": "write", "sealedKey": "s1..." }, "members": [], "memories": [] }] }`,
     notes: "POST /spaces/:id/memories with { memories } writes, POST /spaces/:id/forget with { ids } deletes, with a write role. Every call is logged as space.",
   },
+  {
+    id: "protected-reads",
+    method: "POST",
+    path: "/api/connector/v1/read",
+    summary: "With protected folders: memories in a protected folder come back in held until the owner says yes for that read.",
+    response: `{ "appId": "...", "folders": [], "memories": [], "missing": [], "held": [{ "folderId": "...", "memoryIds": ["..."], "requestId": "...", "state": "pending" }] }`,
+    notes:
+      "The request waits in the owner's inbox for 30 minutes. A yes lasts 10 minutes and is used up by the next read that it covers, logged as protected. GET /index leaves protected folders out; GET /index?protected=<folder id> asks to look through one, with the same flow.",
+  },
+  {
+    id: "sync",
+    method: "GET",
+    path: "/api/connector/v1/sync",
+    summary: "The live sync sources the owner lets this app sync while the vault is closed: each wrapped for this app's sync key, with its folder and whether it is paused.",
+    response: `{ "appId": "...", "sources": [{ "id": "...", "folderId": "...", "box": "v1...", "rev": 4, "ownerRev": 3, "paused": false }] }`,
+    notes:
+      "PUT /sync/:id with { box, rev } saves a newer copy (409 stale for an older one). POST /sync/:id/memories with { memories } writes encrypted memories, only into the source's folder; POST /sync/:id/delete with { ids } removes them. Each is logged as sync.",
+  },
+  {
+    id: "public-self",
+    method: "GET",
+    path: "/api/connector/v1/public",
+    summary: "The public AI self, when the owner picked this app to answer it: its key and rules wrapped for this app, and the public copy it answers from.",
+    response: `{ "appId": "...", "self": { "id": "...", "handle": "sam", "publicKey": "...", "box": "v1...", "enabled": true, "items": [] } }`,
+    notes: "GET /public/pending marks it online and gives waiting questions; POST /public/questions/:id/answer with { sealed, note, cited, wall } answers. 403 public_off for any other app.",
+  },
 ];
 
 const errors: [string, string, string][] = [
@@ -452,7 +513,7 @@ export default function ApiReference() {
                 </li>
               ))}
             </ul>
-            <p className="doc-aside-label">Ask links</p>
+            <p className="doc-aside-label">Ask links and public pages</p>
             <ul>
               {askEndpoints.map((e) => (
                 <li key={e.id}>
@@ -636,7 +697,9 @@ export default function ApiReference() {
                 (with <code>/rotate</code> for a new folder key), <code>/api/apps</code> (with <code>/inbox</code> for suggestions),{" "}
                 <code>/api/proposals</code>, <code>/api/shares</code>, <code>/api/settings</code> (encrypted settings: the AI self&apos;s rules, the
                 model key, how the vault thinks), <code>/api/self</code> (ask links, and the open vault answering them), <code>/api/log</code>,{" "}
-                <code>/api/keyslots</code> and the sign-in routes under{" "}
+                <code>/api/keyslots</code>, <code>/api/access</code> (requests to read a protected folder, and the owner&apos;s yes or no),{" "}
+                <code>/api/sync</code> (live sync sources), <code>/api/public/self</code> (the public AI self and its public copy), <code>/api/meets</code>{" "}
+                (selves meet) and the sign-in routes under{" "}
                 <code>/api/auth</code>. It
                 accepts only encrypted payloads, only with a session cookie, and changes only from the site itself. It is not meant for other
                 programs; the whole router is one readable file, <code>web/src/server/api.ts</code>.

@@ -358,3 +358,47 @@ export const QrIcon = (p: IconProps) => (
     <path d="M14 14h2.5v2.5M20.5 14v6.5h-3M14 18.5v2" />
   </Line>
 );
+
+export const ChatIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M4 5.5h16v10H10l-4.5 4v-4H4Z" />
+    <path d="M8 9.5h8M8 12.5h5" />
+  </Line>
+);
+
+export const DriveIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M8.5 3.5h7l6 10.5-3.5 6h-12L2.5 14Z" />
+    <path d="M8.5 3.5 15 14.5H2.5M15.5 3.5 9 14.5M18 20l-3-5.5" />
+  </Line>
+);
+
+export const MeetingIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3" y="6" width="12.5" height="11" rx="2" />
+    <path d="m15.5 10.5 5.5-3v9l-5.5-3" />
+    <path d="M6.5 10h5.5M6.5 13h3.5" />
+  </Line>
+);
+
+export const SyncIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M19.5 9.5A7.5 7.5 0 0 0 6 6.5L4.5 8M4.5 14.5A7.5 7.5 0 0 0 18 17.5l1.5-1.5" />
+    <path d="M4.5 4v4h4M19.5 20v-4h-4" />
+  </Line>
+);
+
+export const PublicIcon = (p: IconProps) => (
+  <Line {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5Z" />
+  </Line>
+);
+
+export const MeetIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="2.5" y="6.5" width="8" height="7" rx="2" />
+    <rect x="13.5" y="10.5" width="8" height="7" rx="2" />
+    <path d="M6.5 13.5v2.5l2.5-2.5M17.5 17.5V20l-2.5-2.5M10.5 9.5h3M10.5 12h3" />
+  </Line>
+);

@@ -6,7 +6,7 @@
 //   a connected app  -> "Authorization: Bearer <app token>", reads and suggestions only, every call logged
 
 import { z } from "zod";
-import { isBoxPublicKey, isEnvelope, isRelayBox, isSealed, isSettingName, isSigningKey, isSpaceRole, randomId } from "@sigil/core";
+import { isBoxPublicKey, isEnvelope, isHandle, isMeetBox, isRelayBox, isSealed, isSettingName, isSigningKey, isSpaceRole, PUBLIC_MAX_PER_VISITOR, randomId } from "@sigil/core";
 import { getDb, type Db } from "./db";
 import { serverConfig } from "./config";
 import {
@@ -104,6 +104,25 @@ import {
 import { deviceSlot, findPairing, logDeviceStep, openPairing, pairingById, pickUp, revokeDevice, sendToDevice } from "./devices";
 import { agentForget, agentOf, agentProfile, agentRemember, assertTool, createAgent, leaveHandoff, listAgents, ownerHandoffs, pendingHandoffs, pickHandoffs, updateAgent } from "./agents";
 import { acceptSpace, addMember, agentSpaceIds, agentSpaces, createSpace, deleteSpace, deleteSpaceMemories, memberFor, putSpaceMemories, rotateSpace, setRole, vaultSpaces } from "./spaces";
+import { answerRequest, gateRead, listRequests, requestAccess, setProtected, takeApproval, useApproval } from "./protect";
+import { addSource, appSources, listSources, pauseSource, removeSource, saveAppSource, saveSource, setSourceApp, syncDelete, syncWrite } from "./sync";
+import {
+  answerPublic,
+  appPublicSelf,
+  askPublic,
+  deletePublicSelf,
+  hideAnswer,
+  ownerItems,
+  ownerPublicSelf,
+  publicItem,
+  publicPage,
+  publicPending,
+  publicQuestionStatus,
+  publishItems,
+  savePublicSelf,
+  visitorOf,
+} from "./public";
+import { acceptMeet, addTurn, declineMeet, invite, listMeets, meetsWaiting, removeMeet, stopMeet } from "./meets";
 import { deleteCertificate, getCertificate, listCertificates, MAX_CERT_BYTES, MAX_CERT_HOURS, presenceCounts, presenceProofs, presenceTask, publishCertificate, recordPresence, rootsFor, setSignKey } from "./life";
 
 // ---------------------------------------------------------------- input shapes
@@ -182,6 +201,10 @@ const memberShape = z.object({
   appId: id.nullable().optional(),
 });
 const spaceMemoryShape = z.object({ id, folderId: id, head: envelope(64_000), body: envelope(3_000_000) });
+const requesterShape = z.union([id, z.literal("self")]);
+const publicItemShape = z.object({ id, title: z.string().max(300), body: z.string().max(20_000), tags: z.array(z.string().max(48)).max(32), editedAt: isoTime });
+const wallShape = z.object({ question: z.string().max(2000), answer: z.string().max(4000), sources: z.array(z.object({ id, title: z.string().max(300) })).max(12) });
+const meetBox = z.string().max(16 * 1024).refine(isMeetBox, "Expected a meet box");
 const pairingCodeShape = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/, "Invalid code");
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -492,6 +515,10 @@ route("GET", "vault", (ctx) => {
     signKey: getSignKeyFor(ctx.db, userId),
     presence: presenceCounts(ctx.db, userId),
     certificates: listCertificates(ctx.db, userId),
+    access: listRequests(ctx.db, userId),
+    sync: listSources(ctx.db, userId),
+    publicSelf: ownerPublicSelf(ctx.db, userId),
+    meets: listMeets(ctx.db, userId),
   });
 });
 
@@ -716,7 +743,9 @@ route("GET", "log", (ctx) => {
   sealPending(ctx.db);
   const limit = Math.min(Math.max(Number(ctx.url.searchParams.get("limit")) || 200, 1), 1000);
   const before = ctx.url.searchParams.get("before") ?? undefined;
-  return json({ periodSeconds: serverConfig.sealSeconds, mode: anchorStatus().mode, entries: listLog(ctx.db, userId, limit, before) });
+  const app = ctx.url.searchParams.get("app") ?? undefined;
+  if (app !== undefined && !/^[A-Za-z0-9_-]{4,64}$/.test(app)) throw new HttpError(400, "Invalid app id.", "invalid");
+  return json({ periodSeconds: serverConfig.sealSeconds, mode: anchorStatus().mode, entries: listLog(ctx.db, userId, limit, before, app) });
 });
 
 route("GET", "log/:id/proof", (ctx, [entryId]) => {
@@ -747,13 +776,29 @@ route("GET", "connector/v1/folders", (ctx) => {
   return json({ appId: auth.appId, folders });
 });
 
+// The heads of every memory the app may read. Protected folders are left out;
+// ?protected=<folder id> asks for that one too, which needs the owner's yes
+// (a request waits in the inbox until then, and a yes is good for one look).
 route("GET", "connector/v1/index", (ctx) => {
   const auth = appOf(ctx);
   assertTool(ctx.db, auth, "recall");
   const folders = appFolders(ctx.db, auth);
-  const memories = appIndex(ctx.db, auth);
-  logRead(ctx.db, auth, "index", null, memories.length);
-  return json({ appId: auth.appId, folders, memories });
+  const want = ctx.url.searchParams.get("protected");
+  let open: string | null = null;
+  const held: { folderId: string; requestId: string; state: string }[] = [];
+  if (want) {
+    if (!folders.some((f) => f.id === want && f.protected)) throw new HttpError(404, "This app may not read a protected folder with that id.", "not_protected");
+    if (takeApproval(ctx.db, auth.userId, auth.appId, want, "index", [])) open = want;
+    else {
+      const req = requestAccess(ctx.db, auth.userId, { requester: auth.appId, requesterKind: "app", folderId: want, memoryIds: [], scope: "index" });
+      held.push({ folderId: want, requestId: req.id, state: req.state });
+    }
+  }
+  const memories = appIndex(ctx.db, auth, open);
+  const inOpen = open ? memories.filter((m) => m.folderId === open).length : 0;
+  logRead(ctx.db, auth, "index", null, memories.length - inOpen);
+  if (open) logRead(ctx.db, auth, "protected", null, inOpen);
+  return json({ appId: auth.appId, folders, memories, held });
 });
 
 route("POST", "connector/v1/read", async (ctx) => {
@@ -762,9 +807,13 @@ route("POST", "connector/v1/read", async (ctx) => {
   const body = parse(z.object({ ids: z.array(id).min(1).max(20) }), await readJson(ctx.req, 16 * KB));
   const unique = [...new Set(body.ids)];
   const { found, missing } = appRead(ctx.db, auth, unique);
-  for (const m of found) logRead(ctx.db, auth, "read", m.id, 1);
-  const folders = appFolders(ctx.db, auth).filter((f) => found.some((m) => m.folderId === f.id));
-  return json({ appId: auth.appId, folders, memories: found, missing });
+  // Memories in protected folders are handed over only with the owner's yes for this read.
+  const { open, protectedRead, held } = gateRead(ctx.db, auth, found);
+  for (const m of open) logRead(ctx.db, auth, "read", m.id, 1);
+  for (const m of protectedRead) logRead(ctx.db, auth, "protected", m.id, 1);
+  const memories = [...open, ...protectedRead];
+  const folders = appFolders(ctx.db, auth).filter((f) => memories.some((m) => m.folderId === f.id));
+  return json({ appId: auth.appId, folders, memories, missing, held });
 });
 
 // The vault public key and the tag that lets the app check it. Not a read of any memory, so not logged.
@@ -1104,6 +1153,249 @@ route("POST", "connector/v1/spaces/:id/forget", async (ctx, [spaceId]) => {
   return json({ appId: auth.appId, deleted: deleteSpaceMemories(ctx.db, { kind: "agent", auth }, spaceId, body.ids) });
 });
 
+// ---- protected folders: the owner's yes for each read
+
+route("PUT", "folders/:id/protect", async (ctx, [folderId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ protected: z.boolean(), meta: envelope(4096) }), await readJson(ctx.req, 16 * KB));
+  setProtected(ctx.db, userId, folderId, body.protected, body.meta);
+  return json({ ok: true });
+});
+
+route("GET", "access", (ctx) => json({ requests: listRequests(ctx.db, userOf(ctx)) }));
+
+// The owner's device asks too, when the AI self it runs (for a link, the public page or another self) needs a protected folder.
+route("POST", "access", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`access:${userId}`, 60, 60_000);
+  const body = parse(
+    z.object({
+      id,
+      requester: requesterShape,
+      requesterKind: z.enum(["link", "public", "meet", "self"]),
+      folderId: id,
+      memoryIds: z.array(id).max(50),
+      approve: z.boolean().optional(),
+    }),
+    await readJson(ctx.req, 16 * KB),
+  );
+  let req = requestAccess(ctx.db, userId, { id: body.id, requester: body.requester, requesterKind: body.requesterKind, folderId: body.folderId, memoryIds: body.memoryIds, scope: "read" });
+  // A yes given on the vault screen itself, for the owner's own test chat.
+  if (body.approve && req.state === "pending") req = answerRequest(ctx.db, userId, req.id, true);
+  return json({ request: req }, 201);
+});
+
+route("POST", "access/:id/approve", (ctx, [requestId]) => json({ request: answerRequest(ctx.db, userOf(ctx), requestId, true) }));
+route("POST", "access/:id/deny", (ctx, [requestId]) => json({ request: answerRequest(ctx.db, userOf(ctx), requestId, false) }));
+
+route("POST", "access/:id/use", async (ctx, [requestId]) => {
+  const userId = userOf(ctx);
+  useApproval(ctx.db, userId, requestId, parse(z.object({ memoryIds: z.array(id).min(1).max(50) }), await readJson(ctx.req, 16 * KB)).memoryIds);
+  return json({ ok: true });
+});
+
+// ---- live sync: sources under the vault key; fetching and encrypting happen on the device
+
+route("GET", "sync/config", () => json({ clients: serverConfig.syncClients }));
+
+route("GET", "sync", (ctx) => json({ sources: listSources(ctx.db, userOf(ctx)) }));
+
+route("POST", "sync", async (ctx) => {
+  const userId = userOf(ctx);
+  addSource(ctx.db, userId, parse(z.object({ id, folderId: id, ownerBox: envelope(256 * KB), rev: z.number().int().min(0) }), await readJson(ctx.req, 300 * KB)));
+  return json({ ok: true }, 201);
+});
+
+route("PUT", "sync/:id", async (ctx, [sourceId]) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({ ownerBox: envelope(256 * KB), rev: z.number().int().min(0), appBox: envelope(256 * KB).nullable().optional(), appRev: z.number().int().min(0).optional(), synced: z.boolean().optional() }),
+    await readJson(ctx.req, 600 * KB),
+  );
+  return json({ source: saveSource(ctx.db, userId, sourceId, body) });
+});
+
+route("POST", "sync/:id/pause", async (ctx, [sourceId]) => {
+  const userId = userOf(ctx);
+  pauseSource(ctx.db, userId, sourceId, parse(z.object({ paused: z.boolean() }), await readJson(ctx.req, 4 * KB)).paused);
+  return json({ ok: true });
+});
+
+route("DELETE", "sync/:id", (ctx, [sourceId]) => {
+  removeSource(ctx.db, userOf(ctx), sourceId);
+  return json({ ok: true });
+});
+
+route("PUT", "sync/:id/app", async (ctx, [sourceId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ appId: id, appBox: envelope(256 * KB), appRev: z.number().int().min(0), wrappedKey: envelope(256) }), await readJson(ctx.req, 300 * KB));
+  setSourceApp(ctx.db, userId, sourceId, body);
+  return json({ ok: true });
+});
+
+route("DELETE", "sync/:id/app", (ctx, [sourceId]) => {
+  setSourceApp(ctx.db, userOf(ctx), sourceId, null);
+  return json({ ok: true });
+});
+
+route("GET", "connector/v1/sync", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, sources: appSources(ctx.db, auth) });
+});
+
+route("PUT", "connector/v1/sync/:id", async (ctx, [sourceId]) => {
+  const auth = appOf(ctx);
+  const body = parse(z.object({ box: envelope(256 * KB), rev: z.number().int().min(0) }), await readJson(ctx.req, 300 * KB));
+  saveAppSource(ctx.db, auth, sourceId, body.box, body.rev);
+  return json({ ok: true });
+});
+
+route("POST", "connector/v1/sync/:id/memories", async (ctx, [sourceId]) => {
+  const auth = appOf(ctx);
+  const body = parse(z.object({ memories: z.array(z.object({ id, folderId: id, head: envelope(64_000), body: envelope(3_000_000) })).min(1).max(100) }), await readJson(ctx.req, 24 * MB));
+  return json({ appId: auth.appId, saved: syncWrite(ctx.db, auth, sourceId, body.memories) }, 201);
+});
+
+route("POST", "connector/v1/sync/:id/delete", async (ctx, [sourceId]) => {
+  const auth = appOf(ctx);
+  const body = parse(z.object({ ids: z.array(id).min(1).max(500) }), await readJson(ctx.req, 64 * KB));
+  return json({ appId: auth.appId, deleted: syncDelete(ctx.db, auth, sourceId, body.ids) });
+});
+
+// ---- the public AI self: the owner's settings and public copy
+
+const publicShape = z.object({
+  id,
+  handle: z.string().refine(isHandle, "Expected a handle of 3 to 30 lowercase letters, digits, - or _"),
+  name: z.string().trim().min(1).max(80),
+  greeting: z.string().max(400),
+  publicKey: boxPublicKey,
+  ownerBox: envelope(128 * KB),
+  appId: id.nullable(),
+  appBox: envelope(128 * KB).nullable(),
+  perVisitorHour: z.number().int().min(1).max(PUBLIC_MAX_PER_VISITOR),
+  showAnswers: z.boolean(),
+  enabled: z.boolean(),
+});
+
+route("GET", "public/self", (ctx) => {
+  const userId = userOf(ctx);
+  return json({ self: ownerPublicSelf(ctx.db, userId), items: ownerItems(ctx.db, userId) });
+});
+
+route("PUT", "public/self", async (ctx) => {
+  const userId = userOf(ctx);
+  savePublicSelf(ctx.db, userId, parse(publicShape, await readJson(ctx.req, 300 * KB)));
+  return json({ self: ownerPublicSelf(ctx.db, userId) });
+});
+
+route("DELETE", "public/self", (ctx) => {
+  deletePublicSelf(ctx.db, userOf(ctx));
+  return json({ ok: true });
+});
+
+route("PUT", "public/self/items", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ items: z.array(publicItemShape).max(2000), hash: z.string().regex(/^[0-9a-f]{64}$/) }), await readJson(ctx.req, 10 * MB));
+  return json({ published: publishItems(ctx.db, userId, body.items, body.hash) });
+});
+
+route("POST", "public/wall/:id/hide", async (ctx, [answerId]) => {
+  const userId = userOf(ctx);
+  hideAnswer(ctx.db, userId, answerId, parse(z.object({ hidden: z.boolean() }), await readJson(ctx.req, 4 * KB)).hidden);
+  return json({ ok: true });
+});
+
+route("GET", "public/pending", (ctx) => json({ questions: publicPending(ctx.db, { kind: "vault", userId: userOf(ctx) }) }));
+
+const publicAnswerShape = z.object({ sealed: relay(64 * KB), note: sealed(128 * KB), cited: z.number().int().min(0).max(50), wall: wallShape.nullable() });
+
+route("POST", "public/questions/:id/answer", async (ctx, [questionId]) => {
+  const userId = userOf(ctx);
+  answerPublic(ctx.db, { kind: "vault", userId }, questionId, parse(publicAnswerShape, await readJson(ctx.req, 200 * KB)));
+  return json({ ok: true });
+});
+
+route("GET", "connector/v1/public", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, self: appPublicSelf(ctx.db, auth) });
+});
+
+route("GET", "connector/v1/public/pending", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, questions: publicPending(ctx.db, { kind: "app", auth }) });
+});
+
+route("POST", "connector/v1/public/questions/:id/answer", async (ctx, [questionId]) => {
+  const auth = appOf(ctx);
+  answerPublic(ctx.db, { kind: "app", auth }, questionId, parse(publicAnswerShape, await readJson(ctx.req, 200 * KB)));
+  return json({ ok: true });
+});
+
+// ---- the public page at /@handle: anyone may read it and ask; the server relays boxes
+
+route("GET", "public/at/:handle", (ctx, [handle]) => {
+  rateLimit(`public-read:${clientIp(ctx.req)}`, 120, 60_000);
+  return json(publicPage(ctx.db, handle.toLowerCase()));
+});
+
+route("GET", "public/at/:handle/items/:id", (ctx, [handle, itemId]) => {
+  rateLimit(`public-read:${clientIp(ctx.req)}`, 120, 60_000);
+  return json(publicItem(ctx.db, handle.toLowerCase(), itemId));
+});
+
+route("POST", "public/at/:handle/questions", async (ctx, [handle]) => {
+  const ip = clientIp(ctx.req);
+  rateLimit(`public-ask:${ip}`, 8, 60_000);
+  const page = publicPage(ctx.db, handle.toLowerCase());
+  const body = parse(z.object({ id, sessionId: id, askerKey: boxPublicKey, sealed: relay(64 * KB) }), await readJson(ctx.req, 80 * KB));
+  return json(askPublic(ctx.db, page.handle, visitorOf(ip, page.id), body), 201);
+});
+
+route("GET", "public/at/:handle/questions/:qid", (ctx, [handle, questionId]) => {
+  rateLimit(`public-poll:${clientIp(ctx.req)}`, 240, 60_000);
+  return json(publicQuestionStatus(ctx.db, handle.toLowerCase(), questionId));
+});
+
+// ---- selves meet selves: invites, answers and turns, all boxes the server cannot open
+
+route("GET", "meets", (ctx) => json({ meets: listMeets(ctx.db, userOf(ctx)) }));
+
+route("POST", "meets", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ id, toKey: boxPublicKey, invite: sealed(8 * KB), box: envelope(64 * KB), turnLimit: z.number().int().min(2).max(12) }), await readJson(ctx.req, 100 * KB));
+  return json({ meet: invite(ctx.db, userId, body) }, 201);
+});
+
+route("POST", "meets/:id/accept", async (ctx, [meetId]) => {
+  const userId = userOf(ctx);
+  return json({ meet: acceptMeet(ctx.db, userId, meetId, parse(z.object({ answer: sealed(8 * KB), box: envelope(64 * KB) }), await readJson(ctx.req, 100 * KB))) });
+});
+
+route("POST", "meets/:id/decline", (ctx, [meetId]) => {
+  declineMeet(ctx.db, userOf(ctx), meetId);
+  return json({ ok: true });
+});
+
+route("POST", "meets/:id/stop", (ctx, [meetId]) => {
+  stopMeet(ctx.db, userOf(ctx), meetId);
+  return json({ ok: true });
+});
+
+route("DELETE", "meets/:id", (ctx, [meetId]) => {
+  removeMeet(ctx.db, userOf(ctx), meetId);
+  return json({ ok: true });
+});
+
+route("GET", "meets/waiting", (ctx) => json({ meets: meetsWaiting(ctx.db, userOf(ctx)) }));
+
+route("POST", "meets/:id/turns", async (ctx, [meetId]) => {
+  const userId = userOf(ctx);
+  rateLimit(`meet-turn:${userId}`, 30, 60_000);
+  const body = parse(z.object({ turn: z.number().int().min(1).max(12), box: meetBox, done: z.boolean(), cited: z.number().int().min(0).max(50) }), await readJson(ctx.req, 32 * KB));
+  return json({ meet: addTurn(ctx.db, userId, meetId, body) }, 201);
+});
+
 // ---------------------------------------------------------------- dispatch
 
 // Apps that run in a web page (Sign in with Sigil) call the connector routes from
@@ -1111,7 +1403,7 @@ route("POST", "connector/v1/spaces/:id/forget", async (ctx, [spaceId]) => {
 // origin may call them; what a token can do is set by the vault owner.
 const CORS = {
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-methods": "GET, POST, PUT, OPTIONS",
   "access-control-allow-headers": "authorization, content-type",
   "access-control-max-age": "600",
 };

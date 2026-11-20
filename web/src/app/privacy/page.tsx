@@ -35,6 +35,10 @@ const stored: [string, string, string][] = [
   ["Paired devices", "A key slot per device: a hash of its token, your vault key locked with its device key, its name under your vault key, and when it was last used. A pairing in progress keeps the new device's one-time public key, the code made from it and one sealed box, for ten minutes at most.", "Encrypted and hashed, with readable ids and times"],
   ["Agents", "For each agent: its own folder id, which tools it may use, whether it may write each folder, and the public half of the key pair made from its secret. Its handoff notes, encrypted.", "Readable rules and ids, notes encrypted"],
   ["Team spaces", "Each space's encrypted name and memories, and per member: which vault or agent, its public key, its role, the space key sealed to it, a tag made with the space key and its name in the space, encrypted.", "Encrypted and sealed, with readable ids, roles and times"],
+  ["Protected folders", "Which folder ids you protected (not what kind of folder: that stays in its encrypted name), and each request to read one: which app, link or AI self asked, which folder and memory ids, when, your answer, and when it was used. Answered requests are deleted after seven days.", "Readable ids and times"],
+  ["Live sync sources", "For each source: the folder id it writes to, whether it is paused, when it last synced, which app syncs it in the background, and the source itself (which service, your sign-in tokens, the account, where it got to) encrypted with your vault key, and for that app, with a key from its secret. Disconnecting deletes it.", "Encrypted, with readable ids and times"],
+  ["Public AI self", "If you make one: its handle, name and greeting, its public key, its private key and rules locked with your vault key, your limits, counts of questions, and the public copy of the folders you made public, in readable form because you publish it. Visitors' questions in flight are boxes only your device opens, kept a day. If you choose to show answers on the page, those questions and answers in readable form, until you hide them or turn it off.", "Readable by choice, keys and rules encrypted"],
+  ["Selves meet", "For each conversation: the two vaults' public keys, the turn limit, how many turns were taken, whether it runs, ended or was stopped and by whom, when each side last checked in, the invite and the answer sealed to the other vault, each side's own record under its vault key, and every turn encrypted under a key only the two vaults can make.", "Encrypted and sealed, with readable ids, counts and times"],
   ["Presence and certificates", "Your vault's signing public key, one read-log entry per hour your vault was open with its signature, and the certificates you publish by link (which hold seal roots, proofs and signatures, and nothing from your vault).", "Readable signatures and hashes"],
 ];
 
@@ -124,6 +128,21 @@ export default function Privacy() {
           <p>
             Someone you give an ask link to sends their questions, encrypted, through Sigil to your AI self. Sigil cannot read them. You can read
             them, with the answers, in your read log. Their network address is used for rate limits only, held in memory for at most an hour.
+          </p>
+
+          <h2>Live sync, public pages and other selves</h2>
+          <p>
+            When you connect a source under Sync, your browser (or your connector, for background sync) talks to Google or Slack directly with your own sign-in and
+            fetches your mail, events, files or messages there. Those services process that under your account and their own terms. Sigil receives only what was
+            encrypted on your device, and never a readable token.
+          </p>
+          <p>
+            Your public AI self answers anyone, from the public copy you publish; that copy is readable by everyone, by your choice. A visitor&apos;s network
+            address is used for rate limits and, as a hash together with your page, to count their questions per hour; the address itself is not stored.
+          </p>
+          <p>
+            When your AI self talks with another vault&apos;s, the other owner reads everything your self says in that conversation, and their model provider
+            processes it. Choose the folders it may use with that in mind.
           </p>
 
           <h2>How long it is kept</h2>

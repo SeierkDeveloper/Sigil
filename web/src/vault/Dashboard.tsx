@@ -21,6 +21,9 @@ import { LegacyTab } from "./tabs/Legacy";
 import { DevicesTab } from "./tabs/Devices";
 import { AgentsTab } from "./tabs/Agents";
 import { ProofTab } from "./tabs/Proof";
+import { SyncTab } from "./tabs/Sync";
+import { MeetTab } from "./tabs/Meet";
+import { useLiveSync } from "./useLiveSync";
 import { sendPresence } from "./lifeOps";
 import { saveOfflineCopy } from "./offline";
 import { flushCaptures, pinVaultKey } from "./deviceOps";
@@ -33,6 +36,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "memories", label: "Memories" },
   { id: "inbox", label: "Inbox" },
   { id: "self", label: "AI self" },
+  { id: "meet", label: "Meet" },
   { id: "review", label: "Review" },
   { id: "timeline", label: "Timeline" },
   { id: "profile", label: "Self card" },
@@ -44,6 +48,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "proof", label: "Proof" },
   { id: "log", label: "Read log" },
   { id: "import", label: "Import" },
+  { id: "sync", label: "Sync" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -162,7 +167,8 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
     [memories, incoming],
   );
   const semantic = useSemanticIndex(api, vault, indexed);
-  const agent = useSelfAgent(api, data, semantic);
+  const agent = useSelfAgent(api, vault, data, semantic);
+  const liveSync = useLiveSync(api, vault, data, setData);
 
   // The weekly brief, once per opening, when it is due and the owner wants it.
   const briefTried = useRef(false);
@@ -176,6 +182,9 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
       .catch(() => undefined);
   }, [api, vault, data]);
 
+  // Stable, so effects that update the data now and then are not restarted by every change.
+  const updateData = useCallback((fn: (d: ops.VaultData) => ops.VaultData) => setData((d) => (d ? fn(d) : d)), []);
+
   const ctx = useMemo<VaultCtx | null>(
     () =>
       data
@@ -183,18 +192,19 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
             api,
             vault,
             data,
-            update: (fn) => setData((d) => (d ? fn(d) : d)),
+            update: updateData,
             reload,
             goTo,
             openMemory,
             focus,
             semantic,
             agent,
+            liveSync,
             lock: onLock,
             signOut: onSignOut,
           }
         : null,
-    [api, vault, data, reload, goTo, openMemory, focus, semantic, agent, onLock, onSignOut],
+    [api, vault, data, updateData, reload, goTo, openMemory, focus, semantic, agent, liveSync, onLock, onSignOut],
   );
 
   if (error && !data) {
@@ -215,6 +225,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   if (!ctx || !data) return <Spinner label="Decrypting your vault" />;
 
   const activeApps = data.apps.filter((a) => !a.revokedAt).length;
+  const waitingRequests = data.access.filter((r) => r.state === "pending").length;
 
   return (
     <Ctx.Provider value={ctx}>
@@ -267,9 +278,14 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
                   {data.trusted.filter((x) => x.state === "open" && !x.kept).length}
                 </span>
               ) : null}
-              {t.id === "inbox" && data.proposals.length > 0 ? (
-                <span className="tab-count" aria-label={`${data.proposals.length} waiting`}>
-                  {data.proposals.length}
+              {t.id === "inbox" && data.proposals.length + waitingRequests > 0 ? (
+                <span className="tab-count" aria-label={`${data.proposals.length + waitingRequests} waiting`}>
+                  {data.proposals.length + waitingRequests}
+                </span>
+              ) : null}
+              {t.id === "meet" && data.meets.some((m) => m.role === "invitee" && m.state === "invited") ? (
+                <span className="tab-count" aria-label="An invite is waiting">
+                  {data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length}
                 </span>
               ) : null}
             </button>
@@ -280,6 +296,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "memories" ? <MemoriesTab /> : null}
           {tab === "inbox" ? <InboxTab /> : null}
           {tab === "self" ? <SelfTab /> : null}
+          {tab === "meet" ? <MeetTab /> : null}
           {tab === "review" ? <ReviewTab /> : null}
           {tab === "timeline" ? <TimelineTab /> : null}
           {tab === "profile" ? <ProfileTab /> : null}
@@ -291,6 +308,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "proof" ? <ProofTab /> : null}
           {tab === "log" ? <LogTab /> : null}
           {tab === "import" ? <ImportTab /> : null}
+          {tab === "sync" ? <SyncTab /> : null}
           {tab === "settings" ? <SettingsTab onDeleted={onDeleted} /> : null}
         </div>
       </div>

@@ -27,10 +27,10 @@ test("imports mail and calendar from Takeout, and an Obsidian folder, encrypted,
   await page.getByRole("tab", { name: "Import" }).click();
 
   // Google Takeout.
-  await page.getByText("Gmail and Google Calendar", { exact: true }).click();
+  await page.getByText("Older Gmail and Calendar history", { exact: true }).click();
   await page.getByTestId("import-file").setInputFiles(zip);
   const preview = page.getByTestId("import-preview");
-  await expect(preview).toContainText("Gmail and Google Calendar: 4 items found");
+  await expect(preview).toContainText("Older Gmail and Calendar history: 4 items found");
   await expect(preview).toContainText("4 new memories to import.");
   await expect(preview).toContainText("Trip to the coast");
   await expect(preview.getByLabel("Save into")).toHaveValue("__new__");
@@ -39,7 +39,7 @@ test("imports mail and calendar from Takeout, and an Obsidian folder, encrypted,
 
   // The same zip again adds nothing.
   await page.getByRole("button", { name: "Import something else" }).click();
-  await page.getByText("Gmail and Google Calendar", { exact: true }).click();
+  await page.getByText("Older Gmail and Calendar history", { exact: true }).click();
   await page.getByTestId("import-file").setInputFiles(zip);
   await expect(preview).toContainText("Everything in this file is already in your vault.");
   await expect(preview).toContainText("4 items already in your vault will be skipped.");

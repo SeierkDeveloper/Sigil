@@ -14,7 +14,9 @@
 //       SIGIL_HTTP_TOKEN            secret path segment (a random one is made if unset)
 //   sigil-connector --self          answer the ask links the owner gave this app,
 //                                   on this machine, while it runs
-//   sigil-connector --watch <dir>   keep an Obsidian vault in sync through the inbox
+//   sigil-connector --watch [dir]   keep live sync sources (Gmail, Calendar, Drive,
+//                                   Slack) the owner gave this app in sync, and an
+//                                   Obsidian vault through the inbox when a folder is named
 
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -26,6 +28,7 @@ import { CONNECTOR_VERSION, createServer } from "./server";
 import { SelfAgent } from "./self";
 import { ObsidianWatcher } from "./watch";
 import { AgentMemory } from "./agent";
+import { SyncWorker } from "./sync";
 
 function fail(message: string): never {
   process.stderr.write(`sigil-connector: ${message}\n`);
@@ -54,7 +57,8 @@ function help(): never {
       "  sigil-connector                      run over stdio (Claude Desktop, Cursor)",
       "  sigil-connector --http [--port N]    serve http://127.0.0.1:N/mcp/<token>",
       "  sigil-connector --self               answer your ask links on this machine",
-      "  sigil-connector --watch <folder>     suggest new and changed Obsidian notes to the inbox",
+      "  sigil-connector --watch              keep the live sync sources you gave this app in sync",
+      "  sigil-connector --watch <folder>     also suggest new and changed Obsidian notes to the inbox",
       "",
     ].join("\n"),
   );
@@ -117,20 +121,49 @@ async function main() {
     return;
   }
 
-  const watchDir = arg("--watch");
-  if (watchDir) {
-    let watcher: ObsidianWatcher;
-    try {
-      watcher = new ObsidianWatcher(reader, watchDir, { folder: arg("--folder") ?? "Obsidian", log: (l) => process.stderr.write(`sigil-connector: ${l}\n`) });
-    } catch (err) {
-      fail((err as Error).message);
+  if (process.argv.includes("--watch")) {
+    const next = arg("--watch");
+    const watchDir = next && !next.startsWith("--") ? next : undefined;
+    const log = (l: string) => process.stderr.write(`sigil-connector: ${l}\n`);
+    const stop = new AbortController();
+    let watcher: ObsidianWatcher | null = null;
+    if (watchDir) {
+      try {
+        watcher = new ObsidianWatcher(reader, watchDir, { folder: arg("--folder") ?? "Obsidian", log });
+      } catch (err) {
+        fail((err as Error).message);
+      }
+      watcher.start();
+      process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} watching ${watchDir} (stop with Ctrl+C)\n`);
     }
-    watcher.start();
-    process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} watching ${watchDir} (stop with Ctrl+C)\n`);
-    process.on("SIGINT", () => {
-      watcher.stop();
+    const worker = new SyncWorker(reader);
+    let sources = 0;
+    try {
+      sources = (await worker.sources()).length;
+    } catch (err) {
+      log(`live sync is not available for this key: ${(err as Error).message}`);
+    }
+    if (sources) {
+      process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} keeping ${sources} live sync ${sources === 1 ? "source" : "sources"} in sync (stop with Ctrl+C)\n`);
+      const minutes = Number(process.env.SIGIL_SYNC_MINUTES);
+      void worker.run({
+        everyMs: (Number.isFinite(minutes) && minutes >= 1 && minutes <= 1440 ? minutes : 5) * 60_000,
+        signal: stop.signal,
+        onReport: (reports) => {
+          for (const r of reports) log(r.error ? `${r.kind}: ${r.error}` : `${r.kind}: ${r.added} new, ${r.updated} changed, ${r.removed} removed`);
+        },
+        onError: (err) => log(err.message),
+      });
+    } else if (!watchDir) {
+      fail("This app has no live sync sources and no folder was named. Allow background sync for a source in the vault, under Sync, or name an Obsidian folder.");
+    }
+    const end = () => {
+      watcher?.stop();
+      stop.abort();
       process.exit(0);
-    });
+    };
+    process.on("SIGINT", end);
+    process.on("SIGTERM", end);
     return;
   }
 

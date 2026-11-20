@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -382,6 +382,153 @@ CREATE TABLE IF NOT EXISTS certificates (
   created_at TEXT NOT NULL
 );
 
+-- Protected folders: the server holds back their ciphertext from apps, agents
+-- and links until the owner says yes for a read. What kind of folder it is
+-- (health, money, legal) stays in the folder's encrypted meta.
+CREATE TABLE IF NOT EXISTS protected_folders (
+  user_id TEXT NOT NULL,
+  folder_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, folder_id),
+  FOREIGN KEY (user_id, folder_id) REFERENCES folders(user_id, id) ON DELETE CASCADE
+);
+
+-- Requests to read a protected folder and the owner's answer. requester is an
+-- app id, an ask link id, the public self's id, a meet id, or "self" for the
+-- owner's own test chat. memory_ids is a JSON list; empty means the folder's
+-- list of memories (scope index). An approval is good for one read, for a few
+-- minutes.
+CREATE TABLE IF NOT EXISTS access_requests (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  requester TEXT NOT NULL,
+  requester_kind TEXT NOT NULL CHECK (requester_kind IN ('app', 'link', 'public', 'meet', 'self')),
+  folder_id TEXT NOT NULL,
+  memory_ids TEXT NOT NULL,
+  scope TEXT NOT NULL CHECK (scope IN ('read', 'index')),
+  state TEXT NOT NULL CHECK (state IN ('pending', 'approved', 'denied', 'used')),
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  answered_at INTEGER,
+  used_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS access_requests_by_user ON access_requests (user_id, state, created_at);
+
+-- Live sync sources. owner_box is the source (service, tokens, cursor) under
+-- the vault key; app_box the same under a key from the secret of the connector
+-- the owner lets sync in the background. Each carries a revision so the newer
+-- copy wins. Deleting the row deletes the stored tokens.
+CREATE TABLE IF NOT EXISTS sync_sources (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  folder_id TEXT NOT NULL,
+  owner_box TEXT NOT NULL,
+  owner_rev INTEGER NOT NULL,
+  app_id TEXT REFERENCES apps(id) ON DELETE SET NULL,
+  app_box TEXT,
+  app_rev INTEGER NOT NULL DEFAULT 0,
+  paused INTEGER NOT NULL DEFAULT 0,
+  last_sync_at TEXT,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (user_id, folder_id) REFERENCES folders(user_id, id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS sync_sources_by_app ON sync_sources (app_id);
+
+-- The public AI self: a page at /@handle. owner_box is its X25519 private key
+-- and rules under the vault key; app_box the same for a connector that answers
+-- it. public_items is the plain public copy of the folders made public, the
+-- only thing it answers from. public_wall holds answered questions the owner
+-- lets the page show, until hidden.
+CREATE TABLE IF NOT EXISTS public_selves (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  handle TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  greeting TEXT NOT NULL,
+  public_key TEXT NOT NULL,
+  owner_box TEXT NOT NULL,
+  app_id TEXT REFERENCES apps(id) ON DELETE SET NULL,
+  app_box TEXT,
+  per_visitor_hour INTEGER NOT NULL,
+  show_answers INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  copy_hash TEXT,
+  published_at TEXT,
+  agent_seen_at INTEGER,
+  asked INTEGER NOT NULL DEFAULT 0,
+  answered INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS public_items (
+  self_id TEXT NOT NULL REFERENCES public_selves(id) ON DELETE CASCADE,
+  id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  tags TEXT NOT NULL,
+  edited_at TEXT NOT NULL,
+  PRIMARY KEY (self_id, id)
+);
+CREATE TABLE IF NOT EXISTS public_questions (
+  id TEXT PRIMARY KEY,
+  self_id TEXT NOT NULL REFERENCES public_selves(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  visitor TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  asker_key TEXT NOT NULL,
+  sealed TEXT NOT NULL,
+  answer TEXT,
+  created_at INTEGER NOT NULL,
+  answered_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS public_questions_by_self ON public_questions (self_id, answered_at, created_at);
+CREATE INDEX IF NOT EXISTS public_questions_by_visitor ON public_questions (self_id, visitor, created_at);
+CREATE TABLE IF NOT EXISTS public_wall (
+  id TEXT PRIMARY KEY,
+  self_id TEXT NOT NULL REFERENCES public_selves(id) ON DELETE CASCADE,
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  sources TEXT NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS public_wall_by_self ON public_wall (self_id, created_at);
+
+-- Selves meet selves: two vaults whose AI selves talk, after both said yes.
+-- invite is sealed to the invitee, answer to the inviter; each side's own
+-- record (purpose, folders, label) is under its own vault key. Messages are
+-- encrypted under a key only the two vaults can derive.
+CREATE TABLE IF NOT EXISTS meets (
+  id TEXT PRIMARY KEY,
+  inviter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  invitee_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  inviter_key TEXT NOT NULL,
+  invitee_key TEXT NOT NULL,
+  turn_limit INTEGER NOT NULL,
+  invite TEXT NOT NULL,
+  answer TEXT,
+  inviter_box TEXT NOT NULL,
+  invitee_box TEXT,
+  state TEXT NOT NULL CHECK (state IN ('invited', 'running', 'done', 'stopped', 'declined')),
+  turns INTEGER NOT NULL DEFAULT 0,
+  stopped_by TEXT,
+  inviter_seen_at INTEGER,
+  invitee_seen_at INTEGER,
+  inviter_removed INTEGER NOT NULL DEFAULT 0,
+  invitee_removed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS meets_by_inviter ON meets (inviter_id);
+CREATE INDEX IF NOT EXISTS meets_by_invitee ON meets (invitee_id);
+CREATE TABLE IF NOT EXISTS meet_messages (
+  meet_id TEXT NOT NULL REFERENCES meets(id) ON DELETE CASCADE,
+  turn INTEGER NOT NULL,
+  box TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (meet_id, turn)
+);
+
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
   hour INTEGER PRIMARY KEY,
@@ -403,15 +550,16 @@ CREATE TABLE IF NOT EXISTS seal_leaves (
 `;
 
 // Every request a connected app makes, every suggestion it sends, every time
-// another vault opens a folder shared with it, and every question the AI self
-// answers. leaf = Merkle leaf of the entry (salted). note, for answers only, is
+// another vault opens a folder shared with it, every question the AI self
+// answers, every read of a protected folder and the owner's answer to it, and
+// every step of a conversation between two AI selves. leaf = Merkle leaf of the entry (salted). note, for answers only, is
 // the question and answer sealed to the vault's public key.
 const READ_LOG = `
 CREATE TABLE IF NOT EXISTS read_log (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space')),
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync')),
   memory_id TEXT,
   count INTEGER NOT NULL,
   at TEXT NOT NULL,
@@ -430,7 +578,7 @@ CREATE INDEX IF NOT EXISTS read_log_by_kind ON read_log (user_id, kind, hour);
 /** Older versions allowed fewer kinds in the log and had no notes. Rebuild the table, keeping every row. */
 function migrateReadLog(db: Db): void {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes("'space'")) return;
+  if (!row?.sql || row.sql.includes("'sync'")) return;
   const hasNote = row.sql.includes("note TEXT");
   db.exec("BEGIN IMMEDIATE");
   try {

@@ -45,6 +45,9 @@ export default function Security() {
             <a href="#legacy-devices-agents">Legacy, devices and agents</a>
           </li>
           <li>
+            <a href="#round-five">Sync, protection, public and meeting selves</a>
+          </li>
+          <li>
             <a href="#limits">Limits</a>
           </li>
           <li>
@@ -214,6 +217,35 @@ export default function Security() {
               <li>
                 <strong>Presence.</strong> A signing key (Ed25519) is derived from your vault key. One statement per hour you have the vault open is
                 signed in your browser and sealed with that hour, which is what a life certificate is built from.
+              </li>
+            </ul>
+          </section>
+
+          <section id="round-five">
+            <h2>Sync, protection, public and meeting selves</h2>
+            <ul>
+              <li>
+                <strong>Live sync.</strong> OAuth 2.0 with PKCE (S256) from your browser as a public client; no client secret is sent from a browser or kept on the
+                server. The tokens and the cursor are one document encrypted with your vault key, and, for a connector you let sync in the background, under a key
+                derived from that app&apos;s secret. Fetching and encrypting happen on the device. The content security policy allows exactly the Google and Slack
+                addresses live sync calls.
+              </li>
+              <li>
+                <strong>Protected folders.</strong> The server holds a protected folder&apos;s ciphertext back from apps, agents and links until you approve that read;
+                an approval is single use and lasts ten minutes. Protected reads and your answers have their own kinds in the log, and the kind is part of each sealed
+                leaf. Redaction runs on the device before text leaves the vault.
+              </li>
+              <li>
+                <strong>The public AI self.</strong> Its X25519 key pair is made on your device; the private half and its rules are encrypted with your vault key.
+                Visitors&apos; questions use the same relay as ask links, and it answers only from the public copy you publish.
+              </li>
+              <li>
+                <strong>Selves meet.</strong> The invite and the answer are sealed boxes to the other vault. Turns are XChaCha20-Poly1305 under a key from X25519 between
+                the two vaults&apos; own keys, bound to the meet, the turn and the sender, so only those two vaults can write a turn that opens.
+              </li>
+              <li>
+                <strong>The open standard.</strong> All of this is written down in the <Link href="/spec">open standard</Link>, with test vectors the code is
+                checked against on every test run.
               </li>
             </ul>
           </section>

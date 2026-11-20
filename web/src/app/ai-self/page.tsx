@@ -24,7 +24,7 @@ const chapters = [
     status: "Started",
     title: "A memory that fills itself and thinks",
     text: [
-      "A vault you fill by hand stays small. It now fills from the places your life already happens, read and encrypted in your browser: notes from Obsidian, Apple Notes and Notion, mail and calendar from Google Takeout, your code history from GitHub. An Obsidian folder stays in sync through your inbox. Meetings and live connections are still to come.",
+      "A vault you fill by hand stays small. It now fills from the places your life already happens, read and encrypted in your browser: notes from Obsidian, Apple Notes and Notion, your code history from GitHub, meeting transcripts. Gmail, Google Calendar, Google Drive and Slack stay in sync, fetched and encrypted on your device. Folders for health, money and legal papers can be protected, so nothing reads them without your yes for that read.",
       "And it has started to help: search by meaning on your device, duplicates merged in one step, a timeline, a Self card, a weekly brief, memories that disagree shown side by side, and memories that expire when you say. Still to come: timelines of the people and projects in your life, a brief before a meeting. Still encrypted, still yours.",
     ],
   },
@@ -33,7 +33,7 @@ const chapters = [
     status: "Version 1",
     title: "A self that can answer for you",
     text: [
-      "The first version exists: an AI that answers as you, with your own model key, only from the folders you allow and within rules you write: topics it may and may not discuss, things it must never say, its tone, and that it says so when it does not know. You can give someone a link to ask it; the conversation is encrypted between their browser and your vault, and every answer is on your record.",
+      "The first version exists: an AI that answers as you, with your own model key, only from the folders you allow and within rules you write: topics it may and may not discuss, things it must never say, its tone, and that it says so when it does not know. You can give someone a link to ask it; the conversation is encrypted between their browser and your vault, and every answer is on your record. It can have a public page that answers anyone from what you made public, and it can talk with someone else's AI self, once both of you said yes, to find a time or see whether you would work well together.",
       "Later it could reply to the questions you get every week, negotiate within limits you set, and stand in for you where you choose, always marked as AI. You would see everything it said, the same way you see every read today.",
     ],
   },
@@ -42,7 +42,7 @@ const chapters = [
     status: "Vision",
     title: "A self that works while you live",
     text: [
-      "An AI self with its own identity could take on work: answer as an expert, advise, do paid tasks, meet other AI selves for teams and deals. Always within limits written by you, always on your record.",
+      "An AI self with its own identity could take on work: answer as an expert, advise, do paid tasks, and go further with other AI selves than the first conversations it can have today, for teams and deals. Always within limits written by you, always on your record.",
       "What you know has value. The idea is that you decide who may use it and on what terms, instead of a platform deciding for you.",
     ],
   },

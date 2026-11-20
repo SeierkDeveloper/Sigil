@@ -22,6 +22,8 @@ import {
   importKey,
   linkPair,
   openAskMessage,
+  openPublicForApp,
+  publicMemories,
   randomId,
   sealAskMessage,
   sealJson,
@@ -29,6 +31,8 @@ import {
   type AskLinkSecret,
   type AskNote,
   type AskReply,
+  type PublicItem,
+  type PublicReply,
   type ModelCaller,
   type SelfAnswer,
   type SelfMemory,
@@ -163,12 +167,70 @@ export class SelfAgent {
     return n;
   }
 
-  /** Serves links until stopped. The owner's links show as online while this runs. */
+  private publicOffUntil = 0;
+
+  /**
+   * One round of the public AI self, when the owner picked this app to answer
+   * it: marks it online and answers waiting visitors, only from the public copy
+   * the owner published. Each question and answer is sealed into the owner's log.
+   */
+  async servePublicOnce(now = Date.now()): Promise<number> {
+    if (now < this.publicOffUntil) return 0;
+    let pub: { id: string; publicKey: string; box: string; enabled: boolean; items: PublicItem[] };
+    try {
+      pub = (await this.reader.request<{ self: typeof pub }>("GET", "public")).self;
+    } catch {
+      // Not this app's to answer: look again in a minute.
+      this.publicOffUntil = now + 60_000;
+      return 0;
+    }
+    if (!pub.enabled) return 0;
+    const { questions } = await this.reader.request<{ questions: { id: string; selfId: string; sessionId: string; askerKey: string; sealed: string }[] }>("GET", "public/pending");
+    if (!questions.length) return 0;
+    const secret = await openPublicForApp(this.reader.appSecret, this.reader.appId, pub.id, pub.box);
+    const settings = cleanModelSettings(secret?.model);
+    if (!secret || !settings || !secret.boxPublic) throw new Error("The public AI self could not be opened with this app's key. Choose the app again in the vault.");
+    const model = createModelCaller(settings, this.opts.fetch ? { fetch: this.opts.fetch } : {});
+    const pair = linkPair({ secret: secret.secret, label: "", rules: null, introKey: "" });
+    const memories = publicMemories(pub.items);
+    let n = 0;
+    for (const q of questions) {
+      const ids = { linkId: pub.id, sessionId: q.sessionId, messageId: q.id };
+      const key = agentSessionKey(pair, pub.id, q.sessionId, q.askerKey);
+      let reply: PublicReply;
+      let question = "";
+      try {
+        const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
+        question = opened.text;
+        const a = await answerAsSelf({ question, history: opened.history, rules: secret.rules, memories, model, asker: "public" });
+        reply = { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) };
+      } catch {
+        reply = { v: 1, text: AGENT_ERROR_TEXT, refused: "error", sources: [] };
+        if (!question) question = "(the question could not be opened)";
+      }
+      const note: AskNote = { v: 1, via: "public", label: secret.rules.name, question, answer: reply.text, citations: reply.sources, refused: reply.refused };
+      try {
+        await this.reader.request("POST", `public/questions/${q.id}/answer`, {
+          sealed: sealAskMessage(key, ids, "a", reply),
+          note: sealJson(decodeBoxPublicKey(secret.boxPublic), note, askNoteContext(q.id, pub.id)),
+          cited: reply.sources.length,
+          wall: reply.refused === "error" ? null : { question, answer: reply.text, sources: reply.sources },
+        });
+        n++;
+      } catch {
+        // Expired or answered meanwhile.
+      }
+    }
+    return n;
+  }
+
+  /** Serves links (and the public AI self, when it is this app's) until stopped. The owner's links show as online while this runs. */
   async run(opts: { everyMs?: number; signal?: AbortSignal; onError?: (err: Error) => void } = {}): Promise<void> {
     const every = opts.everyMs ?? 3000;
     while (!opts.signal?.aborted) {
       try {
         await this.serveOnce();
+        await this.servePublicOnce();
       } catch (err) {
         opts.onError?.(err as Error);
       }

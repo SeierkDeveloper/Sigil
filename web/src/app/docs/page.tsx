@@ -8,10 +8,14 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the API and the encryption model.",
+    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the open standard, the API and the encryption model.",
 };
 
 const KEY = "sigil_app.<app id>.<secret>";
+
+const syncEnv = `# Public OAuth client ids for live sync. No client secret on the server.
+SIGIL_GOOGLE_CLIENT_ID=<id>.apps.googleusercontent.com
+SIGIL_SLACK_CLIENT_ID=<id>`;
 
 const toc = [
   ["quick-start", "Quick start"],
@@ -35,6 +39,13 @@ const toc = [
   ["agents", "Agent vaults"],
   ["spaces", "Team spaces"],
   ["proof", "Proof of a real life"],
+  ["sync", "Live sync"],
+  ["meetings", "Meeting transcripts"],
+  ["protected", "Protected folders"],
+  ["public-self", "Public AI self"],
+  ["meet", "Selves meet"],
+  ["privacy-score", "Privacy score"],
+  ["spec", "Open standard"],
   ["import", "Importing"],
   ["api", "API"],
   ["encryption", "Encryption model"],
@@ -719,6 +730,182 @@ export default function Docs() {
               <strong>What it proves, and what it does not.</strong> It proves that whoever could open this vault signed in each listed hour and that
               the site sealed it then. It does not prove who that is, that it is one person, that a person rather than a program kept the vault open,
               or anything about the vault&apos;s contents. While seals are local, the site holds the list of roots.
+            </p>
+          </section>
+
+          <section id="sync" className="doc-section">
+            <h2>Live sync</h2>
+            <p>
+              Under <strong>Sync</strong> your vault keeps Gmail, Google Calendar, Google Drive and Slack in folders you choose, read only. Your browser signs in to
+              the service in a small window (OAuth with PKCE, as a public client: no client secret anywhere), trades the code for tokens itself, and encrypts the
+              sign-in with your vault key before it is saved. Then it asks only for what changed (Gmail history ids, Calendar sync tokens, Drive change tokens,
+              the newest Slack message per channel), and encrypts every mail thread, event, document and channel-day on the device. The server stores envelopes.
+            </p>
+            <ul>
+              <li>
+                <strong>Gmail</strong>: the last 90 days, then every change, one memory per thread; spam and trash left out. <strong>Calendar</strong>: your main
+                calendar, one memory per event, cancelled events removed. <strong>Drive</strong>: Google Docs and text files as text, trashed files removed.{" "}
+                <strong>Slack</strong>: your channels and direct messages from the last 30 days, then every new message, one memory per channel and day.
+              </li>
+              <li>
+                <strong>No duplicates.</strong> A thread or event that a Google Takeout import already brought lands on that memory. A new one gets an id
+                derived from the folder key, so two devices syncing at once write one memory.
+              </li>
+              <li>
+                <strong>Pause and disconnect.</strong> Pause stops a source. Disconnect deletes its stored sign-in at once; the memories it made stay.
+              </li>
+              <li>
+                <strong>While the vault is closed.</strong> Pick a connector app for a source and run <span className="mono">sigil-connector --watch</span> on your
+                machine. The vault wraps the source and its folder key for that app&apos;s key only; the connector refreshes the sign-in, encrypts on your machine
+                and writes only into that folder. Each write is in your read log.
+              </li>
+            </ul>
+            <p>
+              <strong>Setting up the sign-in (for whoever runs the site).</strong> Live sync needs a public OAuth client id per provider, set in the server&apos;s
+              environment. Without one, the source says so and does not pretend to connect.
+            </p>
+            <CodeBlock code={syncEnv} label=".env" />
+            <ol>
+              <li>
+                Google: create an OAuth client that may trade a code with PKCE and no client secret (a public client), add{" "}
+                <span className="mono">https://your-site/vault/connect</span> as a redirect address, and allow the read-only Gmail, Calendar and Drive scopes on
+                the consent screen.
+              </li>
+              <li>
+                Slack: create a Slack app that allows PKCE for public clients, add the same redirect address and the user scopes <span className="mono">channels:history channels:read groups:history
+                groups:read im:history im:read mpim:history mpim:read users:read</span>.
+              </li>
+              <li>
+                A client type that still asks for a secret at the token step does not work from a browser. For background sync the connector reads{" "}
+                <span className="mono">SIGIL_GOOGLE_CLIENT_SECRET</span> or <span className="mono">SIGIL_SLACK_CLIENT_SECRET</span> from your own machine&apos;s
+                environment; it is never sent to Sigil.
+              </li>
+            </ol>
+          </section>
+
+          <section id="meetings" className="doc-section">
+            <h2>Meeting transcripts</h2>
+            <p>
+              Under <strong>Import</strong>, choose <strong>Meeting transcripts</strong> and drop a transcript saved from Zoom, Google Meet or Microsoft Teams as
+              .vtt, .srt, .txt or .docx. It becomes one meeting memory: who was there (the people who spoke), what was decided, what was promised and by whom,
+              and the transcript. With your model key set, your own model writes the extract from this browser; without it, or with that switch off, plain rules
+              make it: a decision is a sentence that says something was decided or agreed, a promise a sentence where someone says they will do something.
+            </p>
+          </section>
+
+          <section id="protected" className="doc-section">
+            <h2>Protected folders</h2>
+            <p>
+              Under <strong>Folders</strong>, Protect marks a folder as health, money, legal or other. Then no app, agent, AI self or link reads it without your
+              fresh yes for that read:
+            </p>
+            <ol>
+              <li>An app asks (a search that names the folder, or a read of a memory in it). The server holds the ciphertext back and puts a request in your inbox.</li>
+              <li>You say yes or no in the Inbox. A yes lasts ten minutes and covers that one read.</li>
+              <li>The app asks again and gets it; the yes is used up. The read is logged as protected, and your answer as an approval, both sealed with the hour.</li>
+            </ol>
+            <p>
+              Your own AI self passes the same gate: answering a link or another self it leaves the folder out and asks you; in the test chat you allow it on the
+              screen for one answer. The kind of folder stays in its encrypted name; the server knows only that it is protected. A protected folder cannot be
+              made public.
+            </p>
+            <p>
+              <strong>Redaction.</strong> Per folder, mask card numbers, IBANs, account numbers, national ID and passport numbers, phone numbers and email
+              addresses before anything leaves the vault: in the connector before an app gets the text, in your browser before your model or a public page does.
+              It matches common shapes (with the Luhn and mod 97 checks for cards and IBANs), so an unusual way of writing a number can slip through. Your
+              vault keeps the text as written.
+            </p>
+          </section>
+
+          <section id="public-self" className="doc-section">
+            <h2>Public AI self</h2>
+            <p>
+              Under <strong>AI self</strong>, Public AI self gives you a page at <span className="mono">/@yourname</span> where anyone can ask your AI self. It
+              answers only from folders you make public: those are published as a separate public copy, masked with each folder&apos;s rules, and the page&apos;s
+              sources point to it. Every answer is marked as AI.
+            </p>
+            <ul>
+              <li>
+                <strong>Answered by you.</strong> A visitor&apos;s question is sealed in their browser for your public self&apos;s key; your open vault, or your
+                connector with <span className="mono">--self</span> when you pick it, answers with your model key. When neither is running, the page says it is
+                offline and takes no question.
+              </li>
+              <li>
+                <strong>You stay in charge.</strong> Set the greeting, tone, topics it never touches and a limit of questions per visitor an hour. Every question
+                and answer is in your read log, sealed. Show answered questions on the page if you like, and hide any of them. Turn it off, or delete it with its
+                public copy.
+              </li>
+              <li>
+                <strong>The limit.</strong> The page is public, so its key comes from the server rather than a link: a server that swapped it could read a
+                visitor&apos;s question. Nothing private is at stake, since the public self can only answer from what you published.
+              </li>
+            </ul>
+          </section>
+
+          <section id="meet" className="doc-section">
+            <h2>Selves meet</h2>
+            <p>
+              Under <strong>Meet</strong>, invite another vault&apos;s AI self by its vault code, for one purpose: find a time to meet, check whether a collab
+              fits, or swap intros. Nothing is said until its owner says yes and picks what their self may use. Then the two selves take turns, each with its
+              owner&apos;s model key, rules and chosen folders (and, to find a time, the calendar if you allow it), up to the number of turns you set.
+            </p>
+            <p>
+              The invite and the answer are sealed boxes to the other vault. Every turn is encrypted under a key only the two vaults can derive from their own
+              keys, so the server, which relays the boxes, can neither read nor write one. Both of you read the whole transcript; either can stop it. Every step
+              is in both read logs, sealed. Your self takes its turns while your vault is open.
+            </p>
+          </section>
+
+          <section id="privacy-score" className="doc-section">
+            <h2>Privacy score</h2>
+            <p>
+              Under <strong>Apps</strong> and <strong>Agents</strong>, each app and agent has a privacy score, computed in your browser from your own read log of
+              the last 30 days. It starts at 100 and loses points for five things, each shown with its reason:
+            </p>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Part</th>
+                    <th>Points taken</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>How much it read</td>
+                    <td>Up to 30: the share of the memories it may read that it read in full</td>
+                  </tr>
+                  <tr>
+                    <td>Folders</td>
+                    <td>Up to 20: 5 for each folder it read from</td>
+                  </tr>
+                  <tr>
+                    <td>Protected reads</td>
+                    <td>Up to 25: 10 for each read of a protected folder</td>
+                  </tr>
+                  <tr>
+                    <td>How often</td>
+                    <td>Up to 15: the share of the 30 days it was active</td>
+                  </tr>
+                  <tr>
+                    <td>Writes</td>
+                    <td>Up to 10: 1 for every 5 suggestions, memories written or removed</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              80 and above reads as light, 50 to 79 as regular, below 50 as heavy. The score says what an app read and how often, nothing more: it cannot see what
+              an app did with what it read. It looks at an app&apos;s latest 1,000 log entries.
+            </p>
+          </section>
+
+          <section id="spec" className="doc-section">
+            <h2>Open standard</h2>
+            <p>
+              The <Link href="/spec">Sigil open standard</Link> describes the memory format, folder keys and sealed boxes, the connector&apos;s tools and
+              permissions, the access log entry, hourly seals and presence, and certificates, so anyone can build a vault, a connector or a checker. Its test
+              vectors are generated from the code in this repository, and a test checks on every run that the code still produces them.
             </p>
           </section>
 

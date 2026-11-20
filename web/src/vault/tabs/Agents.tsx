@@ -13,6 +13,7 @@ import * as agents from "../agentOps";
 import { errorText, useVault } from "../context";
 import { AppMark } from "../marks";
 import { CopyButton, Empty, Fingerprint, Notice, Spinner } from "../ui";
+import { PrivacyScoreCard } from "../Score";
 
 const CLIENTS: { kind: AppKind; label: string }[] = [
   { kind: "cursor", label: "Cursor" },
@@ -341,6 +342,7 @@ function AgentRow({ agent, app }: { agent: agents.AgentView; app: ops.AppView })
             </span>
           ))}
         </p>
+        {!app.revokedAt ? <PrivacyScoreCard app={app} /> : null}
         {error ? <Notice kind="error">{error}</Notice> : null}
         {editing ? (
           <div className="subpanel">

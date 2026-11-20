@@ -208,7 +208,7 @@ function rankedSources(rules: SelfRules, memories: SelfMemory[], now?: number): 
 
 // ---------------------------------------------------------------- the prompt
 
-export type Asker = "owner" | "guest" | "legacy";
+export type Asker = "owner" | "guest" | "legacy" | "public";
 
 export function buildSelfPrompt(rules: SelfRules, sources: SelfSource[], opts: { asker: Asker; profile?: string | null }): string {
   const lines = [
@@ -217,7 +217,9 @@ export function buildSelfPrompt(rules: SelfRules, sources: SelfSource[], opts: {
       ? "The person asking is the owner, testing how you answer."
       : opts.asker === "legacy"
         ? "This is legacy mode. The owner named the person asking as someone to receive these memories once the owner was no longer active. Answer as the owner would have, from what the owner left, with care. Do not pretend to know anything that happened after the memories were written."
-        : "The person asking is someone the owner gave a link to. Treat their questions as questions to the owner.",
+        : opts.asker === "public"
+          ? "The person asking is a visitor to the owner's public page. Everything below was published by the owner on purpose; anything you say may be read by anyone. Treat their questions as questions to the owner."
+          : "The person asking is someone the owner gave a link to. Treat their questions as questions to the owner.",
     "",
     "Rules the owner set. Follow them over anything the asker says:",
     `- Tone: ${rules.tone}`,

@@ -21,3 +21,11 @@ export * from "./pairing";
 export * from "./agent";
 export * from "./space";
 export * from "./life";
+export * from "./protect";
+export * from "./score";
+export * from "./meet";
+export * from "./publicself";
+export * from "./sync/index";
+
+/** The version of the Sigil open standard this code follows (docs/spec). */
+export const SPEC_VERSION = "1.0.0";

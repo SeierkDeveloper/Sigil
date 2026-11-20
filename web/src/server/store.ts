@@ -263,12 +263,20 @@ export function deleteFolder(db: Db, userId: string, folderId: string): void {
   });
 }
 
-export function listFolders(db: Db, userId: string): (StoredFolder & { createdAt: string })[] {
-  return (db.prepare("SELECT id, meta, wrapped_key, created_at FROM folders WHERE user_id = ? ORDER BY created_at, id").all(userId) as Row[]).map((r) => ({
+export function listFolders(db: Db, userId: string): (StoredFolder & { createdAt: string; protected?: boolean })[] {
+  return (
+    db
+      .prepare(
+        `SELECT f.id, f.meta, f.wrapped_key, f.created_at, EXISTS (SELECT 1 FROM protected_folders p WHERE p.user_id = f.user_id AND p.folder_id = f.id) AS guarded
+         FROM folders f WHERE f.user_id = ? ORDER BY f.created_at, f.id`,
+      )
+      .all(userId) as Row[]
+  ).map((r) => ({
     id: String(r.id),
     meta: String(r.meta),
     wrappedKey: String(r.wrapped_key),
     createdAt: String(r.created_at),
+    ...(Number(r.guarded) === 1 ? { protected: true } : {}),
   }));
 }
 
@@ -424,23 +432,38 @@ export function appFolders(db: Db, auth: AppAuth) {
   return (
     db
       .prepare(
-        `SELECT f.id, f.meta, g.wrapped_key, g.mode, (SELECT COUNT(*) FROM memories m WHERE m.user_id = f.user_id AND m.folder_id = f.id) AS n
+        `SELECT f.id, f.meta, g.wrapped_key, g.mode, (SELECT COUNT(*) FROM memories m WHERE m.user_id = f.user_id AND m.folder_id = f.id) AS n,
+           EXISTS (SELECT 1 FROM protected_folders p WHERE p.user_id = f.user_id AND p.folder_id = f.id) AS guarded
          FROM grants g JOIN folders f ON f.user_id = g.user_id AND f.id = g.folder_id
          WHERE g.app_id = ? AND g.user_id = ? ORDER BY f.created_at, f.id`,
       )
       .all(auth.appId, auth.userId) as Row[]
-  ).map((r) => ({ id: String(r.id), meta: String(r.meta), wrappedKey: String(r.wrapped_key), count: Number(r.n), mode: r.mode === "write" ? ("write" as const) : ("read" as const) }));
+  ).map((r) => ({
+    id: String(r.id),
+    meta: String(r.meta),
+    wrappedKey: String(r.wrapped_key),
+    count: Number(r.n),
+    mode: r.mode === "write" ? ("write" as const) : ("read" as const),
+    ...(Number(r.guarded) === 1 ? { protected: true } : {}),
+  }));
 }
 
-export function appIndex(db: Db, auth: AppAuth) {
+/**
+ * The heads of every memory the app may see, leaving out protected folders.
+ * With `open`, the heads of that one protected folder too (the caller checked
+ * the owner's approval).
+ */
+export function appIndex(db: Db, auth: AppAuth, open: string | null = null) {
   return (
     db
       .prepare(
         `SELECT m.id, m.folder_id, m.head FROM memories m
          JOIN grants g ON g.user_id = m.user_id AND g.folder_id = m.folder_id
-         WHERE g.app_id = ? AND m.user_id = ? ORDER BY m.updated_at DESC, m.id`,
+         WHERE g.app_id = ? AND m.user_id = ?
+           AND (m.folder_id = ? OR NOT EXISTS (SELECT 1 FROM protected_folders p WHERE p.user_id = m.user_id AND p.folder_id = m.folder_id))
+         ORDER BY m.updated_at DESC, m.id`,
       )
-      .all(auth.appId, auth.userId) as Row[]
+      .all(auth.appId, auth.userId, open ?? "") as Row[]
   ).map((r) => ({ id: String(r.id), folderId: String(r.folder_id), head: String(r.head) }));
 }
 
@@ -525,10 +548,18 @@ function toEntry(r: Row): LogEntry {
   };
 }
 
-export function listLog(db: Db, userId: string, limit = 200, before?: string): LogEntry[] {
-  const rows = before
-    ? db.prepare("SELECT * FROM read_log WHERE user_id = ? AND at < ? ORDER BY at DESC, rowid DESC LIMIT ?").all(userId, before, limit)
-    : db.prepare("SELECT * FROM read_log WHERE user_id = ? ORDER BY at DESC, rowid DESC LIMIT ?").all(userId, limit);
+export function listLog(db: Db, userId: string, limit = 200, before?: string, appId?: string): LogEntry[] {
+  const where = ["user_id = ?"];
+  const params: (string | number)[] = [userId];
+  if (before) {
+    where.push("at < ?");
+    params.push(before);
+  }
+  if (appId) {
+    where.push("app_id = ?");
+    params.push(appId);
+  }
+  const rows = db.prepare(`SELECT * FROM read_log WHERE ${where.join(" AND ")} ORDER BY at DESC, rowid DESC LIMIT ?`).all(...params, limit);
   return (rows as Row[]).map(toEntry);
 }
 

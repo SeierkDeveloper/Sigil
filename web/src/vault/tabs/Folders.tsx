@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { parseVaultCode, vaultFingerprint, type OpenFolder } from "@sigil/core";
+import { PROTECT_KINDS, PROTECT_LABELS, REDACT_LABELS, REDACT_RULES, parseVaultCode, vaultFingerprint, type OpenFolder, type ProtectKind, type RedactRule } from "@sigil/core";
 import { CheckIcon, FolderIcon, KeyIcon, LockIcon, PlusIcon, ShareIcon } from "@/components/icons";
 import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { CopyButton, Fingerprint, Notice } from "../ui";
 import { legacyCovers, resealLegacy } from "../legacyOps";
+import { setFolderGuard } from "../protectOps";
 
 export function FoldersTab() {
   const { api, vault, data, update, reload } = useVault();
@@ -17,6 +18,7 @@ export function FoldersTab() {
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
+  const [guarding, setGuarding] = useState<string | null>(null);
 
   const counts = new Map<string, number>();
   for (const m of data.memories) counts.set(m.folderId, (counts.get(m.folderId) ?? 0) + 1);
@@ -88,12 +90,19 @@ export function FoldersTab() {
                     </p>
                     <p className="list-row-meta">
                       {f.kind === "profile" ? "Your Self card. " : ""}
-                      {plural(n, "memory", "memories")}. {apps.length ? `Readable by ${apps.join(", ")}.` : "No app can read it."}
+                      {plural(n, "memory", "memories")}. {apps.length ? `Readable by ${apps.join(", ")}${f.protect ? ", each read only after your yes" : ""}.` : "No app can read it."}
                     </p>
+                    {f.protect || f.redact?.length ? (
+                      <div className="chips folder-guard" data-testid="folder-guard">
+                        {f.protect ? <span className="chip chip-strong">Protected: {PROTECT_LABELS[f.protect]}</span> : null}
+                        {f.redact?.length ? <span className="chip">Masks {f.redact.map((r) => REDACT_LABELS[r].toLowerCase()).join(", ")}</span> : null}
+                      </div>
+                    ) : null}
                   </>
                 )}
                 <FolderShares folder={f} />
                 {sharing === f.id ? <ShareForm folder={f} onDone={() => setSharing(null)} /> : null}
+                {guarding === f.id ? <GuardForm folder={f} onDone={() => setGuarding(null)} /> : null}
                 {deleting === f.id ? (
                   <div className="subpanel">
                     <p className="small">
@@ -121,13 +130,16 @@ export function FoldersTab() {
                   </div>
                 ) : null}
               </div>
-              {renaming?.id !== f.id && deleting !== f.id && sharing !== f.id ? (
+              {renaming?.id !== f.id && deleting !== f.id && sharing !== f.id && guarding !== f.id ? (
                 <div className="list-row-actions">
                   <button type="button" className="button button-small" onClick={() => setRenaming({ id: f.id, name: f.name })}>
                     Rename
                   </button>
                   <button type="button" className="button button-small" onClick={() => setSharing(f.id)}>
                     Share
+                  </button>
+                  <button type="button" className="button button-small" onClick={() => setGuarding(f.id)}>
+                    {f.protect ? "Protected" : "Protect"}
                   </button>
                   <button type="button" className="button button-small button-ghost" disabled={data.folders.length <= 1} onClick={() => setDeleting(f.id)} title={data.folders.length <= 1 ? "A vault keeps at least one folder" : undefined}>
                     Delete
@@ -154,6 +166,87 @@ export function FoldersTab() {
       <SharedWithYou />
       <VaultCode />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- protecting a folder
+
+function GuardForm({ folder, onDone }: { folder: OpenFolder; onDone(): void }) {
+  const { api, update } = useVault();
+  const [kind, setKind] = useState<ProtectKind | "">(folder.protect ?? "");
+  const [rules, setRules] = useState<Set<RedactRule>>(new Set(folder.redact ?? []));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await setFolderGuard(api, folder, { ...(kind ? { protect: kind } : {}), redact: REDACT_RULES.filter((r) => rules.has(r)) });
+      update((d) => ({ ...d, folders: d.folders.map((f) => (f.id === folder.id ? next : f)) }));
+      onDone();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="subpanel guard-form" onSubmit={save} aria-label={`Protect ${folder.name}`}>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <div className="field">
+        <label className="field-label" htmlFor={`guard-kind-${folder.id}`}>
+          Protection
+        </label>
+        <select id={`guard-kind-${folder.id}`} className="select" value={kind} onChange={(e) => setKind(e.target.value as ProtectKind | "")}>
+          <option value="">Not protected</option>
+          {PROTECT_KINDS.map((k) => (
+            <option key={k} value={k}>
+              Protected: {PROTECT_LABELS[k]}
+            </option>
+          ))}
+        </select>
+        <span className="field-hint">
+          Protected: no app, agent, AI self or link reads it without your yes for that read, given here or in your inbox, and good for ten minutes. Each such read is
+          marked in your read log and its seal. The server knows only that the folder is protected, not what kind.
+        </span>
+      </div>
+      <fieldset className="field">
+        <legend className="field-label">Mask before anything leaves the vault</legend>
+        <div className="checkbox-list">
+          {REDACT_RULES.map((r) => (
+            <label key={r} className="checkbox" htmlFor={`guard-${folder.id}-${r}`}>
+              <input
+                id={`guard-${folder.id}-${r}`}
+                type="checkbox"
+                checked={rules.has(r)}
+                onChange={(e) => {
+                  const next = new Set(rules);
+                  if (e.target.checked) next.add(r);
+                  else next.delete(r);
+                  setRules(next);
+                }}
+              />
+              <span>{REDACT_LABELS[r]}</span>
+            </label>
+          ))}
+        </div>
+        <span className="field-hint">
+          Done on the device: in the connector before an app gets the text, in this browser before your model or a public page does. It matches common shapes, so an
+          unusual way of writing a number can slip through. Your vault keeps the text as you wrote it.
+        </span>
+      </fieldset>
+      <div className="form-actions">
+        <button type="submit" className="button button-primary" disabled={busy}>
+          {busy ? "Saving" : "Save"}
+        </button>
+        <button type="button" className="button button-ghost" onClick={onDone} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

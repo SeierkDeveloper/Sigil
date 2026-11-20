@@ -2,9 +2,14 @@ import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
 
-// The page may only talk to its own server, plus three addresses the owner's own
+// Live sync: the owner's browser talks to these with the owner's own sign-in.
+// Nothing is sent there unless the owner connects a source. Kept in step with
+// SYNC_ORIGINS in packages/core/src/sync/oauth.ts (a test checks it).
+const SYNC_ORIGINS = ["https://oauth2.googleapis.com", "https://gmail.googleapis.com", "https://www.googleapis.com", "https://slack.com"];
+
+// The page may only talk to its own server, plus the addresses the owner's own
 // browser calls directly with the owner's own keys: the two model providers the
-// AI self can use, and GitHub for the import. Nothing is sent there unless the
+// AI self can use, GitHub for the import, and the services of live sync. Nothing is sent there unless the
 // owner sets a model key or starts a GitHub import. No third-party scripts,
 // styles, fonts or frames. Next.js needs inline scripts for hydration; dev mode also needs eval.
 // 'wasm-unsafe-eval' lets the vault run the search model (WebAssembly) it loads
@@ -28,7 +33,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com${chainRead}${isProd ? "" : " ws: wss:"}`,
+  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com ${SYNC_ORIGINS.join(" ")}${chainRead}${isProd ? "" : " ws: wss:"}`,
   "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -42,6 +47,10 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@sigil/core"],
   experimental: { cpus: 3 },
   serverExternalPackages: ["@simplewebauthn/server"],
+  // The public AI self lives at /@handle.
+  async rewrites() {
+    return [{ source: "/@:handle", destination: "/u/:handle" }];
+  },
   async headers() {
     return [
       {

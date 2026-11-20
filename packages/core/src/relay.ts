@@ -199,7 +199,7 @@ export function linkPair(secret: AskLinkSecret): BoxKeyPair {
 /** One question and its answer, sealed to the vault's own public key for the read log. */
 export interface AskNote {
   v: 1;
-  via: "link" | "app" | "legacy";
+  via: "link" | "app" | "legacy" | "public";
   /** The link's label or the app's name. */
   label: string;
   question: string;

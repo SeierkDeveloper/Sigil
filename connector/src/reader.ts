@@ -78,7 +78,7 @@ export class VaultReader extends VaultClient {
   }
 
   /** Lets the AI self agent talk to the connector routes with this app key. */
-  request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  request<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
     return this.call<T>(method, path, body);
   }
 

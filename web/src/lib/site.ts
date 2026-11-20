@@ -45,6 +45,7 @@ export const navGroups: NavGroup[] = [
       { href: "/docs#sharing", label: "Sharing", text: "One folder, read by another vault you trust" },
       { href: "/legacy", label: "Legacy", text: "Who receives your vault, and only when" },
       { href: "/docs#devices", label: "Phone and devices", text: "Install it, add a device by QR code, capture into the inbox" },
+      { href: "/docs#sync", label: "Live sync", text: "Gmail, Calendar, Drive and Slack, kept in sync on your device" },
       { href: "/seals", label: "Seals", text: "The hourly seals, with a proof checker" },
     ],
   },
@@ -65,6 +66,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { href: "/docs", label: "Docs", text: "Quick start and the encryption model" },
       { href: "/docs/api", label: "API reference", text: "Every public and connector endpoint" },
+      { href: "/spec", label: "Open standard", text: "The formats, keys, tools and log, with test vectors" },
       { href: "/connector", label: "Connector", text: "The MCP server, its tools and settings" },
       { href: "/docs#sign-in-with-sigil", label: "Sign in with Sigil", text: "Let a web app read the folders its user picks" },
       { href: "/docs#agents", label: "Agent vaults", text: "A memory of their own for Cursor, Claude Code and other agents" },
