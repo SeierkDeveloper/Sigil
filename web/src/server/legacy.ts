@@ -11,6 +11,7 @@ import { tx, type Db } from "./db";
 import { serverConfig } from "./config";
 import { HttpError, lastActive, logRead, touchActive } from "./store";
 import { getBoxKey, userByBoxKey } from "./inbox";
+import { releaseHeirs } from "./spaces";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -384,6 +385,8 @@ export function markOpened(db: Db, userId: string, planId: string, kept: string)
     if (!plan.released_at) {
       db.prepare("UPDATE legacy_plans SET released_at = ? WHERE id = ?").run(at, planId);
       log(db, String(plan.user_id), String(person.id), "released");
+      // Heirs named in the owner's shared memories become members now.
+      releaseHeirs(db, String(plan.user_id));
     }
     log(db, String(plan.user_id), String(person.id), "opened");
   });

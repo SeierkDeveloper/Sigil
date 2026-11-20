@@ -133,6 +133,51 @@ const covered = [
     threat: "A server that swaps a knowledge pack",
     answer: "A follower pins the publisher's key at the first version and checks every later version against it and the version before. A version signed by any other key is not taken in.",
   },
+  {
+    threat: "The node your vault lives on shuts down or loses its data",
+    answer:
+      "Keep a bundle of your vault where you choose: a file, your own bucket, IPFS or Arweave. It holds everything as ciphertext, and any Sigil node restores it with your recovery phrase or wallet. Your tokens for that storage are kept only under your vault key, and uploads go from your own device.",
+  },
+  {
+    threat: "A changed bundle, or a bundle from someone else",
+    answer:
+      "A bundle carries a hash over every part and your vault key's signature. Before a node takes it in, your device unwraps the vault key from the bundle's own key slot and opens every folder, memory and setting under the record it claims; anything that does not open stops the restore. The node accepts it only with a statement your vault key signed for that node, minutes before.",
+  },
+  {
+    threat: "Someone moves your vault away, or a node lies about a move",
+    answer:
+      "A move needs a statement your vault key signs, naming both nodes and the bundle; the new node fetches the bundle only with the secret in the code you carry; the old node starts sending your links on only once an arrival signed by the same key confirms it. Every step is in the log of the node it happened on.",
+  },
+  {
+    threat: "A node used to reach a private network",
+    answer:
+      "A node fetches another node or a restore address over HTTPS only, follows no redirect, and refuses addresses written as private (localhost, 10.x, 192.168.x and the like) unless its operator allows them for nodes on one machine or one network. A public name that resolves to a private address is not caught by that check: an operator who runs other services on its network should also limit the node's outgoing traffic.",
+  },
+  {
+    threat: "A leaked capture key",
+    answer:
+      "It can only add to your inbox, at most 20 a minute and 300 a day, and nothing it adds becomes a memory until you approve it. It reads nothing. Revoke it under Devices and it fails on its next request; your other keys keep working.",
+  },
+  {
+    threat: "A server that swaps your vault key for a capture",
+    answer:
+      "The sending device checks the vault public key against a tag your vault made with that capture key's own secret, and seals nothing when it does not match.",
+  },
+  {
+    threat: "Your voice reaching a cloud service",
+    answer:
+      "Speech to text runs in a worker on your device with a model this site serves; the browser's own speech recognition, which sends audio to a cloud in most browsers, is never used. Answers are read aloud only by a voice that runs on the device.",
+  },
+  {
+    threat: "The server reads a session's intake or its conversation",
+    answer:
+      "The intake is sealed in the visitor's browser to your public self's key, and questions and answers are sealed between the visitor's browser and your device with a key from the session link, which stays after the #. The transcript is sealed to your vault's key.",
+  },
+  {
+    threat: "Leaving a shared memory, or dying, erases what others wrote",
+    answer:
+      "It does not. An entry keeps the member who added it; a writer changes and deletes only their own, leaving or deleting an account leaves every entry in place, and the history is deleted only by its last member. Heirs you name are sealed now and become members when the legacy plan of the member they are named for releases.",
+  },
 ];
 
 const notCovered = [
@@ -241,6 +286,31 @@ const notCovered = [
     threat: "A self key on chain before the contracts are reviewed",
     answer: "The registry and the wallet are tested, not audited, and not deployed. Put on chain only what you could lose until they have been reviewed.",
   },
+  {
+    threat: "Storage that does not last",
+    answer:
+      "How long a bundle lasts depends on where you keep it: a bucket while your account and the object exist, a pin while the pinning service keeps it, Arweave while its network keeps what was paid for. Sigil does not pay for, renew or check any of these. Keep more than one copy.",
+  },
+  {
+    threat: "Plain text from a watch",
+    answer:
+      "A shortcut that cannot run code sends plain text over HTTPS, for a capture key you allowed that. The node seals it to your vault's key the moment it arrives and keeps only the sealed box, but it handles the text in the clear for that moment. Leave plain text off for keys whose shortcut can open the capture page.",
+  },
+  {
+    threat: "The old node during a move",
+    answer:
+      "Until the period you chose ends, the old node still holds your vault as ciphertext, sends your links on and turns sign-ins away. It cannot read anything, but it decides when it deletes. Move only from a node you trust to do so, and restore from your own bundle if it does not.",
+  },
+  {
+    threat: "Taking a session's answers as the expert's own",
+    answer:
+      "Every answer is marked as written by an AI from what the expert made public, under house rules the expert wrote. It can still be wrong, and rules written as words can be worked around.",
+  },
+  {
+    threat: "An heir named too early",
+    answer:
+      "An heir becomes a member when the legacy plan of the member they are named for releases, which the server decides as for the plan itself. An admin can remove an heir until then, and remove a member afterwards with a new key.",
+  },
 ];
 
 const parties = [
@@ -248,7 +318,7 @@ const parties = [
   {
     who: "Sigil's server",
     sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address, how often an ask link is used, and when an expiring memory is to be deleted.",
-    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other, drafts of your AI self, your wallet rules, your emergency card, the text of an agreement.",
+    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other, drafts of your AI self, your wallet rules, your emergency card, the text of an agreement, your storage tokens and where your bundles are, what a capture key sends (unless you allowed it plain text), a session's intake and conversation, shared memory, anything you say by voice.",
   },
   {
     who: "A connected app",
@@ -284,6 +354,21 @@ const parties = [
     who: "Whoever you share a proof, an agreement or a pack with",
     sees: "The one claim and its evidence; the agreement both of you signed; the pack you published.",
     not: "Any other field of the memory, the date behind an age, anything else in your vault.",
+  },
+  {
+    who: "Another node",
+    sees: "When you move to it or from it: your vault's bundle, as ciphertext, and the move statement your key signed.",
+    not: "Anything inside the bundle, your keys, your sign-in.",
+  },
+  {
+    who: "Your storage service",
+    sees: "The bundle file, as ciphertext, its size and when it arrived, and your account there.",
+    not: "Anything inside it. It opens only with your recovery phrase or wallet.",
+  },
+  {
+    who: "A visitor in a booked session",
+    sees: "Your public AI self's answers within the session's topic, questions and house rules.",
+    not: "Anything you did not make public, other sessions, other visitors.",
   },
   {
     who: "Anyone on the internet",

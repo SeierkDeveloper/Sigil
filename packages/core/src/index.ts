@@ -32,6 +32,13 @@ export * from "./emergency";
 export * from "./agreement";
 export * from "./pack";
 export * from "./work";
+export * from "./bundle";
+export * from "./storage";
+export * from "./node";
+export * from "./capture";
+export * from "./sessions";
+export * from "./memoryspace";
+export * from "./speech";
 
 /** The version of the Sigil open standard this code follows (docs/spec). */
-export const SPEC_VERSION = "1.1.0";
+export const SPEC_VERSION = "1.2.0";

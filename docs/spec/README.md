@@ -1,8 +1,8 @@
 # The Sigil open standard
 
-Version 1.1.0
+Version 1.2.0
 
-This is the format a Sigil vault keeps memories in, how its keys work, what a connector may do and how it asks, what the access log records, how the log is sealed and proved, and the signed documents a vault hands out: the AI self's identity, proofs of a fact, the emergency card, agreements and knowledge packs. Anyone may build a vault, a connector or a checker from it. The reference code is in this repository (`packages/core`), and the test vectors in [`vectors.json`](vectors.json) are generated from that code; `packages/core/test/spec.test.ts` checks on every test run that the code still produces them.
+This is the format a Sigil vault keeps memories in, how its keys work, what a connector may do and how it asks, what the access log records, how the log is sealed and proved, the signed documents a vault hands out: the AI self's identity, proofs of a fact, the emergency card, agreements and knowledge packs, and since 1.2 how a whole vault is written out as a bundle, kept, restored on any node and moved between nodes, capture keys, sessions with a public AI self and shared memory. Anyone may build a vault, a connector or a checker from it. The reference code is in this repository (`packages/core`), and the test vectors in [`vectors.json`](vectors.json) are generated from that code; `packages/core/test/spec.test.ts` checks on every test run that the code still produces them.
 
 ## Parts
 
@@ -18,6 +18,8 @@ This is the format a Sigil vault keeps memories in, how its keys work, what a co
 | [8. Proofs of a fact](08-proofs.md) | Field commitments, the four claims, the signed statement and its sealed entry, what each claim rests on |
 | [9. The emergency card](09-emergency.md) | The card, the key in the link, what an opening records |
 | [10. Agreements and knowledge packs](10-agreements-and-packs.md) | Two signatures over one hash, amendments, signed packs and following them |
+| [11. Bundles, storage and nodes](11-bundles-and-nodes.md) | The vault bundle, checking and restoring it, the storage backends, a node's health, moving a vault between nodes |
+| [12. Capture keys, sessions and shared memory](12-capture-sessions-and-shared-memory.md) | Write-only capture keys, sessions with a public AI self, family and team history with heirs |
 
 ## Conventions
 
@@ -34,4 +36,4 @@ This is the format a Sigil vault keeps memories in, how its keys work, what a co
 
 ## Versioning
 
-The version follows semantic versioning. A change that makes data written by an older version unreadable, or makes a vector change, is a new major version, and the vectors are written again (`npm run vectors -w @sigil/core`). Every format string carries its own version (`v1.`, `s1.`, `r1.`, `m1.`, `sigil-read-v1`), so old and new data can be told apart. A change that only adds formats is a new minor version: 1.1.0 added parts 7 to 10, new access log kinds and their vectors, and left every vector of 1.0.0 as it was.
+The version follows semantic versioning. A change that makes data written by an older version unreadable, or makes a vector change, is a new major version, and the vectors are written again (`npm run vectors -w @sigil/core`). Every format string carries its own version (`v1.`, `s1.`, `r1.`, `m1.`, `sigil-read-v1`), so old and new data can be told apart. A change that only adds formats is a new minor version: 1.1.0 added parts 7 to 10, new access log kinds and their vectors, and left every vector of 1.0.0 as it was; 1.2.0 added parts 11 and 12, the log kinds `backup`, `node`, `capture` and `session`, and their vectors, and left every earlier vector as it was. Sealed vectors carry a fresh nonce, so writing the vectors again keeps the published ones.

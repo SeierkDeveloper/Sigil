@@ -10,6 +10,7 @@ import "./globals.css";
 import "./identity.css";
 import "./round5.css";
 import "./round6.css";
+import "./round7.css";
 
 // Self-hosted faces (the content security policy allows no third-party font hosts).
 const display = localFont({

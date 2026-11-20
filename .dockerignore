@@ -1,0 +1,24 @@
+# Only the core package, the site and the open standard go into the image.
+**/node_modules
+**/.next
+**/dist
+**/.data
+**/*.db
+**/*.db-*
+.env
+.env.*
+.git
+web/public/vendor
+connector
+extension
+examples
+contracts
+e2e
+docs/screenshots
+docs/readme
+packages/sdk
+packages/core/test
+web/test
+coverage
+test-results
+playwright-report

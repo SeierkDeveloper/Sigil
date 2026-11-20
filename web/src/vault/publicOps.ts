@@ -9,6 +9,7 @@ import {
   askNoteContext,
   cleanQuestion,
   cleanRules,
+  contextForBooking,
   decodeBoxPublicKey,
   encodeBoxPublicKey,
   linkPair,
@@ -24,10 +25,12 @@ import {
   sealJson,
   sealPublicForApp,
   sealPublicSecret,
+  sealTurnNote,
   toBase64Url,
   withoutCitations,
   type AskNote,
   type ModelCaller,
+  type PendingBooking,
   type PublicItem,
   type PublicReply,
   type PublicSecret,
@@ -56,6 +59,8 @@ export interface ServerPublicSelf {
   perVisitorHour: number;
   showAnswers: boolean;
   enabled: boolean;
+  /** Visitors may turn voice on: speech to text in their own browser. */
+  voice?: boolean;
   copyHash: string | null;
   publishedAt: string | null;
   items: number;
@@ -96,6 +101,8 @@ export interface PublicInput {
   enabled: boolean;
   /** A connector that answers while the vault is closed, or null. */
   appId: string | null;
+  /** Offer voice on the page: speech to text in the visitor's own browser. */
+  voice?: boolean;
 }
 
 /** The public copy as it should be now: the public folders, masked with their redaction rules, protected folders never. */
@@ -138,6 +145,7 @@ export async function savePublic(api: Api, vault: Unlocked, data: VaultData, inp
     perVisitorHour: input.perVisitorHour,
     showAnswers: input.showAnswers,
     enabled: input.enabled,
+    voice: input.voice === true,
   });
   const copy = currentCopy(data, folderIds);
   await api.put("public/self/items", copy);
@@ -175,6 +183,8 @@ export interface PendingPublic {
   sessionId: string;
   askerKey: string;
   sealed: string;
+  /** Set for a question in a booked session. */
+  booking?: PendingBooking | null;
 }
 
 export const PUBLIC_ERROR_TEXT = "My AI self could not answer just now. Please try again later.";
@@ -204,7 +214,10 @@ export async function composePublicAnswer(data: Pick<VaultData, "publicSelf">, i
   try {
     const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
     question = opened.text;
-    const a = await answerAsSelf({ question, history: opened.history, rules: self.secret.rules, memories: publicMemories(items), model, asker: "public" });
+    // A booked session: its house rules, topic and intake go to the model too, the intake opened with the public self's key.
+    const pair = linkPair({ secret: self.secret.secret, label: "", rules: null, introKey: "" });
+    const context = q.booking ? contextForBooking(pair, self.id, q.booking) : null;
+    const a = await answerAsSelf({ question, history: opened.history, rules: self.secret.rules, memories: publicMemories(items), model, asker: "public", context });
     return { reply: { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) }, question };
   } catch {
     return { reply: { v: 1, text: PUBLIC_ERROR_TEXT, refused: "error", sources: [] }, question: question || "(the question could not be opened)" };
@@ -212,18 +225,22 @@ export async function composePublicAnswer(data: Pick<VaultData, "publicSelf">, i
 }
 
 /** Seals a public answer for the visitor and the question and answer for this vault's log, and sends both. */
-export async function sendPublicAnswer(api: Api, data: Pick<VaultData, "publicSelf" | "boxPublic">, q: Pick<PendingPublic, "id" | "sessionId" | "askerKey">, composed: ComposedPublic): Promise<void> {
+export async function sendPublicAnswer(api: Api, data: Pick<VaultData, "publicSelf" | "boxPublic">, q: Pick<PendingPublic, "id" | "sessionId" | "askerKey" | "booking">, composed: ComposedPublic): Promise<void> {
   const self = data.publicSelf;
   if (!self?.secret || !data.boxPublic) throw new Error("The public AI self is off.");
   const key = publicKeyFor(self, q);
   const ids = { linkId: self.id, sessionId: q.sessionId, messageId: q.id };
   const { reply, question } = composed;
   const note: AskNote = { v: 1, via: "public", label: self.name, question, answer: reply.text, citations: reply.sources, refused: reply.refused };
+  // A turn of a booked session goes to the owner's transcript of that session, never to the page.
+  const sealedNote = q.booking
+    ? sealTurnNote(data.boxPublic, { v: 1, bookingId: q.booking.id, turn: q.booking.turn, question, answer: reply.text, sources: reply.sources, refused: reply.refused })
+    : sealJson(decodeBoxPublicKey(data.boxPublic), note, askNoteContext(q.id, self.id));
   await api.post(`public/questions/${q.id}/answer`, {
     sealed: sealAskMessage(key, ids, "a", reply),
-    note: sealJson(decodeBoxPublicKey(data.boxPublic), note, askNoteContext(q.id, self.id)),
+    note: sealedNote,
     cited: reply.sources.length,
-    wall: reply.refused === "error" ? null : { question, answer: reply.text, sources: reply.sources },
+    wall: reply.refused === "error" || q.booking ? null : { question, answer: reply.text, sources: reply.sources },
   });
 }
 
@@ -240,12 +257,14 @@ export async function pendingPublic(api: Api): Promise<{ questions: PendingPubli
  * public self's rules, with the owner's model. The answer goes back sealed; the
  * question and answer are sealed into the owner's log.
  */
-export async function servePublicOnce(api: Api, data: Pick<VaultData, "publicSelf" | "boxPublic">, deps: { model: ModelCaller }): Promise<number> {
+export async function servePublicOnce(api: Api, data: Pick<VaultData, "publicSelf" | "boxPublic">, deps: { model: ModelCaller; sessionsOnly?: boolean }): Promise<number> {
   const self = data.publicSelf;
   if (!self?.secret || !self.enabled || !data.boxPublic) return 0;
   const { questions, items } = await pendingPublic(api);
   let n = 0;
   for (const q of questions) {
+    // With answers held for approval, questions in a booked session are still answered at once: a session runs within its time.
+    if (deps.sessionsOnly && !q.booking) continue;
     const composed = await composePublicAnswer(data, items, q, deps.model);
     if (!composed) continue;
     try {

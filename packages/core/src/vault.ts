@@ -31,7 +31,9 @@ export type SourceKind =
   | "meeting"
   | "style"
   | "plan"
-  | "pack";
+  | "pack"
+  | "story"
+  | "person";
 
 export interface MemorySource {
   kind: SourceKind;
@@ -61,6 +63,8 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   style: "Learned from your edits",
   plan: "Planned by your AI self",
   pack: "From a knowledge pack",
+  story: "A story in a shared memory",
+  person: "A person in a shared memory",
 };
 
 export function sourceLabel(source: MemorySource): string {
@@ -80,6 +84,10 @@ export interface MemoryHead {
   editedAt: string;
   /** When set, the memory moves to Expired after this time and is deleted for real after the grace period. */
   expiresAt?: string;
+  /** For a story in a shared memory: when it happened, as YYYY, YYYY-MM or YYYY-MM-DD. */
+  when?: string;
+  /** For a story in a shared memory: the ids of the people in it. */
+  people?: string[];
 }
 
 /** A photo kept with a memory, inside its encrypted body. */
@@ -116,6 +124,8 @@ export interface MemoryDraft {
   editedAt?: string;
   expiresAt?: string | null;
   image?: MemoryImage | null;
+  when?: string | null;
+  people?: string[];
 }
 
 /** A folder or memory exactly as the server stores it: ids, envelopes and nothing readable. */
@@ -278,6 +288,8 @@ export function buildMemory(draft: MemoryDraft, folderId: string, id = randomId(
   const body = draft.body ?? "";
   const expiresAt = cleanExpiry(draft.expiresAt);
   const image = cleanImage(draft.image);
+  const when = cleanWhen(draft.when);
+  const people = cleanPeople(draft.people);
   return {
     id,
     folderId,
@@ -290,7 +302,20 @@ export function buildMemory(draft: MemoryDraft, folderId: string, id = randomId(
     editedAt: draft.editedAt ?? now,
     ...(expiresAt ? { expiresAt } : {}),
     ...(image ? { image } : {}),
+    ...(when ? { when } : {}),
+    ...(people.length ? { people } : {}),
   };
+}
+
+/** A year, a month or a day, as YYYY, YYYY-MM or YYYY-MM-DD; anything else is dropped. */
+export function cleanWhen(value: string | null | undefined): string | undefined {
+  const v = (value ?? "").trim();
+  if (!/^\d{4}(-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01]))?)?$/.test(v)) return undefined;
+  return v;
+}
+
+export function cleanPeople(value: unknown): string[] {
+  return Array.isArray(value) ? [...new Set(value.map(String).filter((x) => /^[A-Za-z0-9_-]{8,64}$/.test(x)))].slice(0, 50) : [];
 }
 
 /** A valid ISO time, or nothing. */
@@ -310,6 +335,8 @@ export async function encryptMemory(folder: Pick<OpenFolder, "id" | "key">, memo
     createdAt: memory.createdAt,
     editedAt: memory.editedAt,
     ...(memory.expiresAt ? { expiresAt: memory.expiresAt } : {}),
+    ...(memory.when ? { when: memory.when } : {}),
+    ...(memory.people?.length ? { people: memory.people } : {}),
   };
   return {
     id: memory.id,

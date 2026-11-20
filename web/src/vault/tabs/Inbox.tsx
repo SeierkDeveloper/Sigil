@@ -81,7 +81,7 @@ export function InboxTab() {
           </div>
           <ul className="proposal-list">
             {data.proposals.map((p) => (
-              <ProposalCard key={p.id} proposal={p} appName={appName.get(p.appId)} appKind={appKind.get(p.appId)} />
+              <ProposalCard key={p.id} proposal={p} appName={appName.get(p.appId)} appKind={appKind.get(p.appId)} captureKey={data.captureKeys.find((k) => k.id === p.appId)?.name} />
             ))}
           </ul>
         </>
@@ -90,7 +90,7 @@ export function InboxTab() {
   );
 }
 
-function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalView; appName?: string; appKind?: AppKind }) {
+function ProposalCard({ proposal, appName, appKind, captureKey }: { proposal: ops.ProposalView; appName?: string; appKind?: AppKind; captureKey?: string }) {
   const { api, vault, data, update, semantic } = useVault();
   const p = proposal.payload;
   const [title, setTitle] = useState(p?.title ?? "");
@@ -200,8 +200,9 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
       leave("rejected", () => update(removeProposal));
     });
 
-  const captured = proposal.appId === "capture";
-  const from = captured ? "You" : (appName ?? "A removed app");
+  // Quick capture from a signed-in device, or a capture key named by the owner.
+  const captured = proposal.appId === "capture" || captureKey !== undefined || proposal.payload?.via === "capture";
+  const from = captureKey !== undefined ? `You, with ${captureKey}` : captured ? "You" : (appName ?? "A removed app");
   const folderHint = !p ? null : suggested ? suggested.name : p.folder ? `${p.folder} (new)` : null;
   return (
     <li className="proposal" data-testid="proposal" data-state={leaving ?? (busy ? "busy" : "idle")} data-close={synced ? "synced" : close?.how}>

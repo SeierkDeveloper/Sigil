@@ -172,7 +172,7 @@ const faq = [
   },
   {
     q: "Is anything stored on a blockchain?",
-    a: "Not today. Seals are kept by the Sigil server and marked Local. A contract that publishes seal roots on chain is written and tested but not deployed. Your memories are never put on a chain, encrypted or not.",
+    a: "Not by Sigil. Seals are kept by the Sigil server and marked Local; a contract that publishes seal roots on chain is written and tested but not deployed. If you choose Arweave as a place for your backups, your own device uploads your bundle there, encrypted, with your own key file. Nothing else of yours goes on a chain.",
   },
   {
     q: "What does it cost?",
@@ -180,7 +180,11 @@ const faq = [
   },
   {
     q: "Can I leave?",
-    a: "Yes. Export everything from Settings, decrypted on your device, and delete your account in one step. Or run your own copy of Sigil and keep the vault on your own machine.",
+    a: "Yes. Export everything from Settings, decrypted on your device, and delete your account in one step. Or move your vault to another Sigil node, your own included, with a move your vault key signs.",
+  },
+  {
+    q: "What if this site shuts down?",
+    a: "Keep a copy of your vault: under Storage, download it as one encrypted bundle, or let it go to your own bucket, IPFS or Arweave every day or week. Any Sigil node, including one you run yourself with one command, restores it with your recovery phrase or wallet. How long a copy lasts depends on where you keep it.",
   },
 ];
 

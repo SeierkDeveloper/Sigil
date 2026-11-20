@@ -1,0 +1,253 @@
+/*
+  Round seven: storage and nodes, voice, capture keys, sessions with the
+  public AI self, and shared memory. Plain on purpose, in the existing tokens
+  and line language, so the design pass can finish it without touching logic.
+  Loaded last.
+*/
+
+/* ------------------------------------------------------------------ voice */
+
+.voice {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--plate);
+}
+
+.voice[data-state="listening"] {
+  border-color: var(--color-line-bright);
+  background-image: var(--ruled-edge-faint), var(--plate);
+  background-size: 3px 100%, auto;
+  background-repeat: no-repeat;
+}
+
+.voice-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.voice-note,
+.voice-line {
+  margin: 0;
+}
+
+.voice-mic[aria-pressed="true"] {
+  border-color: var(--color-line-bright);
+  background: var(--color-surface-3);
+}
+
+/* ------------------------------------------------------------------ long keys and links */
+
+.capture-key-text,
+.session-link,
+.move-code,
+.shortcut-url {
+  display: block;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.shortcut-url {
+  margin-top: var(--space-1);
+}
+
+.shortcut-steps details {
+  margin: var(--space-3) 0;
+  border-top: 1px solid var(--color-line);
+  padding-top: var(--space-3);
+}
+
+.shortcut-steps summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.capture-made,
+.move-started {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* ------------------------------------------------------------------ storage and nodes */
+
+.node-list .list-row[data-role="here"] {
+  border-color: var(--color-line-bright);
+}
+
+.node-list .list-row-meta.mono,
+.storage-target-list .list-row-meta.mono {
+  font-size: var(--text-xs);
+}
+
+.storage-target-form,
+.move-form {
+  margin-top: var(--space-4);
+}
+
+.restore {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.restore .segmented {
+  flex-wrap: wrap;
+}
+
+.restore-source {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.restore-done {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+}
+
+/* ------------------------------------------------------------------ sessions */
+
+.session-book {
+  margin-top: var(--space-5);
+}
+
+.session-rules {
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-left: 3px solid var(--color-line-bright);
+  border-radius: var(--radius-sm);
+  background: var(--plate);
+}
+
+.session-rules p {
+  margin: 0;
+}
+
+.session-rules .eyebrow {
+  margin-bottom: var(--space-1);
+}
+
+.session-form,
+.session-offer {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.session-consent span {
+  color: var(--color-text-muted);
+}
+
+.session-booked .row {
+  margin-top: var(--space-2);
+}
+
+.session-window {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.session-days {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.session-day {
+  min-height: 44px;
+}
+
+.session-detail {
+  margin-top: var(--space-3);
+}
+
+/* ------------------------------------------------------------------ shared memory */
+
+.shared-pick {
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.history-year {
+  position: relative;
+  padding: 0 0 var(--space-4) var(--space-5);
+  border-left: 1px solid var(--color-line-strong);
+}
+
+.history-year-label {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+}
+
+.history-year-label::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 0.55em;
+  width: 9px;
+  height: 9px;
+  background: var(--color-text);
+  clip-path: var(--lean);
+}
+
+.history-stories {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.history-story-title {
+  margin: 0;
+  font-weight: 500;
+}
+
+.history-story-meta {
+  margin: var(--space-1) 0 var(--space-2);
+}
+
+.history-story-body {
+  margin: var(--space-2) 0;
+  white-space: pre-wrap;
+}
+
+.history-photo img {
+  max-width: min(100%, 420px);
+  height: auto;
+}
+
+.shared-person-form {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 560px) {
+  .history-year {
+    padding-left: var(--space-4);
+  }
+  .voice-row {
+    align-items: stretch;
+  }
+}

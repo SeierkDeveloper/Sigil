@@ -20,7 +20,9 @@ import {
   openAppSecret,
   openHandoff,
   openSpaceKey,
+  openSpaceMeta,
   openSpaceWithRaw,
+  sealHeir,
   parseAppKey,
   parseVaultCode,
   randomId,
@@ -38,6 +40,7 @@ import {
   type MemoryDraft,
   type OpenFolder,
   type OpenSpace,
+  type SpaceKind,
   type SpaceMember,
   type SpaceRole,
 } from "@sigil/core";
@@ -132,10 +135,23 @@ export async function agentHandoffs(api: Api, vault: Unlocked, app: Pick<AppView
 
 // ---------------------------------------------------------------- team spaces
 
+export interface ServerHeir {
+  id: string;
+  publicKey: string;
+  role: SpaceRole;
+  tag: string;
+  label: string;
+  forMember: string | null;
+  createdAt: string;
+}
+
 export interface ServerSpace {
   id: string;
+  /** team, or a shared memory: family or history. */
+  kind?: SpaceKind;
   meta: string;
   epoch: number;
+  heirs?: ServerHeir[];
   me: { id: string; role: SpaceRole; sealedKey: string; acceptedAt: string | null };
   members: { id: string; kind: "vault" | "agent"; appId: string | null; publicKey: string; role: SpaceRole; tag: string; label: string; acceptedAt: string | null; owner: string | null }[];
   memories: { id: string; folderId: string; head: string; body: string; author: string | null; updatedAt: string }[];
@@ -156,10 +172,25 @@ export interface SpaceMemberView {
   trusted: boolean;
 }
 
+export interface HeirView {
+  id: string;
+  publicKey: string;
+  role: SpaceRole;
+  label: string;
+  /** The member whose legacy plan makes this heir a member, or null for any member's. */
+  forMember: string | null;
+  createdAt: string;
+  /** False when the heir's tag does not check out with the space key. */
+  trusted: boolean;
+}
+
 export interface SpaceView {
   id: string;
   epoch: number;
   name: string;
+  kind: SpaceKind;
+  about: string;
+  heirs: HeirView[];
   /** The space opened with its key, shaped like a folder. Null if the key would not open. */
   folder: OpenSpace | null;
   me: ServerSpace["me"];
@@ -168,11 +199,11 @@ export interface SpaceView {
   untrusted: string[];
 }
 
-function labelAad(spaceId: string, memberId: string): string {
+export function labelAad(spaceId: string, memberId: string): string {
   return AAD.spaceNote(`${spaceId}:${memberId}`);
 }
 
-async function sealLabel(space: OpenSpace, memberId: string, label: string): Promise<string> {
+export async function sealLabel(space: OpenSpace, memberId: string, label: string): Promise<string> {
   return encryptJson(space.key, { label: label.trim().slice(0, 80) || "Member" }, labelAad(space.id, memberId));
 }
 
@@ -181,10 +212,14 @@ export async function openSpaces(box: BoxKeyPair | null, server: ServerSpace[]):
   let unreadable = 0;
   for (const s of server) {
     let folder: OpenSpace | null = null;
+    let meta: { kind: SpaceKind; about: string } = { kind: s.kind ?? "team", about: "" };
     try {
       if (!box) throw new Error("no box key");
       const { raw } = openSpaceKey(box, s.id, s.me.id, s.me.sealedKey);
       folder = await openSpaceWithRaw(s.id, s.meta, raw);
+      const full = await openSpaceMeta(s.id, s.meta, raw);
+      // The node's kind and the encrypted one should agree; a shared memory keeps its rules either way.
+      meta = { kind: full.kind !== "team" ? full.kind : (s.kind ?? "team"), about: full.about };
     } catch {
       unreadable++;
     }
@@ -213,7 +248,21 @@ export async function openSpaces(box: BoxKeyPair | null, server: ServerSpace[]):
       }
     }
     memories.sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1));
-    spaces.push({ id: s.id, epoch: s.epoch, name: folder?.name ?? "A space that would not open", folder, me: s.me, members, memories, untrusted });
+    const heirs: HeirView[] = [];
+    for (const h of s.heirs ?? []) {
+      let label = "An heir";
+      let trusted = false;
+      if (folder) {
+        try {
+          label = (await decryptJson<{ label: string }>(folder.key, h.label, labelAad(s.id, h.id))).label;
+        } catch {
+          label = "Unreadable name";
+        }
+        trusted = (await untrustedMembers(folder.raw, s.id, [{ id: h.id, kind: "vault", publicKey: h.publicKey, role: h.role, tag: h.tag }])).length === 0;
+      }
+      heirs.push({ id: h.id, publicKey: h.publicKey, role: h.role, label, forMember: h.forMember, createdAt: h.createdAt, trusted });
+    }
+    spaces.push({ id: s.id, epoch: s.epoch, name: folder?.name ?? "A space that would not open", kind: meta.kind, about: meta.about, heirs, folder, me: s.me, members, memories, untrusted });
   }
   return { spaces, unreadable };
 }
@@ -224,13 +273,18 @@ function needTrusted(space: SpaceView): OpenSpace {
   return space.folder;
 }
 
-export async function createSpace(api: Api, data: Pick<VaultData, "boxPublic">, name: string, myName: string): Promise<string> {
+export async function createSpace(api: Api, data: Pick<VaultData, "boxPublic">, name: string, myName: string, more: { kind?: SpaceKind; about?: string } = {}): Promise<string> {
   if (!data.boxPublic) throw new Error("This vault has no public key yet. Reload the vault and try again.");
   const id = randomId();
   const me: SpaceMember = { id: randomId(), kind: "vault", publicKey: data.boxPublic, role: "admin" };
-  const made = await sealNewSpace(id, name, me);
+  const made = await sealNewSpace(id, name, me, more);
   const space = await openSpaceWithRaw(id, made.meta, made.raw);
-  await api.post("spaces", { id, meta: made.meta, member: { ...me, sealedKey: made.creator.sealedKey, tag: made.creator.tag, label: await sealLabel(space, me.id, myName || "Owner") } });
+  await api.post("spaces", {
+    id,
+    meta: made.meta,
+    member: { ...me, sealedKey: made.creator.sealedKey, tag: made.creator.tag, label: await sealLabel(space, me.id, myName || "Owner") },
+    ...(more.kind && more.kind !== "team" ? { kind: more.kind } : {}),
+  });
   return id;
 }
 
@@ -277,14 +331,20 @@ export async function removeMembers(api: Api, space: SpaceView, ids: string[]): 
     space.epoch + 1,
     space.memories.map(({ author: _a, ...m }) => m),
     stay.map((m) => ({ id: m.id, kind: m.kind, publicKey: m.publicKey, role: m.role })),
+    { name: space.name, kind: space.kind, about: space.about },
   );
   const next: OpenSpace = { ...space.folder, raw: r.raw, key: await importKey(r.raw) };
+  // Heirs hold the key too: each is sealed again with the new key, as the member it will become.
+  const heirs = await Promise.all(
+    space.heirs.map(async (h) => ({ ...(await sealHeir(r.raw, space.id, r.epoch, { id: h.id, publicKey: h.publicKey, role: h.role })), label: await sealLabel(next, h.id, h.label) })),
+  );
   await api.post(`spaces/${space.id}/rotate`, {
     epoch: r.epoch,
     meta: r.meta,
     memories: r.memories,
     members: await Promise.all(r.members.map(async (m) => ({ ...m, label: await sealLabel(next, m.id, stay.find((x) => x.id === m.id)!.label) }))),
     remove: [...gone],
+    heirs,
   });
 }
 

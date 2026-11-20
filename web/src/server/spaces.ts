@@ -4,7 +4,7 @@
 // roles; it never holds the space key.
 
 import type { StoredMemory } from "@sigil/core";
-import { MAX_SPACE_MEMBERS, type SpaceRole } from "@sigil/core";
+import { MAX_SPACE_MEMBERS, type SpaceKind, type SpaceRole } from "@sigil/core";
 import { tx, type Db } from "./db";
 import { HttpError, logRead, type AppAuth } from "./store";
 import { getBoxKey, userByBoxKey } from "./inbox";
@@ -90,7 +90,12 @@ export interface NewMember {
   appId?: string | null;
 }
 
-export function createSpace(db: Db, userId: string, s: { id: string; meta: string; member: NewMember }): void {
+/** A shared memory (family or history) keeps what its members wrote: rules a team space does not have. */
+function isMemory(space: Row): boolean {
+  return space.kind === "family" || space.kind === "history";
+}
+
+export function createSpace(db: Db, userId: string, s: { id: string; meta: string; member: NewMember; kind?: SpaceKind }): void {
   tx(db, () => {
     if (db.prepare("SELECT 1 FROM spaces WHERE id = ?").get(s.id)) throw new HttpError(409, "A space with this id already exists.");
     const n = db.prepare("SELECT COUNT(*) AS n FROM space_members WHERE user_id = ? AND kind = 'vault'").get(userId) as Row;
@@ -98,7 +103,7 @@ export function createSpace(db: Db, userId: string, s: { id: string; meta: strin
     if (s.member.kind !== "vault" || s.member.role !== "admin") throw new HttpError(400, "A space is made by a vault, as its first admin.", "invalid");
     if (getBoxKey(db, userId)?.publicKey !== s.member.publicKey) throw new HttpError(400, "A space is sealed first to your own vault key.", "invalid");
     const at = now();
-    db.prepare("INSERT INTO spaces (id, created_by, meta, epoch, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)").run(s.id, userId, s.meta, at, at);
+    db.prepare("INSERT INTO spaces (id, created_by, meta, epoch, created_at, updated_at, kind) VALUES (?, ?, ?, 1, ?, ?, ?)").run(s.id, userId, s.meta, at, at, s.kind ?? "team");
     insertMember(db, s.id, userId, null, s.member, null, at, at);
     // The vault's own sealed record of joining: a proof of membership can rest on it.
     logRead(db, { appId: "vault", userId }, "space", `joined-${s.id}`, 1);
@@ -176,7 +181,14 @@ export function rotateSpace(
   db: Db,
   userId: string,
   spaceId: string,
-  r: { epoch: number; meta: string; memories: StoredMemory[]; members: { id: string; sealedKey: string; tag: string; label: string }[]; remove: string[] },
+  r: {
+    epoch: number;
+    meta: string;
+    memories: StoredMemory[];
+    members: { id: string; sealedKey: string; tag: string; label: string }[];
+    remove: string[];
+    heirs?: { id: string; sealedKey: string; tag: string; label: string }[];
+  },
 ): void {
   tx(db, () => {
     const me = need(db, spaceId, { kind: "vault", userId }, "admin");
@@ -188,12 +200,17 @@ export function rotateSpace(
     const memberIds = (db.prepare("SELECT id FROM space_members WHERE space_id = ?").all(spaceId) as Row[]).map((x) => String(x.id));
     if (!sameSet([...r.members.map((m) => m.id), ...r.remove], memberIds)) throw stale();
     if (r.remove.includes(me.id)) throw new HttpError(400, "Hand the space to another admin before you leave it.", "invalid");
+    // Heirs hold the key too: every one is sealed again with the new key, or nothing changes.
+    const heirIds = (db.prepare("SELECT id FROM space_heirs WHERE space_id = ?").all(spaceId) as Row[]).map((x) => String(x.id));
+    if (!sameSet((r.heirs ?? []).map((h) => h.id), heirIds)) throw stale();
     const at = now();
     db.prepare("UPDATE spaces SET meta = ?, epoch = ?, updated_at = ? WHERE id = ?").run(r.meta, r.epoch, at, spaceId);
     const mem = db.prepare("UPDATE space_memories SET head = ?, body = ?, size = ? WHERE id = ? AND space_id = ?");
     for (const m of r.memories) mem.run(m.head, m.body!, m.head.length + m.body!.length, m.id, spaceId);
     const upd = db.prepare("UPDATE space_members SET sealed_key = ?, tag = ?, label = ? WHERE id = ? AND space_id = ?");
     for (const m of r.members) upd.run(m.sealedKey, m.tag, m.label, m.id, spaceId);
+    const heirUpd = db.prepare("UPDATE space_heirs SET sealed_key = ?, tag = ?, label = ? WHERE id = ? AND space_id = ?");
+    for (const h of r.heirs ?? []) heirUpd.run(h.sealedKey, h.tag, h.label, h.id, spaceId);
     const agents = db.prepare("SELECT app_id, user_id FROM space_members WHERE id = ? AND kind = 'agent'");
     const del = db.prepare("DELETE FROM space_members WHERE id = ? AND space_id = ?");
     for (const id of r.remove) {
@@ -212,6 +229,11 @@ export function rotateSpace(
 export function deleteSpace(db: Db, userId: string, spaceId: string): void {
   tx(db, () => {
     need(db, spaceId, { kind: "vault", userId }, "admin");
+    const space = spaceRow(db, spaceId);
+    if (isMemory(space)) {
+      const others = db.prepare("SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND kind = 'vault' AND user_id != ?").get(spaceId, userId) as Row;
+      if (Number(others.n) > 0) throw new HttpError(400, "A shared memory is deleted only by its last member: what others wrote stays theirs. Leave it instead.", "others_wrote");
+    }
     db.prepare("DELETE FROM handoffs WHERE space_id = ?").run(spaceId);
     db.prepare("DELETE FROM spaces WHERE id = ?").run(spaceId);
   });
@@ -227,12 +249,20 @@ export function putSpaceMemories(db: Db, actor: Actor, spaceId: string, memories
       ON CONFLICT (id) DO UPDATE SET head = excluded.head, body = excluded.body, size = excluded.size, author = excluded.author, updated_at = excluded.updated_at`);
     let added = 0;
     const at = now();
+    const memory = isMemory(spaceRow(db, spaceId));
     for (const m of memories) {
       if (m.folderId !== spaceId || !m.body) throw new HttpError(400, "A memory points at another space.", "invalid");
       const e = elsewhere.get(m.id) as Row | undefined;
       if (e && String(e.space_id) !== spaceId) throw new HttpError(409, "A memory with this id already exists elsewhere.");
       if (!e) added++;
-      upsert.run(m.id, spaceId, m.head, m.body, m.head.length + m.body.length, me.id, at, at);
+      let author = me.id;
+      if (e && memory) {
+        // In a shared memory an entry keeps the member who added it; only they or an admin change it.
+        const was = db.prepare("SELECT author FROM space_memories WHERE id = ?").get(m.id) as Row;
+        if (was.author != null && String(was.author) !== me.id && me.role !== "admin") throw new HttpError(403, "Someone else added this. Only they or an admin may change it.", "not_author");
+        author = was.author == null ? me.id : String(was.author);
+      }
+      upsert.run(m.id, spaceId, m.head, m.body, m.head.length + m.body.length, author, at, at);
     }
     if (Number(n.n) + added > SPACE_MEMORY_LIMIT) throw new HttpError(400, `A space holds up to ${SPACE_MEMORY_LIMIT} memories.`);
     db.prepare("UPDATE spaces SET updated_at = ? WHERE id = ?").run(at, spaceId);
@@ -243,10 +273,18 @@ export function putSpaceMemories(db: Db, actor: Actor, spaceId: string, memories
 
 export function deleteSpaceMemories(db: Db, actor: Actor, spaceId: string, ids: string[]): number {
   return tx(db, () => {
-    need(db, spaceId, actor, "write");
+    const me = need(db, spaceId, actor, "write");
+    const memory = isMemory(spaceRow(db, spaceId));
     const del = db.prepare("DELETE FROM space_memories WHERE id = ? AND space_id = ?");
+    const authorOf = db.prepare("SELECT author FROM space_memories WHERE id = ? AND space_id = ?");
     let n = 0;
-    for (const id of ids) n += Number(del.run(id, spaceId).changes);
+    for (const id of ids) {
+      if (memory && me.role !== "admin") {
+        const a = authorOf.get(id, spaceId) as Row | undefined;
+        if (a && a.author != null && String(a.author) !== me.id) throw new HttpError(403, "Someone else added this. Only they or an admin may delete it.", "not_author");
+      }
+      n += Number(del.run(id, spaceId).changes);
+    }
     logAgent(db, actor, spaceId, "forgot", n);
     return n;
   });
@@ -266,10 +304,21 @@ function spaceView(db: Db, spaceId: string, me: MemberRow) {
         updatedAt: String(m.updated_at),
       }))
     : [];
+  const heirs = (db.prepare("SELECT * FROM space_heirs WHERE space_id = ? ORDER BY created_at, id").all(spaceId) as Row[]).map((h) => ({
+    id: String(h.id),
+    publicKey: String(h.public_key),
+    role: h.role as SpaceRole,
+    tag: String(h.tag),
+    label: String(h.label),
+    forMember: str(h.for_member),
+    createdAt: String(h.created_at),
+  }));
   return {
     id: spaceId,
+    kind: (isMemory(s) ? String(s.kind) : "team") as SpaceKind,
     meta: String(s.meta),
     epoch: Number(s.epoch),
+    heirs,
     me: { id: me.id, role: me.role, sealedKey: me.sealedKey, acceptedAt: me.acceptedAt },
     members: members.map((m) => ({
       id: m.id,
@@ -303,4 +352,111 @@ export function agentSpaces(db: Db, auth: AppAuth) {
 
 export function agentSpaceIds(db: Db, appId: string): string[] {
   return (db.prepare("SELECT space_id FROM space_members WHERE kind = 'agent' AND app_id = ?").all(appId) as Row[]).map((r) => String(r.space_id));
+}
+
+// ---------------------------------------------------------------- leaving, and heirs of a shared memory
+
+/** A vault leaves a space on its own. What it wrote stays; its agents leave with it. The last admin hands the space on first. */
+export function leaveSpace(db: Db, userId: string, spaceId: string): void {
+  tx(db, () => {
+    spaceRow(db, spaceId);
+    const me = memberFor(db, spaceId, { kind: "vault", userId });
+    if (!me) throw new HttpError(404, "You are not a member of this space.", "not_member");
+    const others = db.prepare("SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND kind = 'vault' AND user_id != ?").get(spaceId, userId) as Row;
+    if (Number(others.n) === 0) throw new HttpError(400, "You are its last member. Delete the space instead.", "last_member");
+    if (me.role === "admin") {
+      const admins = db.prepare("SELECT COUNT(*) AS n FROM space_members WHERE space_id = ? AND role = 'admin' AND kind = 'vault' AND user_id != ?").get(spaceId, userId) as Row;
+      if (Number(admins.n) === 0) throw new HttpError(400, "Make another member an admin before you leave.", "last_admin");
+    }
+    db.prepare("DELETE FROM space_members WHERE space_id = ? AND user_id = ?").run(spaceId, userId);
+    logRead(db, { appId: "vault", userId }, "space", `left-${spaceId}`, 1);
+  });
+}
+
+export interface HeirInput {
+  id: string;
+  publicKey: string;
+  role: SpaceRole;
+  sealedKey: string;
+  tag: string;
+  label: string;
+  forMember: string | null;
+}
+
+/** An admin names an heir: a vault that becomes a member when a member's legacy plan releases. */
+export function addHeir(db: Db, userId: string, spaceId: string, h: HeirInput): void {
+  tx(db, () => {
+    const me = need(db, spaceId, { kind: "vault", userId }, "admin");
+    if (!isMemory(spaceRow(db, spaceId))) throw new HttpError(400, "Heirs are named for a shared memory, not a team space.", "invalid");
+    if (h.forMember && !db.prepare("SELECT 1 FROM space_members WHERE id = ? AND space_id = ? AND kind = 'vault'").get(h.forMember, spaceId)) throw new HttpError(404, "That member was not found.");
+    if (db.prepare("SELECT 1 FROM space_members WHERE space_id = ? AND public_key = ?").get(spaceId, h.publicKey)) throw new HttpError(409, "That vault is already a member.", "already_member");
+    if (db.prepare("SELECT 1 FROM space_heirs WHERE id = ? OR (space_id = ? AND public_key = ?)").get(h.id, spaceId, h.publicKey)) throw new HttpError(409, "That vault is already named as an heir.", "already_heir");
+    const n = db.prepare("SELECT COUNT(*) AS n FROM space_heirs WHERE space_id = ?").get(spaceId) as Row;
+    if (Number(n.n) >= 20) throw new HttpError(400, "A shared memory names up to 20 heirs.");
+    db.prepare("INSERT INTO space_heirs (id, space_id, public_key, role, sealed_key, tag, label, for_member, added_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      h.id,
+      spaceId,
+      h.publicKey,
+      h.role,
+      h.sealedKey,
+      h.tag,
+      h.label,
+      h.forMember,
+      me.id,
+      now(),
+    );
+  });
+}
+
+export function removeHeir(db: Db, userId: string, spaceId: string, heirId: string): void {
+  tx(db, () => {
+    need(db, spaceId, { kind: "vault", userId }, "admin");
+    const r = db.prepare("DELETE FROM space_heirs WHERE id = ? AND space_id = ?").run(heirId, spaceId);
+    if (r.changes === 0) throw new HttpError(404, "That heir was not found.");
+  });
+}
+
+/**
+ * A member's legacy plan released: in every shared memory they are in, the
+ * heirs named for them (or for the whole space) become members. An heir whose
+ * vault is not on this node stays named, and is made a member when it is.
+ * Runs inside the caller's transaction.
+ */
+export function releaseHeirs(db: Db, ownerUserId: string): number {
+  let made = 0;
+  const mine = db.prepare("SELECT m.id, m.space_id FROM space_members m JOIN spaces s ON s.id = m.space_id WHERE m.kind = 'vault' AND m.user_id = ? AND s.kind IN ('family', 'history')").all(ownerUserId) as Row[];
+  for (const m of mine) {
+    const heirs = db.prepare("SELECT * FROM space_heirs WHERE space_id = ? AND (for_member IS NULL OR for_member = ?)").all(String(m.space_id), String(m.id)) as Row[];
+    for (const h of heirs) {
+      const heirUser = userByBoxKey(db, String(h.public_key));
+      if (!heirUser) continue;
+      const at = now();
+      if (db.prepare("SELECT 1 FROM space_members WHERE space_id = ? AND public_key = ?").get(String(m.space_id), String(h.public_key))) {
+        db.prepare("DELETE FROM space_heirs WHERE id = ?").run(String(h.id));
+        continue;
+      }
+      insertMember(
+        db,
+        String(m.space_id),
+        heirUser,
+        null,
+        { id: String(h.id), kind: "vault", publicKey: String(h.public_key), role: h.role as SpaceRole, sealedKey: String(h.sealed_key), tag: String(h.tag), label: String(h.label) },
+        str(h.added_by),
+        at,
+        null,
+      );
+      db.prepare("DELETE FROM space_heirs WHERE id = ?").run(String(h.id));
+      logRead(db, { appId: "vault", userId: heirUser }, "space", `heir-${String(m.space_id)}`, 1);
+      made++;
+    }
+  }
+  return made;
+}
+
+/** Heirs of members whose plans released before the heir's vault was on this node. Runs on the server's timer. */
+export function heirsTick(db: Db): number {
+  const released = db.prepare("SELECT DISTINCT p.user_id FROM legacy_plans p WHERE p.released_at IS NOT NULL AND EXISTS (SELECT 1 FROM space_members m JOIN space_heirs h ON h.space_id = m.space_id WHERE m.user_id = p.user_id)").all() as Row[];
+  let n = 0;
+  for (const r of released) n += tx(db, () => releaseHeirs(db, String(r.user_id)));
+  return n;
 }

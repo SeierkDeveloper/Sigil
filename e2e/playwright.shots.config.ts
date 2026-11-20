@@ -8,5 +8,6 @@ export default defineConfig({
   testDir: "shots",
   timeout: 300_000,
   projects: [{ name: "shots", use: { channel: "chrome" } }],
-  webServer: { ...(base.webServer as object), env: { ...((base.webServer as { env: Record<string, string> }).env), SIGIL_SEAL_SECONDS: "60" } } as never,
+  // Only the first node is needed for screenshots.
+  webServer: (base.webServer as { env: Record<string, string> }[]).slice(0, 1).map((w) => ({ ...w, env: { ...w.env, SIGIL_SEAL_SECONDS: "60" } })) as never,
 });

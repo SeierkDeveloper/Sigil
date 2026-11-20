@@ -7,7 +7,7 @@ import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "API reference",
-  description: "Every public, ask link and connector endpoint of the Sigil server: requests, responses, errors and limits.",
+  description: "Every public, ask link, node, capture key, session and connector endpoint of the Sigil server: requests, responses, errors and limits.",
 };
 
 interface Endpoint {
@@ -216,6 +216,113 @@ const publicEndpoints: Endpoint[] = [
     params: [["pollSecret", "The secret from opening the pairing."]],
     response: `{ "state": "ready", "sealed": "s1..." }`,
     notes: "state is waiting, ready or gone. The box is sealed to the one-time key; only the new device opens it.",
+  },
+];
+
+const nodeEndpoints: Endpoint[] = [
+  {
+    id: "health",
+    method: "GET",
+    path: "/api/health",
+    summary: "The node's health, for a container's health check, a load balancer or another node. It touches no vault.",
+    response: `{ "ok": true, "node": { "origin": "https://node.example", "version": "0.1.0", "spec": "1.2.0" }, "time": "2026-11-20T10:00:00.000Z" }`,
+    notes: "Any origin may call it.",
+  },
+  {
+    id: "restore-fetch",
+    method: "POST",
+    path: "/api/restore/fetch",
+    summary: "Fetches a bundle for a restore from a public address (an IPFS or Arweave gateway, a bucket address presigned on the owner's device) and passes its bytes on. Nothing is kept.",
+    params: [["url", "An https address. A private network address is refused unless the node allows it (SIGIL_NODE_ALLOW_PRIVATE)."]],
+    response: "The bundle file's bytes, application/octet-stream.",
+    notes: "From the site itself only. 10 a minute per address. Redirects are not followed.",
+  },
+  {
+    id: "restore",
+    method: "POST",
+    path: "/api/restore",
+    summary: "Takes a bundle in as a new vault on this node, with the owner's sign-in and a statement the vault key signed for this node. Opens a session.",
+    params: [
+      ["bundle", "The vault bundle (open standard, part 11)."],
+      ["signIn", "{ kind: wallet or phrase, ref, authToken }: the SHA-256 of authToken must be the bundle key slot's authHash."],
+      ["statement", "{ issuedAt, signature }: Ed25519 by the vault's signing key over sigil-restore-v1, this node's origin, the bundle hash and issuedAt; at most ten minutes old."],
+      ["arrival", "For a move: { code, at, signature, redirectDays }. The node fetches the move from the old node again and tells it once the vault is in."],
+    ],
+    response: `{ "report": { "userId": "...", "hash": "0x...", "folders": 4, "memories": 120, "logEntries": 310, "taken": { "apps": 2 }, "left": {} }, "confirmed": true }`,
+    notes: "409 vault_exists when the vault, or one of its sign-in methods, is already on this node. 403 bad_restore or bad_sign_in. 400 bad_bundle.",
+  },
+  {
+    id: "move-fetch",
+    method: "GET",
+    path: "/api/nodes/moves/:id",
+    summary: "Node to node: the move statement, its signature and the bundle, for the holder of the move's secret.",
+    params: [["Authorization", "Bearer <the secret from the move code>. The old node keeps only its hash."]],
+    response: `{ "move": { "statement": { "format": "sigil-move", "v": 1, "id": "...", "vault": "...", "from": "...", "to": "...", "bundle": "0x...", "redirectDays": 30, "issuedAt": "..." }, "signature": "..." }, "bundle": { "...": "..." } }`,
+    notes: "410 move_closed once cancelled or done. The first fetch is logged as bundle-sent.",
+  },
+  {
+    id: "move-done",
+    method: "POST",
+    path: "/api/nodes/moves/:id/done",
+    summary: "Node to node: the arrival the owner's device signed on the new node. Once it holds under the vault's key, the old node sends the vault's addresses on and deletes it when the period ends.",
+    params: [
+      ["Authorization", "Bearer <the move's secret>."],
+      ["at, signature", "Ed25519 by the vault's signing key over sigil-arrived-v1, the move id, the new origin, the bundle hash and at."],
+    ],
+    response: `{ "until": "2026-12-20T10:00:00.000Z" }`,
+    notes: "403 bad_arrival. Afterwards sign-ins, app keys and the vault's public addresses answer 410 moved with { to }.",
+  },
+  {
+    id: "capture-key",
+    method: "GET",
+    path: "/api/capture/v1/key",
+    summary: "For a capture key: the vault public key and the tag the owner's vault made over it for this key. Check the tag before sealing anything.",
+    params: [["Authorization", "Bearer <base64url HKDF(secret, sigil:auth:capture)>."]],
+    response: `{ "captureId": "...", "publicKey": "...", "tag": "<hex>" }`,
+    notes: "401 capture_revoked for a revoked key.",
+  },
+  {
+    id: "capture",
+    method: "POST",
+    path: "/api/capture/v1",
+    summary: "One capture into the inbox, sealed on the sending device to the vault public key, as a proposal whose app id is the capture key's id.",
+    params: [
+      ["id", "The proposal id."],
+      ["sealed", "The sealed proposal, context proposal:<id>:<capture key id>."],
+    ],
+    response: `{ "id": "...", "createdAt": "2026-11-20T10:00:00.000Z" }`,
+    notes: "20 a minute and 300 a day per key; an inbox holds 500. POST /api/capture/v1/text with { text, title } is for a key the owner allowed plain text: sealed by the node on arrival, 403 plain_off otherwise.",
+  },
+  {
+    id: "sessions-offer",
+    method: "GET",
+    path: "/api/public/at/:handle/sessions",
+    summary: "A public AI self's sessions: the offer (topics, questions, length, house rules, intake, consent) and the free times of the next two weeks.",
+    response: `{ "selfId": "...", "handle": "gardener", "name": "...", "publicKey": "...", "offer": { "turns": 8, "slotMinutes": 30, "houseRules": "...", "...": "..." }, "slots": [{ "start": "...", "end": "..." }] }`,
+    notes: "offer is null when the owner takes no bookings.",
+  },
+  {
+    id: "sessions-book",
+    method: "POST",
+    path: "/api/public/at/:handle/sessions",
+    summary: "Books a free time. The intake is sealed in the visitor's browser to the public self's key.",
+    params: [
+      ["id, slotStart, topic", "The booking."],
+      ["intake", "Sealed to the public self's key, context session-intake:<self id>:<booking id>."],
+      ["tokenHash", "SHA-256 of the session token from the link's secret."],
+      ["askerKey", "The visitor's X25519 key for the session, made from the link's secret."],
+    ],
+    response: `{ "id": "...", "slotStart": "...", "slotEnd": "..." }`,
+    notes: "409 slot_taken; 403 blocked; 429 visitor_limit (two upcoming sessions per visitor). 6 a minute per address.",
+  },
+  {
+    id: "session",
+    method: "GET",
+    path: "/api/sessions/:id",
+    summary: "A session, for the bearer of its link: its topic, time, questions used, house rules, whether the host's AI self is answering, and why a question cannot be asked now, if so.",
+    params: [["Authorization", "Bearer <session token>."]],
+    response: `{ "topic": "Soil", "slotStart": "...", "slotEnd": "...", "turns": 8, "used": 1, "state": "booked", "houseRules": "...", "online": true, "problem": null, "...": "..." }`,
+    notes: "POST /api/sessions/:id/questions with { id, sealed } asks (409 session_closed outside its time or questions, 503 offline); GET /api/sessions/:id/questions/:qid gives the sealed answer.",
   },
 ];
 
@@ -482,7 +589,15 @@ const connectorEndpoints: Endpoint[] = [
     path: "/api/connector/v1/public",
     summary: "The public AI self, when the owner picked this app to answer it: its key and rules wrapped for this app, and the public copy it answers from.",
     response: `{ "appId": "...", "self": { "id": "...", "handle": "sam", "publicKey": "...", "box": "v1...", "enabled": true, "items": [] } }`,
-    notes: "GET /public/pending marks it online and gives waiting questions; POST /public/questions/:id/answer with { sealed, note, cited, wall } answers. 403 public_off for any other app.",
+    notes: "GET /public/pending marks it online and gives waiting questions; POST /public/questions/:id/answer with { sealed, note, cited, wall } answers. 403 public_off for any other app. A question in a booked session comes with its booking (topic, the sealed intake, house rules, which turn); its note is the turn sealed for the owner's transcript, and it never goes on the page.",
+  },
+  {
+    id: "backup",
+    method: "GET",
+    path: "/api/connector/v1/backup",
+    summary: "For a connector the owner lets back the vault up: the storage targets wrapped for this app's key (HKDF(secret, sigil:wrap:backup)), and when the vault was last backed up.",
+    response: `{ "appId": "...", "box": "v1...", "lastAt": "2026-11-19T10:00:00.000Z" }`,
+    notes: "GET /backup/bundle gives the vault's bundle body as ciphertext; POST /backup/done with { id, hash, size, record, places } logs a backup, record sealed to the vault public key. 403 backup_off for any other app.",
   },
 ];
 
@@ -498,6 +613,11 @@ const errors: [string, string, string][] = [
   ["404", "not_found", "No such endpoint. Also no_seal and not_in_seal on the seal endpoints."],
   ["405", "method", "The endpoint exists, the method does not."],
   ["409", "not_sealed", "A proof was asked for an entry whose hour has not been sealed yet."],
+  ["410", "moved", "The vault moved to another node; to names it. Sign-ins, app keys and its public addresses answer this until the old node deletes it."],
+  ["401", "capture_revoked", "The capture key was revoked or never existed."],
+  ["403", "plain_off", "This capture key seals on the device; the owner has not allowed plain text for it."],
+  ["409", "session_closed", "A question outside its session's time or number of questions, or in an ended session."],
+  ["409", "vault_exists", "A restore of a vault, or of a sign-in method, that is already on this node."],
   ["409", "stale", "A folder changed while its new key was being made. Reload and try again."],
   ["429", "rate_limited", "Too many requests. Wait a little and try again."],
   ["429", "propose_limit", "The app sent 30 suggestions in the last hour."],
@@ -564,6 +684,14 @@ export default function ApiReference() {
                 </li>
               ))}
             </ul>
+            <p className="doc-aside-label">Nodes, capture and sessions</p>
+            <ul>
+              {nodeEndpoints.map((e) => (
+                <li key={e.id}>
+                  <a href={`#${e.id}`}>{e.path.replace("/api", "")}</a>
+                </li>
+              ))}
+            </ul>
             <p className="doc-aside-label">Ask links and public pages</p>
             <ul>
               {askEndpoints.map((e) => (
@@ -612,6 +740,19 @@ export default function ApiReference() {
               </h2>
               <p className="section-lead">No key, no session. These power the Status, Seals and Verify pages.</p>
               {publicEndpoints.map((e) => (
+                <EndpointBlock key={e.id} e={e} />
+              ))}
+            </section>
+
+            <section className="doc-block" aria-labelledby="nodes-title">
+              <h2 id="nodes-title" className="section-title">
+                Nodes, capture keys and sessions
+              </h2>
+              <p className="section-lead">
+                A node&apos;s health, restoring and moving a vault (the formats are in the <Link href="/spec">open standard</Link>, part 11), the write-only capture
+                keys and booked sessions with a public AI self (part 12).
+              </p>
+              {nodeEndpoints.map((e) => (
                 <EndpointBlock key={e.id} e={e} />
               ))}
             </section>
@@ -752,7 +893,10 @@ export default function ApiReference() {
                 <code>/api/sync</code> (live sync sources), <code>/api/public/self</code> (the public AI self and its public copy), <code>/api/meets</code>{" "}
                 (selves meet), <code>/api/self/identity</code> (the self key&apos;s address and its signed statement), <code>/api/drafts</code> (the AI self&apos;s approval
                 queue), <code>/api/disclosures</code> (proofs of a fact), <code>/api/emergency</code> (the emergency card and its openings),{" "}
-                <code>/api/agreements</code> (sealed agreements), <code>/api/packs</code> (knowledge packs) and the sign-in routes under{" "}
+                <code>/api/agreements</code> (sealed agreements), <code>/api/packs</code> (knowledge packs), <code>/api/bundle</code> and{" "}
+                <code>/api/backups</code> (the vault&apos;s bundle and the record of each backup), <code>/api/nodes</code> (where the vault lives, and moves),{" "}
+                <code>/api/capture-keys</code>, <code>/api/sessions</code> and <code>/api/public/self/sessions</code> (bookings and the offer),{" "}
+                <code>/api/spaces/:id/heirs</code> and <code>/leave</code> (shared memory) and the sign-in routes under{" "}
                 <code>/api/auth</code>. It
                 accepts only encrypted payloads, only with a session cookie, and changes only from the site itself. It is not meant for other
                 programs; the whole router is one readable file, <code>web/src/server/api.ts</code>.

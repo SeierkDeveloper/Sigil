@@ -201,6 +201,7 @@ function PublicForm({ onCancel, onSave }: { onCancel?: () => void; onSave(input:
   const [perHour, setPerHour] = useState(cur?.perVisitorHour ?? 10);
   const [showAnswers, setShowAnswers] = useState(cur?.showAnswers ?? false);
   const [enabled, setEnabled] = useState(cur?.enabled ?? true);
+  const [voice, setVoice] = useState(cur?.voice ?? false);
   const [by, setBy] = useState(cur?.appId ?? "vault");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,6 +225,7 @@ function PublicForm({ onCancel, onSave }: { onCancel?: () => void; onSave(input:
         showAnswers,
         enabled,
         appId: by === "vault" ? null : by,
+        voice,
       });
     } catch (err) {
       setError(errorText(err));
@@ -332,6 +334,13 @@ function PublicForm({ onCancel, onSave }: { onCancel?: () => void; onSave(input:
           <span>
             Show answered questions on the page
             <span className="field-hint">You can hide any of them. Off: questions and answers are only in your log.</span>
+          </span>
+        </label>
+        <label className="checkbox" htmlFor="public-voice">
+          <input id="public-voice" type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} />
+          <span>
+            Offer voice on the page
+            <span className="field-hint">Visitors can speak their question and hear the answer. The speech model runs in their own browser, loaded only if they turn it on.</span>
           </span>
         </label>
         <label className="checkbox" htmlFor="public-on">

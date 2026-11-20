@@ -114,6 +114,18 @@ export function newAskSession(linkId: string, linkPublicKey: string): AskSession
   return { id, publicKey: encodeBoxPublicKey(pair.publicKey), key: conversationKey(shared, pair.publicKey, linkPublic, linkId, id) };
 }
 
+/** The asker's side with a key pair and a session id it already has: a booked session, where both come from the session link. */
+export function askSessionFromPair(linkId: string, linkPublicKey: string, sessionId: string, pair: BoxKeyPair): AskSession {
+  const linkPublic = decodeBoxPublicKey(linkPublicKey);
+  let shared: Uint8Array;
+  try {
+    shared = x25519.getSharedSecret(pair.secretKey, linkPublic);
+  } catch {
+    throw new Error("This key is not usable.");
+  }
+  return { id: sessionId, publicKey: encodeBoxPublicKey(pair.publicKey), key: conversationKey(shared, pair.publicKey, linkPublic, linkId, sessionId) };
+}
+
 /** The owner's side: the same conversation key from the link's private key and the asker's public key. */
 export function agentSessionKey(link: BoxKeyPair, linkId: string, sessionId: string, askerPublicKey: string): Uint8Array {
   const askerPublic = decodeBoxPublicKey(askerPublicKey);

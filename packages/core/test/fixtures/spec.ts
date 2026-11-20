@@ -68,6 +68,26 @@ import {
   EMERGENCY_AAD,
   EMERGENCY_OWNER_AAD,
   type WalletRules,
+  appBackupKey,
+  bundleHash,
+  captureBoxTag,
+  captureToken,
+  deepHash,
+  formatCaptureKey,
+  moveHash,
+  restoreMessage,
+  sealBundle,
+  serializeTags,
+  sessionToken,
+  signArrival,
+  signMove,
+  signRestore,
+  arrivalMessage,
+  intakeContext,
+  sessionTurnContext,
+  backupRecordContext,
+  BUNDLE_PARTS,
+  type BundleBody,
 } from "../../src";
 import { encodeFunctionData, parseAbi } from "viem";
 
@@ -224,6 +244,65 @@ export async function deterministic() {
     },
     privacyScore: { score: score.score, level: score.level, parts: score.parts.map((p) => [p.key, p.points]) },
     ...(await versionOneOne(vault, signing)),
+    ...(await versionOneTwo(vault, signing)),
+  };
+}
+
+/** Added in version 1.2: the vault bundle, moving between nodes, capture keys, sessions and the storage formats. */
+async function versionOneTwo(vault: Uint8Array, signing: Awaited<ReturnType<typeof vaultSigningKey>>) {
+  const secret = fromHex(INPUT.appSecret);
+  const box = encodeBoxPublicKey(boxKeyPairFromSecret(fromHex(INPUT.boxSecret)).publicKey);
+  const body: BundleBody = {
+    origin: "https://old.example",
+    periodSeconds: 3600,
+    createdAt: "2026-11-20T12:00:00.000Z",
+    madeBy: "vault",
+    vault: { boxPublicKey: box, boxWrappedSecret: "v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA", signKey: signing.publicKey, createdAt: "2026-01-01T00:00:00.000Z" },
+    keyslots: [{ kind: "phrase", ref: "00".repeat(16), authHash: "11".repeat(32), wrappedKey: "v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA" }],
+    folders: [{ id: INPUT.folderId, meta: "v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA", wrappedKey: "v1.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA", protected: false, createdAt: "2026-01-01T00:00:00.000Z" }],
+    memories: [],
+    settings: {},
+    log: [],
+    parts: Object.fromEntries(BUNDLE_PARTS.map((p) => [p, []])) as unknown as BundleBody["parts"],
+  };
+  const bundle = sealBundle(body, signing);
+  const move = signMove(signing, { id: "move-0000001", from: "https://old.example", to: "https://new.example", bundle: bundle.hash, redirectDays: 30, issuedAt: "2026-11-20T12:00:00.000Z" });
+  const restore = { origin: "https://new.example", bundle: bundle.hash, issuedAt: "2026-11-20T12:05:00.000Z" };
+  const capture = { id: "cap-00000001", secret: INPUT.appSecret };
+  return {
+    vaultBundle: { canonicalBody: canonicalJson(body), hash: bundleHash(body), signature: bundle.signature },
+    moveStatement: { canonicalStatement: canonicalJson(move.statement), hash: moveHash(move.statement), signature: move.signature },
+    restoreStatement: { ...restore, message: restoreMessage(restore), signature: signRestore(signing, restore) },
+    arrival: {
+      moveId: "move-0000001",
+      to: "https://new.example",
+      bundle: bundle.hash,
+      at: "2026-11-20T12:06:00.000Z",
+      message: arrivalMessage("move-0000001", "https://new.example", bundle.hash, "2026-11-20T12:06:00.000Z"),
+      signature: signArrival(signing, "move-0000001", "https://new.example", bundle.hash, "2026-11-20T12:06:00.000Z"),
+    },
+    captureKey: {
+      ...capture,
+      key: formatCaptureKey(capture.id, secret),
+      token: await captureToken(secret),
+      vaultPublicKey: box,
+      tag: await captureBoxTag(secret, box),
+    },
+    sessionToken: { secret: toBase64Url(secret), token: await sessionToken(toBase64Url(secret)) },
+    backupKey: { secret: INPUT.appSecret, key: toHex(await appBackupKey(secret)) },
+    arweaveItem: {
+      tags: [{ name: "Content-Type", value: "application/octet-stream" }, { name: "App-Name", value: "Sigil" }],
+      serializedTags: toHex(serializeTags([{ name: "Content-Type", value: "application/octet-stream" }, { name: "App-Name", value: "Sigil" }])),
+      deepHashOfAbc: toHex(deepHash(new TextEncoder().encode("abc"))),
+      deepHashOfList: toHex(deepHash([new TextEncoder().encode("dataitem"), new TextEncoder().encode("1")])),
+    },
+    contexts: {
+      backupApp: AAD.backupApp(INPUT.appId),
+      captureNote: AAD.captureNote(capture.id),
+      backupRun: backupRecordContext("run-00000001"),
+      sessionIntake: intakeContext("self-0000001", "booking-00001"),
+      sessionTurn: sessionTurnContext("booking-00001", 1),
+    },
   };
 }
 

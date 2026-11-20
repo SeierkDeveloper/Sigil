@@ -236,7 +236,7 @@ export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData,
   const made: DraftView[] = [];
   for (const q of questions) {
     const ref = `p:${q.id}`;
-    if (seen.has(ref)) continue;
+    if (seen.has(ref) || q.booking) continue;
     const c = await composePublicAnswer(data, items, q, deps.model);
     if (!c) continue;
     const channel: AnswerChannel = { kind: "public", questionId: q.id, selfId: self.id, sessionId: q.sessionId, askerKey: q.askerKey };

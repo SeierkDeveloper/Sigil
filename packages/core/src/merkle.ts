@@ -93,6 +93,12 @@ export const fromHex32 = (hex: string) => {
  *   emergency  the emergency card was published, revoked, or opened (a count of opens)
  *   agreement  an agreement was proposed, signed, declined or withdrawn; the memory id field holds its hash
  *   pack       a knowledge pack was published or followed, or a new version taken in
+ *
+ * Added in version 1.2:
+ *   backup     a bundle of the vault was made and stored; the memory id field holds its hash
+ *   node       a step of moving the vault between nodes, or restoring it on one
+ *   capture    a device's capture key sent something to the inbox, or the key was made or revoked
+ *   session    a step of a session with the public AI self: booked, a turn answered, ended or blocked
  */
 export type ReadKind =
   | "folders"
@@ -118,7 +124,11 @@ export type ReadKind =
   | "disclose"
   | "emergency"
   | "agreement"
-  | "pack";
+  | "pack"
+  | "backup"
+  | "node"
+  | "capture"
+  | "session";
 
 export const READ_KINDS: readonly ReadKind[] = [
   "folders",
@@ -145,6 +155,10 @@ export const READ_KINDS: readonly ReadKind[] = [
   "emergency",
   "agreement",
   "pack",
+  "backup",
+  "node",
+  "capture",
+  "session",
 ];
 
 export interface ReadEntryFields {

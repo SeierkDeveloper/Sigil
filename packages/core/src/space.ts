@@ -47,8 +47,19 @@ export interface SpaceMember {
   role: SpaceRole;
 }
 
+/** A team space, or a shared memory: a family's or a team's history. The node keeps the kind in the clear too, to keep what others wrote. */
+export type SpaceKind = "team" | "family" | "history";
+export const SPACE_KINDS: readonly SpaceKind[] = ["team", "family", "history"];
+
+export function isSpaceKind(v: unknown): v is SpaceKind {
+  return v === "team" || v === "family" || v === "history";
+}
+
 export interface SpaceMeta {
   name: string;
+  kind?: SpaceKind;
+  /** A line about the space, for a shared memory. */
+  about?: string;
 }
 
 export function newSpaceKey(): Uint8Array {
@@ -59,7 +70,15 @@ export function newSpaceKey(): Uint8Array {
 export type OpenSpace = OpenFolder;
 
 export async function encryptSpaceMeta(raw: Uint8Array, spaceId: string, meta: SpaceMeta): Promise<string> {
-  return encryptJson(await importKey(raw), { name: meta.name.trim().slice(0, 120) || "Team space" }, AAD.spaceMeta(spaceId));
+  const kind = isSpaceKind(meta.kind) && meta.kind !== "team" ? meta.kind : undefined;
+  const about = meta.about?.trim().slice(0, 400);
+  return encryptJson(await importKey(raw), { name: meta.name.trim().slice(0, 120) || "Team space", ...(kind ? { kind } : {}), ...(about ? { about } : {}) }, AAD.spaceMeta(spaceId));
+}
+
+/** The whole meta of a space: its name, kind and the line about it. */
+export async function openSpaceMeta(spaceId: string, metaEnvelope: string, raw: Uint8Array): Promise<Required<SpaceMeta>> {
+  const meta = await decryptJson<SpaceMeta>(await importKey(raw), metaEnvelope, AAD.spaceMeta(spaceId));
+  return { name: String(meta.name ?? "Team space").slice(0, 120), kind: isSpaceKind(meta.kind) ? meta.kind : "team", about: String(meta.about ?? "").slice(0, 400) };
 }
 
 export async function openSpaceWithRaw(spaceId: string, metaEnvelope: string, raw: Uint8Array): Promise<OpenSpace> {
@@ -133,10 +152,10 @@ export interface NewSpace {
   creator: SealedMember;
 }
 
-export async function createSpace(spaceId: string, name: string, creator: SpaceMember): Promise<NewSpace> {
+export async function createSpace(spaceId: string, name: string, creator: SpaceMember, more: Omit<SpaceMeta, "name"> = {}): Promise<NewSpace> {
   if (creator.role !== "admin" || creator.kind !== "vault") throw new Error("A space is made by a vault, as its first admin.");
   const raw = newSpaceKey();
-  return { raw, meta: await encryptSpaceMeta(raw, spaceId, { name }), creator: await sealForMember(raw, spaceId, 1, creator) };
+  return { raw, meta: await encryptSpaceMeta(raw, spaceId, { name, ...more }), creator: await sealForMember(raw, spaceId, 1, creator) };
 }
 
 export interface SpaceRotation {
@@ -151,7 +170,7 @@ export interface SpaceRotation {
  * Gives a space a new key on an admin's device: every memory encrypted again,
  * and the key sealed and tagged again for each member who stays.
  */
-export async function rotateSpace(space: OpenSpace, epoch: number, memories: Memory[], stay: SpaceMember[]): Promise<SpaceRotation> {
+export async function rotateSpace(space: OpenSpace, epoch: number, memories: Memory[], stay: SpaceMember[], meta: SpaceMeta = { name: space.name }): Promise<SpaceRotation> {
   const raw = newSpaceKey();
   const next: OpenSpace = { ...space, raw, key: await importKey(raw) };
   const stored: StoredMemory[] = [];
@@ -161,5 +180,5 @@ export async function rotateSpace(space: OpenSpace, epoch: number, memories: Mem
   }
   const members: SealedMember[] = [];
   for (const m of stay) members.push(await sealForMember(raw, space.id, epoch, m));
-  return { raw, epoch, meta: await encryptSpaceMeta(raw, space.id, { name: space.name }), memories: stored, members };
+  return { raw, epoch, meta: await encryptSpaceMeta(raw, space.id, meta), memories: stored, members };
 }

@@ -37,6 +37,31 @@ const identityRead = (() => {
   }
 })();
 
+// Backups: the owner's own device uploads ciphertext to the owner's own storage
+// with the owner's own tokens. These are the storage addresses the page may
+// talk to: common S3-compatible hosts, IPFS pinning and Arweave upload
+// addresses, plus any the node lists in SIGIL_BACKUP_ORIGINS (space separated,
+// https only; read at build time). Nothing is sent there unless the owner adds
+// that storage under Storage. Restoring never needs this: the node fetches.
+const BACKUP_ORIGINS = [
+  "https://*.amazonaws.com",
+  "https://*.r2.cloudflarestorage.com",
+  "https://*.backblazeb2.com",
+  "https://*.digitaloceanspaces.com",
+  "https://*.wasabisys.com",
+  "https://s3.filebase.com",
+  "https://api.pinata.cloud",
+  "https://upload.ardrive.io",
+  "https://*.irys.xyz",
+];
+const backupOrigins = (() => {
+  const extra = (process.env.SIGIL_BACKUP_ORIGINS ?? "")
+    .split(/\s+/)
+    .map((v) => v.trim())
+    .filter((v) => /^https:\/\/(\*\.)?[a-z0-9.-]+(:\d+)?$/i.test(v) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(v));
+  return [...BACKUP_ORIGINS, ...extra].join(" ");
+})();
+
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? "" : " 'unsafe-eval'"}`,
@@ -44,7 +69,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com ${SYNC_ORIGINS.join(" ")}${chainRead}${identityRead}${isProd ? "" : " ws: wss:"}`,
+  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com ${SYNC_ORIGINS.join(" ")} ${backupOrigins}${chainRead}${identityRead}${isProd ? "" : " ws: wss:"}`,
+  "media-src 'self' blob:",
   "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
@@ -72,7 +98,8 @@ const nextConfig: NextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
           // The camera is allowed for this site only: the vault reads a device's pairing code with it, on this page.
-          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)" },
+          // The microphone too, for voice: what it hears is turned into text on the device and never sent.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)" },
           ...(isProd ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
         ],
       },

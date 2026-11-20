@@ -85,6 +85,10 @@ import { openEmergency, type EmergencyView, type ServerEmergency } from "./emerg
 import { openAgreements, type AgreementView, type ServerAgreement } from "./agreementOps";
 import { openFollows, type PackRow } from "./packOps";
 import { EMPTY_CHOICES } from "./identityOps";
+import { openBackups, type BackupView, type ServerBackups } from "./storageOps";
+import { NO_NODES, type NodesView } from "./nodeOps";
+import { openCaptureKeys, type CaptureKeyView, type ServerCaptureKey } from "./captureKeyOps";
+import { openSessions, type ServerSessions, type SessionsView } from "./sessionOps";
 import { DEFAULT_WORK, type FollowedPack, type WalletRules, type WorkSettings } from "@sigil/core";
 
 // ---------------------------------------------------------------- types
@@ -233,6 +237,16 @@ export interface VaultData {
   packs: PackRow[];
   /** Knowledge packs this vault follows. */
   follows: FollowedPack[];
+  /** Where the vault's bundles go, and each backup made. */
+  backups: BackupView;
+  /** Where the vault lives: this node, the nodes it came from or went to, moves under way. */
+  nodes: NodesView;
+  /** Capture keys for phones, watches and shortcuts. */
+  captureKeys: CaptureKeyView[];
+  /** Sessions with the public AI self: the offer and the bookings. */
+  sessions: SessionsView;
+  /** Whether the owner turned voice on for the test chat (kept encrypted). */
+  voiceOn: boolean;
 }
 
 export interface LogEntryView {
@@ -248,6 +262,8 @@ export interface LogEntryView {
   sealed: boolean;
   /** For an answer of the AI self: the question and answer, sealed to this vault's key. */
   note?: string;
+  /** For an entry that came with the vault from another node: where it was sealed, with its proof, or that it was not sealed there yet. */
+  carried?: { origin: string; periodSeconds: number; root: string; index: number; proof: string[] } | { origin: string; unsealed: true };
 }
 
 export interface LogData {
@@ -305,6 +321,10 @@ export interface ServerVault {
   emergency?: ServerEmergency;
   agreements?: ServerAgreement[];
   packs?: PackRow[];
+  captureKeys?: ServerCaptureKey[];
+  backups?: ServerBackups;
+  nodes?: NodesView;
+  sessions?: ServerSessions;
   box?: StoredBoxKey | null;
   proposals?: { id: string; appId: string; sealed: string; createdAt: string }[];
   shares?: {
@@ -637,6 +657,13 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   unreadable += em.unreadable;
   const agreed = await openAgreements(vault, box, data.agreements ?? []);
   unreadable += agreed.unreadable;
+  const backed = await openBackups(vault, box, settings.backup, data.backups);
+  unreadable += backed.unreadable;
+  const captured = await openCaptureKeys(vault, data.captureKeys ?? []);
+  unreadable += captured.unreadable;
+  const booked = openSessions(pub.self, box, data.sessions);
+  unreadable += booked.unreadable;
+  const voice = await later(async () => (settings.voice ? (await openSetting<{ on?: boolean }>(vault.key, "voice", settings.voice)).on === true : false), false);
 
   return {
     access: data.access ?? [],
@@ -653,6 +680,11 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     agreements: agreed.agreements,
     packs: data.packs ?? [],
     follows,
+    backups: backed.backups,
+    nodes: data.nodes ?? NO_NODES,
+    captureKeys: captured.keys,
+    sessions: booked.sessions,
+    voiceOn: voice,
     legacy,
     trusted,
     agents: (data.agents ?? []).map((a) => ({ appId: a.appId, homeFolderId: a.homeFolderId, rules: a.rules, publicKey: a.publicKey, createdAt: a.createdAt })),
@@ -1020,7 +1052,7 @@ export async function loadLog(api: Api, limit = 300): Promise<LogData> {
   return api.get<LogData>(`log?limit=${limit}`);
 }
 
-export type VerifyResult = { ok: true; hour: number; root: string; index: number } | { ok: false; reason: string };
+export type VerifyResult = { ok: true; hour: number; root: string; index: number; origin?: string } | { ok: false; reason: string };
 
 /**
  * Checks one log entry against its hour's seal, on the device: recompute the
@@ -1037,6 +1069,11 @@ export async function verifyEntry(api: Api, entry: LogEntryView): Promise<Verify
     return { ok: false, reason: (err as Error).message };
   }
   if (proof.leaf !== leaf) return { ok: false, reason: "The server returned a different fingerprint." };
+  if (entry.carried && "root" in entry.carried) {
+    // Sealed on the node the vault came from: the path is checked here; the root is the one that node published for that hour.
+    const ok = verifyProof(fromHex32(entry.carried.root), fromHex32(leaf), entry.carried.proof.map(fromHex32));
+    return ok ? { ok: true, hour: entry.hour, root: entry.carried.root, index: entry.carried.index, origin: entry.carried.origin } : { ok: false, reason: "The proof does not lead to the seal." };
+  }
   const seals = await api.get<{ seals: { hour: number; root: string }[] }>("seals?limit=200");
   const published = seals.seals.find((s) => s.hour === proof.hour);
   if (published && published.root !== proof.root) return { ok: false, reason: "The proof does not match the published seal." };

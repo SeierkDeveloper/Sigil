@@ -10,6 +10,7 @@ import * as devices from "../deviceOps";
 import { forgetDevice, offlineWanted, setOfflineWanted, thisDevice, type DeviceRecord } from "../offline";
 import { errorText, useVault } from "../context";
 import { Empty, Fingerprint, Notice } from "../ui";
+import { CaptureKeysSection } from "./CaptureKeys";
 
 /** The fragment of /vault/pair#<id>.<key>, when the QR code was opened with the phone's own camera. */
 function usePairFragment(): string | null {
@@ -129,6 +130,8 @@ export function DevicesTab() {
           ))}
         </ul>
       )}
+
+      <CaptureKeysSection />
 
       <section className="subpanel device-here" aria-labelledby="device-here-title">
         <h3 id="device-here-title" className="settings-heading">

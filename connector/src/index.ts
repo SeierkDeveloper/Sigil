@@ -15,7 +15,8 @@
 //   sigil-connector --self          answer the ask links the owner gave this app,
 //                                   on this machine, while it runs
 //   sigil-connector --watch [dir]   keep live sync sources (Gmail, Calendar, Drive,
-//                                   Slack) the owner gave this app in sync, and an
+//                                   Slack) the owner gave this app in sync, back the
+//                                   vault up when the owner allowed it, and an
 //                                   Obsidian vault through the inbox when a folder is named
 
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
@@ -27,6 +28,7 @@ import { embedSettings, loadEmbedder } from "./embed";
 import { CONNECTOR_VERSION, createServer } from "./server";
 import { SelfAgent } from "./self";
 import { ObsidianWatcher } from "./watch";
+import { BackupWorker } from "./backup";
 import { AgentMemory } from "./agent";
 import { SyncWorker } from "./sync";
 
@@ -57,7 +59,7 @@ function help(): never {
       "  sigil-connector                      run over stdio (Claude Desktop, Cursor)",
       "  sigil-connector --http [--port N]    serve http://127.0.0.1:N/mcp/<token>",
       "  sigil-connector --self               answer your ask links on this machine",
-      "  sigil-connector --watch              keep the live sync sources you gave this app in sync",
+      "  sigil-connector --watch              keep the live sync sources you gave this app in sync, and back the vault up if you allowed it",
       "  sigil-connector --watch <folder>     also suggest new and changed Obsidian notes to the inbox",
       "",
     ].join("\n"),
@@ -154,8 +156,20 @@ async function main() {
         },
         onError: (err) => log(err.message),
       });
-    } else if (!watchDir) {
-      fail("This app has no live sync sources and no folder was named. Allow background sync for a source in the vault, under Sync, or name an Obsidian folder.");
+    }
+    // Backups while it watches, when the owner let this app back the vault up.
+    const backups = new BackupWorker(reader);
+    const backingUp = await backups.allowed();
+    if (backingUp) {
+      process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} backing the vault up on the schedule set in the vault (stop with Ctrl+C)\n`);
+      void backups.run({
+        signal: stop.signal,
+        onReport: (r) => log(`backup ${r.hash.slice(0, 18)}...: ${r.places.length} stored${r.failed.length ? `, ${r.failed.length} failed (${r.failed.map((f) => `${f.label}: ${f.reason}`).join("; ")})` : ""}`),
+        onError: (err) => log(`backup: ${err.message}`),
+      });
+    }
+    if (!sources && !watchDir && !backingUp) {
+      fail("This app has no live sync sources, no backups and no folder was named. Allow background sync under Sync or backups under Storage in the vault, or name an Obsidian folder.");
     }
     const end = () => {
       watcher?.stop();

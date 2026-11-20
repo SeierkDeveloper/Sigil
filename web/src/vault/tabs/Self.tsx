@@ -20,8 +20,10 @@ import { ChatGptIcon, ClaudeIcon, DeviceIcon } from "@/components/icons";
 import { AppMark } from "../marks";
 import { Band, CopyButton, Empty, Notice, PlateHead, Quiet } from "../ui";
 import { PublicSelfSection } from "./PublicSelf";
+import { SessionsSection } from "./Sessions";
 import { approveHere, guardedMemories } from "../protectOps";
-import { retrieve } from "@sigil/core";
+import { retrieve, sealSetting } from "@sigil/core";
+import { VoiceControls } from "@/voice/VoiceControls";
 
 const STATE_WORD: Record<ReturnType<typeof useVault>["agent"]["state"], string> = {
   serving: "Answering",
@@ -53,6 +55,7 @@ export function SelfTab() {
       <AppsSection />
       <LinksSection />
       <PublicSelfSection />
+      <SessionsSection />
     </div>
   );
 }
@@ -407,7 +410,7 @@ const REFUSED: Record<string, string> = {
 };
 
 function TestChat() {
-  const { api, data, semantic, openMemory } = useVault();
+  const { api, vault, data, semantic, openMemory, update } = useVault();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -556,6 +559,19 @@ function TestChat() {
               </div>
             </div>
           ) : null}
+          <VoiceControls
+            label="Test chat voice"
+            startOn={data.voiceOn}
+            onText={(text) => setQuestion(text)}
+            answer={turns.length ? { id: String(turns.length), text: turns[turns.length - 1].answer.text } : null}
+            onSwitch={(on) => {
+              if (on === data.voiceOn) return;
+              update((d) => ({ ...d, voiceOn: on }));
+              void sealSetting(vault.key, "voice", { on })
+                .then((value) => api.put("settings/voice", { value }))
+                .catch(() => undefined);
+            }}
+          />
           <form className="chat-form" onSubmit={ask} aria-label="Ask your AI self">
             <label className="visually-hidden" htmlFor="chat-question">
               Question
@@ -891,6 +907,7 @@ function NewLinkForm({ onCancel, onCreate }: { onCancel(): void; onCreate(input:
   const [perHour, setPerHour] = useState(10);
   const answerers = data.apps.filter((a) => !a.revokedAt && a.canAskSelf);
   const [by, setBy] = useState<string>("vault");
+  const [voice, setVoice] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -909,6 +926,7 @@ function NewLinkForm({ onCancel, onCreate }: { onCancel(): void; onCreate(input:
         maxUses,
         perHour,
         appId: by === "vault" ? null : by,
+        voice,
       });
     } catch (err) {
       setError(errorText(err));
@@ -1008,6 +1026,13 @@ function NewLinkForm({ onCancel, onCreate }: { onCancel(): void; onCreate(input:
             {by === "vault" ? "Keep this vault open in a tab for the link to be online." : "Run the connector with --self on your machine for the link to be online."}
           </span>
         </div>
+        <label className="checkbox" htmlFor="link-voice">
+          <input id="link-voice" type="checkbox" checked={voice} onChange={(e) => setVoice(e.target.checked)} />
+          <span>
+            Offer voice with this link
+            <span className="field-hint">Whoever opens it can speak and hear answers; the speech model runs in their browser, only if they turn it on.</span>
+          </span>
+        </label>
       </Band>
       <div className="form-actions plate-actions">
         <button type="submit" className="button button-primary" disabled={busy}>

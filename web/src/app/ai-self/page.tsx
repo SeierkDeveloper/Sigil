@@ -35,6 +35,7 @@ const chapters = [
     text: [
       "The first version exists: an AI that answers as you, with your own model key, only from the folders you allow and within rules you write: topics it may and may not discuss, things it must never say, its tone, and that it says so when it does not know. You can give someone a link to ask it; the conversation is encrypted between their browser and your vault, and every answer is on your record. It can have a public page that answers anyone from what you made public, and it can talk with someone else's AI self, once both of you said yes, to find a time or see whether you would work well together.",
       "It has started to work for you, too: it drafts replies and a plan for your week, and can hold the answers it gives people until you approve them. Nothing it writes goes anywhere before you say yes, and it learns how you write from the changes you make, in notes you can read and delete. It has a key of its own and a signed statement of who it is, and a wallet that would let it pay only within your rules is written and tested, not yet on any chain.",
+      "You can talk to it out loud: what you say is turned into text on your own device, and its answers can be read aloud by a voice on your device. And if you know something others need, it can take booked sessions: people pick a time, ask within the topics, questions and house rules you set, and every answer says it comes from an AI. Sessions are free.",
       "Later it could negotiate within limits you set and stand in for you where you choose, always marked as AI. You would see everything it said, the same way you see every read today.",
     ],
   },
@@ -43,7 +44,7 @@ const chapters = [
     status: "Vision",
     title: "A self that works while you live",
     text: [
-      "An AI self with its own identity could take on work: answer as an expert, advise, do paid tasks, and go further with other AI selves than the first conversations it can have today, for teams and deals. Always within limits written by you, always on your record.",
+      "An AI self with its own identity could take on more work: advise, do paid tasks, and go further with other AI selves than the first conversations and free sessions it can have today, for teams and deals. Always within limits written by you, always on your record.",
       "What you know has value. The first pieces exist: a folder can be published as a signed knowledge pack that others follow for free, two vaults can sign an agreement that both of them seal, and a fact can be proved without showing it. The idea is that you decide who may use what you know and on what terms, instead of a platform deciding for you.",
     ],
   },
@@ -53,6 +54,7 @@ const chapters = [
     title: "A self that outlives you",
     text: [
       "The first steps exist. A legacy plan names the people who receive your vault, the folders each one gets, and whether they may talk to your AI self. Only together, only after the time you chose without a sign of you, they open it in their own browsers, and your AI self answers them in legacy mode, within your rules. And a life certificate shows that a vault has a long, continuous sealed history, without showing a word of it.",
+      "It does not depend on any one server either. The whole vault can be kept as one encrypted bundle where you choose, in your own storage, and restored on any Sigil node; anyone can run a node, and a vault can move from one to another. A family or a team can keep its history together, with heirs who carry it on.",
       "What is still a vision: turning years of sealed history into proof that a real, continuous person stands behind an AI self, without biometrics and without revealing anything, and recovery through the people you trust. Your memory, on your terms, forever.",
     ],
   },

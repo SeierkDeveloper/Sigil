@@ -10,12 +10,14 @@ import { Consent, type ConsentRequest } from "./Consent";
 import { Notice, Spinner } from "./ui";
 import { offlineCopy, thisDevice } from "./offline";
 import { OfflineVault } from "./OfflineVault";
+import { RestoreApp } from "./RestoreApp";
 
 type Phase =
   | { kind: "checking" }
   | { kind: "offline"; copy: boolean }
   | { kind: "offline-copy" }
   | { kind: "gate"; mode: GateMode }
+  | { kind: "restore" }
   | { kind: "phrase"; vault: ops.Unlocked; phrase: string }
   | { kind: "open"; vault: ops.Unlocked };
 
@@ -25,12 +27,14 @@ type Phase =
  * Sign in with Sigil window: once open, it asks about one web app instead of
  * showing the dashboard.
  */
-export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) {
+export function VaultApp({ consent, restore = false }: { consent?: ConsentRequest | null; restore?: boolean } = {}) {
   const api = useMemo(() => createApi(), []);
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
 
   // Signed out on a device that keeps a device key: start on sign-in, where that key is offered.
   const firstPhase = useCallback(async (): Promise<Phase> => {
+    // Restoring a bundle, or arriving from another node, starts on its own step, signed in or not.
+    if (restore) return { kind: "restore" };
     try {
       const s = await api.get<{ signedIn: boolean }>("session");
       if (s.signedIn) return { kind: "gate", mode: "unlock" };
@@ -38,7 +42,7 @@ export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) 
     } catch {
       return { kind: "offline", copy: !!(await offlineCopy().catch(() => null)) };
     }
-  }, [api]);
+  }, [api, restore]);
 
   const check = useCallback(async () => setPhase(await firstPhase()), [firstPhase]);
 
@@ -78,6 +82,19 @@ export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) 
           </div>
         ) : null}
         {phase.kind === "offline-copy" ? <OfflineVault onBack={() => void check()} /> : null}
+        {phase.kind === "restore" ? (
+          <RestoreApp
+            api={api}
+            onOpened={(vault) => {
+              window.history.replaceState(null, "", "/vault#storage");
+              setPhase({ kind: "open", vault });
+            }}
+            onBack={() => {
+              window.history.replaceState(null, "", "/vault");
+              setPhase({ kind: "gate", mode: "signin" });
+            }}
+          />
+        ) : null}
         {phase.kind === "gate" ? (
           <Gate
             api={api}

@@ -7,12 +7,12 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d0e10?style=for-the-badge&labelColor=0b0c0e)](LICENSE)
 [![Encryption](https://img.shields.io/badge/AES--256--GCM-client--side-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-encryption-model)
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
-[![Tests](https://img.shields.io/badge/tests-531%20%2B%2043%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
+[![Tests](https://img.shields.io/badge/tests-600%20%2B%2052%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
 
-[How it works](#how-it-works) · [Encryption](#the-encryption-model) · [Connector](#the-connector) · [AI self](#your-ai-self) · [Ask links](#ask-links) · [Inbox](#the-memory-inbox) · [Meaning](#search-by-meaning) · [Thinking](#memory-that-thinks) · [Imports](#your-whole-digital-life) · [Live sync](#live-sync) · [Protected folders](#protected-folders) · [Public AI self](#a-public-ai-self) · [Selves meet](#selves-meet-selves) · [Work](#your-ai-self-at-work) · [Identity](#an-identity-and-a-wallet-for-the-ai-self) · [Prove a fact](#prove-a-fact-without-showing-it) · [Emergency](#emergency-access) · [Agreements](#sealed-agreements) · [Packs](#knowledge-packs) · [Open standard](#an-open-standard-and-a-privacy-score) · [Extension](#the-browser-extension) · [Sign in with Sigil](#sign-in-with-sigil) · [Sharing](#sharing-a-folder) · [Legacy](#legacy) · [Devices](#your-phone-and-every-device) · [Agents](#agents-get-their-own-memory) · [Proof](#proof-of-a-real-life) · [Threat model](#threat-model) · [Run it](#run-it) · [Roadmap](#roadmap)
+[How it works](#how-it-works) · [Encryption](#the-encryption-model) · [Connector](#the-connector) · [AI self](#your-ai-self) · [Ask links](#ask-links) · [Inbox](#the-memory-inbox) · [Meaning](#search-by-meaning) · [Thinking](#memory-that-thinks) · [Imports](#your-whole-digital-life) · [Live sync](#live-sync) · [Protected folders](#protected-folders) · [Public AI self](#a-public-ai-self) · [Selves meet](#selves-meet-selves) · [Work](#your-ai-self-at-work) · [Identity](#an-identity-and-a-wallet-for-the-ai-self) · [Prove a fact](#prove-a-fact-without-showing-it) · [Emergency](#emergency-access) · [Agreements](#sealed-agreements) · [Packs](#knowledge-packs) · [Bundles](#your-vault-in-one-bundle-kept-where-you-choose) · [Nodes](#run-your-own-node) · [Moving](#moving-between-nodes) · [Voice](#talk-to-your-ai-self) · [Capture keys](#capture-from-anywhere) · [Sessions](#sessions-with-an-experts-ai-self) · [Shared memory](#shared-family-and-team-memory) · [Open standard](#an-open-standard-and-a-privacy-score) · [Extension](#the-browser-extension) · [Sign in with Sigil](#sign-in-with-sigil) · [Sharing](#sharing-a-folder) · [Legacy](#legacy) · [Devices](#your-phone-and-every-device) · [Agents](#agents-get-their-own-memory) · [Proof](#proof-of-a-real-life) · [Threat model](#threat-model) · [Run it](#run-it) · [Roadmap](#roadmap)
 
 </div>
 
@@ -44,6 +44,12 @@ Every AI app keeps its own memory of you, locked inside that app, readable by th
 - **Prove a fact without showing it.** One field of a memory, an age, months of sealed history or a team space, signed and sealed, checked by anyone in a browser.
 - **Emergency access.** A medical card behind a code on your lock screen, encrypted with a key that lives only in its link, every opening shown to you.
 - **Sealed agreements and knowledge packs.** Agreements two vaults both sign and seal, and folders published as signed packs others follow, free.
+- **Your vault, kept where you choose.** The whole vault as one encrypted bundle, signed on your device: download it, or store it in your own bucket, on IPFS or on Arweave with your own tokens, every day or week, and restore it on any Sigil node with your recovery phrase or wallet.
+- **Run your own node, and move.** One command starts a node with the same site and API. A vault moves between nodes with a statement its own key signs; the old node sends your links on for a while, then deletes it.
+- **Talk to your AI self.** Speak in the test chat, on ask links and on the public page: speech to text runs on your device, and answers are read aloud by a voice on your device.
+- **Capture from anywhere.** A write-only key per phone, watch or shortcut, so "remember that I parked on level 3" said to Siri lands in your inbox, sealed on the device that sends it.
+- **Sessions with an expert's AI self.** Open times when anyone may book a short conversation with your public AI self, with topics, a number of questions, an intake and house rules. Free.
+- **Shared family and team memory.** A timeline of stories with people and photos, who added what, heirs who become members when a member's legacy plan releases, and a copy to print.
 - **An open standard and a privacy score.** The formats, keys, tools and log written down with test vectors from the code, and a score per app from your own read log.
 - **Legacy.** Name the people who receive your vault, the folders each gets and whether they may talk to your AI self. A legacy key is split in your browser and each share sealed to one person; they open it together, only after you have been away for the period you chose.
 - **Your phone and every device.** Install it like an app, add a device by QR code with the vault key sealed to that device only, revoke it, and capture text, links and photos into your inbox (from the share sheet on Android, from the capture screen anywhere).
@@ -129,6 +135,9 @@ sequenceDiagram
 | **Meet key** | Derived by each of two vaults from their own box keys | Never stored | Every turn between two AI selves |
 | **Self key** (secp256k1) | Derived from the vault key on the device | Never stored; the server keeps its address | The AI self's identity on any EVM chain: it co-signs the identity statement and signs within the self wallet's rules |
 | **Emergency card key** | Your browser, new for every code | The vault key; the link carries it after `#` | The emergency card, which the server stores and cannot open |
+| **Storage tokens** (yours: a bucket's keys, an IPFS token, an Arweave key file) | You give them | The vault key, and for a connector you allow, a key from that app's secret | Uploading your bundles from your device or connector to your own storage |
+| **Capture key** `sigil_cap.<id>.<secret>` | Your browser, shown once | Never stored | A bearer token the server keeps only hashed, and a tag key that checks the vault public key before anything is sealed |
+| **Session link secret** | The visitor's browser, per booking | Never stored; it rides after `#` | The session's bearer token and the visitor's key for the session's relay |
 
 Every ciphertext is AES-256-GCM, bound to its own record with associated data, so an envelope cannot be swapped into another record. Keys are derived with HKDF.
 
@@ -161,6 +170,11 @@ Data for a vault that is not open is a **sealed box**: a fresh X25519 key pair p
 | That an emergency card exists, and when it was opened, on what kind of device, in what language | The card |
 | An agreement's fingerprint, the two vaults' keys and their signatures | Its text |
 | A knowledge pack you publish, in full | Which packs you follow (an encrypted setting), apart from the fetches and your log lines |
+| For each backup: its hash, size and time | The bundle, your storage tokens, where each copy went |
+| During a move: the bundle as ciphertext, the move statement your key signed | Anything inside the bundle |
+| That a capture key exists, its token's hash, how many captures it sent | What it sends (sealed on the sending device), unless you allowed that key plain text |
+| A session offer, bookings, times and counts, the consent text, a hash of the visitor's address | The intake, the questions and answers, the transcript |
+| A shared memory's kind, its members and heirs, who wrote each entry | The stories, the people, the photos |
 
 ---
 
@@ -236,7 +250,7 @@ node /path/to/Sigil/connector/dist/index.js --self                    # answers 
 node /path/to/Sigil/connector/dist/index.js --watch ~/Obsidian        # suggests new and changed notes to your inbox
 ```
 
-Both use the same `SIGIL_APP_KEY` and `SIGIL_URL`.
+Both use the same `SIGIL_APP_KEY` and `SIGIL_URL`. When you allow the app under **Storage**, `--watch` also backs the vault up to your own storage on your schedule; after a move, point `SIGIL_URL` at the new node and the same key keeps working.
 
 </details>
 
@@ -377,9 +391,60 @@ Under **Agreements**, write an agreement and send it to another vault by its vau
 
 Under **Packs**, publish a folder as a pack with a title, a description and a version, signed by your vault; its memories are masked with the folder's rules and a protected folder can never be published. Its page at `/p/<id>` checks the signature in the browser. Followers' vaults copy it into a folder of their own and take in each new version when they open, checked link by link against the publisher they first followed; give that folder to your AI self or your agents like any other. Packs are free; paid packs are an idea on the roadmap, not something built.
 
+## Your vault in one bundle, kept where you choose
+
+Under **Storage**, download the vault as one bundle: every memory, key slot, setting, app, shared space and the sealed log with each entry's proof, all still encrypted, with a hash over every part and your vault key's signature, made on your device. Or add your own storage and store a copy every day or week while the vault is open:
+
+| Where | How | Read back |
+| --- | --- | --- |
+| A file | Downloaded on your device | Chosen on your device |
+| Your S3-compatible bucket | `PUT` signed with AWS Signature Version 4 on your device | A presigned address made on your device |
+| IPFS | Your pinning service's upload with your token, or your own IPFS node's `/api/v0/add` | `<gateway>/ipfs/<cid>` |
+| Arweave | A data item signed on your device with your own key file, sent to the bundler you choose | `<gateway>/<id>` |
+
+Your tokens are kept only in the vault's `backup` setting, encrypted with your vault key, and used only from your device. A connector you allow backs up in the background with `--watch`, with the targets wrapped for its key only; it never holds the vault key, so its bundles are not signed, and your device checks every part when it restores one. Where each copy went is sealed to your vault's key.
+
+**How long a copy lasts depends on where you keep it.** A file lasts as long as you keep it, a bucket while your account and the object exist, IPFS while the pin is kept, Arweave while its network keeps what was paid for. Sigil does not pay for, renew or check any of it; keep more than one.
+
+To restore, open `/vault/restore` on any Sigil node, give the file, a link, an IPFS content id, an Arweave id or your bucket, and sign in with your recovery phrase or wallet. Your device unwraps the vault key from the bundle's own key slot, opens and checks every part, and signs a restore statement for that node; the node takes the bundle in as a new vault with its log and proofs. App keys keep working there unchanged.
+
+## Run your own node
+
+Every Sigil server is a node: the same site and API. With Docker:
+
+```sh
+SIGIL_ORIGIN=https://sigil.example.org SIGIL_PORT=8080 docker compose up -d --build
+```
+
+`compose.yaml` builds the `Dockerfile` (Node 22.13, an unprivileged user), keeps the data in the `sigil-data` volume, maps `SIGIL_PORT` (8080 unless set) and checks `GET /api/health`, which answers `{ ok, node: { origin, version, spec }, time }`. Put a TLS proxy in front of it for a public address and set `SIGIL_ORIGIN` to it. The settings below go in the environment or a `.env` next to `compose.yaml`; the ones that shape the content security policy (`SIGIL_ORIGIN`, `SIGIL_BACKUP_ORIGINS`, `SIGIL_CHAIN_READ_RPC`, `SIGIL_IDENTITY_READ_RPC`) are fixed when the image is built. Without Docker, `npm install && npm run build && PORT=8080 npm start` runs the same node.
+
+## Moving between nodes
+
+Under **Storage**, give another node's address and how long the old node should send your links on (7, 30 or 90 days), and sign. Your device signs a bundle and a move statement with your vault key; this node keeps them for the new node and gives you a link with a move code. Open it on the new node and sign in there with your recovery phrase or wallet: the new node fetches the move from the old one with the secret in the code, your device opens and checks the bundle, signs a restore statement for the new node and an arrival for the old one, and the vault arrives. The old node checks the arrival against your vault key, sends your ask links, public page, packs and emergency card on to the new address, turns sign-ins and app keys away with the new address, and deletes the vault when the period ends. A node list under Storage shows where the vault lives, where it came from and where its copies are; every step is in the log of the node it happened on, sealed with the hour.
+
+## Talk to your AI self
+
+In the test chat, and on ask links and the public page when you offer it, **Turn on voice**. A speech model (Whisper in ONNX form, about 41 MB, English) is fetched once from the node and runs in a worker on the device: speak, and what it heard goes into the question field for you to check. The browser's own speech recognition, which sends audio to a cloud service in most browsers, is never used. **Read answers aloud** uses the browser's speech synthesis with a voice that runs on the device, and none at all when the device has none. Tests run the real speech code against a tiny stand-in model kept in the repository.
+
+## Capture from anywhere
+
+Under **Devices**, make a capture key for each phone, watch or shortcut: write-only into the inbox, at most 20 a minute and 300 a day, every capture in your log, revoked on its own. The sending device checks the vault public key against a tag your vault made for that key, then seals the capture to it.
+
+- **iPhone, Siri and headphones:** a shortcut with Dictate Text, URL Encode and Open URLs opens `/c#k=<capture key>&t=<what you said>`; the page seals it on the phone. "Hey Siri, remember that I parked on level 3."
+- **A watch:** it cannot open the page, so allow that key plain text: the shortcut sends `POST /api/capture/v1/text` over HTTPS and the node seals the text to your vault key as it arrives, keeping only the sealed box. That path has the node handle the text in the clear for that moment, and is off unless you allow it.
+- **Android:** the share sheet once Sigil is on the home screen, or the same link or plain request from an app.
+
+## Sessions with an expert's AI self
+
+Under **AI self**, open sessions on your public AI self: topics, how many questions a session holds, its length, the days and hours in your time zone, up to six intake questions, house rules (for example "not medical advice, see a doctor"), a cap per day and the text a visitor agrees to. Visitors book a free time on your page at `/@you`; the intake is sealed in their browser to your public self's key, and the session link they get holds the only key to the session. Your open vault or connector answers only from what you made public, under your rules and the house rules, every answer marked as AI. You read each booking, what the visitor agreed to and the transcript, and can end a session or block its visitor. Sessions are free; payments are not part of Sigil.
+
+## Shared family and team memory
+
+Under **Shared memory**, start a family's or a team's history on a shared space: a timeline of stories with a year, a month or a day, the people in them (members, and others by name), photos, and who added each one. Roles are those of team spaces. A writer changes and deletes only what they wrote; leaving, being removed or deleting an account never deletes what others wrote, and the history is deleted only by its last member. Name heirs by vault code, for one member or for all: their key is sealed now, sealed again with every new key, and they become members when that member's legacy plan releases. Download the whole history as one HTML document made on your device, ready to print to PDF; it is also part of each member's bundle.
+
 ## An open standard and a privacy score
 
-[`docs/spec`](docs/spec/README.md) is the open standard, version 1.1.0: the memory format, folder keys and sealed boxes, the connector's tools and permissions, the access log entry, seals and presence, certificates, and since 1.1 the AI self's identity and wallet rules, proofs of a fact, the emergency card, agreements and knowledge packs. Its test vectors are generated from the code and checked on every test run; the site renders it at `/spec`.
+[`docs/spec`](docs/spec/README.md) is the open standard, version 1.2.0: the memory format, folder keys and sealed boxes, the connector's tools and permissions, the access log entry, seals and presence, certificates, since 1.1 the AI self's identity and wallet rules, proofs of a fact, the emergency card, agreements and knowledge packs, and since 1.2 the vault bundle, storage, nodes and moving, capture keys, sessions and shared memory. Its test vectors are generated from the code and checked on every test run; the site renders it at `/spec`.
 
 Under **Apps** and **Agents**, each app has a privacy score computed in your browser from your own read log of the last 30 days: how much of what it may read it read, how many folders, protected reads, how often, and its writes, each with its points shown. It says what was read, not what an app did with it.
 
@@ -526,6 +591,13 @@ Every request a connected app makes is written to your read log with a random sa
 | The server reads your emergency card | It holds ciphertext; the key is only in the link after `#`. Anyone who sees your lock screen can open it, which is its purpose. |
 | A signed agreement is changed | Both signatures cover one fingerprint of the text and the parties; one changed word and neither holds. |
 | The server swaps a knowledge pack | Followers check every version against the publisher key they pinned. |
+| The node your vault lives on shuts down | Restore your bundle on any node with your phrase or wallet. How long a copy lasts depends on where you keep it. |
+| A bundle was changed, or is someone else's | Your device opens every part with your vault key before a node takes it in; the node needs a restore statement your key signed for it. |
+| Someone tries to move your vault | A move needs your vault key's signature, the secret in the code you carry, and an arrival your key signs. |
+| A capture key leaks | It can only add to your inbox, within its limits, and nothing becomes a memory until you approve it. Revoke it on its own. |
+| A watch sends plain text | Only for a key you allowed: the node seals it as it arrives and keeps only the sealed box, but it handled the text for that moment. |
+| Your voice | Turned into text on your device; no audio leaves it. |
+| A shared memory loses a member | What they and others wrote stays; heirs you named become members when that member's legacy plan releases. |
 
 ---
 
@@ -543,7 +615,9 @@ Sigil
 │                   public copy, selves meet, the privacy score, the self key
 │                   and identity statement, wallet rules, proofs of a fact,
 │                   the emergency card, agreements, knowledge packs, drafts
-│                   and learning from edits
+│                   and learning from edits, vault bundles, storage backends,
+│                   moving between nodes, capture keys, sessions, shared
+│                   memory and speech to text
 ├── packages/sdk    Sign in with Sigil for web apps
 ├── web             the site and the server: Next.js App Router, the vault
 │                   dashboard, the API in web/src/server, SQLite storage
@@ -552,8 +626,9 @@ Sigil
 ├── examples        hello-sigil, a small web app that signs in with Sigil
 ├── contracts       SigilSeal.sol for on-chain seal roots, SigilSelfRegistry.sol
 │                   and SigilSelfWallet.sol for the AI self (Foundry)
-├── e2e             Playwright: the whole product, end to end, in Chrome
-└── docs            the open standard (docs/spec), design brief, README assets
+├── e2e             Playwright: the whole product, end to end, in Chrome, on two nodes
+├── docs            the open standard (docs/spec), design brief, README assets
+└── Dockerfile, compose.yaml   run your own node with one command
 ```
 
 <details>
@@ -594,8 +669,16 @@ Sigil
 | `GET /api/e/<id>` | An emergency card's ciphertext; the opening is recorded for its owner |
 | `GET /api/packs/at/<id>`, `/versions` | A knowledge pack, the newest version or one by number, and its versions |
 | `GET /spec/vectors.json` | The open standard's test vectors |
+| `GET /api/health` | The node's health: its origin, version and the open standard it follows |
+| `POST /api/restore/fetch`, `POST /api/restore` | A bundle fetched from a public address for a restore, and a bundle taken in with the owner's sign-in and restore statement |
+| `GET /api/nodes/moves/<id>`, `POST .../done` | Node to node: a move and its bundle for the holder of its secret, and the arrival the vault key signed |
+| `POST /api/nodes/arrive` | The new node fetches a move from the old one for the restore page |
+| `GET /api/capture/v1/key`, `POST /api/capture/v1`, `POST /api/capture/v1/text` | A capture key: the vault key and its tag, a sealed capture, and plain text for a key allowed it |
+| `GET`, `POST /api/public/at/<handle>/sessions` | A public AI self's sessions and free times, and booking one |
+| `GET /api/sessions/<id>`, `POST .../questions`, `GET .../questions/<id>` | A booked session for the bearer of its link |
+| `GET /api/connector/v1/backup`, `/backup/bundle`, `POST /backup/done` | Backups in the background, for the app the owner allowed (app token) |
 
-The connector routes answer any origin, since they take a bearer token and never a cookie. The vault's own routes (sign-up, sign-in, memories, folders and their key rotation, apps, the inbox, shares, encrypted settings, ask links and the open vault answering them, legacy plans and the release room, devices, agents, team spaces, presence and certificates, protected folders and access requests, live sync sources, the public AI self, selves meet, the self's identity, drafts, proofs, the emergency card, agreements, packs, export, delete) are under `web/src/server/api.ts`.
+The connector routes answer any origin, since they take a bearer token and never a cookie. The vault's own routes (sign-up, sign-in, memories, folders and their key rotation, apps, the inbox, shares, encrypted settings, ask links and the open vault answering them, legacy plans and the release room, devices, agents, team spaces, presence and certificates, protected folders and access requests, live sync sources, the public AI self, selves meet, the self's identity, drafts, proofs, the emergency card, agreements, packs, the bundle and backups, nodes and moves, capture keys, sessions, shared memory heirs, export, delete) are under `web/src/server/api.ts`.
 
 </details>
 
@@ -630,13 +713,17 @@ For development: `npm run dev`. Settings are in `web/.env.example`:
 | `SIGIL_SLACK_CLIENT_ID` | | Public OAuth client id for Slack live sync |
 | `SIGIL_IDENTITY_CHAIN_ID`, `SIGIL_IDENTITY_REGISTRY` | | The chain and address of SigilSelfRegistry once deployed. Unset, the Identity tab works off chain |
 | `SIGIL_IDENTITY_READ_RPC` | | A public, read-only RPC of that chain; the vault reads a self wallet's spends through it in the browser, and its origin joins the content security policy |
+| `SIGIL_VOICE` | `on` | Offer voice: the speech model runs in the browser; the node only serves its files |
+| `SIGIL_SPEECH_MODEL` | `Xenova/whisper-tiny.en` | The speech model, fetched once into `SIGIL_MODEL_DIR` like the sentence model |
+| `SIGIL_BACKUP_ORIGINS` | | More storage addresses the page may upload backups to, space separated (https), on top of common S3, IPFS pinning and Arweave upload hosts. Read at build time |
+| `SIGIL_NODE_ALLOW_PRIVATE` | `off` | Let this node talk to nodes and restore addresses on a private network (nodes on one machine or network) |
 
 The logo, favicon and app icons are made from `web/brand/sigil-logo.png` with `node web/scripts/icons.mjs`.
 
 ## Tests
 
 ```sh
-npm run test:unit       # 463: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
+npm run test:unit       # 532: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
                         #      the AI self and its rules, briefs, contradictions, expiry, every import
                         #      parser with fixtures, seals, server, connector, extension, SDK, Shamir
                         #      split and combine, sealed shares and bundles, the legacy heartbeat and
@@ -650,12 +737,21 @@ npm run test:unit       # 463: cryptography, sealed boxes, the ask link relay, s
                         #      the identity statement, wallet rules and the configure call, drafts,
                         #      held answers and learning from edits, field commitments and every kind
                         #      of proof of a fact, the emergency card's key and openings, agreement
-                        #      signatures and amendments, signed packs, pinning and following, and the
-                        #      open standard's vectors against the code
+                        #      signatures and amendments, signed packs, pinning and following, the vault
+                        #      bundle made, signed, checked and restored on another node with its log and
+                        #      proofs, AWS Signature Version 4 against the published examples, S3, IPFS
+                        #      and Arweave uploads against HTTP played by the tests, Arweave data items
+                        #      signed and read back, storage tokens kept under the vault or a connector's
+                        #      key, a connector's backups, moves between two nodes with their redirects,
+                        #      refusals and deletion, capture keys sealing, tags, limits and revoking,
+                        #      session offers, free times, turns, intakes and transcripts, shared memory
+                        #      with authors and heirs made members by a legacy release, the speech code
+                        #      (spectrogram, encoder, greedy decoding) against a tiny stand-in model, the
+                        #      container files as written, and the open standard's vectors against the code
 npm run test:contracts  # 68: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
                         #     wallet's caps, freeze and expiry, and the standard's vectors signed in
                         #     TypeScript and accepted by both new contracts
-npm run test:e2e        # 43: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
+npm run test:e2e        # 52: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
                         #     the inbox, the Self card, search by meaning, sharing, Sign in with Sigil,
                         #     the AI self test chat, an ask link answered across two browsers, the
                         #     weekly brief, contradictions, expiry, merging every group, the site,
@@ -669,10 +765,13 @@ npm run test:e2e        # 43: sign up, import (ChatGPT, Claude, Takeout, Obsidia
                         #     approved with an edit and learned from, a proof of a fact and of an age
                         #     verified in another browser, the emergency card opened on a phone and
                         #     revoked, an agreement signed across two browsers, a pack followed and
-                        #     updated
+                        #     updated, a bundle downloaded and restored on a second node, a vault moved
+                        #     between two nodes, voice in the test chat with the tiny speech model, a
+                        #     capture key used from a phone, a session booked and answered across two
+                        #     browsers, a family timeline whose heir becomes a member
 ```
 
-The server tests check that no plaintext ever reaches the database or leaves the browser, and that the server never holds a model key, a rule, a question, an answer, a legacy share, a device secret, a space key, a sync token, a mail or a turn between two selves in readable form. Live sync is tested against recorded API fixtures with the HTTP mocked; no test calls Google or Slack. No test reaches a chain: the contracts run in Foundry, and the vault's chain reads are tested with the RPC answered by the test. Search by meaning is tested with a tiny generated model kept in `packages/core/test/fixtures/tiny-model`, and every model call is answered by the tests themselves, so no test needs the network or a real model.
+The server tests check that no plaintext ever reaches the database or leaves the browser, and that the server never holds a model key, a rule, a question, an answer, a legacy share, a device secret, a space key, a sync token, a mail or a turn between two selves in readable form. Live sync is tested against recorded API fixtures with the HTTP mocked; no test calls Google or Slack. No test reaches a chain: the contracts run in Foundry, and the vault's chain reads are tested with the RPC answered by the test. No test calls a storage service: S3, IPFS and Arweave are answered by the tests, and the end-to-end suite runs two nodes on this machine. Voice is tested with a tiny stand-in speech model kept in `packages/core/test/fixtures/tiny-model` (made by `make-tiny-whisper.mjs`) and a fake microphone, so no test downloads or runs the real model. Search by meaning is tested with a tiny generated model kept in `packages/core/test/fixtures/tiny-model`, and every model call is answered by the tests themselves, so no test needs the network or a real model.
 
 ---
 
@@ -684,13 +783,13 @@ The server tests check that no plaintext ever reaches the database or leaves the
 | 2 | **Every AI, one memory**: the MCP connector, per-app folder grants, revoke, the read log, hourly seals, the memory inbox, the browser extension, Sign in with Sigil, sharing between vaults | Built |
 | 3 | **Your whole digital life**: local imports, live sync from Gmail, Google Calendar, Google Drive and Slack, meeting transcripts and protected folders for health, money and legal are built; ask your life and more sources are next | Started |
 | 4 | **Memory that thinks**: search by meaning on the device, duplicates merged by group, a timeline, the Self card, a weekly brief, contradictions and expiry are built; timelines of people and projects, briefs before meetings and a fully local mode are next | Started |
-| 5 | **Your AI self**: version 1 is built: answers as you within your rules with your own model key, ask links end to end encrypted, `ask_self` in the connector, a public AI self at `/@you`, drafts in an approval queue that learn from your edits, its own key and signed identity; its wallet contract is written and tested, not deployed; a personal model is next | Version 1 |
-| 6 | **Agents get memory**: agent vaults with their own folder, rules per tool, remember, recall, forget and handoff notes, and team spaces with roles are built; a memory for a whole company is next | Core built |
+| 5 | **Your AI self**: version 1 is built: answers as you within your rules with your own model key, ask links end to end encrypted, `ask_self` in the connector, a public AI self at `/@you`, drafts in an approval queue that learn from your edits, its own key and signed identity, and voice with speech to text on the device; its wallet contract is written and tested, not deployed; a personal model is next | Version 1 |
+| 6 | **Agents get memory**: agent vaults with their own folder, rules per tool, remember, recall, forget and handoff notes, team spaces with roles, and shared family and team memory with heirs are built; a memory for a whole company is next | Core built |
 | 7 | **The memory economy**: knowledge packs others follow for free and proving a fact without showing it (version 1, selective disclosure) are built; zero-knowledge proofs and licensed packs are next | Started |
-| 8 | **Trust**: the open standard version 1 with test vectors, and a privacy score per app from your own log, are built | Core built |
-| 9 | **Everywhere**: the installable app with an offline shell, devices added by QR code, quick capture, and legacy are built; recovery through people you trust, native store apps and storage nodes are next | Started |
+| 8 | **Trust**: the open standard (1.2) with test vectors, and a privacy score per app from your own log, are built | Core built |
+| 9 | **Everywhere**: the installable app with an offline shell, devices added by QR code, quick capture, capture keys for phones, watches and shortcuts, legacy, the vault as one bundle kept in your own storage, your own node and moving between nodes are built; recovery through people you trust, native store apps and nodes that keep copies of each other's data are next | Started |
 | 10 | **Devices**: emergency medical access from the lock screen is built; wearables, car and home are next | Started |
-| 11 | **Your AI self in the world**: selves meet selves, version 1, is built; hiring experts' selves and paid work are next | Started |
+| 11 | **Your AI self in the world**: selves meet selves, version 1, and free sessions with experts' AI selves are built; paid work is an idea, not something built | Started |
 | 12 | **Proof of a real life**: a signed certificate of continuous sealed history and sealed agreements between two vaults are built; proof of human with zero-knowledge proofs is next | Started |
 | 13 | **Collective memory** | Planned |
 

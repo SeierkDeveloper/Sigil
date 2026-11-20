@@ -13,7 +13,11 @@ export function json(data: unknown, status = 200, headers: Record<string, string
 }
 
 export function errorResponse(err: unknown): Response {
-  if (err instanceof HttpError) return json({ error: err.message, code: err.code }, err.status);
+  if (err instanceof HttpError) {
+    // A vault that moved to another node says where it went.
+    const to = (err as HttpError & { to?: string }).to;
+    return json({ error: err.message, code: err.code, ...(to ? { to } : {}) }, err.status);
+  }
   console.error("[sigil] unexpected error", err);
   return json({ error: "Something went wrong on the server. Please try again.", code: "server" }, 500);
 }
