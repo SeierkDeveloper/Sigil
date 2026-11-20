@@ -5,7 +5,7 @@
 // voice that runs on the device. No audio and no question reach Sigil.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
 
 test.use({ launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] }, permissions: ["microphone"] });
 
@@ -49,6 +49,8 @@ test("the test chat listens on the device and reads the answer aloud", async ({ 
 
   await voice.getByTestId("voice-mic").click();
   await expect(voice).toContainText("Listening");
+  await expect(voice).toHaveAttribute("data-state", "listening");
+  await fitsPhone(page, "Test chat, listening");
   await page.waitForTimeout(1200);
   await voice.getByTestId("voice-mic").click();
   await expect(chat.getByLabel("Question")).toHaveValue("Where did I park the car?", { timeout: 30_000 });
@@ -57,6 +59,10 @@ test("the test chat listens on the device and reads the answer aloud", async ({ 
   await chat.getByRole("button", { name: "Ask" }).click();
   await expect(chat.getByTestId("chat-turn").first()).toContainText("You parked on level 3");
   await expect.poll(() => page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken)).toEqual(["You parked on level 3, by the lift."]);
+  // While the device reads, the strip says so.
+  await expect(voice).toHaveAttribute("data-speaking", "true");
+  await expect(voice).toContainText("Reading the answer aloud");
+  await fitsPhone(page, "Test chat, reading an answer aloud");
   expect(calls.at(-1)?.messages.at(-1)?.content).toBe("Where did I park the car?");
 
   // The voice choice is kept, encrypted, for the next time the vault opens.

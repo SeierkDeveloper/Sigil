@@ -68,6 +68,9 @@ test("a visitor books a session, talks with the expert's AI self under its house
   await expect(turn).toContainText("Add compost in autumn.", { timeout: 30_000 });
   await expect(turn.locator(".chat-by-kind")).toHaveText("AI");
   await expect(visitor.getByTestId("session-status")).toContainText("2 questions left");
+  // The questions are drawn too: three cuts, two still to ask.
+  await expect(visitor.locator(".session-meter i")).toHaveCount(3);
+  await expect(visitor.locator('.session-meter i[data-left="true"]')).toHaveCount(2);
   await fitsPhone(visitor, "A session, one answer");
   expect(calls.at(-1)!.system).toContain("House rules the owner set for every session");
   expect(calls.at(-1)!.system).toContain(INTAKE);
