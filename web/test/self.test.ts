@@ -102,6 +102,11 @@ describe("settings", () => {
     expect(db).not.toContain("salary");
     expect(h.sent.join("\n")).not.toContain(MODEL_KEY);
     expect(count(h.db, "SELECT COUNT(*) AS n FROM vault_settings")).toBe(2);
+    // The export holds the rules and which model, but not the key.
+    const exported = JSON.stringify(ops.buildExport(s.data, []));
+    expect(exported).toContain("Sam's AI self");
+    expect(exported).toContain("claude-opus-5-5");
+    expect(exported).not.toContain(MODEL_KEY);
   });
 
   it("are refused under a name the vault does not use, and removed for real", async () => {

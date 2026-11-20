@@ -905,6 +905,13 @@ export interface VaultExport {
   inbox: { app: string; createdAt: string; title: string; body: string; tags: string[]; folder: string | null; url: string | null }[];
   /** Folders shared with other vaults, by what you call them. */
   shares: { folder: string; with: string; createdAt: string; acceptedAt: string | null }[];
+  /** The AI self's rules, which model it uses (the key itself is left out of the file), and the ask links. */
+  aiSelf: {
+    rules: SelfRules | null;
+    model: { provider: ModelSettings["provider"]; model: string } | null;
+    links: { label: string; createdAt: string; expiresAt: string; uses: number; answered: number; revokedAt: string | null }[];
+  };
+  thinking: ThinkingSettings;
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -941,6 +948,12 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
         : [],
     ),
     shares: data.shares.outgoing.map((s) => ({ folder: folderName.get(s.folderId) ?? s.folderId, with: s.label, createdAt: s.createdAt, acceptedAt: s.acceptedAt })),
+    aiSelf: {
+      rules: data.self,
+      model: data.model ? { provider: data.model.provider, model: data.model.model } : null,
+      links: data.askLinks.map((l) => ({ label: l.label, createdAt: l.createdAt, expiresAt: l.expiresAt, uses: l.uses, answered: l.answered, revokedAt: l.revokedAt })),
+    },
+    thinking: data.thinking,
   };
 }
 
