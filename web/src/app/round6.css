@@ -1,3 +1,165 @@
+/*
+  Round six in the logo's line language: the vault's index, work, identity and
+  the self's wallet, proofs of a fact, agreements, the emergency card and
+  knowledge packs, with the public pages /e/<id> and /p/<id> and the checker
+  for signed documents on /verify.
+
+  Loaded after round5.css. It uses the tokens already there and adds none:
+  three fine lines down the left edge for something sealed or quoted
+  (--ruled-edge), a cut of ribbon on the top edge of something that waits for
+  your yes (--ruled with --lean), dashed outlines for what waits on someone
+  else. A component carries one such detail, never several.
+
+  The emergency card is the exception to all of it. It is read by a stranger
+  in a hurry, so it carries no ornament: solid black, pure white, large plain
+  type, and the call buttons as white plates.
+*/
+
+/* ------------------------------------------------------------------ the vault's index */
+
+/* Twenty-two sections in four named rows, like the index of a ledger. */
+.tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  overflow: visible;
+  border-top: 1px solid var(--color-line-strong);
+}
+
+.tab-group {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+}
+
+.tab-group + .tab-group {
+  border-top: 1px solid var(--color-line);
+}
+
+.tab-group-label {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transition: color var(--transition);
+}
+
+/* The row that holds the open section reads brighter. */
+.tab-group:has(.tab[aria-selected="true"]) .tab-group-label {
+  color: var(--color-text);
+}
+
+.tab-group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.tab,
+.tab:first-child {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+}
+
+.tab-group-tabs > .tab:first-child {
+  margin-left: calc(-1 * var(--space-4));
+}
+
+/* The open section is marked as the open menu is in the header: three lines with angled ends on the rule. */
+.tab::after,
+.tab:first-child::after {
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: -3px;
+  z-index: 1;
+  height: 5px;
+  background: var(--ruled);
+  --cut: 4px;
+  clip-path: var(--lean);
+}
+
+@media (max-width: 640px) {
+  /* On a phone each row is a plate of cells with its name up its spine, and no cell is left empty. */
+  .tabs {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .tab-group {
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: stretch;
+    border: 1px solid var(--color-line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--color-line);
+    gap: 1px;
+    overflow: hidden;
+  }
+
+  .tab-group + .tab-group {
+    border-top: 1px solid var(--color-line-strong);
+  }
+
+  .tab-group-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #070707;
+    font-size: 0.5625rem;
+    letter-spacing: 0.16em;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+  }
+
+  .tab-group-tabs {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 1px;
+  }
+
+  .tab-group-tabs > .tab {
+    grid-column: span 3;
+  }
+
+  /* Five sections sit three and two, seven sit four and three. */
+  .tab-group-tabs[data-count="5"] > .tab {
+    grid-column: span 4;
+  }
+
+  .tab-group-tabs[data-count="5"] > .tab:nth-child(n + 4) {
+    grid-column: span 6;
+  }
+
+  .tab-group-tabs[data-count="7"] > .tab:nth-child(n + 5) {
+    grid-column: span 4;
+  }
+
+  .tab,
+  .tab:first-child {
+    min-width: 0;
+    padding: 0 2px;
+    font-size: 0.8125rem;
+    letter-spacing: 0;
+  }
+
+  .tab-group-tabs > .tab:first-child {
+    margin-left: 0;
+  }
+
+  .tab .tab-count {
+    margin-left: 5px;
+  }
+
+  .tab[aria-selected="true"] .tab-count {
+    background: var(--color-accent-ink);
+    color: var(--color-text);
+  }
+}
+
 /* ------------------------------------------------------------------ round six: work, identity, proofs, emergency, agreements, packs
    Plain first styling, in the tokens above, for the design pass to replace. */
 

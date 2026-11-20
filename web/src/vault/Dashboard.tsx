@@ -38,30 +38,53 @@ import { EmergencyTab } from "./tabs/Emergency";
 import { AgreementsTab } from "./tabs/Agreements";
 import { PacksTab } from "./tabs/Packs";
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: "memories", label: "Memories" },
-  { id: "inbox", label: "Inbox" },
-  { id: "self", label: "AI self" },
-  { id: "work", label: "Work" },
-  { id: "identity", label: "Identity" },
-  { id: "meet", label: "Meet" },
-  { id: "agreements", label: "Agreements" },
-  { id: "review", label: "Review" },
-  { id: "timeline", label: "Timeline" },
-  { id: "profile", label: "Self card" },
-  { id: "folders", label: "Folders" },
-  { id: "apps", label: "Apps" },
-  { id: "agents", label: "Agents" },
-  { id: "devices", label: "Devices" },
-  { id: "legacy", label: "Legacy" },
-  { id: "proof", label: "Proof" },
-  { id: "emergency", label: "Emergency" },
-  { id: "packs", label: "Packs" },
-  { id: "log", label: "Read log" },
-  { id: "import", label: "Import" },
-  { id: "sync", label: "Sync" },
-  { id: "settings", label: "Settings" },
+// The sections of the vault, in the four groups the index shows them in. Tab ids never change.
+const TAB_GROUPS: { label: string; tabs: { id: TabId; label: string }[] }[] = [
+  {
+    label: "Vault",
+    tabs: [
+      { id: "memories", label: "Memories" },
+      { id: "inbox", label: "Inbox" },
+      { id: "timeline", label: "Timeline" },
+      { id: "review", label: "Review" },
+      { id: "folders", label: "Folders" },
+      { id: "import", label: "Import" },
+      { id: "sync", label: "Sync" },
+    ],
+  },
+  {
+    label: "Self",
+    tabs: [
+      { id: "self", label: "AI self" },
+      { id: "profile", label: "Self card" },
+      { id: "work", label: "Work" },
+      { id: "identity", label: "Identity" },
+      { id: "meet", label: "Meet" },
+    ],
+  },
+  {
+    label: "Access",
+    tabs: [
+      { id: "apps", label: "Apps" },
+      { id: "agents", label: "Agents" },
+      { id: "devices", label: "Devices" },
+      { id: "log", label: "Read log" },
+      { id: "settings", label: "Settings" },
+    ],
+  },
+  {
+    label: "Others",
+    tabs: [
+      { id: "proof", label: "Proof" },
+      { id: "packs", label: "Packs" },
+      { id: "legacy", label: "Legacy" },
+      { id: "agreements", label: "Agreements" },
+      { id: "emergency", label: "Emergency" },
+    ],
+  },
 ];
+
+const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
 const NO_MEMORIES: ops.VaultData["memories"] = [];
 
@@ -282,44 +305,53 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
         ) : null}
 
         <div className="tabs" role="tablist" aria-label="Vault sections">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              id={`tab-${t.id}`}
-              className="tab"
-              aria-selected={tab === t.id}
-              aria-controls={`panel-${t.id}`}
-              onClick={() => goTo(t.id)}
-            >
-              {t.label}
-              {t.id === "legacy" && data.trusted.some((x) => x.state === "open" && !x.kept) ? (
-                <span className="tab-count" aria-label="A plan that names you is open for release">
-                  {data.trusted.filter((x) => x.state === "open" && !x.kept).length}
-                </span>
-              ) : null}
-              {t.id === "inbox" && data.proposals.length + waitingRequests > 0 ? (
-                <span className="tab-count" aria-label={`${data.proposals.length + waitingRequests} waiting`}>
-                  {data.proposals.length + waitingRequests}
-                </span>
-              ) : null}
-              {t.id === "work" && data.drafts.some((d) => d.state === "waiting") ? (
-                <span className="tab-count" aria-label={`${data.drafts.filter((d) => d.state === "waiting").length} drafts waiting`}>
-                  {data.drafts.filter((d) => d.state === "waiting").length}
-                </span>
-              ) : null}
-              {t.id === "agreements" && data.agreements.some((a) => a.role === "to" && a.state === "proposed") ? (
-                <span className="tab-count" aria-label="An agreement waits for your signature">
-                  {data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length}
-                </span>
-              ) : null}
-              {t.id === "meet" && data.meets.some((m) => m.role === "invitee" && m.state === "invited") ? (
-                <span className="tab-count" aria-label="An invite is waiting">
-                  {data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length}
-                </span>
-              ) : null}
-            </button>
+          {TAB_GROUPS.map((g) => (
+            <div key={g.label} className="tab-group" role="presentation">
+              <span className="tab-group-label" aria-hidden="true">
+                {g.label}
+              </span>
+              <div className="tab-group-tabs" role="presentation" data-count={g.tabs.length}>
+                {g.tabs.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="tab"
+                    id={`tab-${t.id}`}
+                    className="tab"
+                    aria-selected={tab === t.id}
+                    aria-controls={`panel-${t.id}`}
+                    onClick={() => goTo(t.id)}
+                  >
+                    {t.label}
+                    {t.id === "legacy" && data.trusted.some((x) => x.state === "open" && !x.kept) ? (
+                      <span className="tab-count" aria-label="A plan that names you is open for release">
+                        {data.trusted.filter((x) => x.state === "open" && !x.kept).length}
+                      </span>
+                    ) : null}
+                    {t.id === "inbox" && data.proposals.length + waitingRequests > 0 ? (
+                      <span className="tab-count" aria-label={`${data.proposals.length + waitingRequests} waiting`}>
+                        {data.proposals.length + waitingRequests}
+                      </span>
+                    ) : null}
+                    {t.id === "work" && data.drafts.some((d) => d.state === "waiting") ? (
+                      <span className="tab-count" aria-label={`${data.drafts.filter((d) => d.state === "waiting").length} drafts waiting`}>
+                        {data.drafts.filter((d) => d.state === "waiting").length}
+                      </span>
+                    ) : null}
+                    {t.id === "agreements" && data.agreements.some((a) => a.role === "to" && a.state === "proposed") ? (
+                      <span className="tab-count" aria-label="An agreement waits for your signature">
+                        {data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length}
+                      </span>
+                    ) : null}
+                    {t.id === "meet" && data.meets.some((m) => m.role === "invitee" && m.state === "invited") ? (
+                      <span className="tab-count" aria-label="An invite is waiting">
+                        {data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length}
+                      </span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
