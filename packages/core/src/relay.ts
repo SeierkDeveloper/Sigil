@@ -12,8 +12,14 @@
 // derive the same conversation key:
 //
 //   shared = X25519(asker secret, link public) = X25519(link secret, asker public)
-//   key    = HKDF-SHA256(shared, salt = asker public || link public,
-//                        info = "sigil:ask:v1:" + link id + ":" + session id)
+//   key    = HKDF-SHA256(shared || greeting key, salt = asker public || link public,
+//                        info = "sigil:ask:v2:" + link id + ":" + session id)
+//
+// The greeting key travels only in the link's fragment and with the owner, so
+// a question is answered only for someone who holds the whole link: the server
+// (which knows the link id and its public key) cannot make a session of its
+// own and have the owner's AI self answer it. The public AI self and booked
+// sessions, which anyone may use, keep the v1 key without it.
 //
 // Every message is XChaCha20-Poly1305 under that key with a fresh nonce, bound
 // to its link, session, message id and direction, so the server (which only
@@ -89,7 +95,11 @@ export async function openIntro(introKey: Uint8Array, linkId: string, envelope: 
 
 // ---------------------------------------------------------------- the conversation
 
-function conversationKey(shared: Uint8Array, askerPublic: Uint8Array, linkPublic: Uint8Array, linkId: string, sessionId: string): Uint8Array {
+function conversationKey(shared: Uint8Array, askerPublic: Uint8Array, linkPublic: Uint8Array, linkId: string, sessionId: string, linkSecret?: Uint8Array): Uint8Array {
+  if (linkSecret) {
+    if (linkSecret.length !== 32) throw new DecryptError("A link's greeting key has the wrong length.");
+    return hkdfSync(sha256, concatBytes(shared, linkSecret), concatBytes(askerPublic, linkPublic), utf8(`sigil:ask:v2:${linkId}:${sessionId}`), 32);
+  }
   return hkdfSync(sha256, shared, concatBytes(askerPublic, linkPublic), utf8(`sigil:ask:v1:${linkId}:${sessionId}`), 32);
 }
 
@@ -100,8 +110,12 @@ export interface AskSession {
   key: Uint8Array;
 }
 
-/** The asker's side: a fresh key pair and the conversation key, made in the asker's browser. */
-export function newAskSession(linkId: string, linkPublicKey: string): AskSession {
+/**
+ * The asker's side: a fresh key pair and the conversation key, made in the
+ * asker's browser. For an ask link, pass the greeting key from the link's
+ * fragment; the public AI self has none.
+ */
+export function newAskSession(linkId: string, linkPublicKey: string, linkSecret?: Uint8Array): AskSession {
   const pair = newBoxKeyPair();
   const linkPublic = decodeBoxPublicKey(linkPublicKey);
   let shared: Uint8Array;
@@ -111,7 +125,7 @@ export function newAskSession(linkId: string, linkPublicKey: string): AskSession
     throw new Error("This link's key is not usable.");
   }
   const id = randomId();
-  return { id, publicKey: encodeBoxPublicKey(pair.publicKey), key: conversationKey(shared, pair.publicKey, linkPublic, linkId, id) };
+  return { id, publicKey: encodeBoxPublicKey(pair.publicKey), key: conversationKey(shared, pair.publicKey, linkPublic, linkId, id, linkSecret) };
 }
 
 /** The asker's side with a key pair and a session id it already has: a booked session, where both come from the session link. */
@@ -126,8 +140,8 @@ export function askSessionFromPair(linkId: string, linkPublicKey: string, sessio
   return { id: sessionId, publicKey: encodeBoxPublicKey(pair.publicKey), key: conversationKey(shared, pair.publicKey, linkPublic, linkId, sessionId) };
 }
 
-/** The owner's side: the same conversation key from the link's private key and the asker's public key. */
-export function agentSessionKey(link: BoxKeyPair, linkId: string, sessionId: string, askerPublicKey: string): Uint8Array {
+/** The owner's side: the same conversation key from the link's private key and the asker's public key (and, for an ask link, its greeting key). */
+export function agentSessionKey(link: BoxKeyPair, linkId: string, sessionId: string, askerPublicKey: string, linkSecret?: Uint8Array): Uint8Array {
   const askerPublic = decodeBoxPublicKey(askerPublicKey);
   let shared: Uint8Array;
   try {
@@ -135,7 +149,19 @@ export function agentSessionKey(link: BoxKeyPair, linkId: string, sessionId: str
   } catch {
     throw new DecryptError("The asker's key is not usable.");
   }
-  return conversationKey(shared, askerPublic, link.publicKey, linkId, sessionId);
+  return conversationKey(shared, askerPublic, link.publicKey, linkId, sessionId, linkSecret);
+}
+
+/** The greeting key an ask link's owner keeps, as bytes for agentSessionKey. */
+export function linkGreetingKey(secret: Pick<AskLinkSecret, "introKey">): Uint8Array {
+  let raw: Uint8Array;
+  try {
+    raw = fromBase64Url(secret.introKey);
+  } catch {
+    throw new DecryptError("A link's greeting key is damaged.");
+  }
+  if (raw.length !== 32) throw new DecryptError("A link's greeting key has the wrong length.");
+  return raw;
 }
 
 export type AskDirection = "q" | "a";

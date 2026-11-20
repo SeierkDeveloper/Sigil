@@ -10,6 +10,7 @@
 import {
   AAD,
   agentSessionKey,
+  linkGreetingKey,
   answerAsSelf,
   appSelfKey,
   askNoteContext,
@@ -141,7 +142,7 @@ export class SelfAgent {
       const link = self.links.get(q.linkId);
       if (!link) continue;
       const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
-      const key = agentSessionKey(linkPair(link), q.linkId, q.sessionId, q.askerKey);
+      const key = agentSessionKey(linkPair(link), q.linkId, q.sessionId, q.askerKey, linkGreetingKey(link));
       let reply: AskReply;
       let question = "";
       let citations: AskNote["citations"] = [];

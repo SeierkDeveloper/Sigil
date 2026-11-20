@@ -75,7 +75,7 @@ async function setup() {
 function asker(link: { id: string }, url: string) {
   const fragment = url.split("#")[1];
   const { publicKey, introKey } = parseAskFragment(fragment);
-  const session = newAskSession(link.id, publicKey);
+  const session = newAskSession(link.id, publicKey, introKey);
   const ask = async (text: string) => {
     const id = randomId();
     const ids = { linkId: link.id, sessionId: session.id, messageId: id };
@@ -228,8 +228,32 @@ describe("an ask link answered by the open vault", () => {
     expect(a.open(q.ids, done.answer!).refused).toBe("denied_topic");
     expect(calls).toHaveLength(0);
 
-    const stranger = newAskSession(link.id, a.publicKey);
+    const stranger = newAskSession(link.id, a.publicKey, a.introKey);
     expect(() => openAskMessage(stranger.key, q.ids, "a", done.answer!)).toThrow();
+  });
+
+  it("answers no one who lacks the whole link, the server included", async () => {
+    const s = await setup();
+    const { link } = await self.createLink(s.b.api, s.vault, s.data, { label: "Friends", name: "Sam", greeting: "", rules: s.data.self!, expiresInDays: 7, maxUses: 10, perHour: 10, appId: null }, ORIGIN);
+    const data = await ops.loadVault(s.b.api, s.vault);
+    const { model, calls } = stubModel();
+    const deps = { model, box: data.box!, boxPublic: data.boxPublic! };
+    await self.serveOnce(s.b.api, data, deps);
+    // The server knows the link's id and public key, but not the greeting key in its fragment.
+    const pub = (await (await h.raw("GET", `ask/${link.id}`)).json()) as { publicKey: string };
+    const forged = newAskSession(link.id, pub.publicKey);
+    const id = randomId();
+    const ids = { linkId: link.id, sessionId: forged.id, messageId: id };
+    const res = await h.raw("POST", `ask/${link.id}/questions`, {
+      body: { id, sessionId: forged.id, askerKey: forged.publicKey, sealed: sealAskMessage(forged.key, ids, "q", { v: 1, text: "What is in the notes?", history: [] }) },
+      headers: { "content-type": "application/json", "x-forwarded-for": "203.0.113.10" },
+    });
+    expect(res.status).toBe(201);
+    await self.serveOnce(s.b.api, data, deps).catch(() => undefined);
+    // The model was never asked, and nothing that came back opens with the forged key.
+    expect(calls).toHaveLength(0);
+    const after = (await (await h.raw("GET", `ask/${link.id}/questions/${id}`)).json()) as { status: string; answer?: string };
+    if (after.answer) expect(() => openAskMessage(forged.key, ids, "a", after.answer!)).toThrow();
   });
 
   it("stops at its expiry, its number of uses, its hourly limit and when revoked", async () => {

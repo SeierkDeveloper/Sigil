@@ -6,6 +6,7 @@
 import {
   AAD,
   agentSessionKey,
+  linkGreetingKey,
   answerAsSelf,
   appSelfKey,
   askNoteContext,
@@ -267,7 +268,7 @@ export async function composeLinkAnswer(api: Api, data: VaultData, q: PendingQue
   const link = data.askLinks.find((l) => l.id === q.linkId);
   if (!link?.secret) return null;
   const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
-  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey);
+  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey, linkGreetingKey(link.secret));
   const rules = cleanRules(link.secret.rules);
   let question = "";
   try {
@@ -306,7 +307,7 @@ export async function sendLinkAnswer(
   const link = data.askLinks.find((l) => l.id === q.linkId);
   if (!link?.secret) throw new Error("That ask link is gone.");
   const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
-  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey);
+  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey, linkGreetingKey(link.secret));
   const note: AskNote = { v: 1, via: "link", label: link.label, question: composed.question, answer: composed.reply.text, citations: composed.citations, refused: composed.reply.refused };
   await api.post(`self/questions/${q.id}/answer`, {
     sealed: sealAskMessage(key, ids, "a", composed.reply),

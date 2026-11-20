@@ -124,6 +124,7 @@ export const INPUT = {
   boxSecret: toHex(H(4)),
   peerSecret: toHex(H(5)),
   linkSecret: toHex(H(6)),
+  greetingKey: toHex(H(7)),
   phrase: `${"abandon ".repeat(23)}art`,
   wallet: { address: "0x000000000000000000000000000000000000dEaD", signature: `0x${toHex(H(9, 65))}` },
   appId: "app-0000001",
@@ -237,6 +238,15 @@ export async function deterministic() {
       linkId: INPUT.linkId,
       sessionId: INPUT.sessionId,
       key: toHex(agentSessionKey(link, INPUT.linkId, INPUT.sessionId, peerPublic)),
+    },
+    askKeyV2: {
+      linkSecret: INPUT.linkSecret,
+      greetingKey: INPUT.greetingKey,
+      linkPublic: encodeBoxPublicKey(link.publicKey),
+      askerPublic: peerPublic,
+      linkId: INPUT.linkId,
+      sessionId: INPUT.sessionId,
+      key: toHex(agentSessionKey(link, INPUT.linkId, INPUT.sessionId, peerPublic, fromHex(INPUT.greetingKey))),
     },
     publicCopy: {
       items: [{ id: "item-000001", title: "Talks", body: "I give talks.", tags: ["work"], editedAt: "2026-11-01T00:00:00.000Z" }],

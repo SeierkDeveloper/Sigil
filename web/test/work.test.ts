@@ -158,8 +158,8 @@ describe("answers held for approval", () => {
 
     // The vault checks in so the link is online, then a guest asks.
     expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toHaveLength(0);
-    const { publicKey } = parseAskFragment(url.split("#")[1]);
-    const session = newAskSession(link.id, publicKey);
+    const { publicKey, introKey } = parseAskFragment(url.split("#")[1]);
+    const session = newAskSession(link.id, publicKey, introKey);
     const qid = randomId();
     const ids = { linkId: link.id, sessionId: session.id, messageId: qid };
     const res = await h.raw("POST", `ask/${link.id}/questions`, {
