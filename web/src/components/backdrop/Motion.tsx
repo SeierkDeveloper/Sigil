@@ -45,7 +45,7 @@ const REVEAL = [
   ".flow",
 ].join(",");
 const LABELS = ".eyebrow, .works-with-label";
-const LIT = ".card, .permission-card, .pillar, .vault-gate";
+const LIT = ".card, .permission-card, .pillar, .vault-gate, .self-card";
 const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
 function decode(el: HTMLElement) {

@@ -2,9 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { parseProfileBody, PROFILE_HEADINGS, PROFILE_LIMIT, type ProfileSections } from "@sigil/core";
+import { CardIcon, LockIcon } from "@/components/icons";
 import { formatDateTime } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
+import { AppMark } from "../marks";
 import { Notice } from "../ui";
 
 const HINTS: Record<keyof ProfileSections, string> = {
@@ -24,7 +26,9 @@ export function ProfileTab() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const readers = folder ? data.apps.filter((a) => !a.revokedAt && a.folderIds.includes(folder.id)).map((a) => a.name) : [];
+  const readerApps = folder ? data.apps.filter((a) => !a.revokedAt && a.folderIds.includes(folder.id)) : [];
+  const readers = readerApps.map((a) => a.name);
+  const fingerprint = ops.vaultCode(data)?.fingerprint ?? null;
   const dirty = (Object.keys(sections) as (keyof ProfileSections)[]).some((k) => sections[k] !== initial[k]);
   const empty = (Object.values(sections) as string[]).every((v) => !v.trim());
 
@@ -60,41 +64,94 @@ export function ProfileTab() {
       {error ? <Notice kind="error">{error}</Notice> : null}
       {saved ? <Notice kind="success">Your Self card is saved.</Notice> : null}
 
-      {(Object.keys(PROFILE_HEADINGS) as (keyof ProfileSections)[]).map((k) => (
-        <div key={k} className="field">
-          <label className="field-label" htmlFor={`profile-${k}`}>
-            {PROFILE_HEADINGS[k]}
-          </label>
-          <textarea
-            id={`profile-${k}`}
-            className="textarea"
-            rows={4}
-            maxLength={PROFILE_LIMIT}
-            value={sections[k]}
-            onChange={(e) => {
-              setSaved(false);
-              setSections((s) => ({ ...s, [k]: e.target.value }));
-            }}
-          />
-          <span className="field-hint">{HINTS[k]}</span>
-        </div>
-      ))}
+      <div className="self-layout">
+        <div className="self-card" data-state={!card ? "new" : dirty ? "changed" : "saved"}>
+          <div className="self-card-top">
+            <span className="self-card-mark" aria-hidden="true">
+              <CardIcon />
+            </span>
+            <p className="self-card-kind">Self card</p>
+            <span className="badge self-card-state">{!card ? "Not saved yet" : dirty ? "Unsaved changes" : "Saved"}</span>
+          </div>
 
-      <div className="profile-access subpanel">
-        <p className="small">
-          {!folder
-            ? "Saving makes a folder called Self card. No app can read it until you give it that folder."
-            : readers.length
-              ? `Readable by ${readers.join(", ")}.`
-              : "No app can read it yet. Give an app the Self card folder under Apps."}
-        </p>
-        {folder ? (
-          <button type="button" className="button button-small" onClick={() => goTo("apps")}>
-            Choose apps
-          </button>
-        ) : null}
+          <div className="self-card-fields">
+            {(Object.keys(PROFILE_HEADINGS) as (keyof ProfileSections)[]).map((k, i) => (
+              <div key={k} className="field self-field" data-part={k}>
+                <div className="self-field-head">
+                  <span className="self-field-number" aria-hidden="true">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <label className="field-label" htmlFor={`profile-${k}`}>
+                    {PROFILE_HEADINGS[k]}
+                  </label>
+                  <span className="self-field-count" aria-hidden="true">
+                    {sections[k].length.toLocaleString("en-US")} / {PROFILE_LIMIT.toLocaleString("en-US")}
+                  </span>
+                </div>
+                <textarea
+                  id={`profile-${k}`}
+                  className="textarea"
+                  rows={4}
+                  maxLength={PROFILE_LIMIT}
+                  value={sections[k]}
+                  onChange={(e) => {
+                    setSaved(false);
+                    setSections((s) => ({ ...s, [k]: e.target.value }));
+                  }}
+                />
+                <span className="field-hint">{HINTS[k]}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="self-card-foot">
+            {fingerprint ? (
+              <p className="self-card-id">
+                <span className="self-card-id-label">Vault fingerprint</span>
+                <span className="self-card-id-value">{fingerprint}</span>
+              </p>
+            ) : null}
+            <p className="self-card-id self-card-sealed">
+              <LockIcon />
+              <span>Encrypted on this device</span>
+            </p>
+          </div>
+        </div>
+
+        <aside className="self-aside" aria-label="Who reads your Self card">
+          <div className="profile-access subpanel">
+            <p className="self-aside-label">Who reads it</p>
+            {readerApps.length ? (
+              <ul className="self-readers" aria-hidden="true">
+                {readerApps.map((a) => (
+                  <li key={a.id} className="self-reader">
+                    <AppMark kind={a.kind} />
+                    <span>{a.name}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="small">
+              {!folder
+                ? "Saving makes a folder called Self card. No app can read it until you give it that folder."
+                : readers.length
+                  ? `Readable by ${readers.join(", ")}.`
+                  : "No app can read it yet. Give an app the Self card folder under Apps."}
+            </p>
+            {folder ? (
+              <button type="button" className="button button-small" onClick={() => goTo("apps")}>
+                Choose apps
+              </button>
+            ) : null}
+          </div>
+          <ul className="self-notes">
+            <li>Connected apps are asked to read it first, so they start from who you are.</li>
+            <li>It lives in its own folder with its own key. An app without that folder cannot open it.</li>
+            <li>Every read of it goes into your read log, like any other memory.</li>
+          </ul>
+          {card ? <p className="editor-meta">Last saved {formatDateTime(card.editedAt)}.</p> : null}
+        </aside>
       </div>
-      {card ? <p className="editor-meta">Last saved {formatDateTime(card.editedAt)}.</p> : null}
 
       <div className="form-actions">
         <button type="submit" className="button button-primary" disabled={busy || !dirty || (empty && !card)}>
