@@ -3,7 +3,9 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { PageLinks } from "@/components/PageLinks";
 import { ImportDrop } from "@/components/ImportDrop";
-import { ChatGptIcon, ClaudeIcon } from "@/components/icons";
+import { CodeBlock } from "@/components/CodeBlock";
+import { CalendarIcon, ChatGptIcon, ClaudeIcon, EditorIcon, GemIcon, GitHubIcon, MailIcon, PageIcon } from "@/components/icons";
+import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Import",
@@ -53,13 +55,21 @@ const facts = [
 ];
 
 const more = [
-  { title: "Obsidian", text: "Every note in a vault, with its tags. The connector can watch the folder and suggest changed notes to your inbox." },
-  { title: "Apple Notes", text: "Notes from your iCloud data copy, or notes exported as text, Markdown or HTML files." },
-  { title: "Gmail", text: "From Google Takeout: one memory per thread, with senders, dates and text, within size limits. Spam and trash are left out." },
-  { title: "Google Calendar", text: "From Google Takeout: one memory per event, with its time, place and description." },
-  { title: "Notion", text: "Every page of a workspace from its Markdown export, with the pages it sits under." },
-  { title: "GitHub", text: "A repository's commits or your recent activity, one memory per day, asked from your browser with a token that is never saved." },
+  { title: "Obsidian", Icon: GemIcon, takes: "Folder or zip", text: "Every note in a vault, with its tags. The connector can watch the folder and suggest changed notes to your inbox." },
+  { title: "Apple Notes", Icon: EditorIcon, takes: "iCloud data copy or files", text: "Notes from your iCloud data copy, or notes exported as text, Markdown or HTML files." },
+  { title: "Gmail", Icon: MailIcon, takes: "Google Takeout, .mbox", text: "From Google Takeout: one memory per thread, with senders, dates and text, within size limits. Spam and trash are left out." },
+  { title: "Google Calendar", Icon: CalendarIcon, takes: "Google Takeout, .ics", text: "From Google Takeout: one memory per event, with its time, place and description." },
+  { title: "Notion", Icon: PageIcon, takes: "Markdown export", text: "Every page of a workspace from its Markdown export, with the pages it sits under." },
+  { title: "GitHub", Icon: GitHubIcon, takes: "Repository or user name", text: "A repository's commits or your recent activity, one memory per day, asked from your browser with a token that is never saved." },
 ];
+
+const watchSteps = [
+  { title: "You write", text: "Edit or add a note in Obsidian, as you always do." },
+  { title: "The connector sees it", text: "It seals the note on your computer and sends it to your inbox, up to 8 notes in one pass." },
+  { title: "You approve", text: "A changed note offers to update the memory imported from the same note. Nothing is kept until you say so." },
+];
+
+const WATCH = `SIGIL_APP_KEY=sigil_app.<app id>.<secret> \\\nSIGIL_URL=${site.url} \\\nnode connector/dist/index.js --watch "/path/to/your/Obsidian vault"`;
 
 export default function ImportPage() {
   return (
@@ -137,16 +147,51 @@ export default function ImportPage() {
             </p>
           </div>
           <div className="grid grid-3">
-            {more.map((m) => (
-              <article key={m.title} className="card">
-                <h3 className="card-title">{m.title}</h3>
-                <p className="card-text">{m.text}</p>
+            {more.map(({ title, Icon, takes, text }) => (
+              <article key={title} className="card source-card">
+                <span className="card-icon" aria-hidden="true">
+                  <Icon />
+                </span>
+                <h3 className="card-title">{title}</h3>
+                <p className="card-text">{text}</p>
+                <p className="source-card-takes">{takes}</p>
               </article>
             ))}
           </div>
-          <p className="card-link">
-            <Link href="/vault#import">Open Import in your vault</Link>
-          </p>
+          <div className="section-actions">
+            <Link href="/vault#import" className="button">
+              Open Import in your vault
+            </Link>
+          </div>
+        </section>
+
+        <section className="page-section" aria-labelledby="watch-title">
+          <div className="split split-top">
+            <div>
+              <p className="eyebrow">Obsidian</p>
+              <h2 id="watch-title" className="section-title">
+                Notes that stay in sync
+              </h2>
+              <p className="section-lead">
+                After the first import, the connector can watch your Obsidian folder. New and changed notes wait in your inbox for your approval,
+                like any other suggestion.
+              </p>
+              <ol className="mini-steps">
+                {watchSteps.map((w) => (
+                  <li key={w.title}>
+                    <strong>{w.title}.</strong> {w.text}
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div className="watch-side">
+              <CodeBlock label="Terminal" code={WATCH} />
+              <p className="small muted">
+                Use an app key that may suggest memories and read the folder you imported into. You make one in your vault, under Apps. More in
+                the <Link href="/docs#import">docs</Link>.
+              </p>
+            </div>
+          </div>
         </section>
 
         <section className="page-section" aria-labelledby="facts-title">
