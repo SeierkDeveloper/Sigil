@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -99,22 +99,56 @@ CREATE TABLE IF NOT EXISTS grants (
   FOREIGN KEY (user_id, folder_id) REFERENCES folders(user_id, id) ON DELETE CASCADE
 );
 
--- Every request a connected app makes. leaf = Merkle leaf of the entry (salted).
-CREATE TABLE IF NOT EXISTS read_log (
+READ_LOG_TABLE
+
+-- The vault's X25519 public key, in the clear so apps and other vaults can seal
+-- to it, and its private key wrapped by the vault key on the device.
+CREATE TABLE IF NOT EXISTS box_keys (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL UNIQUE,
+  wrapped_secret TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+-- Whether an app may suggest memories (off unless the owner turns it on), and
+-- the tag the owner's device made so the app can check the vault public key.
+CREATE TABLE IF NOT EXISTS app_inbox (
+  app_id TEXT PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  enabled INTEGER NOT NULL DEFAULT 0,
+  tag TEXT,
+  updated_at TEXT NOT NULL
+);
+
+-- Suggested memories waiting in the inbox: one sealed box each, which only the
+-- vault's private key opens. Resolved proposals are deleted.
+CREATE TABLE IF NOT EXISTS proposals (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read')),
-  memory_id TEXT,
-  count INTEGER NOT NULL,
-  at TEXT NOT NULL,
-  salt TEXT NOT NULL,
-  leaf TEXT NOT NULL,
-  hour INTEGER NOT NULL,
-  sealed INTEGER NOT NULL DEFAULT 0
+  sealed TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS read_log_by_user ON read_log (user_id, at);
-CREATE INDEX IF NOT EXISTS read_log_unsealed ON read_log (sealed, hour);
+CREATE INDEX IF NOT EXISTS proposals_by_user ON proposals (user_id, created_at);
+
+-- A folder shared with another vault. sealed_key is the folder key sealed to the
+-- recipient's public key; note is the owner's label for the recipient, encrypted
+-- under the owner's vault key.
+CREATE TABLE IF NOT EXISTS shares (
+  id TEXT PRIMARY KEY,
+  owner_id TEXT NOT NULL,
+  folder_id TEXT NOT NULL,
+  recipient_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  recipient_key TEXT NOT NULL,
+  sealed_key TEXT NOT NULL,
+  note TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  accepted_at TEXT,
+  UNIQUE (folder_id, owner_id, recipient_id),
+  FOREIGN KEY (owner_id, folder_id) REFERENCES folders(user_id, id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS shares_by_recipient ON shares (recipient_id);
 
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
@@ -136,6 +170,46 @@ CREATE TABLE IF NOT EXISTS seal_leaves (
 );
 `;
 
+// Every request a connected app makes, every suggestion it sends, and every time
+// another vault opens a folder shared with it. leaf = Merkle leaf of the entry (salted).
+const READ_LOG = `
+CREATE TABLE IF NOT EXISTS read_log (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  app_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared')),
+  memory_id TEXT,
+  count INTEGER NOT NULL,
+  at TEXT NOT NULL,
+  salt TEXT NOT NULL,
+  leaf TEXT NOT NULL,
+  hour INTEGER NOT NULL,
+  sealed INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS read_log_by_user ON read_log (user_id, at);
+CREATE INDEX IF NOT EXISTS read_log_unsealed ON read_log (sealed, hour);
+CREATE INDEX IF NOT EXISTS read_log_by_app ON read_log (app_id, kind, at);
+`;
+
+/** Version 1 allowed only reads in the log. Rebuild the table with the new kinds, keeping every row. */
+function migrateReadLog(db: Db): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
+  if (!row?.sql || row.sql.includes("'propose'")) return;
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("ALTER TABLE read_log RENAME TO read_log_v1");
+    db.exec("DROP INDEX IF EXISTS read_log_by_user");
+    db.exec("DROP INDEX IF EXISTS read_log_unsealed");
+    db.exec(READ_LOG);
+    db.exec("INSERT INTO read_log SELECT id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed FROM read_log_v1");
+    db.exec("DROP TABLE read_log_v1");
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
+}
+
 export function openDb(file: string): Db {
   if (file !== ":memory:") mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
@@ -146,7 +220,8 @@ export function openDb(file: string): Db {
     db.exec("PRAGMA journal_mode = WAL;");
     db.exec("PRAGMA busy_timeout = 5000;");
   }
-  db.exec(SCHEMA);
+  migrateReadLog(db);
+  db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return db;
 }

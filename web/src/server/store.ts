@@ -253,21 +253,24 @@ export function listFolders(db: Db, userId: string): (StoredFolder & { createdAt
 // ---------------------------------------------------------------- memories
 
 export function putMemories(db: Db, userId: string, items: StoredMemory[]): number {
-  return tx(db, () => {
-    const folderOk = db.prepare("SELECT 1 FROM folders WHERE user_id = ? AND id = ?");
-    const upsert = db.prepare(`
-      INSERT INTO memories (user_id, id, folder_id, head, body, size, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT (user_id, id) DO UPDATE SET folder_id = excluded.folder_id, head = excluded.head,
-        body = excluded.body, size = excluded.size, updated_at = excluded.updated_at`);
-    const at = now();
-    for (const m of items) {
-      if (!folderOk.get(userId, m.folderId)) throw new HttpError(400, "A memory points at a folder that does not exist.");
-      if (!m.body) throw new HttpError(400, "A memory was sent without its body.");
-      upsert.run(userId, m.id, m.folderId, m.head, m.body, m.head.length + m.body.length, at, at);
-    }
-    return items.length;
-  });
+  return tx(db, () => putMemoriesIn(db, userId, items));
+}
+
+/** The body of putMemories, for callers that are already inside a transaction. */
+export function putMemoriesIn(db: Db, userId: string, items: StoredMemory[]): number {
+  const folderOk = db.prepare("SELECT 1 FROM folders WHERE user_id = ? AND id = ?");
+  const upsert = db.prepare(`
+    INSERT INTO memories (user_id, id, folder_id, head, body, size, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (user_id, id) DO UPDATE SET folder_id = excluded.folder_id, head = excluded.head,
+      body = excluded.body, size = excluded.size, updated_at = excluded.updated_at`);
+  const at = now();
+  for (const m of items) {
+    if (!folderOk.get(userId, m.folderId)) throw new HttpError(400, "A memory points at a folder that does not exist.");
+    if (!m.body) throw new HttpError(400, "A memory was sent without its body.");
+    upsert.run(userId, m.id, m.folderId, m.head, m.body, m.head.length + m.body.length, at, at);
+  }
+  return items.length;
 }
 
 /** Real delete: the rows are removed and, with secure_delete on, overwritten on disk. */
@@ -333,6 +336,7 @@ export function revokeApp(db: Db, userId: string, appId: string): void {
     const r = db.prepare("UPDATE apps SET revoked_at = COALESCE(revoked_at, ?), token_hash = NULL WHERE id = ? AND user_id = ?").run(now(), appId, userId);
     if (r.changes === 0) throw new HttpError(404, "That app was not found.");
     db.prepare("DELETE FROM grants WHERE app_id = ?").run(appId);
+    db.prepare("DELETE FROM app_inbox WHERE app_id = ?").run(appId);
   });
 }
 

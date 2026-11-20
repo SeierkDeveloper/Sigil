@@ -31,5 +31,21 @@ export const serverConfig = {
       sealerKey: process.env.SIGIL_SEALER_KEY || "",
     };
   },
+  /** Search by meaning in the vault. The model runs in the browser; the server only hands out its files. On by default. */
+  get semanticEnabled(): boolean {
+    return flag("SIGIL_SEMANTIC", true);
+  },
+  /** The sentence model the vault page loads. */
+  get embedModel(): string {
+    return process.env.SIGIL_EMBED_MODEL?.trim() || "Xenova/all-MiniLM-L6-v2";
+  },
+  /** Where model files are kept. Defaults to models/ in the data folder. */
+  get modelDir(): string | undefined {
+    return process.env.SIGIL_MODEL_DIR?.trim() || undefined;
+  },
+  /** Fetch a missing model file from the public model hub once and keep it. Turn off to serve only what is on disk. */
+  get modelFetch(): boolean {
+    return flag("SIGIL_MODEL_FETCH", true);
+  },
   sessionDays: 30,
 };

@@ -11,7 +11,7 @@ import { clampBody } from "./util";
 export { toIso, clampBody, MAX_BODY_CHARS } from "./util";
 
 export interface ImportResult {
-  source: Exclude<SourceKind, "note">;
+  source: Extract<SourceKind, "chatgpt" | "claude">;
   drafts: MemoryDraft[];
   /** Conversations or documents that had nothing readable in them. */
   skipped: number;

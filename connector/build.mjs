@@ -9,7 +9,7 @@ await build({
   target: "node20",
   format: "esm",
   // Installed as normal dependencies; everything else (the Sigil core) is bundled in.
-  external: ["@modelcontextprotocol/sdk", "zod"],
+  external: ["@modelcontextprotocol/sdk", "zod", "onnxruntime-web", "@huggingface/tokenizers"],
   banner: { js: "#!/usr/bin/env node" },
   legalComments: "none",
   logLevel: "warning",

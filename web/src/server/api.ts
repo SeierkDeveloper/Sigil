@@ -3,10 +3,10 @@
 //
 // Two kinds of callers:
 //   the vault page   -> session cookie, same-origin checked
-//   a connected app  -> "Authorization: Bearer <app token>", read only, every call logged
+//   a connected app  -> "Authorization: Bearer <app token>", reads and suggestions only, every call logged
 
 import { z } from "zod";
-import { isEnvelope, randomId } from "@sigil/core";
+import { isBoxPublicKey, isEnvelope, isSealed, randomId } from "@sigil/core";
 import { getDb, type Db } from "./db";
 import { serverConfig } from "./config";
 import {
@@ -44,6 +44,8 @@ import {
   vaultUsage,
   type AppAuth,
 } from "./store";
+import { appInbox, appInboxStates, approveProposal, createProposal, getBoxKey, listProposals, rejectProposal, setAppInbox, setBoxKey } from "./inbox";
+import { acceptShare, createShare, leaveShare, listIncoming, listOutgoing, rotateFolder } from "./shares";
 import { getSeal, listSeals, proofFor, proofForLeaf, publicStats, sealPending, sealQueue, sealStats } from "./seal";
 import { anchorStatus } from "./anchor";
 import {
@@ -82,7 +84,11 @@ const appShape = z.object({
   grants: z.array(grantShape).max(200),
 });
 const recoveryShape = z.object({ lookupId, authToken: token, wrappedKey: envelope(256) });
-const vaultInitShape = z.object({ wrappedKey: envelope(256), recovery: recoveryShape, folder: folderShape });
+const boxPublicKey = z.string().refine(isBoxPublicKey, "Expected a vault public key");
+const sealed = (max: number) => z.string().max(max).refine(isSealed, "Expected a sealed box");
+const boxShape = z.object({ publicKey: boxPublicKey, wrappedSecret: envelope(256) });
+const vaultInitShape = z.object({ wrappedKey: envelope(256), recovery: recoveryShape, folder: folderShape, box: boxShape.optional() });
+const tagShape = z.string().regex(/^[0-9a-f]{64}$/, "Invalid tag");
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
@@ -237,6 +243,7 @@ route("POST", "auth/passkey/register", async (ctx) => {
     },
     userId,
   );
+  if (body.box) setBoxKey(ctx.db, userId, body.box);
   return signedIn(ctx, userId, {});
 });
 
@@ -267,6 +274,7 @@ route("POST", "auth/wallet/register", async (ctx) => {
     recovery: { kind: "phrase", ref: body.recovery.lookupId, authToken: body.recovery.authToken, wrappedKey: body.recovery.wrappedKey },
     folder: body.folder,
   });
+  if (body.box) setBoxKey(ctx.db, userId, body.box);
   return signedIn(ctx, userId, {});
 });
 
@@ -332,14 +340,28 @@ route("DELETE", "keyslots/:id", (ctx, [slotId]) => {
 
 route("GET", "vault", (ctx) => {
   const userId = userOf(ctx);
+  const inbox = appInboxStates(ctx.db, userId);
   return json({
     folders: listFolders(ctx.db, userId),
     memories: listMemories(ctx.db, userId),
-    apps: listApps(ctx.db, userId),
+    apps: listApps(ctx.db, userId).map((a) => ({ ...a, canPropose: !a.revokedAt && inbox.get(a.id) === true })),
     keyslots: listKeyslots(ctx.db, userId),
     usage: vaultUsage(ctx.db, userId),
+    box: getBoxKey(ctx.db, userId),
+    proposals: listProposals(ctx.db, userId),
+    shares: { outgoing: listOutgoing(ctx.db, userId), incoming: listIncoming(ctx.db, userId) },
   });
 });
+
+// A vault made before vault public keys existed gets one the first time it is opened.
+route("POST", "vault/box-key", async (ctx) => {
+  const userId = userOf(ctx);
+  setBoxKey(ctx.db, userId, parse(boxShape, await readJson(ctx.req, 8 * KB)));
+  return json({ ok: true }, 201);
+});
+
+// Search by meaning: which model the page should load. Its files come from /models.
+route("GET", "semantic", () => json({ enabled: serverConfig.semanticEnabled, model: serverConfig.embedModel }));
 
 route("GET", "usage", (ctx) => json(vaultUsage(ctx.db, userOf(ctx))));
 
@@ -386,6 +408,13 @@ route("PUT", "apps/:id/grants", async (ctx, [appId]) => {
   return json({ ok: true });
 });
 
+route("PUT", "apps/:id/inbox", async (ctx, [appId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ enabled: z.boolean(), tag: tagShape.optional() }), await readJson(ctx.req, 8 * KB));
+  setAppInbox(ctx.db, userId, appId, body.enabled, body.tag ?? null);
+  return json({ ok: true });
+});
+
 route("POST", "apps/:id/revoke", (ctx, [appId]) => {
   revokeApp(ctx.db, userOf(ctx), appId);
   return json({ ok: true });
@@ -393,6 +422,58 @@ route("POST", "apps/:id/revoke", (ctx, [appId]) => {
 
 route("DELETE", "apps/:id", (ctx, [appId]) => {
   deleteApp(ctx.db, userOf(ctx), appId);
+  return json({ ok: true });
+});
+
+// ---- the inbox
+
+route("GET", "proposals", (ctx) => json({ proposals: listProposals(ctx.db, userOf(ctx)) }));
+
+route("POST", "proposals/:id/approve", async (ctx, [proposalId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ memory: memoryShape }), await readJson(ctx.req, 4 * MB));
+  approveProposal(ctx.db, userId, proposalId, body.memory);
+  return json({ ok: true });
+});
+
+route("DELETE", "proposals/:id", (ctx, [proposalId]) => {
+  rejectProposal(ctx.db, userOf(ctx), proposalId);
+  return json({ ok: true });
+});
+
+// ---- sharing
+
+route("POST", "shares", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ id, folderId: id, recipientKey: boxPublicKey, sealedKey: sealed(512), note: envelope(2048) }), await readJson(ctx.req, 16 * KB));
+  createShare(ctx.db, userId, body);
+  return json({ ok: true }, 201);
+});
+
+route("POST", "shares/:id/accept", (ctx, [shareId]) => {
+  acceptShare(ctx.db, userOf(ctx), shareId);
+  return json({ ok: true });
+});
+
+route("DELETE", "shares/:id", (ctx, [shareId]) => {
+  leaveShare(ctx.db, userOf(ctx), shareId);
+  return json({ ok: true });
+});
+
+route("POST", "folders/:id/rotate", async (ctx, [folderId]) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({
+      wrappedKey: envelope(256),
+      meta: envelope(4096),
+      memories: z.array(memoryShape).max(20_000),
+      grants: z.array(z.object({ appId: id, wrappedKey: envelope(256) })).max(200),
+      shares: z.array(z.object({ id, sealedKey: sealed(512) })).max(200),
+      revoke: z.array(id).max(200),
+    }),
+    await readJson(ctx.req, 64 * MB),
+  );
+  rotateFolder(ctx.db, userId, folderId, body);
   return json({ ok: true });
 });
 
@@ -420,7 +501,7 @@ route("DELETE", "account", (ctx) => {
   return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(ctx.req) });
 });
 
-// ---- connected apps (read only)
+// ---- connected apps: reads, and suggestions when the owner allows them
 
 route("GET", "connector/v1/folders", (ctx) => {
   const auth = appOf(ctx);
@@ -447,7 +528,36 @@ route("POST", "connector/v1/read", async (ctx) => {
   return json({ appId: auth.appId, folders, memories: found, missing });
 });
 
+// The vault public key and the tag that lets the app check it. Not a read of any memory, so not logged.
+route("GET", "connector/v1/inbox", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, ...appInbox(ctx.db, auth) });
+});
+
+route("POST", "connector/v1/proposals", async (ctx) => {
+  const auth = appOf(ctx);
+  rateLimit(`propose:${auth.appId}`, 10, 60_000);
+  const body = parse(z.object({ id, sealed: sealed(400 * KB) }), await readJson(ctx.req, 512 * KB));
+  const p = createProposal(ctx.db, auth, body.id, body.sealed);
+  return json({ appId: auth.appId, id: p.id, createdAt: p.createdAt }, 201);
+});
+
 // ---------------------------------------------------------------- dispatch
+
+// Apps that run in a web page (Sign in with Sigil) call the connector routes from
+// their own origin. These routes take a bearer token and never a cookie, so any
+// origin may call them; what a token can do is set by the vault owner.
+const CORS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET, POST, OPTIONS",
+  "access-control-allow-headers": "authorization, content-type",
+  "access-control-max-age": "600",
+};
+
+function withCors(res: Response): Response {
+  for (const [k, v] of Object.entries(CORS)) res.headers.set(k, v);
+  return res;
+}
 
 function match(pattern: string, path: string[]): string[] | null {
   const parts = pattern.split("/");
@@ -464,6 +574,15 @@ function match(pattern: string, path: string[]): string[] | null {
 
 export async function handleApi(req: Request, path: string[], db: Db = getDb()): Promise<Response> {
   const ctx: Ctx = { req, db, method: req.method.toUpperCase(), path, url: new URL(req.url) };
+  if (path[0] === "connector") {
+    if (ctx.method === "OPTIONS") return withCors(new Response(null, { status: 204 }));
+    return withCors(await dispatch(ctx));
+  }
+  return dispatch(ctx);
+}
+
+async function dispatch(ctx: Ctx): Promise<Response> {
+  const path = ctx.path;
   try {
     let pathMatched = false;
     for (const [method, pattern, handler] of routes) {

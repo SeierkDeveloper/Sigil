@@ -207,7 +207,7 @@ describe("sharing", () => {
     const pub = encodeBoxPublicKey(newBoxKeyPair().publicKey);
     const env = await encryptShareNote(vk, "share1234567", { label: "My sister", recipient: pub });
     expect(env).not.toContain("sister");
-    expect(await openShareNote(vk, "share1234567", env)).toEqual({ label: "My sister", recipient: pub });
+    expect(await openShareNote(vk, "share1234567", env)).toEqual({ label: "My sister", recipient: pub, from: "" });
     await expect(openShareNote(vk, "share0000000", env)).rejects.toThrow(DecryptError);
   });
 

@@ -3,7 +3,28 @@
 // carries ids, envelopes and hashes.
 
 import {
+  appBoxTag,
   buildMemory,
+  buildProfileBody,
+  createBoxKey,
+  encryptShareNote,
+  formatVaultCode,
+  mergeBodies,
+  openBoxKey,
+  openProposal,
+  openShare,
+  openShareNote,
+  parseVaultCode,
+  PROFILE_FOLDER_NAME,
+  PROFILE_TITLE,
+  randomId,
+  rotateFolder,
+  sealShare,
+  vaultFingerprint,
+  type BoxKeyPair,
+  type ProfileSections,
+  type ProposalPayload,
+  type StoredBoxKey,
   createApp as encryptApp,
   createFolder as encryptFolder,
   decryptMemory,
@@ -15,6 +36,7 @@ import {
   openAppMeta,
   openAppSecret,
   openFolder,
+  openFolderWithRaw,
   passkeyKek,
   phraseKeys,
   readEntryLeaf,
@@ -62,6 +84,41 @@ export interface AppView {
   folderIds: string[];
   meta: string;
   secret: string;
+  /** May suggest memories to the inbox. Off unless the owner turns it on. */
+  canPropose: boolean;
+}
+
+export interface ProposalView {
+  id: string;
+  appId: string;
+  createdAt: string;
+  /** Null when the sealed box did not open with this vault's key. */
+  payload: ProposalPayload | null;
+}
+
+export interface OutgoingShareView {
+  id: string;
+  folderId: string;
+  label: string;
+  /** The recipient's public key, from the owner's own encrypted note. */
+  recipient: string;
+  /** False if the server holds another key for this share than the owner entered. */
+  verified: boolean;
+  /** The name the owner signed the share with. */
+  from: string;
+  createdAt: string;
+  acceptedAt: string | null;
+}
+
+export interface IncomingShareView {
+  id: string;
+  folderId: string;
+  /** The shared folder, opened with the key sealed to this vault. Null if it would not open. */
+  folder: OpenFolder | null;
+  from: string;
+  createdAt: string;
+  acceptedAt: string | null;
+  memories: Memory[];
 }
 
 export interface VaultData {
@@ -72,6 +129,11 @@ export interface VaultData {
   usage: { memories: number; bytes: number };
   /** Items that did not decrypt. Should always be zero; shown if not. */
   unreadable: number;
+  /** The vault's own X25519 key pair, unwrapped on this device. */
+  box: BoxKeyPair | null;
+  boxPublic: string | null;
+  proposals: ProposalView[];
+  shares: { outgoing: OutgoingShareView[]; incoming: IncomingShareView[] };
 }
 
 export interface LogEntryView {
@@ -96,9 +158,24 @@ export interface LogData {
 interface ServerVault {
   folders: (StoredFolder & { createdAt: string })[];
   memories: (StoredMemory & { updatedAt: string })[];
-  apps: { id: string; meta: string; secret: string; createdAt: string; revokedAt: string | null; lastUsedAt: string | null; grants: { folderId: string }[] }[];
+  apps: {
+    id: string;
+    meta: string;
+    secret: string;
+    createdAt: string;
+    revokedAt: string | null;
+    lastUsedAt: string | null;
+    grants: { folderId: string }[];
+    canPropose?: boolean;
+  }[];
   keyslots: KeyslotView[];
   usage: { memories: number; bytes: number };
+  box?: StoredBoxKey | null;
+  proposals?: { id: string; appId: string; sealed: string; createdAt: string }[];
+  shares?: {
+    outgoing: { id: string; folderId: string; recipientKey: string; note: string; createdAt: string; acceptedAt: string | null }[];
+    incoming: { id: string; folderId: string; sealedKey: string; folderMeta: string; createdAt: string; acceptedAt: string | null; memories: StoredMemory[] }[];
+  };
 }
 
 export const DEFAULT_FOLDER = "Notes";
@@ -120,6 +197,7 @@ async function vaultInit(kek: Uint8Array, kind: KeyslotKind) {
   const phrase = newRecoveryPhrase();
   const pk = await phraseKeys(phrase);
   const { stored: folder } = await encryptFolder(vault.key, DEFAULT_FOLDER);
+  const { stored: box } = await createBoxKey(vault.key);
   return {
     vault,
     phrase,
@@ -127,6 +205,7 @@ async function vaultInit(kek: Uint8Array, kind: KeyslotKind) {
       wrappedKey: await wrapVaultKey(kek, raw, kind),
       recovery: { lookupId: pk.lookupId, authToken: pk.authToken, wrappedKey: await wrapVaultKey(pk.kek, raw, "phrase") },
       folder,
+      box,
     },
   };
 }
@@ -273,15 +352,84 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
       folderIds: a.grants.map((g) => g.folderId),
       meta: a.meta,
       secret: a.secret,
+      canPropose: a.canPropose === true,
     });
   }
-  return { folders, memories, apps, keyslots: data.keyslots, usage: data.usage, unreadable };
+
+  // The vault's box key: made now for a vault from before box keys existed.
+  let box: BoxKeyPair | null = null;
+  let boxPublic: string | null = data.box?.publicKey ?? null;
+  if (data.box) {
+    try {
+      box = await openBoxKey(vault.key, data.box);
+    } catch {
+      unreadable++;
+    }
+  } else {
+    const made = await createBoxKey(vault.key);
+    try {
+      await api.post("vault/box-key", made.stored);
+      box = made.pair;
+      boxPublic = made.stored.publicKey;
+    } catch {
+      // Another device may have made it at the same moment; it is picked up on the next load.
+    }
+  }
+
+  const proposals: ProposalView[] = (data.proposals ?? []).map((p) => {
+    let payload: ProposalPayload | null = null;
+    try {
+      if (box) payload = openProposal(box, p);
+    } catch {
+      payload = null;
+    }
+    return { id: p.id, appId: p.appId, createdAt: p.createdAt, payload };
+  });
+
+  const outgoing: OutgoingShareView[] = [];
+  for (const s of data.shares?.outgoing ?? []) {
+    try {
+      const note = await openShareNote(vault.key, s.id, s.note);
+      outgoing.push({
+        id: s.id,
+        folderId: s.folderId,
+        label: note.label,
+        recipient: note.recipient,
+        from: note.from ?? "",
+        verified: note.recipient === s.recipientKey,
+        createdAt: s.createdAt,
+        acceptedAt: s.acceptedAt,
+      });
+    } catch {
+      unreadable++;
+    }
+  }
+
+  const incoming: IncomingShareView[] = [];
+  for (const s of data.shares?.incoming ?? []) {
+    let folder: OpenFolder | null = null;
+    let from = "";
+    const shared: Memory[] = [];
+    try {
+      if (!box) throw new Error("no box key");
+      const opened = openShare(box, s);
+      from = opened.from;
+      folder = await openFolderWithRaw({ id: s.folderId, meta: s.folderMeta }, opened.raw);
+      for (const m of s.memories) shared.push(await decryptMemory(folder, m));
+    } catch {
+      folder = null;
+    }
+    shared.sort((a, b) => (a.editedAt < b.editedAt ? 1 : a.editedAt > b.editedAt ? -1 : 0));
+    incoming.push({ id: s.id, folderId: s.folderId, folder, from, createdAt: s.createdAt, acceptedAt: s.acceptedAt, memories: shared });
+  }
+
+  return { folders, memories, apps, keyslots: data.keyslots, usage: data.usage, unreadable, box, boxPublic, proposals, shares: { outgoing, incoming } };
 }
 
 // ---------------------------------------------------------------- folders
 
-export async function addFolder(api: Api, vault: Unlocked, name: string): Promise<OpenFolder> {
-  const { stored, folder } = await encryptFolder(vault.key, name);
+export async function addFolder(api: Api, vault: Unlocked, name: string, kind?: "profile"): Promise<OpenFolder> {
+  const { stored, folder } = await encryptFolder(vault.key, name, undefined, kind);
   await api.post("folders", stored);
   return folder;
 }
@@ -379,10 +527,35 @@ export async function importDrafts(
 
 // ---------------------------------------------------------------- connected apps
 
-export async function connectApp(api: Api, vault: Unlocked, meta: AppMeta, folders: OpenFolder[]): Promise<{ appKey: string; appId: string }> {
+export async function connectApp(
+  api: Api,
+  vault: Unlocked,
+  meta: AppMeta,
+  folders: OpenFolder[],
+  opts: { canPropose?: boolean; boxPublic?: string | null } = {},
+): Promise<{ appKey: string; appId: string }> {
   const app = await encryptApp(vault.key, meta, folders);
   await api.post("apps", app.stored);
+  if (opts.canPropose) {
+    if (!opts.boxPublic) throw new Error("This vault has no public key yet. Reload the vault and try again.");
+    const secret = await openAppSecret(vault.key, app.stored);
+    await api.put(`apps/${app.stored.id}/inbox`, { enabled: true, tag: await appBoxTag(secret, opts.boxPublic) });
+  }
   return { appKey: app.appKey, appId: app.stored.id };
+}
+
+/**
+ * Lets an app suggest memories, or stops it. Turning it on tags the vault public
+ * key with the app's own secret, so the app can tell the key really is this vault's.
+ */
+export async function setAppSuggestions(api: Api, vault: Unlocked, app: Pick<AppView, "id" | "secret">, boxPublic: string | null, enabled: boolean): Promise<void> {
+  if (!enabled) {
+    await api.put(`apps/${app.id}/inbox`, { enabled: false });
+    return;
+  }
+  if (!boxPublic) throw new Error("This vault has no public key yet. Reload the vault and try again.");
+  const secret = await openAppSecret(vault.key, app);
+  await api.put(`apps/${app.id}/inbox`, { enabled: true, tag: await appBoxTag(secret, boxPublic) });
 }
 
 export async function setAppFolders(api: Api, vault: Unlocked, app: Pick<AppView, "id" | "secret">, folders: OpenFolder[]): Promise<void> {
@@ -396,6 +569,157 @@ export async function revokeApp(api: Api, appId: string): Promise<void> {
 
 export async function removeApp(api: Api, appId: string): Promise<void> {
   await api.del(`apps/${appId}`);
+}
+
+// ---------------------------------------------------------------- the inbox
+
+export interface ProposalEdits {
+  title: string;
+  body: string;
+  tags: string[];
+}
+
+function proposalSource(app: Pick<AppView, "name"> | undefined, payload: ProposalPayload): Memory["source"] {
+  if (payload.via === "extension" && payload.url) return { kind: "web", ref: payload.url };
+  return { kind: "app", ref: app?.name ?? "an app" };
+}
+
+/** Approves a suggestion as a new memory, encrypted on this device into the chosen folder. */
+export async function approveProposal(api: Api, folder: OpenFolder, proposal: ProposalView, edits: ProposalEdits, app?: Pick<AppView, "name">): Promise<Memory> {
+  if (!proposal.payload) throw new Error("This suggestion could not be opened with your vault key.");
+  const memory = buildMemory({ title: edits.title, body: edits.body, tags: edits.tags, source: proposalSource(app, proposal.payload) }, folder.id);
+  await api.post(`proposals/${proposal.id}/approve`, { memory: await encryptMemory(folder, memory) });
+  return memory;
+}
+
+/** Merges a suggestion into an existing memory: its text is added under a dated line, its tags joined. */
+export async function mergeProposal(api: Api, folders: OpenFolder[], proposal: ProposalView, edits: ProposalEdits, into: Memory): Promise<Memory> {
+  const folder = folders.find((f) => f.id === into.folderId);
+  if (!folder) throw new Error("That memory's folder no longer exists.");
+  const merged = buildMemory(
+    {
+      title: into.title,
+      body: mergeBodies(into.body, edits.body),
+      tags: [...into.tags, ...edits.tags],
+      source: into.source,
+      createdAt: into.createdAt,
+      editedAt: new Date().toISOString(),
+    },
+    into.folderId,
+    into.id,
+  );
+  await api.post(`proposals/${proposal.id}/approve`, { memory: await encryptMemory(folder, merged) });
+  return merged;
+}
+
+export async function rejectProposal(api: Api, proposalId: string): Promise<void> {
+  await api.del(`proposals/${proposalId}`);
+}
+
+// ---------------------------------------------------------------- the Self card
+
+export function profileFolder(data: Pick<VaultData, "folders">): OpenFolder | null {
+  return data.folders.find((f) => f.kind === "profile") ?? null;
+}
+
+export function profileMemory(data: Pick<VaultData, "folders" | "memories">): Memory | null {
+  const folder = profileFolder(data);
+  if (!folder) return null;
+  return data.memories.filter((m) => m.folderId === folder.id && m.source.kind === "profile").sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1))[0] ?? null;
+}
+
+/** Saves the Self card, making its own folder the first time. */
+export async function saveProfile(
+  api: Api,
+  vault: Unlocked,
+  data: Pick<VaultData, "folders" | "memories">,
+  sections: ProfileSections,
+): Promise<{ folder: OpenFolder; memory: Memory; createdFolder: boolean }> {
+  let folder = profileFolder(data);
+  let createdFolder = false;
+  if (!folder) {
+    folder = await addFolder(api, vault, PROFILE_FOLDER_NAME, "profile");
+    createdFolder = true;
+  }
+  const existing = profileMemory(data);
+  const memory = buildMemory(
+    {
+      title: PROFILE_TITLE,
+      body: buildProfileBody(sections),
+      tags: ["self-card"],
+      source: { kind: "profile" },
+      createdAt: existing?.createdAt,
+      editedAt: new Date().toISOString(),
+    },
+    folder.id,
+    existing?.id,
+  );
+  await saveMemory(api, folder, memory);
+  return { folder, memory, createdFolder };
+}
+
+// ---------------------------------------------------------------- sharing
+
+/** The code another person enters to share a folder with this vault. */
+export function vaultCode(data: Pick<VaultData, "boxPublic">): { code: string; fingerprint: string } | null {
+  return data.boxPublic ? { code: formatVaultCode(data.boxPublic), fingerprint: vaultFingerprint(data.boxPublic) } : null;
+}
+
+export async function shareFolder(api: Api, vault: Unlocked, folder: OpenFolder, code: string, label: string, from: string): Promise<OutgoingShareView> {
+  const recipient = parseVaultCode(code);
+  const id = randomId();
+  const note = await encryptShareNote(vault.key, id, { label, recipient, from });
+  await api.post("shares", { id, folderId: folder.id, recipientKey: recipient, sealedKey: sealShare(recipient, id, folder.id, folder.raw, from), note });
+  return {
+    id,
+    folderId: folder.id,
+    label: label.trim().slice(0, 80) || "Another vault",
+    recipient,
+    from: from.trim().slice(0, 80),
+    verified: true,
+    createdAt: new Date().toISOString(),
+    acceptedAt: null,
+  };
+}
+
+export async function acceptShare(api: Api, shareId: string): Promise<void> {
+  await api.post(`shares/${shareId}/accept`);
+}
+
+export async function leaveShare(api: Api, shareId: string): Promise<void> {
+  await api.del(`shares/${shareId}`);
+}
+
+/**
+ * Stops sharing a folder with one vault. The folder gets a new key on this
+ * device: every memory in it is encrypted again, and the new key is wrapped for
+ * this vault, for each app that may read the folder and for every other share.
+ * The vault that was removed keeps only the old key, which opens nothing new.
+ */
+export async function revokeShare(api: Api, vault: Unlocked, data: VaultData, folder: OpenFolder, shareId: string): Promise<OpenFolder> {
+  const shares = data.shares.outgoing.filter((s) => s.folderId === folder.id);
+  if (!shares.some((s) => s.id === shareId)) throw new Error("That share was not found.");
+  const apps = [];
+  for (const a of data.apps.filter((x) => !x.revokedAt && x.folderIds.includes(folder.id))) {
+    apps.push({ id: a.id, secret: await openAppSecret(vault.key, a) });
+  }
+  const kept = shares.filter((s) => s.id !== shareId);
+  const r = await rotateFolder(
+    vault.key,
+    folder,
+    data.memories.filter((m) => m.folderId === folder.id),
+    apps,
+    kept.map((s) => ({ id: s.id, recipient: s.recipient, from: s.from })),
+  );
+  await api.post(`folders/${folder.id}/rotate`, {
+    wrappedKey: r.wrappedKey,
+    meta: r.meta,
+    memories: r.memories,
+    grants: r.grants.map((g) => ({ appId: g.appId, wrappedKey: g.wrappedKey })),
+    shares: r.shares,
+    revoke: [shareId],
+  });
+  return r.folder;
 }
 
 // ---------------------------------------------------------------- read log and seals

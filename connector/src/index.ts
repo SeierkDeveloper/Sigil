@@ -3,6 +3,10 @@
 //
 //   SIGIL_APP_KEY  the app key from the vault's Apps page (required)
 //   SIGIL_URL      the Sigil site the vault lives on (required)
+//   SIGIL_SEMANTIC        search by meaning on this machine (on by default)
+//   SIGIL_EMBED_MODEL     the sentence model (default Xenova/all-MiniLM-L6-v2)
+//   SIGIL_MODEL_DIR       where its files are kept
+//   SIGIL_MODEL_FETCH     fetch missing model files once (on by default)
 //
 //   sigil-connector                 stdio, for Claude Desktop, Cursor and most clients
 //   sigil-connector --http          a local HTTP endpoint, for clients that need a URL
@@ -14,6 +18,7 @@ import { randomBytes } from "node:crypto";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { VaultReader } from "./reader";
+import { embedSettings, loadEmbedder } from "./embed";
 import { CONNECTOR_VERSION, createServer } from "./server";
 
 function fail(message: string): never {
@@ -31,11 +36,13 @@ function help(): never {
     [
       `sigil-connector ${CONNECTOR_VERSION}`,
       "",
-      "Reads your Sigil vault for MCP clients. Decrypts on this machine.",
+      "Reads your Sigil vault for MCP clients and suggests memories to its inbox. Decrypts and encrypts on this machine.",
       "",
       "Environment:",
       "  SIGIL_APP_KEY   app key from your vault (Apps, Connect an app)",
       "  SIGIL_URL       address of the Sigil site your vault is on",
+      "  SIGIL_SEMANTIC  off to search by words only (default on)",
+      "  SIGIL_MODEL_DIR where the search model is kept",
       "",
       "Usage:",
       "  sigil-connector                      run over stdio (Claude Desktop, Cursor)",
@@ -72,7 +79,14 @@ async function main() {
 
   let reader: VaultReader;
   try {
-    reader = new VaultReader({ appKey, baseUrl, userAgent: `sigil-connector/${CONNECTOR_VERSION}` });
+    const settings = embedSettings();
+    reader = new VaultReader({
+      appKey,
+      baseUrl,
+      userAgent: `sigil-connector/${CONNECTOR_VERSION}`,
+      via: "mcp",
+      embedder: settings ? () => loadEmbedder(settings) : undefined,
+    });
   } catch (err) {
     fail((err as Error).message);
   }

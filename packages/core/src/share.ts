@@ -27,6 +27,8 @@ export interface ShareNote {
   label: string;
   /** The recipient's public key as the owner entered it, kept encrypted so the server cannot swap it. */
   recipient: string;
+  /** The name the owner signed the share with, so a new key can be sealed with the same name. */
+  from?: string;
 }
 
 export function shareContext(shareId: string, folderId: string): string {
@@ -46,7 +48,8 @@ export function openShare(pair: BoxKeyPair, share: { id: string; folderId: strin
 }
 
 export async function encryptShareNote(vaultKey: CryptoKey, shareId: string, note: ShareNote): Promise<string> {
-  return encryptJson(vaultKey, { label: note.label.trim().slice(0, 80) || "Another vault", recipient: note.recipient }, AAD.shareNote(shareId));
+  const clean: ShareNote = { label: note.label.trim().slice(0, 80) || "Another vault", recipient: note.recipient, from: (note.from ?? "").trim().slice(0, 80) };
+  return encryptJson(vaultKey, clean, AAD.shareNote(shareId));
 }
 
 export async function openShareNote(vaultKey: CryptoKey, shareId: string, envelope: string): Promise<ShareNote> {

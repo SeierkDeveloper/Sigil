@@ -63,3 +63,38 @@ export function dumpDb(db: Db): string {
 export function count(db: Db, sql: string, ...params: (string | number)[]): number {
   return Number((db.prepare(sql).get(...params) as { n: number }).n);
 }
+
+// ---------------------------------------------------------------- shared vault helpers
+
+import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
+import { walletKeyMessage } from "@sigil/core";
+import * as ops from "../src/vault/ops";
+import { VaultReader, type ReaderOptions } from "../../connector/src/reader";
+
+export async function wallet() {
+  const account = privateKeyToAccount(generatePrivateKey());
+  const signature = await account.signMessage({ message: walletKeyMessage(account.address) });
+  return { address: account.address, signature };
+}
+
+/** A connector on "this machine": its requests go straight into the router, and every body it sends is recorded. */
+export function readerFor(h: Harness, appKey: string, opts: Partial<ReaderOptions> = {}) {
+  return new VaultReader({
+    appKey,
+    baseUrl: ORIGIN,
+    ...opts,
+    fetcher: async (input, init = {}) => {
+      const url = new URL(input);
+      if (typeof init.body === "string") h.sent.push(init.body);
+      return handleApi(new Request(url, init as RequestInit), url.pathname.replace(/^\/api\//, "").split("/"), h.db);
+    },
+  });
+}
+
+export async function signedUp(h: Harness) {
+  const b = h.browser();
+  const w = await wallet();
+  const { vault, phrase } = await ops.signUpWithWallet(b.api, w.address, w.signature);
+  const data = await ops.loadVault(b.api, vault);
+  return { b, w, vault, phrase, data };
+}

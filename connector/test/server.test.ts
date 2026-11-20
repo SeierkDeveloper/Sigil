@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createServer, formatResults, type Reader } from "../src/server";
+import { createServer, formatProfile, formatResults, type Reader } from "../src/server";
 import { ReaderError } from "../src/reader";
 
 const memory = {
@@ -20,6 +20,8 @@ function stub(overrides: Partial<Reader> = {}): Reader {
     listFolders: async () => [{ id: "f1", name: "Work", memories: 1 }],
     search: async () => [{ id: memory.id, title: memory.title, folder: "Work", tags: ["work"], snippet: "Ship on a Tuesday.", editedAt: memory.editedAt }],
     read: async (ids) => (ids.includes(memory.id) ? { memories: [memory], missing: [] } : { memories: [], missing: ids }),
+    profile: async () => ({ ...memory, id: "card12345678", title: "Self card", body: "## Who I am\n\nA sailor." }),
+    propose: async () => ({ id: "prop12345678" }),
     ...overrides,
   };
 }
@@ -35,12 +37,43 @@ async function connect(reader: Reader) {
 const textOf = (r: unknown) => ((r as { content: { text: string }[] }).content[0]?.text ?? "");
 
 describe("MCP server", () => {
-  it("offers three read-only tools", async () => {
+  it("offers four read-only tools and one that only suggests", async () => {
     const client = await connect(stub());
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["list_folders", "read_memory", "search_memories"]);
-    expect(tools.every((t) => t.annotations?.readOnlyHint === true)).toBe(true);
+    expect(tools.map((t) => t.name).sort()).toEqual(["get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
+    expect(tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name).sort()).toEqual(["get_profile", "list_folders", "read_memory", "search_memories"]);
+    const propose = tools.find((t) => t.name === "propose_memory")!;
+    expect(propose.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(propose.description).toContain("only if the user approves");
     expect(client.getInstructions()).toContain("read log");
+  });
+
+  it("reads the Self card, and says how to share it when it cannot", async () => {
+    const client = await connect(stub());
+    expect(textOf(await client.callTool({ name: "get_profile", arguments: {} }))).toContain("A sailor.");
+    const none = await connect(stub({ profile: async () => null }));
+    expect(textOf(await none.callTool({ name: "get_profile", arguments: {} }))).toBe(formatProfile(null));
+  });
+
+  it("suggests a memory and passes the reason through when suggestions are off", async () => {
+    const seen: unknown[] = [];
+    const client = await connect(stub({ propose: async (d) => (seen.push(d), { id: "prop12345678" }) }));
+    const ok = await client.callTool({ name: "propose_memory", arguments: { title: "Prefers tea", body: "Green, no sugar.", tags: ["food"], folder: "Notes" } });
+    expect(ok.isError).toBeFalsy();
+    expect(textOf(ok)).toContain("only if they approve it");
+    expect(seen).toEqual([{ title: "Prefers tea", body: "Green, no sugar.", tags: ["food"], folder: "Notes" }]);
+
+    const off = new ReaderError("This app may not suggest memories.", 403, "propose_off");
+    const blocked = await connect(stub({ propose: async () => Promise.reject(off) }));
+    const r = await blocked.callTool({ name: "propose_memory", arguments: { title: "x", body: "y" } });
+    expect(r.isError).toBe(true);
+    expect(textOf(r)).toContain("may not suggest");
+    expect((await client.callTool({ name: "propose_memory", arguments: { title: "", body: "y" } })).isError).toBe(true);
+  });
+
+  it("marks results found by meaning", () => {
+    const out = formatResults("automobile", [{ id: "a1234567", title: "My car", folder: "Notes", tags: [], snippet: "garage", editedAt: memory.editedAt, match: "meaning" }]);
+    expect(out).toContain("matched by meaning");
   });
 
   it("lists folders, searches and reads", async () => {
