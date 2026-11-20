@@ -762,6 +762,10 @@ export interface VaultExport {
   memories: Omit<Memory, "snippet">[];
   apps: { id: string; name: string; kind: AppKind; createdAt: string; revokedAt: string | null; folders: string[] }[];
   readLog: Omit<LogEntryView, "salt" | "leaf" | "hour" | "sealed">[];
+  /** Suggestions still waiting in the inbox, opened on the device. */
+  inbox: { app: string; createdAt: string; title: string; body: string; tags: string[]; folder: string | null; url: string | null }[];
+  /** Folders shared with other vaults, by what you call them. */
+  shares: { folder: string; with: string; createdAt: string; acceptedAt: string | null }[];
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -782,6 +786,22 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
       folders: a.folderIds.map((id) => folderName.get(id) ?? id),
     })),
     readLog: log.map(({ salt: _s, leaf: _l, hour: _h, sealed: _x, ...e }) => e),
+    inbox: data.proposals.flatMap((p) =>
+      p.payload
+        ? [
+            {
+              app: data.apps.find((a) => a.id === p.appId)?.name ?? "Removed app",
+              createdAt: p.createdAt,
+              title: p.payload.title,
+              body: p.payload.body,
+              tags: p.payload.tags,
+              folder: p.payload.folder,
+              url: p.payload.url,
+            },
+          ]
+        : [],
+    ),
+    shares: data.shares.outgoing.map((s) => ({ folder: folderName.get(s.folderId) ?? s.folderId, with: s.label, createdAt: s.createdAt, acceptedAt: s.acceptedAt })),
   };
 }
 

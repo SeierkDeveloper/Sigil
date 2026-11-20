@@ -182,8 +182,11 @@ export interface DuplicateOptions {
   maxPairwise?: number;
 }
 
+/** Duplicates are judged on the title and the start of the text, which keeps the pairwise pass quick on large vaults. */
+const DUPLICATE_TEXT = 4000;
+
 function normalizedText(item: Searchable): string {
-  return tokenize(`${item.title} ${item.text}`).join(" ");
+  return tokenize(`${item.title} ${item.text.slice(0, DUPLICATE_TEXT)}`).join(" ");
 }
 
 function shingles(text: string): Set<string> {
@@ -230,7 +233,7 @@ export function findDuplicates<T extends Searchable>(items: T[], opts: Duplicate
     }
   }
 
-  const recent = [...items].sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1)).slice(0, opts.maxPairwise ?? 1500);
+  const recent = [...items].sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1)).slice(0, opts.maxPairwise ?? 1000);
   const sh = recent.map((i) => shingles(normalizedText(i)));
   for (let i = 0; i < recent.length; i++) {
     for (let j = i + 1; j < recent.length; j++) {

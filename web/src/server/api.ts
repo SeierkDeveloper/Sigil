@@ -537,7 +537,7 @@ route("GET", "connector/v1/inbox", (ctx) => {
 route("POST", "connector/v1/proposals", async (ctx) => {
   const auth = appOf(ctx);
   rateLimit(`propose:${auth.appId}`, 10, 60_000);
-  const body = parse(z.object({ id, sealed: sealed(400 * KB) }), await readJson(ctx.req, 512 * KB));
+  const body = parse(z.object({ id, sealed: sealed(600 * KB) }), await readJson(ctx.req, 700 * KB));
   const p = createProposal(ctx.db, auth, body.id, body.sealed);
   return json({ appId: auth.appId, id: p.id, createdAt: p.createdAt }, 201);
 });

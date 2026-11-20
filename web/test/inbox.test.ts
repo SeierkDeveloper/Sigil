@@ -86,6 +86,10 @@ describe("suggestions", () => {
     expect(after.proposals).toHaveLength(0);
     expect(after.memories.map((m) => [m.title, m.body, m.tags])).toEqual([["Tea", `Green tea, no sugar. ${CANARY}`, ["food"]]]);
     expect(dumpDb(h.db)).not.toContain(CANARY);
+    // A waiting suggestion is part of the export, decrypted on the device.
+    await s.reader.propose({ title: "Waiting", body: "still in the inbox" });
+    const exported = ops.buildExport(await ops.loadVault(s.b.api, s.vault), []);
+    expect(exported.inbox).toEqual([expect.objectContaining({ app: "Claude Desktop", title: "Waiting", body: "still in the inbox" })]);
     // The app can now find it like any memory in a folder it may read.
     expect((await s.reader.search("tea")).map((r) => r.title)).toEqual(["Tea"]);
     // A suggestion is handled once.
