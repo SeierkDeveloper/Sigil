@@ -87,6 +87,12 @@ export const fromHex32 = (hex: string) => {
  *   public     the public AI self answered a question (sealed note, like "ask")
  *   meet       a step of a conversation between two AI selves (invite, answer, a turn, stop)
  *   sync       a connector wrote what a live sync source fetched, in the background
+ *   identity   a step of the AI self's identity (its key made, a statement signed, rules saved)
+ *   work       a step of the AI self's work: a draft made, approved, sent, discarded, or a lesson learned
+ *   disclose   a proof of a fact was made; the memory id field holds the signed statement's hash
+ *   emergency  the emergency card was published, revoked, or opened (a count of opens)
+ *   agreement  an agreement was proposed, signed, declined or withdrawn; the memory id field holds its hash
+ *   pack       a knowledge pack was published or followed, or a new version taken in
  */
 export type ReadKind =
   | "folders"
@@ -106,7 +112,13 @@ export type ReadKind =
   | "approval"
   | "public"
   | "meet"
-  | "sync";
+  | "sync"
+  | "identity"
+  | "work"
+  | "disclose"
+  | "emergency"
+  | "agreement"
+  | "pack";
 
 export const READ_KINDS: readonly ReadKind[] = [
   "folders",
@@ -127,6 +139,12 @@ export const READ_KINDS: readonly ReadKind[] = [
   "public",
   "meet",
   "sync",
+  "identity",
+  "work",
+  "disclose",
+  "emergency",
+  "agreement",
+  "pack",
 ];
 
 export interface ReadEntryFields {

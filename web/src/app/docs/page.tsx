@@ -8,7 +8,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the open standard, the API and the encryption model.",
+    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the AI self at work, its identity and wallet, proving a fact, the emergency card, agreements and knowledge packs, the open standard, the API and the encryption model.",
 };
 
 const KEY = "sigil_app.<app id>.<secret>";
@@ -44,6 +44,12 @@ const toc = [
   ["protected", "Protected folders"],
   ["public-self", "Public AI self"],
   ["meet", "Selves meet"],
+  ["work", "Your AI self at work"],
+  ["identity", "Identity and wallet"],
+  ["prove", "Proving a fact"],
+  ["emergency", "Emergency card"],
+  ["agreements", "Agreements"],
+  ["packs", "Knowledge packs"],
   ["privacy-score", "Privacy score"],
   ["spec", "Open standard"],
   ["import", "Importing"],
@@ -856,6 +862,91 @@ export default function Docs() {
             </p>
           </section>
 
+          <section id="work" className="doc-section">
+            <h2>Your AI self at work</h2>
+            <p>
+              Under <strong>Work</strong>, ask your AI self for a reply to a message you paste or to a mail thread you synced or imported, or for a plan of the
+              next seven days from the calendar memories in your vault. With your model key set, it writes them with your own model on your device, from the
+              folders its rules allow. Without one, a reply is a plain start in your own greeting and sign-off and a plan is a plain list of each day with its free
+              time.
+            </p>
+            <p>
+              Every draft waits in an approval queue. Nothing is sent anywhere on its own: approving a reply or a plan copies it for you. You can also hold the
+              answers your open vault gives through ask links, your public page and meetings of selves: they then wait in the same queue, and approving one sends
+              it back through the channel it came from, and nowhere else. A link answered by the connector is not held.
+            </p>
+            <p>
+              When you change a draft before approving it, the change becomes a note in a folder called <strong>How I write</strong>: written by your model when
+              you allow it (told to describe style only, not what the text says), or as a plain summary of the change (the greeting, the sign-off, the length,
+              words you replaced). Later drafts follow these notes. You can read, change and delete each one. Drafts, approvals, discards and lessons are all in
+              your read log, and sealed.
+            </p>
+          </section>
+
+          <section id="identity" className="doc-section">
+            <h2>Identity and wallet</h2>
+            <p>
+              Under <strong>Identity</strong>, make your AI self&apos;s key. It is a secp256k1 key derived from your vault key on your device, never stored and never
+              sent; its address is the self&apos;s identity on any EVM chain. Sign an identity statement (its name, what it is for, optionally your own address
+              and its wallet) with both your vault key and the self key: anyone can read it at <code>/api/identity/at/&lt;address&gt;</code> and check both
+              signatures, here or on the verify page.
+            </p>
+            <p>
+              Draft the rules of its wallet: a cap per payment and per day, the recipients and contracts it may pay or call and which functions, tokens with
+              their own caps, and an end date. The draft is encrypted in your vault, and you can try any payment against it. The contracts that make this real
+              on chain are in the repository: <code>SigilSelfRegistry</code> records which owner stands behind a self key (both must agree), and{" "}
+              <code>SigilSelfWallet</code> lets the self key act only within the owner&apos;s rules while the owner can freeze it, change its rules and withdraw at
+              any time. They are tested and not deployed. Until a site sets <code>SIGIL_IDENTITY_CHAIN_ID</code> and <code>SIGIL_IDENTITY_REGISTRY</code>, the
+              tab says so and everything above works off chain; with them set, your own browser wallet sends the calls.
+            </p>
+          </section>
+
+          <section id="prove" className="doc-section">
+            <h2>Proving a fact</h2>
+            <p>
+              Under <strong>Proof</strong>, Prove a fact makes one claim, signed by your vault and sealed with the hour, that shows nothing else: one field of a
+              memory (a line such as Nationality: ...), that a date in a memory is more than a number of years ago (an age, with the date kept back), how many
+              months of sealed history the vault has, or that it joined a team space and when. Share it by link or file; the verify page checks it in any browser.
+            </p>
+            <p>
+              Who stands behind each: sealed history and team spaces rest on the site&apos;s seals and are checked in full. A field or an age is your vault&apos;s own
+              statement, committed and signed; nobody else checked it. Zero-knowledge proofs, where a checker computes an age from a date nobody sees, are on the{" "}
+              <Link href="/roadmap">roadmap</Link>.
+            </p>
+          </section>
+
+          <section id="emergency" className="doc-section">
+            <h2>Emergency card</h2>
+            <p>
+              Under <strong>Emergency</strong>, pick health memories and fill a card from them: blood type, allergies, medication, conditions, languages and who to
+              call. Change what you like, then publish. The card is encrypted on your device with a key that is only in its link, after the <code>#</code>, which
+              browsers never send to a server; Sigil stores ciphertext it cannot read. Save the lock screen image with the code (made on your device) and set it
+              as your wallpaper. Whoever scans it sees the card, in large type, on any phone. You see each opening with its time, a device class and a language;
+              nothing that tells who it was is kept. Take it down, or issue a new code, at any time.
+            </p>
+          </section>
+
+          <section id="agreements" className="doc-section">
+            <h2>Agreements</h2>
+            <p>
+              Under <strong>Agreements</strong>, write an agreement and send it to another vault by its vault code. You sign it as you send it; its owner reads it
+              in their vault, where it is checked against both vaults&apos; keys, and signs the same fingerprint, or declines. Once both signed, the fingerprint is in
+              both read logs and both hourly seals. Nothing is changed after signing: an amendment is a new version that names the old one. Either side can
+              download a verifiable copy and check it on the verify page. The text travels sealed to the other vault; the server checks signatures, never reads
+              the text.
+            </p>
+          </section>
+
+          <section id="packs" className="doc-section">
+            <h2>Knowledge packs</h2>
+            <p>
+              Under <strong>Packs</strong>, publish a folder as a pack with a title, a description and a version, signed by your vault. Its memories are masked with
+              the folder&apos;s rules first; a protected folder can never be published. Anyone with the link sees it at <code>/p/&lt;id&gt;</code> and can follow it:
+              their vault copies it into a folder of its own and takes in each new version when it opens, checked against the publisher it first followed. Give
+              that folder to your AI self or your agents like any other. Packs are free.
+            </p>
+          </section>
+
           <section id="privacy-score" className="doc-section">
             <h2>Privacy score</h2>
             <p>
@@ -903,8 +994,9 @@ export default function Docs() {
           <section id="spec" className="doc-section">
             <h2>Open standard</h2>
             <p>
-              The <Link href="/spec">Sigil open standard</Link> describes the memory format, folder keys and sealed boxes, the connector&apos;s tools and
-              permissions, the access log entry, hourly seals and presence, and certificates, so anyone can build a vault, a connector or a checker. Its test
+              The <Link href="/spec">Sigil open standard</Link>, version 1.1, describes the memory format, folder keys and sealed boxes, the connector&apos;s tools and
+              permissions, the access log entry, hourly seals and presence, certificates, the AI self&apos;s identity and wallet rules, proofs of a fact, the
+              emergency card, agreements and knowledge packs, so anyone can build a vault, a connector or a checker. Its test
               vectors are generated from the code in this repository, and a test checks on every run that the code still produces them.
             </p>
           </section>

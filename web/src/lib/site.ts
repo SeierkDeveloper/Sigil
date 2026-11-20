@@ -70,7 +70,7 @@ export const navGroups: NavGroup[] = [
       { href: "/connector", label: "Connector", text: "The MCP server, its tools and settings" },
       { href: "/docs#sign-in-with-sigil", label: "Sign in with Sigil", text: "Let a web app read the folders its user picks" },
       { href: "/docs#agents", label: "Agent vaults", text: "A memory of their own for Cursor, Claude Code and other agents" },
-      { href: "/verify", label: "Verify", text: "Check a seal, a log entry or a life certificate" },
+      { href: "/verify", label: "Verify", text: "Check a seal, a certificate, a proof, an agreement or a pack" },
       { href: "/open-source", label: "Open source", text: "The repository, the licence, run it yourself" },
     ],
   },

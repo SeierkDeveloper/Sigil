@@ -10,7 +10,7 @@ export const dynamic = "force-static";
 export const metadata: Metadata = {
   title: "Open standard",
   description:
-    "The Sigil open standard, version 1: the memory format, folder keys and sealed boxes, the connector's tools and permissions, the access log, hourly seals and presence, and certificates, with test vectors generated from the code.",
+    "The Sigil open standard, version 1.1: the memory format, folder keys and sealed boxes, the connector's tools and permissions, the access log, hourly seals and presence, certificates, the AI self's identity and wallet, proofs of a fact, the emergency card, agreements and knowledge packs, with test vectors generated from the code.",
 };
 
 /** The standard's files in docs/spec, rendered as one document. Links between parts become links within this page. */

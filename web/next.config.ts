@@ -26,6 +26,17 @@ const chainRead = (() => {
   }
 })();
 
+// The same for the chain of the registry of AI selves: when its public read
+// address is set, the vault reads a self wallet's spends from it.
+const identityRead = (() => {
+  try {
+    const v = process.env.SIGIL_IDENTITY_READ_RPC?.trim();
+    return v && v.startsWith("https://") ? ` ${new URL(v).origin}` : "";
+  } catch {
+    return "";
+  }
+})();
+
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? "" : " 'unsafe-eval'"}`,
@@ -33,7 +44,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com ${SYNC_ORIGINS.join(" ")}${chainRead}${isProd ? "" : " ws: wss:"}`,
+  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com ${SYNC_ORIGINS.join(" ")}${chainRead}${identityRead}${isProd ? "" : " ws: wss:"}`,
   "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",

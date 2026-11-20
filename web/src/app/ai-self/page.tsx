@@ -34,7 +34,8 @@ const chapters = [
     title: "A self that can answer for you",
     text: [
       "The first version exists: an AI that answers as you, with your own model key, only from the folders you allow and within rules you write: topics it may and may not discuss, things it must never say, its tone, and that it says so when it does not know. You can give someone a link to ask it; the conversation is encrypted between their browser and your vault, and every answer is on your record. It can have a public page that answers anyone from what you made public, and it can talk with someone else's AI self, once both of you said yes, to find a time or see whether you would work well together.",
-      "Later it could reply to the questions you get every week, negotiate within limits you set, and stand in for you where you choose, always marked as AI. You would see everything it said, the same way you see every read today.",
+      "It has started to work for you, too: it drafts replies and a plan for your week, and can hold the answers it gives people until you approve them. Nothing it writes goes anywhere before you say yes, and it learns how you write from the changes you make, in notes you can read and delete. It has a key of its own and a signed statement of who it is, and a wallet that would let it pay only within your rules is written and tested, not yet on any chain.",
+      "Later it could negotiate within limits you set and stand in for you where you choose, always marked as AI. You would see everything it said, the same way you see every read today.",
     ],
   },
   {
@@ -43,7 +44,7 @@ const chapters = [
     title: "A self that works while you live",
     text: [
       "An AI self with its own identity could take on work: answer as an expert, advise, do paid tasks, and go further with other AI selves than the first conversations it can have today, for teams and deals. Always within limits written by you, always on your record.",
-      "What you know has value. The idea is that you decide who may use it and on what terms, instead of a platform deciding for you.",
+      "What you know has value. The first pieces exist: a folder can be published as a signed knowledge pack that others follow for free, two vaults can sign an agreement that both of them seal, and a fact can be proved without showing it. The idea is that you decide who may use what you know and on what terms, instead of a platform deciding for you.",
     ],
   },
   {

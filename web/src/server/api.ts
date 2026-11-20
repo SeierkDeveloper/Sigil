@@ -123,6 +123,12 @@ import {
   visitorOf,
 } from "./public";
 import { acceptMeet, addTurn, declineMeet, invite, listMeets, meetsWaiting, removeMeet, stopMeet } from "./meets";
+import { getIdentity, publicStatement, putStatement, setSelfKey, withdrawStatement } from "./identity";
+import { createDraft, deleteDraft, listDrafts, logLesson, updateDraft } from "./work";
+import { createDisclosure, deleteDisclosure, disclosureAnchor, listDisclosures, MAX_PROOF_BYTES, publishDisclosure, publishedDisclosure, spaceJoinEntry, unpublishDisclosure, updateDisclosureBox } from "./disclose";
+import { cardOpens, openPublicCard, ownerCard, putCard, revokeCard } from "./emergency";
+import { agreementSeal, declineAgreement, listAgreements, peerSigningKey, proposeAgreement, removeAgreement, signAgreementRow } from "./agreements";
+import { deletePack, listPacks, logFollow, packVersions, publicPack, publishPack } from "./packs";
 import { deleteCertificate, getCertificate, listCertificates, MAX_CERT_BYTES, MAX_CERT_HOURS, presenceCounts, presenceProofs, presenceTask, publishCertificate, recordPresence, rootsFor, setSignKey } from "./life";
 
 // ---------------------------------------------------------------- input shapes
@@ -205,6 +211,9 @@ const requesterShape = z.union([id, z.literal("self")]);
 const publicItemShape = z.object({ id, title: z.string().max(300), body: z.string().max(20_000), tags: z.array(z.string().max(48)).max(32), editedAt: isoTime });
 const wallShape = z.object({ question: z.string().max(2000), answer: z.string().max(4000), sources: z.array(z.object({ id, title: z.string().max(300) })).max(12) });
 const meetBox = z.string().max(16 * 1024).refine(isMeetBox, "Expected a meet box");
+const hex32 = z.string().regex(/^0x[0-9a-f]{64}$/, "Expected a 32-byte hash");
+const evmAddress = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Expected an address");
+const edSignature = z.string().regex(/^[A-Za-z0-9_-]{86}$/, "Expected a signature");
 const pairingCodeShape = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/, "Invalid code");
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -519,6 +528,12 @@ route("GET", "vault", (ctx) => {
     sync: listSources(ctx.db, userId),
     publicSelf: ownerPublicSelf(ctx.db, userId),
     meets: listMeets(ctx.db, userId),
+    identity: getIdentity(ctx.db, userId),
+    drafts: listDrafts(ctx.db, userId),
+    disclosures: listDisclosures(ctx.db, userId),
+    emergency: { card: ownerCard(ctx.db, userId), opens: cardOpens(ctx.db, userId) },
+    agreements: listAgreements(ctx.db, userId),
+    packs: listPacks(ctx.db, userId),
   });
 });
 
@@ -581,6 +596,8 @@ route("PUT", "settings/:name", async (ctx, [name]) => {
   if (!isSettingName(name)) throw new HttpError(404, "There is no such setting.", "not_found");
   const body = parse(z.object({ value: envelope(64 * KB) }), await readJson(ctx.req, 80 * KB));
   putSetting(ctx.db, userId, name, body.value);
+  // The self wallet's rules are part of its identity's history: each saved draft is a line in the log.
+  if (name === "wallet") logRead(ctx.db, { appId: "self", userId }, "identity", "rules-saved", 1);
   return json({ ok: true });
 });
 
@@ -1394,6 +1411,203 @@ route("POST", "meets/:id/turns", async (ctx, [meetId]) => {
   rateLimit(`meet-turn:${userId}`, 30, 60_000);
   const body = parse(z.object({ turn: z.number().int().min(1).max(12), box: meetBox, done: z.boolean(), cited: z.number().int().min(0).max(50) }), await readJson(ctx.req, 32 * KB));
   return json({ meet: addTurn(ctx.db, userId, meetId, body) }, 201);
+});
+
+// ---- the AI self's identity: its self key, a signed statement, and where the registry is
+
+route("GET", "identity/config", () => json({ chain: serverConfig.identityChain }));
+
+// The public statement of a self key: what the registry's metadata address points at.
+route("GET", "identity/at/:address", (ctx, [address]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) throw new HttpError(400, "That is not an address.", "invalid");
+  return new Response(publicStatement(ctx.db, address), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "access-control-allow-origin": "*" } });
+});
+
+route("POST", "self/identity", async (ctx) => {
+  const userId = userOf(ctx);
+  return json({ identity: setSelfKey(ctx.db, userId, parse(z.object({ address: evmAddress }), await readJson(ctx.req, 4 * KB)).address) }, 201);
+});
+
+route("PUT", "self/identity/statement", async (ctx) => {
+  const userId = userOf(ctx);
+  return json({ identity: putStatement(ctx.db, userId, parse(z.object({ statement: z.string().max(16 * KB) }), await readJson(ctx.req, 20 * KB)).statement) });
+});
+
+route("DELETE", "self/identity/statement", (ctx) => {
+  withdrawStatement(ctx.db, userOf(ctx));
+  return json({ ok: true });
+});
+
+// ---- the AI self at work: drafts waiting for the owner, each sealed under the vault key
+
+route("GET", "drafts", (ctx) => json({ drafts: listDrafts(ctx.db, userOf(ctx)) }));
+
+route("POST", "drafts", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`drafts:${userId}`, 60, 60_000);
+  const body = parse(z.object({ id, kind: z.enum(["reply", "plan", "answer"]), ref: z.string().regex(/^[A-Za-z0-9_:-]{4,140}$/).nullable(), box: envelope(160 * KB) }), await readJson(ctx.req, 200 * KB));
+  return json({ draft: createDraft(ctx.db, userId, body) }, 201);
+});
+
+route("PUT", "drafts/:id", async (ctx, [draftId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ box: envelope(160 * KB), state: z.enum(["waiting", "approved", "discarded"]).optional(), learned: z.boolean().optional() }), await readJson(ctx.req, 200 * KB));
+  return json({ draft: updateDraft(ctx.db, userId, draftId, body) });
+});
+
+route("DELETE", "drafts/:id", (ctx, [draftId]) => {
+  deleteDraft(ctx.db, userOf(ctx), draftId);
+  return json({ ok: true });
+});
+
+route("POST", "work/lessons", async (ctx) => {
+  const userId = userOf(ctx);
+  logLesson(ctx.db, userId, parse(z.object({ step: z.enum(["lesson-edited", "lesson-deleted"]) }), await readJson(ctx.req, 1 * KB)).step);
+  return json({ ok: true });
+});
+
+// ---- proofs of a fact: the statement's hash goes into the log; the proof is complete once its hour is sealed
+
+route("POST", "disclosures", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`disclose:${userId}`, 30, 60_000);
+  const body = parse(z.object({ id, hash: hex32, box: envelope(MAX_PROOF_BYTES * 2) }), await readJson(ctx.req, MAX_PROOF_BYTES * 2 + 4 * KB));
+  return json({ disclosure: createDisclosure(ctx.db, userId, body) }, 201);
+});
+
+route("PUT", "disclosures/:id", async (ctx, [disclosureId]) => {
+  const userId = userOf(ctx);
+  updateDisclosureBox(ctx.db, userId, disclosureId, parse(z.object({ box: envelope(MAX_PROOF_BYTES * 2) }), await readJson(ctx.req, MAX_PROOF_BYTES * 2 + 4 * KB)).box);
+  return json({ ok: true });
+});
+
+route("GET", "disclosures/:id/anchor", (ctx, [disclosureId]) => json({ anchor: disclosureAnchor(ctx.db, userOf(ctx), disclosureId) }));
+
+route("PUT", "disclosures/:id/publish", async (ctx, [disclosureId]) => {
+  const userId = userOf(ctx);
+  await publishDisclosure(ctx.db, userId, disclosureId, parse(z.object({ proof: z.string().max(MAX_PROOF_BYTES) }), await readJson(ctx.req, MAX_PROOF_BYTES + 4 * KB)).proof);
+  return json({ ok: true });
+});
+
+route("DELETE", "disclosures/:id/publish", (ctx, [disclosureId]) => {
+  unpublishDisclosure(ctx.db, userOf(ctx), disclosureId);
+  return json({ ok: true });
+});
+
+route("DELETE", "disclosures/:id", (ctx, [disclosureId]) => {
+  deleteDisclosure(ctx.db, userOf(ctx), disclosureId);
+  return json({ ok: true });
+});
+
+// A shared proof, by its link. It holds the one claim and its evidence.
+route("GET", "proofs/:id", (ctx, [proofId]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  return new Response(publishedDisclosure(ctx.db, proofId), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
+});
+
+route("GET", "proof/space/:id", (ctx, [spaceId]) => json({ entry: spaceJoinEntry(ctx.db, userOf(ctx), spaceId) }));
+
+// ---- the emergency card: ciphertext under a key the server never receives
+
+route("PUT", "emergency", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ id, card: envelope(16 * KB), ownerBox: envelope(24 * KB) }), await readJson(ctx.req, 48 * KB));
+  return json({ card: putCard(ctx.db, userId, body) });
+});
+
+route("DELETE", "emergency", (ctx) => {
+  revokeCard(ctx.db, userOf(ctx));
+  return json({ ok: true });
+});
+
+route("GET", "emergency/opens", (ctx) => json({ opens: cardOpens(ctx.db, userOf(ctx)) }));
+
+// Anyone with the link: the card's ciphertext. Each opening is logged for the owner without anything that identifies the opener.
+route("GET", "e/:id", (ctx, [cardId]) => {
+  rateLimit(`emergency:${clientIp(ctx.req)}`, 60, 60_000);
+  return json(openPublicCard(ctx.db, cardId, ctx.req));
+});
+
+// ---- sealed agreements between two vaults
+
+route("GET", "agreements", (ctx) => json({ agreements: listAgreements(ctx.db, userOf(ctx)) }));
+
+route("GET", "agreements/peer/:key", (ctx, [key]) => {
+  userOf(ctx);
+  return json({ signingKey: peerSigningKey(ctx.db, parse(boxPublicKey, key)) });
+});
+
+route("POST", "agreements", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({
+      id,
+      toKey: boxPublicKey,
+      hash: hex32,
+      version: z.number().int().min(1).max(1000),
+      previous: hex32.nullable(),
+      offer: sealed(160 * KB),
+      box: envelope(160 * KB),
+      signature: edSignature,
+    }),
+    await readJson(ctx.req, 360 * KB),
+  );
+  return json({ agreement: proposeAgreement(ctx.db, userId, body) }, 201);
+});
+
+route("POST", "agreements/:id/sign", async (ctx, [agreementId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ signature: edSignature, box: envelope(160 * KB) }), await readJson(ctx.req, 180 * KB));
+  return json({ agreement: signAgreementRow(ctx.db, userId, agreementId, body) });
+});
+
+route("POST", "agreements/:id/decline", (ctx, [agreementId]) => {
+  declineAgreement(ctx.db, userOf(ctx), agreementId);
+  return json({ ok: true });
+});
+
+route("DELETE", "agreements/:id", (ctx, [agreementId]) => {
+  removeAgreement(ctx.db, userOf(ctx), agreementId);
+  return json({ ok: true });
+});
+
+route("GET", "agreements/:id/seal", (ctx, [agreementId]) => json({ seal: agreementSeal(ctx.db, userOf(ctx), agreementId), periodSeconds: serverConfig.sealSeconds }));
+
+// ---- knowledge packs: public and signed; followed from each follower's own vault
+
+route("GET", "packs", (ctx) => json({ packs: listPacks(ctx.db, userOf(ctx)) }));
+
+route("POST", "packs", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`packs:${userId}`, 20, 60_000);
+  const body = parse(z.object({ folderId: id, pack: z.string().max(2_200_000) }), await readJson(ctx.req, 2_300_000));
+  return json({ pack: publishPack(ctx.db, userId, body) }, 201);
+});
+
+route("DELETE", "packs/:id", (ctx, [packId]) => {
+  deletePack(ctx.db, userOf(ctx), packId);
+  return json({ ok: true });
+});
+
+route("POST", "packs/:id/log", async (ctx, [packId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ step: z.enum(["followed", "updated", "unfollowed"]), version: z.number().int().min(0).max(100_000), items: z.number().int().min(0).max(10_000) }), await readJson(ctx.req, 2 * KB));
+  logFollow(ctx.db, userId, packId, body.step, body.version, body.items);
+  return json({ ok: true });
+});
+
+// A pack, by its link: the latest version, or one by number. Public, like the pack itself.
+route("GET", "packs/at/:id", (ctx, [packId]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  const v = ctx.url.searchParams.get("version");
+  const version = v && /^\d{1,6}$/.test(v) ? Number(v) : undefined;
+  return new Response(publicPack(ctx.db, packId, version), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "access-control-allow-origin": "*" } });
+});
+
+route("GET", "packs/at/:id/versions", (ctx, [packId]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  return json({ versions: packVersions(ctx.db, packId) });
 });
 
 // ---------------------------------------------------------------- dispatch

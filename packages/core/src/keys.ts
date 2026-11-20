@@ -53,6 +53,9 @@ export const AAD = {
   publicOwner: (selfId: string) => `sigil:public-self:${selfId}`,
   publicApp: (appId: string, selfId: string) => `sigil:public-self-app:${appId}:${selfId}`,
   meetOwner: (meetId: string) => `sigil:meet:${meetId}`,
+  draft: (draftId: string) => `sigil:draft:${draftId}`,
+  disclosure: (disclosureId: string) => `sigil:disclosure:${disclosureId}`,
+  agreementOwner: (agreementId: string) => `sigil:agreement:${agreementId}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */

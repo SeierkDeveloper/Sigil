@@ -78,6 +78,14 @@ import type { AccessRequestView } from "./protectOps";
 import { openSources, type ServerSource, type SyncSourceView } from "./syncOps";
 import { openPublicSelf, type PublicSelfView, type ServerPublicSelf } from "./publicOps";
 import { openMeets, type MeetView, type ServerMeet } from "./meetOps";
+import { openChoices, openIdentity, openRules, type IdentityChoices, type IdentityView, type ServerIdentity } from "./identityOps";
+import { openDrafts, openWork, type DraftView, type ServerDraft } from "./workOps";
+import { openDisclosures, type DisclosureView, type ServerDisclosure } from "./discloseOps";
+import { openEmergency, type EmergencyView, type ServerEmergency } from "./emergencyOps";
+import { openAgreements, type AgreementView, type ServerAgreement } from "./agreementOps";
+import { openFollows, type PackRow } from "./packOps";
+import { EMPTY_CHOICES } from "./identityOps";
+import { DEFAULT_WORK, type FollowedPack, type WalletRules, type WorkSettings } from "@sigil/core";
 
 // ---------------------------------------------------------------- types
 
@@ -205,6 +213,26 @@ export interface VaultData {
   publicSelf: PublicSelfView | null;
   /** Conversations between this vault's AI self and others. */
   meets: MeetView[];
+  /** The AI self's identity: its self key's address and its signed statement. */
+  identity: IdentityView | null;
+  /** What the owner chose to say about the self, kept encrypted. */
+  identityChoices: IdentityChoices;
+  /** The draft rules of the self wallet, kept encrypted. */
+  walletRules: WalletRules | null;
+  /** What the AI self holds for approval, and how it learns. */
+  work: WorkSettings;
+  /** The approval queue. */
+  drafts: DraftView[];
+  /** Proofs of a fact, opened on this device. */
+  disclosures: DisclosureView[];
+  /** The emergency card and who opened it. */
+  emergency: EmergencyView;
+  /** Agreements with other vaults, opened on this device. */
+  agreements: AgreementView[];
+  /** Knowledge packs this vault publishes. */
+  packs: PackRow[];
+  /** Knowledge packs this vault follows. */
+  follows: FollowedPack[];
 }
 
 export interface LogEntryView {
@@ -271,6 +299,12 @@ export interface ServerVault {
   sync?: ServerSource[];
   publicSelf?: ServerPublicSelf | null;
   meets?: ServerMeet[];
+  identity?: ServerIdentity | null;
+  drafts?: ServerDraft[];
+  disclosures?: ServerDisclosure[];
+  emergency?: ServerEmergency;
+  agreements?: ServerAgreement[];
+  packs?: PackRow[];
   box?: StoredBoxKey | null;
   proposals?: { id: string; appId: string; sealed: string; createdAt: string }[];
   shares?: {
@@ -583,12 +617,42 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   unreadable += pub.unreadable;
   const met = await openMeets(vault, box, data.meets ?? []);
   unreadable += met.unreadable;
+  const later = async <T,>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await fn();
+    } catch {
+      unreadable++;
+      return fallback;
+    }
+  };
+  const identityChoices = await later(() => openChoices(vault, settings.identity), EMPTY_CHOICES);
+  const walletRules = await later(() => openRules(vault, settings.wallet), null);
+  const work = await later(() => openWork(vault, settings.work), DEFAULT_WORK);
+  const follows = await later(() => openFollows(vault, settings.packs), []);
+  const drafted = await openDrafts(vault, data.drafts ?? []);
+  unreadable += drafted.unreadable;
+  const disclosed = await openDisclosures(vault, data.disclosures ?? []);
+  unreadable += disclosed.unreadable;
+  const em = await openEmergency(vault, data.emergency);
+  unreadable += em.unreadable;
+  const agreed = await openAgreements(vault, box, data.agreements ?? []);
+  unreadable += agreed.unreadable;
 
   return {
     access: data.access ?? [],
     sync: synced.sources,
     publicSelf: pub.self,
     meets: met.meets,
+    identity: openIdentity(data.identity),
+    identityChoices,
+    walletRules,
+    work,
+    drafts: drafted.drafts,
+    disclosures: disclosed.disclosures,
+    emergency: em.emergency,
+    agreements: agreed.agreements,
+    packs: data.packs ?? [],
+    follows,
     legacy,
     trusted,
     agents: (data.agents ?? []).map((a) => ({ appId: a.appId, homeFolderId: a.homeFolderId, rules: a.rules, publicKey: a.publicKey, createdAt: a.createdAt })),
@@ -1015,6 +1079,17 @@ export interface VaultExport {
   publicSelf: { handle: string; name: string; greeting: string; enabled: boolean; folders: string[]; perVisitorHour: number; answers: { question: string; answer: string; hidden: boolean; createdAt: string }[] } | null;
   /** Conversations of your AI self with others, with their transcripts. */
   meets: { with: string; purpose: string; state: string; createdAt: string; transcript: { turn: number; by: string; text: string }[] }[];
+  /** The AI self's identity, its signed statement and the draft rules of its wallet. The self key itself is never in the file: it is made again from the vault key. */
+  identity: { address: string; statement: unknown; choices: IdentityChoices; walletRules: WalletRules | null } | null;
+  /** The approval queue and what is held back. */
+  work: { settings: WorkSettings; drafts: { kind: string; state: string; title: string; draft: string; final: string | null; createdAt: string }[] };
+  /** Proofs of a fact, complete with their evidence. */
+  proofs: unknown[];
+  /** The emergency card, without its key. */
+  emergency: { card: unknown; published: string | null; opens: { at: string; device: string; lang: string }[] };
+  /** Agreements, with their texts and signatures. */
+  agreements: { title: string; text: string; version: number; state: string; hash: string; parties: string[]; signatures: (string | null)[]; createdAt: string; signedAt: string | null }[];
+  packs: { published: { title: string; version: number; folder: string }[]; following: { title: string; version: number; origin: string; id: string }[] };
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -1104,6 +1179,32 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
       createdAt: m.createdAt,
       transcript: m.lines.filter((l) => l.ok).map((l) => ({ turn: l.turn, by: l.mine ? "my AI self" : `${m.peerName}'s AI self`, text: l.text })),
     })),
+    identity: data.identity ? { address: data.identity.address, statement: data.identity.statement, choices: data.identityChoices, walletRules: data.walletRules } : null,
+    work: {
+      settings: data.work,
+      drafts: data.drafts
+        .filter((d) => d.record)
+        .map((d) => ({ kind: d.kind, state: d.state, title: d.record!.title, draft: d.record!.draft, final: d.record!.final, createdAt: d.createdAt })),
+    },
+    proofs: data.disclosures.map((d) => d.proof).filter(Boolean),
+    emergency: { card: data.emergency.card?.card ?? null, published: data.emergency.card?.createdAt ?? null, opens: data.emergency.opens.map((o) => ({ at: o.at, device: o.device, lang: o.lang })) },
+    agreements: data.agreements
+      .filter((a) => a.doc)
+      .map((a) => ({
+        title: a.doc!.title,
+        text: a.doc!.text,
+        version: a.version,
+        state: a.state,
+        hash: a.hash,
+        parties: a.doc!.parties.map((p) => p.name),
+        signatures: [a.fromSig, a.toSig],
+        createdAt: a.createdAt,
+        signedAt: a.signedAt,
+      })),
+    packs: {
+      published: data.packs.map((p) => ({ title: p.title, version: p.version, folder: folderName.get(p.folderId) ?? "" })),
+      following: data.follows.map((f) => ({ title: f.title, version: f.version, origin: f.origin, id: f.id })),
+    },
   };
 }
 

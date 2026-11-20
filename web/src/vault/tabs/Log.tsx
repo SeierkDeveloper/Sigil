@@ -68,14 +68,22 @@ export function LogTab() {
         ...data.askLinks.map((l) => [l.id, `Ask link "${l.label}"`] as const),
         ...(data.publicSelf ? [[data.publicSelf.id, `Your public AI self @${data.publicSelf.handle}`] as const] : []),
         ...data.meets.map((m) => [m.id, `Your AI self with ${m.record?.label ?? m.peerName}`] as const),
-        ["self", "Your test chat"] as const,
+        ["self", "Your AI self"] as const,
+        ["vault", "Your vault"] as const,
+        ...data.agreements.map((a) => [a.id, `The agreement "${a.doc?.title ?? "untitled"}"`] as const),
+        ...data.packs.map((p) => [p.id, `Your pack "${p.title}"`] as const),
+        ...data.follows.map((f) => [f.id, `The pack "${f.title}"`] as const),
+        ...(data.emergency.card ? [[data.emergency.card.id, "Your emergency card"] as const] : []),
       ]),
-    [data.apps, data.shares.outgoing, data.askLinks, data.publicSelf, data.meets],
+    [data.apps, data.shares.outgoing, data.askLinks, data.publicSelf, data.meets, data.agreements, data.packs, data.follows, data.emergency.card],
   );
   const people = useMemo(() => new Map((data.legacy.record?.people ?? []).map((p) => [p.id, p.label] as const)), [data.legacy.record]);
   const whoDid = (e: ops.LogEntryView) => {
     if (e.kind === "legacy") return e.appId === "legacy" || e.appId === data.legacy.plan?.id ? "Your legacy plan" : (people.get(e.appId) ?? "A trusted person from an earlier plan");
     if (e.kind === "device") return "Your devices";
+    if (e.kind === "emergency") return appName.get(e.appId) ?? "An earlier emergency card";
+    if (e.kind === "agreement") return appName.get(e.appId) ?? "An agreement you removed";
+    if (e.kind === "pack") return appName.get(e.appId) ?? "A pack";
     return (
       appName.get(e.appId) ??
       (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : e.kind === "public" ? "A public AI self you deleted" : e.kind === "meet" ? "A conversation you removed" : "Removed app")
@@ -138,6 +146,46 @@ export function LogTab() {
       if (step.startsWith("turn-")) return `Turn ${step.slice(5)} of the conversation, encrypted between the two vaults`;
       if (step.startsWith("used-")) return `Your AI self used ${plural(e.count, "memory", "memories")} for turn ${step.slice(5)}`;
       return "A step of a conversation between AI selves";
+    }
+    if (e.kind === "identity") {
+      if (step === "key-made") return "Your AI self's key was made on your device";
+      if (step === "statement-signed") return "A new identity statement was signed by your vault and the self's key";
+      if (step === "statement-withdrawn") return "The identity statement was withdrawn";
+      if (step === "rules-saved") return "The self wallet's rules were saved, encrypted";
+      return "A step of your AI self's identity";
+    }
+    if (e.kind === "work") {
+      const what = (k: string) => (k === "plan" ? "a plan" : k === "answer" ? "an answer" : "a reply");
+      if (step.startsWith("drafted-")) return `Your AI self drafted ${what(step.slice(8))}, waiting for you`;
+      if (step.startsWith("approved-")) return `You approved ${what(step.slice(9))}`;
+      if (step.startsWith("discarded-")) return `You discarded ${what(step.slice(10))}`;
+      if (step === "learned") return "Your edit became a note under How I write";
+      if (step === "lesson-edited") return "You changed a note under How I write";
+      if (step === "lesson-deleted") return "You deleted a note under How I write";
+      return "A step of your AI self's work";
+    }
+    if (e.kind === "disclose") return "A proof of a fact was made: its signed statement is sealed with this hour";
+    if (e.kind === "emergency") {
+      if (step === "opened") return "Your emergency card was opened";
+      if (step === "published") return "Your emergency card was published";
+      if (step === "changed") return "Your emergency card was changed";
+      if (step === "reissued") return "A new code was issued for your emergency card; the old one opens nothing";
+      if (step === "revoked") return "Your emergency card was taken down";
+      return "A step of your emergency card";
+    }
+    if (e.kind === "agreement") {
+      if (step.startsWith("proposed-")) return "An agreement was sent for signing";
+      if (step.startsWith("declined-")) return "An agreement was declined";
+      if (step.startsWith("withdrawn-")) return "An agreement was withdrawn";
+      return "An agreement was signed by both: its fingerprint is sealed with this hour";
+    }
+    if (e.kind === "pack") {
+      if (step.startsWith("published-")) return `Version ${step.slice(10)} of the pack was published (${plural(e.count, "memory", "memories")})`;
+      if (step.startsWith("followed-")) return `You followed the pack, at version ${step.slice(9)}`;
+      if (step.startsWith("updated-")) return `Version ${step.slice(8)} of the pack was taken in, checked against its publisher`;
+      if (step.startsWith("unfollowed-")) return "You stopped following the pack";
+      if (step === "withdrawn") return "The pack was taken down";
+      return "A step of a knowledge pack";
     }
     if (e.kind === "sync") return step.startsWith("wrote-") ? `Wrote ${plural(e.count, "memory", "memories")} from live sync, in the background` : `Removed ${plural(e.count, "memory", "memories")} that are gone at the source`;
     if (e.kind === "propose") return "Suggested a memory to your inbox";

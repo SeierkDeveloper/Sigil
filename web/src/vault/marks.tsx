@@ -22,6 +22,8 @@ import {
   ChatIcon,
   DriveIcon,
   MeetingIcon,
+  PackIcon,
+  StyleIcon,
 } from "@/components/icons";
 
 const APP_ICONS: Record<AppKind, typeof ClaudeIcon> = {
@@ -53,6 +55,9 @@ const SOURCE_ICONS: Record<SourceKind, typeof ClaudeIcon> = {
   slack: ChatIcon,
   drive: DriveIcon,
   meeting: MeetingIcon,
+  style: StyleIcon,
+  plan: CalendarIcon,
+  pack: PackIcon,
 };
 
 export function AppMark({ kind, className = "" }: { kind?: AppKind; className?: string }) {

@@ -78,5 +78,20 @@ export const serverConfig = {
     };
     return { google: clean(process.env.SIGIL_GOOGLE_CLIENT_ID), slack: clean(process.env.SIGIL_SLACK_CLIENT_ID) };
   },
+  /**
+   * The registry of AI selves (contracts/src/SigilSelfRegistry.sol) and the
+   * chain it lives on, once the owner of the site deployed it. Null until both
+   * a chain id and an address are set: the Identity tab then works off chain.
+   * The read address is public and read-only; the browser reads a self wallet's
+   * spends through it. No key is ever set here: registering is sent by the
+   * vault owner's own wallet.
+   */
+  get identityChain(): { chainId: string; registry: string; rpcUrl: string } | null {
+    const chainId = process.env.SIGIL_IDENTITY_CHAIN_ID?.trim() ?? "";
+    const registry = process.env.SIGIL_IDENTITY_REGISTRY?.trim() ?? "";
+    if (!/^[1-9]\d{0,17}$/.test(chainId) || !/^0x[0-9a-fA-F]{40}$/.test(registry)) return null;
+    const rpc = process.env.SIGIL_IDENTITY_READ_RPC?.trim() ?? "";
+    return { chainId, registry, rpcUrl: /^https:\/\/[^\s]+$/.test(rpc) ? rpc : "" };
+  },
   sessionDays: 30,
 };

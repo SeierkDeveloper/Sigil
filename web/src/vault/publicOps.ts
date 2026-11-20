@@ -169,7 +169,7 @@ export function publicUrl(origin: string, handle: string): string {
 
 // ---------------------------------------------------------------- answering while the vault is open
 
-interface PendingPublic {
+export interface PendingPublic {
   id: string;
   selfId: string;
   sessionId: string;
@@ -179,48 +179,77 @@ interface PendingPublic {
 
 export const PUBLIC_ERROR_TEXT = "My AI self could not answer just now. Please try again later.";
 
+export interface ComposedPublic {
+  reply: PublicReply;
+  question: string;
+}
+
+function publicKeyFor(self: NonNullable<VaultData["publicSelf"]>, q: Pick<PendingPublic, "sessionId" | "askerKey">): Uint8Array {
+  const pair = linkPair({ secret: self.secret!.secret, label: "", rules: null, introKey: "" });
+  return agentSessionKey(pair, self.id, q.sessionId, q.askerKey);
+}
+
+/** Writes the answer to one visitor's question without sending it: only from the public copy as published, within the public self's rules. Null when the question cannot be addressed. */
+export async function composePublicAnswer(data: Pick<VaultData, "publicSelf">, items: PublicItem[], q: PendingPublic, model: ModelCaller): Promise<ComposedPublic | null> {
+  const self = data.publicSelf;
+  if (!self?.secret) return null;
+  let key: Uint8Array;
+  try {
+    key = publicKeyFor(self, q);
+  } catch {
+    return null;
+  }
+  const ids = { linkId: self.id, sessionId: q.sessionId, messageId: q.id };
+  let question = "";
+  try {
+    const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
+    question = opened.text;
+    const a = await answerAsSelf({ question, history: opened.history, rules: self.secret.rules, memories: publicMemories(items), model, asker: "public" });
+    return { reply: { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) }, question };
+  } catch {
+    return { reply: { v: 1, text: PUBLIC_ERROR_TEXT, refused: "error", sources: [] }, question: question || "(the question could not be opened)" };
+  }
+}
+
+/** Seals a public answer for the visitor and the question and answer for this vault's log, and sends both. */
+export async function sendPublicAnswer(api: Api, data: Pick<VaultData, "publicSelf" | "boxPublic">, q: Pick<PendingPublic, "id" | "sessionId" | "askerKey">, composed: ComposedPublic): Promise<void> {
+  const self = data.publicSelf;
+  if (!self?.secret || !data.boxPublic) throw new Error("The public AI self is off.");
+  const key = publicKeyFor(self, q);
+  const ids = { linkId: self.id, sessionId: q.sessionId, messageId: q.id };
+  const { reply, question } = composed;
+  const note: AskNote = { v: 1, via: "public", label: self.name, question, answer: reply.text, citations: reply.sources, refused: reply.refused };
+  await api.post(`public/questions/${q.id}/answer`, {
+    sealed: sealAskMessage(key, ids, "a", reply),
+    note: sealJson(decodeBoxPublicKey(data.boxPublic), note, askNoteContext(q.id, self.id)),
+    cited: reply.sources.length,
+    wall: reply.refused === "error" ? null : { question, answer: reply.text, sources: reply.sources },
+  });
+}
+
+/** The visitors waiting, and the public copy as published (fetched from the server, so an unpublished change never leaks). */
+export async function pendingPublic(api: Api): Promise<{ questions: PendingPublic[]; items: PublicItem[] }> {
+  const { questions } = await api.get<{ questions: PendingPublic[] }>("public/pending");
+  if (questions.length === 0) return { questions, items: [] };
+  const { items } = await api.get<{ items: PublicItem[] }>("public/self");
+  return { questions, items };
+}
+
 /**
- * Answers waiting visitors: only from the public copy as published (fetched
- * from the server, so an unpublished change never leaks), within the public
- * self's rules, with the owner's model. The answer goes back sealed; the
+ * Answers waiting visitors: only from the public copy as published, within the
+ * public self's rules, with the owner's model. The answer goes back sealed; the
  * question and answer are sealed into the owner's log.
  */
 export async function servePublicOnce(api: Api, data: Pick<VaultData, "publicSelf" | "boxPublic">, deps: { model: ModelCaller }): Promise<number> {
   const self = data.publicSelf;
   if (!self?.secret || !self.enabled || !data.boxPublic) return 0;
-  const { questions } = await api.get<{ questions: PendingPublic[] }>("public/pending");
-  if (questions.length === 0) return 0;
-  const { items } = await api.get<{ items: PublicItem[] }>("public/self");
-  const memories = publicMemories(items);
-  const pair = linkPair({ secret: self.secret.secret, label: "", rules: null, introKey: "" });
+  const { questions, items } = await pendingPublic(api);
   let n = 0;
   for (const q of questions) {
-    const ids = { linkId: self.id, sessionId: q.sessionId, messageId: q.id };
-    let reply: PublicReply;
-    let question = "";
-    let key: Uint8Array;
+    const composed = await composePublicAnswer(data, items, q, deps.model);
+    if (!composed) continue;
     try {
-      key = agentSessionKey(pair, self.id, q.sessionId, q.askerKey);
-    } catch {
-      continue;
-    }
-    try {
-      const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
-      question = opened.text;
-      const a = await answerAsSelf({ question, history: opened.history, rules: self.secret.rules, memories, model: deps.model, asker: "public" });
-      reply = { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) };
-    } catch {
-      reply = { v: 1, text: PUBLIC_ERROR_TEXT, refused: "error", sources: [] };
-      if (!question) question = "(the question could not be opened)";
-    }
-    const note: AskNote = { v: 1, via: "public", label: self.name, question, answer: reply.text, citations: reply.sources, refused: reply.refused };
-    try {
-      await api.post(`public/questions/${q.id}/answer`, {
-        sealed: sealAskMessage(key, ids, "a", reply),
-        note: sealJson(decodeBoxPublicKey(data.boxPublic), note, askNoteContext(q.id, self.id)),
-        cited: reply.sources.length,
-        wall: reply.refused === "error" ? null : { question, answer: reply.text, sources: reply.sources },
-      });
+      await sendPublicAnswer(api, data, q, composed);
       n++;
     } catch {
       // Answered elsewhere or expired.
