@@ -110,6 +110,9 @@ describe("selves meet", () => {
       const steps = (await ops.loadLog(o.b.api)).entries.filter((e) => e.kind === "meet" && e.appId === id).map((e) => e.memoryId);
       expect(steps).toEqual(expect.arrayContaining(["invited", "accepted", "turn-1", "turn-2", "done"]));
     }
+    // The export holds the transcript, opened on the device.
+    expect(ops.buildExport(sam.data, []).meets[0]).toMatchObject({ with: "Robin", purpose: "find_time", state: "done", transcript: [{ turn: 1, by: "my AI self" }, { turn: 2, by: "Robin's AI self" }] });
+
     // Over: no more turns.
     await expect(sam.b.api.post(`meets/${id}/turns`, { turn: 3, box: "m1.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA", done: false, cited: 0 })).rejects.toMatchObject({ status: 409 });
   });

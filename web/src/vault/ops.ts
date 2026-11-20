@@ -986,7 +986,7 @@ export interface VaultExport {
   format: "sigil-export";
   version: 1;
   exportedAt: string;
-  folders: { id: string; name: string }[];
+  folders: { id: string; name: string; protect?: string; redact?: string[] }[];
   memories: Omit<Memory, "snippet">[];
   apps: { id: string; name: string; kind: AppKind; createdAt: string; revokedAt: string | null; folders: string[] }[];
   readLog: Omit<LogEntryView, "salt" | "leaf" | "hour" | "sealed">[];
@@ -1009,6 +1009,12 @@ export interface VaultExport {
   spaces: { name: string; role: string; members: { name: string; kind: string; role: string }[]; memories: { title: string; body: string; editedAt: string }[] }[];
   devices: { addedAt: string; lastUsedAt: string | null }[];
   certificates: { link: string; from: string; to: string; createdAt: string }[];
+  /** Live sync sources, without their sign-in tokens. */
+  sync: { service: string; account: string; folder: string; paused: boolean; lastSyncAt: string | null; inBackground: boolean }[];
+  /** The public AI self: its settings, which folders are public, and the answers it showed. */
+  publicSelf: { handle: string; name: string; greeting: string; enabled: boolean; folders: string[]; perVisitorHour: number; answers: { question: string; answer: string; hidden: boolean; createdAt: string }[] } | null;
+  /** Conversations of your AI self with others, with their transcripts. */
+  meets: { with: string; purpose: string; state: string; createdAt: string; transcript: { turn: number; by: string; text: string }[] }[];
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -1018,7 +1024,7 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
     format: "sigil-export",
     version: 1,
     exportedAt: new Date().toISOString(),
-    folders: data.folders.map((f) => ({ id: f.id, name: f.name })),
+    folders: data.folders.map((f) => ({ id: f.id, name: f.name, ...(f.protect ? { protect: f.protect } : {}), ...(f.redact?.length ? { redact: f.redact } : {}) })),
     memories: data.memories.map(({ snippet: _snippet, ...m }) => m),
     apps: data.apps.map((a) => ({
       id: a.id,
@@ -1072,6 +1078,32 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
     })),
     devices: data.keyslots.filter((k) => k.kind === "device").map((k) => ({ addedAt: k.createdAt, lastUsedAt: k.lastUsedAt })),
     certificates: data.certificates.map((c) => ({ link: `/verify?certificate=${c.id}`, from: c.summary.from, to: c.summary.to, createdAt: c.createdAt })),
+    sync: data.sync.map((x) => ({
+      service: x.state?.kind ?? "unreadable",
+      account: x.state?.account ?? "",
+      folder: folderName.get(x.folderId) ?? x.folderId,
+      paused: x.paused,
+      lastSyncAt: x.lastSyncAt,
+      inBackground: !!x.appId,
+    })),
+    publicSelf: data.publicSelf
+      ? {
+          handle: data.publicSelf.handle,
+          name: data.publicSelf.name,
+          greeting: data.publicSelf.greeting,
+          enabled: data.publicSelf.enabled,
+          folders: (data.publicSelf.secret?.folderIds ?? []).map((id) => folderName.get(id) ?? id),
+          perVisitorHour: data.publicSelf.perVisitorHour,
+          answers: data.publicSelf.wall.map((w) => ({ question: w.question, answer: w.answer, hidden: w.hidden, createdAt: w.createdAt })),
+        }
+      : null,
+    meets: data.meets.map((m) => ({
+      with: m.record?.label ?? m.peerName,
+      purpose: m.purpose,
+      state: m.state,
+      createdAt: m.createdAt,
+      transcript: m.lines.filter((l) => l.ok).map((l) => ({ turn: l.turn, by: l.mine ? "my AI self" : `${m.peerName}'s AI self`, text: l.text })),
+    })),
   };
 }
 

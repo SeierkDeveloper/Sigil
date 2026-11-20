@@ -92,6 +92,10 @@ describe("a pass in the open vault", () => {
     expect(launch.id).toBe(await syncMemoryId(s.folder.raw, "gmail", gmailThreadRef("18c2a1f3b4d5e6f7")));
     expect(dumpDb(h.db)).not.toContain("CANARY-mail-1");
     expect(data.sync[0].state?.last).toMatchObject({ added: 2, error: null });
+    // The export lists the source without its sign-in.
+    const exported = JSON.stringify(ops.buildExport(data, []).sync);
+    expect(exported).toContain("me@example.org");
+    expect(exported).not.toContain("CANARY");
     expect(data.sync[0].lastSyncAt).not.toBeNull();
 
     s.g.mail.arrive(gmailMessage({ id: "m9", threadId: "18c2a1f3b4d5e6f7", from: "Robin", to: "me", subject: "Re: Launch plan", at: "2026-11-19T09:00:00Z", text: "CANARY-later" }));
