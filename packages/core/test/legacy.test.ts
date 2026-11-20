@@ -158,6 +158,7 @@ describe("sealing a plan", () => {
     // Each note tells the person what they would get, readable before any release.
     const note = openLegacyNote(s.b, { ...ref(1), sealed: plan.people[1].note! });
     expect(note).toMatchObject({ owner: "Sam", label: "Ben", folders: ["Work"], self: false, periodDays: 180, threshold: 2, total: 3 });
+    expect(plan.complete).toBe(true);
   });
 
   it("keeps the owner's record under the vault key, and a new epoch makes old shares useless", async () => {
@@ -191,7 +192,7 @@ describe("sealing a plan", () => {
   it("refuses plans that cannot work", async () => {
     const s = await setup();
     const base = { planId: "p", epoch: 1, owner: "Sam", periodDays: 180, includeModel: false, folders: [s.family], rules: null, model: null, ownerKey: null };
-    await expect(sealLegacyPlan(s.vaultKey, { ...base, threshold: 1, people: [person("Ana", null, [s.family.id])] })).rejects.toThrow("at least one trusted person");
+    await expect(sealLegacyPlan(s.vaultKey, { ...base, threshold: 1, people: [] })).rejects.toThrow("at least one trusted person");
     await expect(sealLegacyPlan(s.vaultKey, { ...base, threshold: 3, people: [person("Ana", s.a, [s.family.id]), person("Ben", s.b, [s.family.id])] })).rejects.toThrow("between 1 and 2");
     await expect(sealLegacyPlan(s.vaultKey, { ...base, threshold: 1, people: [person("Ana", s.a, [])] })).rejects.toThrow("at least one folder");
     await expect(sealLegacyPlan(s.vaultKey, { ...base, threshold: 1, people: [person("Ana", s.a, ["gone-folder-id"])] })).rejects.toThrow("no longer exists");
@@ -200,20 +201,19 @@ describe("sealing a plan", () => {
 
   it("leaves a person waiting on an invite without a share until the owner seals again", async () => {
     const s = await setup();
-    const plan = await sealLegacyPlan(s.vaultKey, {
-      planId: "p3",
-      epoch: 1,
-      owner: "Sam",
-      periodDays: 365,
-      threshold: 1,
-      includeModel: false,
-      people: [person("Ana", s.a, [s.family.id]), person("Dee", null, [s.family.id])],
-      folders: [s.family],
-      rules: null,
-      model: null,
-      ownerKey: null,
-    });
+    const base = { planId: "p3", epoch: 1, owner: "Sam", periodDays: 365, includeModel: false, folders: [s.family], rules: null, model: null, ownerKey: null };
+    const people = [person("Ana", s.a, [s.family.id]), person("Dee", null, [s.family.id])];
+    const plan = await sealLegacyPlan(s.vaultKey, { ...base, threshold: 1, people });
+    expect(plan.complete).toBe(true);
     expect(plan.people[1]).toMatchObject({ publicKey: null, share: null, bundle: null, note: null });
+    // With two needed and one key known, the plan waits: no shares at all, but Ana is told she is named.
+    const waiting = await sealLegacyPlan(s.vaultKey, { ...base, threshold: 2, people });
+    expect(waiting.complete).toBe(false);
+    expect(waiting.people.map((p) => [!!p.share, !!p.bundle, !!p.note])).toEqual([
+      [false, false, true],
+      [false, false, false],
+    ]);
+    expect(openLegacyNote(s.a, { planId: "p3", epoch: 1, trusteeId: people[0].id, sealed: waiting.people[0].note! })).toMatchObject({ threshold: 2, total: 2 });
   });
 });
 

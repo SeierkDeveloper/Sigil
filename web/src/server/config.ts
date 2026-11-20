@@ -52,5 +52,19 @@ export const serverConfig = {
     const n = Number(process.env.SIGIL_AGENT_ONLINE_SECONDS);
     return (Number.isInteger(n) && n >= 2 && n <= 600 ? n : 30) * 1000;
   },
+  /** The length of one day for legacy plans, in milliseconds. A real day unless tests shorten it. */
+  get legacyDayMs(): number {
+    const n = Number(process.env.SIGIL_LEGACY_DAY_MS);
+    return Number.isFinite(n) && n >= 1 && n <= 86_400_000 ? n : 86_400_000;
+  },
+  /**
+   * A public, read-only RPC address for the chain the seals are anchored on.
+   * When set together with SIGIL_SEAL_CONTRACT, the verify page reads roots
+   * from the contract in the visitor's browser. It never carries a key.
+   */
+  get chainReadRpc(): string {
+    const v = process.env.SIGIL_CHAIN_READ_RPC?.trim() || "";
+    return /^https:\/\/[^\s]+$/.test(v) ? v : "";
+  },
   sessionDays: 30,
 };

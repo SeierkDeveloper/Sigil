@@ -122,6 +122,8 @@ export interface StoredMemory {
 export interface StoredGrant {
   folderId: string;
   wrappedKey: string;
+  /** "write" lets an agent add, change and delete memories in the folder. Apps only read. */
+  mode?: "read" | "write";
 }
 
 export interface StoredApp {
@@ -132,15 +134,15 @@ export interface StoredApp {
   grants: StoredGrant[];
 }
 
-export type FolderKind = "profile";
+export type FolderKind = "profile" | "agent";
 
 export interface FolderMeta {
   name: string;
-  /** "profile" marks the folder that holds the Self card. Encrypted like the name, so the server cannot tell. */
+  /** "profile" marks the folder that holds the Self card, "agent" an agent's own folder. Encrypted like the name, so the server cannot tell. */
   kind?: FolderKind;
 }
 
-export type AppKind = "claude-desktop" | "cursor" | "chatgpt" | "other" | "extension" | "web";
+export type AppKind = "claude-desktop" | "claude-code" | "cursor" | "chatgpt" | "other" | "extension" | "web";
 
 export interface AppMeta {
   name: string;
@@ -217,7 +219,7 @@ export async function openFolder(vaultKey: CryptoKey, stored: StoredFolder): Pro
 export async function openFolderWithRaw(stored: Pick<StoredFolder, "id" | "meta">, raw: Uint8Array): Promise<OpenFolder> {
   const key = await importKey(raw);
   const meta = await decryptJson<FolderMeta>(key, stored.meta, AAD.folderMeta(stored.id));
-  return { id: stored.id, name: meta.name, key, raw, ...(meta.kind === "profile" ? { kind: meta.kind } : {}) };
+  return { id: stored.id, name: meta.name, key, raw, ...(meta.kind === "profile" || meta.kind === "agent" ? { kind: meta.kind } : {}) };
 }
 
 /** The folder's name (and kind) encrypted under its own key. Renaming keeps the kind. */

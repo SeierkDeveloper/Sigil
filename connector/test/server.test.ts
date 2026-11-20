@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createServer, formatProfile, formatResults, formatSelfAnswer, type Reader, type SelfAsker } from "../src/server";
+import { createServer, formatHandoffs, formatProfile, formatRecall, formatResults, formatSelfAnswer, type Reader, type SelfAsker } from "../src/server";
 import { ReaderError } from "../src/reader";
 
 const memory = {
@@ -135,5 +135,52 @@ describe("MCP server", () => {
   it("formats empty results helpfully", () => {
     expect(formatResults("", [])).toContain("no memories");
     expect(formatResults("zebra", [])).toBe('No memories match "zebra".');
+  });
+});
+
+describe("agent tools", () => {
+  const agentStub = {
+    remember: async (input: { title: string }) => ({ id: "mem-agent-1", where: input.title === "space" ? "the space Launch" : "Cursor memory" }),
+    recall: async () => [{ id: "mem-agent-1", title: "Parser state", where: "Cursor memory", body: "Half done.", editedAt: "2026-11-20T00:00:00.000Z", tags: ["parser"] }],
+    forget: async (ids: string[]) => ({ deleted: ids.slice(0, 1), refused: ids.slice(1) }),
+    leaveHandoff: async (input: { space?: string }) => ({ id: "handoff-1", where: input.space ? `the space ${input.space}` : "this agent's next session" }),
+    pickUpHandoffs: async () => [{ v: 1 as const, id: "handoff-1", from: "cursor", text: "Finish the parser.", to: null, createdAt: "2026-11-20T00:00:00.000Z", space: null }],
+  };
+
+  async function connectAgent() {
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    await createServer(stub(), undefined, agentStub).connect(a);
+    const client = new Client({ name: "cursor", version: "1.0.0" });
+    await client.connect(b);
+    return client;
+  }
+
+  it("are offered only to an agent key, with forget marked as destructive", async () => {
+    const plain = await connect(stub());
+    expect((await plain.listTools()).tools.map((t) => t.name)).not.toContain("remember");
+    const client = await connectAgent();
+    const { tools } = await client.listTools();
+    expect(tools.map((t) => t.name).sort()).toEqual(
+      ["ask_self", "forget", "get_profile", "leave_handoff", "list_folders", "pick_up_handoffs", "propose_memory", "read_memory", "recall", "remember", "search_memories"].sort(),
+    );
+    expect(tools.find((t) => t.name === "forget")!.annotations).toMatchObject({ destructiveHint: true });
+    expect(tools.find((t) => t.name === "recall")!.annotations).toMatchObject({ readOnlyHint: true });
+    expect(client.getInstructions()).toContain("pick_up_handoffs");
+  });
+
+  it("remembers, recalls, forgets and passes notes", async () => {
+    const client = await connectAgent();
+    expect(textOf(await client.callTool({ name: "remember", arguments: { title: "Parser state", body: "Half done." } }))).toContain("in Cursor memory");
+    const recalled = textOf(await client.callTool({ name: "recall", arguments: { query: "parser" } }));
+    expect(recalled).toContain("Parser state");
+    expect(recalled).toContain("Half done.");
+    expect(textOf(await client.callTool({ name: "forget", arguments: { ids: ["mem-agent-1", "mem-other-2"] } }))).toBe("Forgot 1 memory. Not allowed or not found: mem-other-2.");
+    expect(textOf(await client.callTool({ name: "leave_handoff", arguments: { text: "Next.", space: "Launch" } }))).toBe("Left a note for the space Launch.");
+    expect(textOf(await client.callTool({ name: "pick_up_handoffs", arguments: {} }))).toContain("From cursor");
+  });
+
+  it("formats empty results plainly", () => {
+    expect(formatRecall("x", [])).toBe('Nothing this agent may read matches "x".');
+    expect(formatHandoffs([])).toBe("No handoff notes are waiting.");
   });
 });

@@ -17,10 +17,13 @@ import {
   MailIcon,
   McpIcon,
   PageIcon,
+  PhoneIcon,
+  AgentIcon,
 } from "@/components/icons";
 
 const APP_ICONS: Record<AppKind, typeof ClaudeIcon> = {
   "claude-desktop": ClaudeIcon,
+  "claude-code": ClaudeIcon,
   cursor: CursorIcon,
   chatgpt: ChatGptIcon,
   other: McpIcon,
@@ -42,6 +45,8 @@ const SOURCE_ICONS: Record<SourceKind, typeof ClaudeIcon> = {
   calendar: CalendarIcon,
   github: GitHubIcon,
   notion: PageIcon,
+  capture: PhoneIcon,
+  agent: AgentIcon,
 };
 
 export function AppMark({ kind, className = "" }: { kind?: AppKind; className?: string }) {

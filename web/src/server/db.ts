@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -21,12 +21,14 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS keyslots (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('passkey', 'wallet', 'phrase')),
+  kind TEXT NOT NULL CHECK (kind IN ('passkey', 'wallet', 'phrase', 'device')),
   ref TEXT NOT NULL,
   auth_hash TEXT,
   wrapped_key TEXT NOT NULL,
   created_at TEXT NOT NULL,
   last_used_at TEXT,
+  -- For a device: its name, encrypted under the vault key.
+  note TEXT,
   UNIQUE (kind, ref)
 );
 
@@ -211,6 +213,175 @@ CREATE TABLE IF NOT EXISTS ask_questions (
 );
 CREATE INDEX IF NOT EXISTS ask_questions_by_link ON ask_questions (link_id, answered_at, created_at);
 
+-- Legacy: one plan per vault. owner_box is the legacy key and the plan under
+-- the vault key; check_value tells whether combined shares gave the right key
+-- and says nothing about it. The warning columns record the stages the owner
+-- missed, shown once when they come back.
+CREATE TABLE IF NOT EXISTS legacy_plans (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  epoch INTEGER NOT NULL,
+  threshold INTEGER NOT NULL,
+  period_days INTEGER NOT NULL,
+  check_value TEXT NOT NULL,
+  owner_box TEXT NOT NULL,
+  warned_stage INTEGER NOT NULL DEFAULT 0,
+  warned_at TEXT,
+  missed_stage INTEGER NOT NULL DEFAULT 0,
+  missed_at TEXT,
+  released_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- The trusted people of a plan. share, bundle and note are sealed to
+-- public_key; kept is the person's own copy after release, under their vault
+-- key. invite_* is what an invited vault answered: its key and the tag made
+-- with the secret in the invite link.
+CREATE TABLE IF NOT EXISTS legacy_people (
+  id TEXT PRIMARY KEY,
+  plan_id TEXT NOT NULL REFERENCES legacy_plans(id) ON DELETE CASCADE,
+  owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  public_key TEXT,
+  trustee_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  folder_ids TEXT NOT NULL,
+  self INTEGER NOT NULL DEFAULT 0,
+  share TEXT,
+  bundle TEXT,
+  note TEXT,
+  invite_intro TEXT,
+  invite_key TEXT,
+  invite_tag TEXT,
+  invite_user TEXT REFERENCES users(id) ON DELETE SET NULL,
+  kept TEXT,
+  opened_at TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS legacy_people_by_trustee ON legacy_people (trustee_id);
+
+-- The release room: shares one trusted person passed to another, each sealed
+-- to the receiver's key, and who asked for a release. Cleared when the plan changes.
+CREATE TABLE IF NOT EXISTS legacy_passes (
+  plan_id TEXT NOT NULL REFERENCES legacy_plans(id) ON DELETE CASCADE,
+  epoch INTEGER NOT NULL,
+  from_id TEXT NOT NULL,
+  to_id TEXT NOT NULL,
+  sealed TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (plan_id, epoch, from_id, to_id)
+);
+CREATE TABLE IF NOT EXISTS legacy_requests (
+  plan_id TEXT NOT NULL REFERENCES legacy_plans(id) ON DELETE CASCADE,
+  epoch INTEGER NOT NULL,
+  person_id TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (plan_id, epoch, person_id)
+);
+
+-- Adding a device: the new device's one-time public key, the short code made
+-- from it, a hash of the secret only the new device holds, and the sealed box
+-- the signed-in device sends. Deleted once picked up, or after ten minutes.
+CREATE TABLE IF NOT EXISTS device_pairings (
+  id TEXT PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  public_key TEXT NOT NULL,
+  poll_hash TEXT NOT NULL,
+  sealed TEXT,
+  user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+-- Agents: an app with its own folder, tool rules the server enforces, and the
+-- public half of the key pair derived from its secret (for team spaces).
+CREATE TABLE IF NOT EXISTS agents (
+  app_id TEXT PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  home_folder_id TEXT NOT NULL,
+  may_remember INTEGER NOT NULL DEFAULT 1,
+  may_recall INTEGER NOT NULL DEFAULT 1,
+  may_forget INTEGER NOT NULL DEFAULT 0,
+  may_handoff INTEGER NOT NULL DEFAULT 1,
+  public_key TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+
+-- Handoff notes: encrypted for the agent's next session, or for a team space.
+CREATE TABLE IF NOT EXISTS handoffs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  from_app TEXT NOT NULL,
+  space_id TEXT,
+  sealed TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS handoffs_by_app ON handoffs (from_app, created_at);
+CREATE INDEX IF NOT EXISTS handoffs_by_space ON handoffs (space_id, created_at);
+CREATE TABLE IF NOT EXISTS handoff_picks (
+  handoff_id TEXT NOT NULL REFERENCES handoffs(id) ON DELETE CASCADE,
+  app_id TEXT NOT NULL,
+  picked_at TEXT NOT NULL,
+  PRIMARY KEY (handoff_id, app_id)
+);
+
+-- Team spaces. meta is the name under the space key. Every member, the vault
+-- that made the space included, holds the key sealed to its own public key;
+-- tag is a MAC under the space key that admins check before sealing anything.
+CREATE TABLE IF NOT EXISTS spaces (
+  id TEXT PRIMARY KEY,
+  created_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  meta TEXT NOT NULL,
+  epoch INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS space_members (
+  id TEXT PRIMARY KEY,
+  space_id TEXT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('vault', 'agent')),
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  app_id TEXT REFERENCES apps(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('read', 'write', 'admin')),
+  sealed_key TEXT NOT NULL,
+  tag TEXT NOT NULL,
+  -- What the space calls the member, under the space key.
+  label TEXT NOT NULL,
+  added_by TEXT,
+  created_at TEXT NOT NULL,
+  accepted_at TEXT,
+  UNIQUE (space_id, public_key)
+);
+CREATE INDEX IF NOT EXISTS space_members_by_user ON space_members (user_id);
+CREATE INDEX IF NOT EXISTS space_members_by_app ON space_members (app_id);
+CREATE TABLE IF NOT EXISTS space_memories (
+  id TEXT PRIMARY KEY,
+  space_id TEXT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+  head TEXT NOT NULL,
+  body TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  author TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS space_memories_by_space ON space_memories (space_id, updated_at);
+
+-- Proof of a real life: the vault's Ed25519 public key for presence
+-- statements, and certificates the owner chose to publish by link.
+CREATE TABLE IF NOT EXISTS sign_keys (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS certificates (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  body TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  summary TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
   hour INTEGER PRIMARY KEY,
@@ -240,7 +411,7 @@ CREATE TABLE IF NOT EXISTS read_log (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask')),
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space')),
   memory_id TEXT,
   count INTEGER NOT NULL,
   at TEXT NOT NULL,
@@ -253,27 +424,60 @@ CREATE TABLE IF NOT EXISTS read_log (
 CREATE INDEX IF NOT EXISTS read_log_by_user ON read_log (user_id, at);
 CREATE INDEX IF NOT EXISTS read_log_unsealed ON read_log (sealed, hour);
 CREATE INDEX IF NOT EXISTS read_log_by_app ON read_log (app_id, kind, at);
+CREATE INDEX IF NOT EXISTS read_log_by_kind ON read_log (user_id, kind, hour);
 `;
 
 /** Older versions allowed fewer kinds in the log and had no notes. Rebuild the table, keeping every row. */
 function migrateReadLog(db: Db): void {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes("'ask'")) return;
+  if (!row?.sql || row.sql.includes("'space'")) return;
+  const hasNote = row.sql.includes("note TEXT");
   db.exec("BEGIN IMMEDIATE");
   try {
     db.exec("ALTER TABLE read_log RENAME TO read_log_old");
     db.exec("DROP INDEX IF EXISTS read_log_by_user");
     db.exec("DROP INDEX IF EXISTS read_log_unsealed");
     db.exec("DROP INDEX IF EXISTS read_log_by_app");
+    db.exec("DROP INDEX IF EXISTS read_log_by_kind");
     db.exec(READ_LOG);
-    db.exec(
-      "INSERT INTO read_log (id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed) SELECT id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed FROM read_log_old",
-    );
+    const cols = `id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed${hasNote ? ", note" : ""}`;
+    db.exec(`INSERT INTO read_log (${cols}) SELECT ${cols} FROM read_log_old`);
     db.exec("DROP TABLE read_log_old");
     db.exec("COMMIT");
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;
+  }
+}
+
+/** Key slots for paired devices came later: the kind check gains 'device' and the table a note. Rebuild it, keeping every row. */
+function migrateKeyslots(db: Db): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'keyslots'").get() as { sql?: string } | undefined;
+  if (!row?.sql || row.sql.includes("'device'")) return;
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("ALTER TABLE keyslots RENAME TO keyslots_old");
+    db.exec(`CREATE TABLE keyslots (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('passkey', 'wallet', 'phrase', 'device')),
+  ref TEXT NOT NULL,
+  auth_hash TEXT,
+  wrapped_key TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT,
+  note TEXT,
+  UNIQUE (kind, ref)
+)`);
+    db.exec("INSERT INTO keyslots (id, user_id, kind, ref, auth_hash, wrapped_key, created_at, last_used_at) SELECT id, user_id, kind, ref, auth_hash, wrapped_key, created_at, last_used_at FROM keyslots_old");
+    db.exec("DROP TABLE keyslots_old");
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
   }
 }
 
@@ -293,8 +497,15 @@ export function openDb(file: string): Db {
     db.exec("PRAGMA busy_timeout = 5000;");
   }
   migrateReadLog(db);
+  migrateKeyslots(db);
   db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
   addColumn(db, "memories", "delete_after", "TEXT");
+  // The last sign-in or vault action of the owner: the legacy plan's heartbeat.
+  addColumn(db, "users", "last_active_at", "TEXT");
+  // Which key slot a session was opened with, so revoking a device ends its sessions.
+  addColumn(db, "sessions", "keyslot_id", "TEXT");
+  // Whether an app may write a folder (agents) or only read it.
+  addColumn(db, "grants", "mode", "TEXT NOT NULL DEFAULT 'read'");
   db.exec("CREATE INDEX IF NOT EXISTS memories_to_delete ON memories (delete_after) WHERE delete_after IS NOT NULL;");
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return db;

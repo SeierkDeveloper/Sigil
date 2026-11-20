@@ -384,6 +384,8 @@ export interface SealedPerson {
 }
 
 export interface SealedPlan {
+  /** False while fewer people than the threshold have a known key: no shares exist yet. */
+  complete: boolean;
   epoch: number;
   threshold: number;
   periodDays: number;
@@ -403,11 +405,14 @@ export function cleanPeriod(days: number): number {
  */
 export async function sealLegacyPlan(vaultKey: CryptoKey, input: LegacyPlanInput): Promise<SealedPlan> {
   const periodDays = cleanPeriod(input.periodDays);
-  const ready = input.people.filter((p) => p.publicKey);
-  if (ready.length === 0) throw new Error("Add at least one trusted person whose vault key is known.");
-  if (!Number.isInteger(input.threshold) || input.threshold < 1 || input.threshold > ready.length) {
-    throw new Error(`The number of people needed must be between 1 and ${ready.length}, the trusted people who can receive a share now.`);
+  if (input.people.length === 0) throw new Error("Add at least one trusted person.");
+  if (input.people.length > MAX_TRUSTEES) throw new Error(`A plan has up to ${MAX_TRUSTEES} trusted people.`);
+  if (!Number.isInteger(input.threshold) || input.threshold < 1 || input.threshold > input.people.length) {
+    throw new Error(`The number of people needed must be between 1 and ${input.people.length}.`);
   }
+  const ready = input.people.filter((p) => p.publicKey);
+  // Shares are made only once enough people have a known key. Until then the plan waits for invites.
+  const complete = ready.length >= input.threshold;
   const ids = new Set(input.people.map((p) => p.id));
   if (ids.size !== input.people.length) throw new Error("A trusted person is listed twice.");
   const keys = new Set(ready.map((p) => p.publicKey));
@@ -420,7 +425,7 @@ export async function sealLegacyPlan(vaultKey: CryptoKey, input: LegacyPlanInput
 
   const key = newLegacyKey();
   const check = legacyCheck(key, input.planId, input.epoch);
-  const shares = await splitLegacyKey(key, ready.length, input.threshold);
+  const shares = complete ? await splitLegacyKey(key, ready.length, input.threshold) : [];
   const trustees: LegacyTrustee[] = ready.map((p) => ({ id: p.id, label: p.label, publicKey: p.publicKey! }));
   const owner = input.owner.trim().slice(0, 80) || "The owner";
 
@@ -430,11 +435,6 @@ export async function sealLegacyPlan(vaultKey: CryptoKey, input: LegacyPlanInput
       people.push({ id: p.id, publicKey: null, folderIds: p.folderIds, self: p.self, share: null, bundle: null, note: null });
       continue;
     }
-    const i = ready.indexOf(p);
-    const share = sealLegacyShare({ v: 1, planId: input.planId, epoch: input.epoch, trusteeId: p.id, share: toBase64Url(shares[i]), threshold: input.threshold, trustees, check, owner });
-    const folders = p.folderIds.map((id) => ({ id, key: toBase64Url(byFolder.get(id)!.raw) }));
-    const self = p.self ? { rules: { ...cleanRules(input.rules ?? {}), folderIds: [...p.folderIds] }, model: input.includeModel ? input.model : null } : null;
-    const bundle = await sealLegacyBundle(key, p.publicKey, { v: 1, planId: input.planId, epoch: input.epoch, trusteeId: p.id, owner, ownerKey: input.ownerKey, folders, self });
     const note = sealLegacyNote(p.publicKey, p.id, {
       v: 1,
       planId: input.planId,
@@ -445,8 +445,17 @@ export async function sealLegacyPlan(vaultKey: CryptoKey, input: LegacyPlanInput
       self: p.self,
       periodDays,
       threshold: input.threshold,
-      total: ready.length,
+      total: input.people.length,
     });
+    if (!complete) {
+      people.push({ id: p.id, publicKey: p.publicKey, folderIds: p.folderIds, self: p.self, share: null, bundle: null, note });
+      continue;
+    }
+    const i = ready.indexOf(p);
+    const share = sealLegacyShare({ v: 1, planId: input.planId, epoch: input.epoch, trusteeId: p.id, share: toBase64Url(shares[i]), threshold: input.threshold, trustees, check, owner });
+    const folders = p.folderIds.map((id) => ({ id, key: toBase64Url(byFolder.get(id)!.raw) }));
+    const self = p.self ? { rules: { ...cleanRules(input.rules ?? {}), folderIds: [...p.folderIds] }, model: input.includeModel ? input.model : null } : null;
+    const bundle = await sealLegacyBundle(key, p.publicKey, { v: 1, planId: input.planId, epoch: input.epoch, trusteeId: p.id, owner, ownerKey: input.ownerKey, folders, self });
     people.push({ id: p.id, publicKey: p.publicKey, folderIds: p.folderIds, self: p.self, share, bundle, note });
   }
 
@@ -461,7 +470,7 @@ export async function sealLegacyPlan(vaultKey: CryptoKey, input: LegacyPlanInput
     people: input.people,
   });
   key.fill(0);
-  return { epoch: input.epoch, threshold: input.threshold, periodDays, check, ownerBox, people };
+  return { complete, epoch: input.epoch, threshold: input.threshold, periodDays, check, ownerBox, people };
 }
 
 // ---------------------------------------------------------------- after release

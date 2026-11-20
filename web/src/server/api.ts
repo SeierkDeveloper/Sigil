@@ -6,7 +6,7 @@
 //   a connected app  -> "Authorization: Bearer <app token>", reads and suggestions only, every call logged
 
 import { z } from "zod";
-import { isBoxPublicKey, isEnvelope, isRelayBox, isSealed, isSettingName, randomId } from "@sigil/core";
+import { isBoxPublicKey, isEnvelope, isRelayBox, isSealed, isSettingName, isSigningKey, isSpaceRole, randomId } from "@sigil/core";
 import { getDb, type Db } from "./db";
 import { serverConfig } from "./config";
 import {
@@ -46,7 +46,7 @@ import {
   vaultUsage,
   type AppAuth,
 } from "./store";
-import { appInbox, appInboxStates, approveProposal, createProposal, getBoxKey, listProposals, rejectProposal, setAppInbox, setBoxKey } from "./inbox";
+import { appInbox, appInboxStates, approveProposal, createCapture, createProposal, getBoxKey, listProposals, rejectProposal, setAppInbox, setBoxKey } from "./inbox";
 import { acceptShare, createShare, leaveShare, listIncoming, listOutgoing, rotateFolder } from "./shares";
 import {
   answerQuestion,
@@ -81,8 +81,30 @@ import {
   readJson,
   SESSION_COOKIE,
   sessionCookie,
+  siteOrigin,
 } from "./http";
 import { authenticationOptions, registrationOptions, verifyAuthentication, verifyRegistration } from "./webauthn";
+import {
+  answerInvite,
+  bundleFor,
+  cancelPlan,
+  checkIn,
+  dismissMissed,
+  inviteFor,
+  logLegacyAsk,
+  markActive,
+  markOpened,
+  ownerPlan,
+  passShare,
+  releasedFolders,
+  requestRelease,
+  savePlan,
+  trustedPlans,
+} from "./legacy";
+import { deviceSlot, findPairing, logDeviceStep, openPairing, pairingById, pickUp, revokeDevice, sendToDevice } from "./devices";
+import { agentForget, agentOf, agentProfile, agentRemember, assertTool, createAgent, leaveHandoff, listAgents, ownerHandoffs, pendingHandoffs, pickHandoffs, updateAgent } from "./agents";
+import { acceptSpace, addMember, agentSpaceIds, agentSpaces, createSpace, deleteSpace, deleteSpaceMemories, memberFor, putSpaceMemories, rotateSpace, setRole, vaultSpaces } from "./spaces";
+import { deleteCertificate, getCertificate, listCertificates, MAX_CERT_BYTES, MAX_CERT_HOURS, presenceCounts, presenceProofs, presenceTask, publishCertificate, recordPresence, rootsFor, setSignKey } from "./life";
 
 // ---------------------------------------------------------------- input shapes
 
@@ -125,6 +147,42 @@ const linkShape = z.object({
   perHour: z.number().int().min(1).max(MAX_PER_HOUR),
 });
 const answerShape = z.object({ sealed: relay(64 * 1024), note: sealed(128 * 1024), cited: z.number().int().min(0).max(50) });
+const hexTag = z.string().regex(/^[0-9a-f]{64}$/, "Invalid tag");
+const personShape = z.object({
+  id,
+  publicKey: boxPublicKey.nullable(),
+  folderIds: z.array(id).max(200),
+  self: z.boolean(),
+  share: sealed(4096).nullable(),
+  bundle: sealed(256 * 1024).nullable(),
+  note: sealed(16 * 1024).nullable(),
+  inviteIntro: envelope(2048).nullable(),
+});
+const planShape = z.object({
+  id,
+  epoch: z.number().int().min(1).max(1_000_000),
+  threshold: z.number().int().min(1).max(12),
+  periodDays: z.number().int().min(30).max(730),
+  check: hexTag,
+  ownerBox: envelope(64 * 1024),
+  people: z.array(personShape).min(1).max(12),
+});
+const modeGrant = z.object({ folderId: id, wrappedKey: envelope(256), mode: z.enum(["read", "write"]).optional() });
+const agentRulesShape = z.object({ remember: z.boolean(), recall: z.boolean(), forget: z.boolean(), handoff: z.boolean() });
+const signKey = z.string().refine(isSigningKey, "Expected a signing key");
+const spaceRole = z.string().refine(isSpaceRole, "Expected read, write or admin");
+const memberShape = z.object({
+  id,
+  kind: z.enum(["vault", "agent"]),
+  publicKey: boxPublicKey,
+  role: spaceRole,
+  sealedKey: sealed(1024),
+  tag: hexTag,
+  label: envelope(1024),
+  appId: id.nullable().optional(),
+});
+const spaceMemoryShape = z.object({ id, folderId: id, head: envelope(64_000), body: envelope(3_000_000) });
+const pairingCodeShape = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/, "Invalid code");
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
@@ -152,6 +210,8 @@ function userOf(ctx: Ctx): string {
   const userId = sessionUser(ctx.db, getCookie(ctx.req, SESSION_COOKIE));
   if (!userId) throw new HttpError(401, "Please sign in to your vault.", "signed_out");
   if (ctx.method !== "GET") assertSameOrigin(ctx.req);
+  // Any vault action counts as alive for the owner's legacy plan.
+  markActive(ctx.db, userId);
   return userId;
 }
 
@@ -165,8 +225,9 @@ function appOf(ctx: Ctx): AppAuth {
   return auth;
 }
 
-function signedIn(ctx: Ctx, userId: string, body: Record<string, unknown>): Response {
-  const sessionToken = createSession(ctx.db, userId);
+function signedIn(ctx: Ctx, userId: string, body: Record<string, unknown>, keyslotId: string | null = null): Response {
+  markActive(ctx.db, userId);
+  const sessionToken = createSession(ctx.db, userId, keyslotId);
   return json({ userId, ...body }, 200, { "set-cookie": sessionCookie(ctx.req, sessionToken, serverConfig.sessionDays * 86400) });
 }
 
@@ -214,7 +275,27 @@ route("GET", "seals", (ctx) => {
   sealPending(ctx.db);
   const limit = Math.min(Math.max(Number(ctx.url.searchParams.get("limit")) || 24, 1), 200);
   const anchor = anchorStatus();
-  return json({ mode: anchor.mode, periodSeconds: serverConfig.sealSeconds, seals: listSeals(ctx.db, limit) });
+  return json({ mode: anchor.mode, periodSeconds: serverConfig.sealSeconds, chain: chainInfo(), seals: listSeals(ctx.db, limit) });
+});
+
+/** Where a browser can read the anchored roots itself: only when anchoring is on and a public read address is set. */
+function chainInfo(): { contract: string; rpcUrl: string } | null {
+  const a = anchorStatus();
+  return a.mode === "anchored" && serverConfig.chainReadRpc ? { contract: a.contract, rpcUrl: serverConfig.chainReadRpc } : null;
+}
+
+// Published roots for many hours at once, for checking a life certificate.
+route("POST", "seals/roots", async (ctx) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  sealPending(ctx.db);
+  const body = parse(z.object({ hours: z.array(z.number().int().min(0).max(1e12)).max(MAX_CERT_HOURS) }), await readJson(ctx.req, 512 * KB));
+  return json({ roots: rootsFor(ctx.db, body.hours) });
+});
+
+// A published life certificate, by its link. Anyone with the link may read it; it holds no content.
+route("GET", "certificates/:id", (ctx, [certId]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  return new Response(getCertificate(ctx.db, certId), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 });
 
 const sealHour = (value: string) => {
@@ -335,6 +416,19 @@ route("POST", "auth/phrase/login", async (ctx) => {
   return signedIn(ctx, slot.userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } });
 });
 
+// ---- a paired device: its own secret gives the token and the key that wraps the vault key
+
+route("POST", "auth/device/login", async (ctx) => {
+  authLimit(ctx);
+  assertSameOrigin(ctx.req);
+  const body = parse(z.object({ deviceId: id, authToken: token }), await readJson(ctx.req, 8 * KB));
+  const before = deviceSlot(ctx.db, body.deviceId);
+  const slot = keyslotByToken(ctx.db, "device", body.deviceId, body.authToken);
+  if (!slot) throw new HttpError(404, "This device was removed from the vault. Add it again from a signed-in device.", "unknown_device");
+  if (before && !before.lastUsedAt) logDeviceStep(ctx.db, slot.userId, `signed-in-${body.deviceId}`);
+  return signedIn(ctx, slot.userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } }, slot.id);
+});
+
 // ---- sign-in methods on an open vault
 
 route("GET", "keyslots", (ctx) => json({ keyslots: listKeyslots(ctx.db, userOf(ctx)) }));
@@ -391,7 +485,24 @@ route("GET", "vault", (ctx) => {
     box: getBoxKey(ctx.db, userId),
     proposals: listProposals(ctx.db, userId),
     shares: { outgoing: listOutgoing(ctx.db, userId), incoming: listIncoming(ctx.db, userId) },
+    legacy: ownerPlan(ctx.db, userId),
+    trusted: trustedPlans(ctx.db, userId),
+    agents: listAgents(ctx.db, userId),
+    spaces: vaultSpaces(ctx.db, userId),
+    signKey: getSignKeyFor(ctx.db, userId),
+    presence: presenceCounts(ctx.db, userId),
+    certificates: listCertificates(ctx.db, userId),
   });
+});
+
+function getSignKeyFor(db: Db, userId: string): string | null {
+  return presenceTask(db, userId, "").signingKey;
+}
+
+route("POST", "vault/sign-key", async (ctx) => {
+  const userId = userOf(ctx);
+  setSignKey(ctx.db, userId, parse(z.object({ publicKey: signKey }), await readJson(ctx.req, 4 * KB)).publicKey);
+  return json({ ok: true }, 201);
 });
 
 // A vault made before vault public keys existed gets one the first time it is opened.
@@ -628,13 +739,17 @@ route("DELETE", "account", (ctx) => {
 
 route("GET", "connector/v1/folders", (ctx) => {
   const auth = appOf(ctx);
-  const folders = appFolders(ctx.db, auth);
+  // An agent that may remember but not recall still gets the folders it may write: it needs their keys to write.
+  const agent = agentOf(ctx.db, auth.appId);
+  if (agent && !agent.rules.recall && !agent.rules.remember) assertTool(ctx.db, auth, "recall");
+  const folders = appFolders(ctx.db, auth).filter((f) => !agent || agent.rules.recall || f.mode === "write");
   logRead(ctx.db, auth, "folders", null, folders.length);
   return json({ appId: auth.appId, folders });
 });
 
 route("GET", "connector/v1/index", (ctx) => {
   const auth = appOf(ctx);
+  assertTool(ctx.db, auth, "recall");
   const folders = appFolders(ctx.db, auth);
   const memories = appIndex(ctx.db, auth);
   logRead(ctx.db, auth, "index", null, memories.length);
@@ -643,6 +758,7 @@ route("GET", "connector/v1/index", (ctx) => {
 
 route("POST", "connector/v1/read", async (ctx) => {
   const auth = appOf(ctx);
+  assertTool(ctx.db, auth, "recall");
   const body = parse(z.object({ ids: z.array(id).min(1).max(20) }), await readJson(ctx.req, 16 * KB));
   const unique = [...new Set(body.ids)];
   const { found, missing } = appRead(ctx.db, auth, unique);
@@ -689,6 +805,303 @@ route("POST", "connector/v1/self/asked", async (ctx) => {
   const body = parse(z.object({ id, note: sealed(128 * KB), cited: z.number().int().min(0).max(50) }), await readJson(ctx.req, 160 * KB));
   logSelfAnswer(ctx.db, auth, body.id, body.note, body.cited);
   return json({ ok: true }, 201);
+});
+
+// ---- legacy: the owner's plan
+
+route("PUT", "legacy", async (ctx) => {
+  const userId = userOf(ctx);
+  savePlan(ctx.db, userId, parse(planShape, await readJson(ctx.req, 4 * MB)));
+  return json(ownerPlan(ctx.db, userId));
+});
+
+route("DELETE", "legacy", (ctx) => {
+  cancelPlan(ctx.db, userOf(ctx));
+  return json({ ok: true });
+});
+
+route("POST", "legacy/check-in", (ctx) => {
+  const userId = userOf(ctx);
+  checkIn(ctx.db, userId);
+  return json(ownerPlan(ctx.db, userId));
+});
+
+route("POST", "legacy/dismiss", (ctx) => {
+  dismissMissed(ctx.db, userOf(ctx));
+  return json({ ok: true });
+});
+
+// ---- legacy: invites and trusted people
+
+route("GET", "legacy/invites/:id", (ctx, [personId]) => {
+  userOf(ctx);
+  return json(inviteFor(ctx.db, personId));
+});
+
+route("POST", "legacy/invites/:id", async (ctx, [personId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ publicKey: boxPublicKey, tag: hexTag }), await readJson(ctx.req, 4 * KB));
+  answerInvite(ctx.db, userId, personId, body.publicKey, body.tag);
+  return json({ ok: true });
+});
+
+route("GET", "legacy/trusted", (ctx) => json({ plans: trustedPlans(ctx.db, userOf(ctx)) }));
+
+route("POST", "legacy/plans/:id/request", (ctx, [planId]) => {
+  requestRelease(ctx.db, userOf(ctx), planId);
+  return json({ ok: true });
+});
+
+route("POST", "legacy/plans/:id/pass", async (ctx, [planId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ to: id, sealed: sealed(4096) }), await readJson(ctx.req, 16 * KB));
+  passShare(ctx.db, userId, planId, body.to, body.sealed);
+  return json({ ok: true });
+});
+
+route("GET", "legacy/plans/:id/bundle", (ctx, [planId]) => json(bundleFor(ctx.db, userOf(ctx), planId)));
+
+route("POST", "legacy/plans/:id/opened", async (ctx, [planId]) => {
+  const userId = userOf(ctx);
+  markOpened(ctx.db, userId, planId, parse(z.object({ kept: envelope(512 * KB) }), await readJson(ctx.req, 600 * KB)).kept);
+  return json({ ok: true });
+});
+
+route("GET", "legacy/plans/:id/folders", (ctx, [planId]) => json(releasedFolders(ctx.db, userOf(ctx), planId)));
+
+route("POST", "legacy/plans/:id/asked", async (ctx, [planId]) => {
+  const userId = userOf(ctx);
+  rateLimit(`legacy-ask:${userId}`, 30, 60_000);
+  const body = parse(z.object({ id, note: sealed(128 * KB), cited: z.number().int().min(0).max(50) }), await readJson(ctx.req, 160 * KB));
+  logLegacyAsk(ctx.db, userId, planId, body.id, body.note, body.cited);
+  return json({ ok: true }, 201);
+});
+
+// ---- devices: the new device opens a pairing and picks up its sealed keys; the signed-in device sends them
+
+route("POST", "devices/pairings", async (ctx) => {
+  rateLimit(`pair:${clientIp(ctx.req)}`, 20, 60_000);
+  const body = parse(z.object({ id, publicKey: boxPublicKey, code: pairingCodeShape, pollSecret: token }), await readJson(ctx.req, 4 * KB));
+  return json(openPairing(ctx.db, body), 201);
+});
+
+route("POST", "devices/pairings/:id/poll", async (ctx, [pairingId]) => {
+  rateLimit(`pair-poll:${clientIp(ctx.req)}`, 120, 60_000);
+  const body = parse(z.object({ pollSecret: token }), await readJson(ctx.req, 4 * KB));
+  return json(pickUp(ctx.db, pairingId, body.pollSecret));
+});
+
+route("GET", "devices/pairings", (ctx) => {
+  userOf(ctx);
+  rateLimit(`pair-find:${clientIp(ctx.req)}`, 30, 60_000);
+  return json(findPairing(ctx.db, parse(pairingCodeShape, ctx.url.searchParams.get("code") ?? "")));
+});
+
+route("GET", "devices/pairings/:id", (ctx, [pairingId]) => {
+  userOf(ctx);
+  return json(pairingById(ctx.db, pairingId));
+});
+
+route("POST", "devices/pairings/:id/send", async (ctx, [pairingId]) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({ sealed: sealed(4096), deviceId: id, authToken: token, wrappedKey: envelope(256), note: envelope(1024) }),
+    await readJson(ctx.req, 16 * KB),
+  );
+  sendToDevice(ctx.db, userId, pairingId, body.sealed, { kind: "device", ref: body.deviceId, authToken: body.authToken, wrappedKey: body.wrappedKey, note: body.note });
+  return json({ keyslots: listKeyslots(ctx.db, userId) });
+});
+
+route("DELETE", "devices/:id", (ctx, [keyslotId]) => {
+  const userId = userOf(ctx);
+  revokeDevice(ctx.db, userId, keyslotId);
+  return json({ keyslots: listKeyslots(ctx.db, userId) });
+});
+
+// ---- quick capture: sealed on the phone to the vault public key, into the inbox, without opening the vault
+
+route("GET", "capture/key", (ctx) => {
+  const userId = userOf(ctx);
+  const key = getBoxKey(ctx.db, userId);
+  if (!key) throw new HttpError(409, "Open your vault once on this device first.", "no_box");
+  return json({ publicKey: key.publicKey });
+});
+
+route("POST", "capture", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`capture:${userId}`, 30, 60_000);
+  const body = parse(z.object({ id, sealed: sealed(3 * MB) }), await readJson(ctx.req, 4 * MB));
+  return json(createCapture(ctx.db, userId, body.id, body.sealed), 201);
+});
+
+// ---- agents
+
+route("POST", "agents", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({
+      app: z.object({ id, meta: envelope(4096), secret: envelope(256), tokenHash: z.string().regex(/^[0-9a-f]{64}$/), grants: z.array(modeGrant).min(1).max(200) }),
+      folder: folderShape,
+      rules: agentRulesShape,
+      publicKey: boxPublicKey,
+    }),
+    await readJson(ctx.req, 64 * KB),
+  );
+  createAgent(ctx.db, userId, body);
+  return json({ ok: true }, 201);
+});
+
+route("PUT", "agents/:id", async (ctx, [appId]) => {
+  const userId = userOf(ctx);
+  updateAgent(ctx.db, userId, appId, parse(z.object({ rules: agentRulesShape, grants: z.array(modeGrant).min(1).max(200) }), await readJson(ctx.req, 64 * KB)));
+  return json({ ok: true });
+});
+
+route("GET", "agents/:id/handoffs", (ctx, [appId]) => json({ handoffs: ownerHandoffs(ctx.db, userOf(ctx), appId) }));
+
+// ---- team spaces
+
+route("POST", "spaces", async (ctx) => {
+  const userId = userOf(ctx);
+  createSpace(ctx.db, userId, parse(z.object({ id, meta: envelope(4096), member: memberShape }), await readJson(ctx.req, 16 * KB)));
+  return json({ ok: true }, 201);
+});
+
+route("POST", "spaces/:id/members", async (ctx, [spaceId]) => {
+  const userId = userOf(ctx);
+  addMember(ctx.db, userId, spaceId, parse(memberShape, await readJson(ctx.req, 16 * KB)));
+  return json({ ok: true }, 201);
+});
+
+route("POST", "spaces/:id/accept", (ctx, [spaceId]) => {
+  acceptSpace(ctx.db, userOf(ctx), spaceId);
+  return json({ ok: true });
+});
+
+route("PUT", "spaces/:id/members/:mid/role", async (ctx, [spaceId, memberId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ role: spaceRole, tag: hexTag }), await readJson(ctx.req, 4 * KB));
+  setRole(ctx.db, userId, spaceId, memberId, body.role as "read" | "write" | "admin", body.tag);
+  return json({ ok: true });
+});
+
+route("POST", "spaces/:id/rotate", async (ctx, [spaceId]) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({
+      epoch: z.number().int().min(2),
+      meta: envelope(4096),
+      memories: z.array(spaceMemoryShape).max(5000),
+      members: z.array(z.object({ id, sealedKey: sealed(1024), tag: hexTag, label: envelope(1024) })).max(50),
+      remove: z.array(id).min(1).max(50),
+    }),
+    await readJson(ctx.req, 64 * MB),
+  );
+  rotateSpace(ctx.db, userId, spaceId, body);
+  return json({ ok: true });
+});
+
+route("DELETE", "spaces/:id", (ctx, [spaceId]) => {
+  deleteSpace(ctx.db, userOf(ctx), spaceId);
+  return json({ ok: true });
+});
+
+route("PUT", "spaces/:id/memories", async (ctx, [spaceId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ memories: z.array(spaceMemoryShape).min(1).max(200) }), await readJson(ctx.req, 24 * MB));
+  return json({ saved: putSpaceMemories(ctx.db, { kind: "vault", userId }, spaceId, body.memories) });
+});
+
+route("POST", "spaces/:id/memories/delete", async (ctx, [spaceId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ ids: z.array(id).min(1).max(1000) }), await readJson(ctx.req, 128 * KB));
+  return json({ deleted: deleteSpaceMemories(ctx.db, { kind: "vault", userId }, spaceId, body.ids) });
+});
+
+// ---- proof of a real life
+
+route("GET", "presence", (ctx) => json(presenceTask(ctx.db, userOf(ctx), siteOrigin(ctx.req))));
+
+route("POST", "presence", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`presence:${userId}`, 20, 60_000);
+  const body = parse(z.object({ hour: z.number().int().min(0), sig: z.string().regex(/^[A-Za-z0-9_-]{86}$/) }), await readJson(ctx.req, 4 * KB));
+  return json(recordPresence(ctx.db, userId, siteOrigin(ctx.req), body.hour, body.sig));
+});
+
+route("GET", "proof/presence", (ctx) => {
+  const userId = userOf(ctx);
+  return json({ origin: siteOrigin(ctx.req), periodSeconds: serverConfig.sealSeconds, hours: presenceProofs(ctx.db, userId) });
+});
+
+route("POST", "certificates", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ id, certificate: z.string().max(MAX_CERT_BYTES) }), await readJson(ctx.req, MAX_CERT_BYTES + 4 * KB));
+  return json(publishCertificate(ctx.db, userId, body.id, body.certificate), 201);
+});
+
+route("DELETE", "certificates/:id", (ctx, [certId]) => {
+  deleteCertificate(ctx.db, userOf(ctx), certId);
+  return json({ ok: true });
+});
+
+// ---- agents through the connector: their own memory, handoff notes and team spaces
+
+route("GET", "connector/v1/agent", (ctx) => {
+  const auth = appOf(ctx);
+  return json(agentProfile(ctx.db, auth));
+});
+
+route("POST", "connector/v1/remember", async (ctx) => {
+  const auth = appOf(ctx);
+  const body = parse(z.object({ memories: z.array(z.object({ id, folderId: id, head: envelope(64_000), body: envelope(3_000_000) })).min(1).max(20) }), await readJson(ctx.req, 8 * MB));
+  return json({ appId: auth.appId, saved: agentRemember(ctx.db, auth, body.memories) }, 201);
+});
+
+route("POST", "connector/v1/forget", async (ctx) => {
+  const auth = appOf(ctx);
+  const body = parse(z.object({ ids: z.array(id).min(1).max(50) }), await readJson(ctx.req, 16 * KB));
+  return json({ appId: auth.appId, ...agentForget(ctx.db, auth, body.ids) });
+});
+
+route("GET", "connector/v1/handoffs", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, handoffs: pendingHandoffs(ctx.db, auth, agentSpaceIds(ctx.db, auth.appId)) });
+});
+
+route("POST", "connector/v1/handoffs", async (ctx) => {
+  const auth = appOf(ctx);
+  rateLimit(`handoff:${auth.appId}`, 30, 60_000);
+  const body = parse(z.object({ id, sealed: envelope(64 * KB), spaceId: id.nullable().optional() }), await readJson(ctx.req, 80 * KB));
+  leaveHandoff(ctx.db, auth, { id: body.id, sealed: body.sealed, spaceId: body.spaceId ?? null }, (spaceId) => !!memberFor(ctx.db, spaceId, { kind: "agent", auth }));
+  return json({ appId: auth.appId, id: body.id }, 201);
+});
+
+route("POST", "connector/v1/handoffs/picked", async (ctx) => {
+  const auth = appOf(ctx);
+  assertTool(ctx.db, auth, "handoff");
+  pickHandoffs(ctx.db, auth, parse(z.object({ ids: z.array(id).min(1).max(100) }), await readJson(ctx.req, 16 * KB)).ids);
+  return json({ ok: true });
+});
+
+route("GET", "connector/v1/spaces", (ctx) => {
+  const auth = appOf(ctx);
+  assertTool(ctx.db, auth, "recall");
+  return json({ appId: auth.appId, spaces: agentSpaces(ctx.db, auth) });
+});
+
+route("POST", "connector/v1/spaces/:id/memories", async (ctx, [spaceId]) => {
+  const auth = appOf(ctx);
+  assertTool(ctx.db, auth, "remember");
+  const body = parse(z.object({ memories: z.array(spaceMemoryShape).min(1).max(20) }), await readJson(ctx.req, 8 * MB));
+  return json({ appId: auth.appId, saved: putSpaceMemories(ctx.db, { kind: "agent", auth }, spaceId, body.memories) }, 201);
+});
+
+route("POST", "connector/v1/spaces/:id/forget", async (ctx, [spaceId]) => {
+  const auth = appOf(ctx);
+  assertTool(ctx.db, auth, "forget");
+  const body = parse(z.object({ ids: z.array(id).min(1).max(50) }), await readJson(ctx.req, 16 * KB));
+  return json({ appId: auth.appId, deleted: deleteSpaceMemories(ctx.db, { kind: "agent", auth }, spaceId, body.ids) });
 });
 
 // ---------------------------------------------------------------- dispatch

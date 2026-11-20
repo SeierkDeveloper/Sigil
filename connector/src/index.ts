@@ -25,6 +25,7 @@ import { embedSettings, loadEmbedder } from "./embed";
 import { CONNECTOR_VERSION, createServer } from "./server";
 import { SelfAgent } from "./self";
 import { ObsidianWatcher } from "./watch";
+import { AgentMemory } from "./agent";
 
 function fail(message: string): never {
   process.stderr.write(`sigil-connector: ${message}\n`);
@@ -133,8 +134,22 @@ async function main() {
     return;
   }
 
+  // An agent key gets its own memory tools as well. A key that is not an agent's works as before.
+  let isAgent = false;
+  try {
+    isAgent = !!(await AgentMemory.detect(reader));
+  } catch (err) {
+    process.stderr.write(`sigil-connector: could not check whether this key is an agent's: ${(err as Error).message}\n`);
+  }
+  const serve = () => {
+    const agent = isAgent ? new AgentMemory(reader) : undefined;
+    const server = createServer(reader, self, agent);
+    if (agent) agent.name = () => server.server.getClientVersion()?.name?.slice(0, 80) || "An agent";
+    return server;
+  };
+
   if (!process.argv.includes("--http")) {
-    const server = createServer(reader, self);
+    const server = serve();
     await server.connect(new StdioServerTransport());
     process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} ready (stdio)\n`);
     return;
@@ -154,7 +169,7 @@ async function main() {
     }
     try {
       // Stateless: a fresh server and transport per request, nothing kept in memory.
-      const server = createServer(reader, self);
+      const server = serve();
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       res.on("close", () => {
         void transport.close();

@@ -305,3 +305,56 @@ export const PageIcon = (p: IconProps) => (
     <path d="M14.5 3.5V8H19M9 12h7M9 15.5h5" />
   </Line>
 );
+
+export const PhoneIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="6.5" y="2.5" width="11" height="19" rx="2.5" />
+    <path d="M10.5 18.5h3" />
+  </Line>
+);
+
+export const CameraIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M3.5 8.5a2 2 0 0 1 2-2h2l1.5-2h6l1.5 2h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+    <circle cx="12" cy="13" r="3.5" />
+  </Line>
+);
+
+export const AgentIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="4.5" y="7.5" width="15" height="11" rx="3" />
+    <path d="M12 7.5v-3M9.5 12.5v1M14.5 12.5v1M2.5 12v2M21.5 12v2" />
+  </Line>
+);
+
+export const TeamIcon = (p: IconProps) => (
+  <Line {...p}>
+    <circle cx="9" cy="8.5" r="3" />
+    <circle cx="16.5" cy="9.5" r="2.5" />
+    <path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 14.2a4.5 4.5 0 0 1 6.5 4.3" />
+  </Line>
+);
+
+export const HourglassIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M6.5 3.5h11M6.5 20.5h11M7.5 3.5c0 4.5 4.5 5.5 4.5 8.5s-4.5 4-4.5 8.5M16.5 3.5c0 4.5-4.5 5.5-4.5 8.5s4.5 4 4.5 8.5" />
+  </Line>
+);
+
+export const CertificateIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="4.5" width="17" height="12" rx="1.5" />
+    <path d="M7 8.5h10M7 11.5h6" />
+    <circle cx="16" cy="17.5" r="2.5" />
+    <path d="m14.8 19.7-.8 2.3 2-1 2 1-.8-2.3" />
+  </Line>
+);
+
+export const QrIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1" />
+    <rect x="14" y="3.5" width="6.5" height="6.5" rx="1" />
+    <rect x="3.5" y="14" width="6.5" height="6.5" rx="1" />
+    <path d="M14 14h2.5v2.5M20.5 14v6.5h-3M14 18.5v2" />
+  </Line>
+);
