@@ -230,3 +230,50 @@ export const BookIcon = (p: IconProps) => (
     <path d="M5 16.5a3 3 0 0 1 3-3h10.5M9 8.5h5.5" />
   </Line>
 );
+
+export const InboxIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M3.5 13.5 6 5.5h12l2.5 8v4a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+    <path d="M3.5 13.5h5l1.5 2.5h4l1.5-2.5h5" />
+  </Line>
+);
+
+export const ShareIcon = (p: IconProps) => (
+  <Line {...p}>
+    <circle cx="6.5" cy="12" r="2.5" />
+    <circle cx="17.5" cy="6" r="2.5" />
+    <circle cx="17.5" cy="18" r="2.5" />
+    <path d="m8.7 10.8 6.6-3.6M8.7 13.2l6.6 3.6" />
+  </Line>
+);
+
+export const CardIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="1.5" />
+    <circle cx="9" cy="11" r="2" />
+    <path d="M6 15.5c.6-1.4 1.7-2 3-2s2.4.6 3 2M14 10h3.5M14 13h3.5" />
+  </Line>
+);
+
+export const TimelineIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M6 4v16" />
+    <circle cx="6" cy="7" r="1.5" />
+    <circle cx="6" cy="12" r="1.5" />
+    <circle cx="6" cy="17" r="1.5" />
+    <path d="M10 7h9M10 12h7M10 17h9" />
+  </Line>
+);
+
+export const ExtensionIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M9 4.5a2 2 0 0 1 4 0v1.5h4a1.5 1.5 0 0 1 1.5 1.5v3.5H17a2 2 0 0 0 0 4h1.5v3.5A1.5 1.5 0 0 1 17 20H7a1.5 1.5 0 0 1-1.5-1.5V15H7a2 2 0 0 0 0-4H5.5V7.5A1.5 1.5 0 0 1 7 6h2Z" />
+  </Line>
+);
+
+export const GlobeIcon = (p: IconProps) => (
+  <Line {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5Z" />
+  </Line>
+);

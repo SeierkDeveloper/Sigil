@@ -4,9 +4,12 @@ const isProd = process.env.NODE_ENV === "production";
 
 // The page may only talk to its own server. No third-party scripts, styles,
 // fonts or frames. Next.js needs inline scripts for hydration; dev mode also needs eval.
+// 'wasm-unsafe-eval' lets the vault run the search model (WebAssembly) it loads
+// from this same site; it does not allow eval of JavaScript.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isProd ? "" : " 'unsafe-eval'"}`,
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? "" : " 'unsafe-eval'"}`,
+  "worker-src 'self'",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",

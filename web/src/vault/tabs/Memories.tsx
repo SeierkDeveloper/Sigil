@@ -1,36 +1,83 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { search, type Memory } from "@sigil/core";
+import { hybridSearch, sourceLabel, type MatchKind, type Memory } from "@sigil/core";
 import { PlusIcon, SearchIcon, ImportIcon } from "@/components/icons";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
+import type { SemanticStatus } from "../semantic";
 import { Empty, Notice } from "../ui";
+import { Duplicates } from "./Duplicates";
 
 const PAGE = 50;
 
-const SOURCE_LABEL: Record<string, string> = { note: "Written in Sigil", chatgpt: "Imported from ChatGPT", claude: "Imported from Claude" };
+/** A memory as the list shows it: one of yours, or one from a folder shared with you (read only). */
+export interface ListedMemory extends Memory {
+  sharedFrom?: string;
+}
+
+function semanticLine(s: SemanticStatus): string {
+  switch (s.state) {
+    case "off":
+      return "Search by words.";
+    case "loading":
+      return "Starting search by meaning on this device.";
+    case "indexing":
+      return `Search by meaning is reading your memories on this device: ${s.done} of ${s.total}.`;
+    case "ready":
+      return "Search by words and by meaning, on this device.";
+    case "failed":
+      return "Search by words. Search by meaning is not available here.";
+  }
+}
 
 export function MemoriesTab() {
-  const { data, goTo } = useVault();
+  const { data, goTo, focus, semantic } = useVault();
   const [query, setQuery] = useState("");
   const [folder, setFolder] = useState("all");
-  const [selected, setSelected] = useState<string | "new" | null>(null);
+  const [selected, setSelected] = useState<string | "new" | null>(focus);
   const [shown, setShown] = useState(PAGE);
+  const [tidy, setTidy] = useState(false);
+  const [queryVector, setQueryVector] = useState<{ query: string; vector: Float32Array | null } | null>(null);
 
-  const folderName = useMemo(() => new Map(data.folders.map((f) => [f.id, f.name])), [data.folders]);
+  // Embed the query on this device once typing pauses.
+  const { embedQuery } = semantic;
+  useEffect(() => {
+    const q = query.trim();
+    if (!q) return;
+    let alive = true;
+    const t = window.setTimeout(() => {
+      void embedQuery(q).then((vector) => alive && setQueryVector({ query: q, vector }));
+    }, 180);
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+  }, [query, embedQuery]);
+
+  const shared = useMemo<ListedMemory[]>(
+    () => data.shares.incoming.filter((s) => s.acceptedAt && s.folder).flatMap((s) => s.memories.map((m) => ({ ...m, sharedFrom: s.from || "another vault" }))),
+    [data.shares.incoming],
+  );
+  const folderName = useMemo(
+    () => new Map([...data.folders.map((f) => [f.id, f.name] as const), ...data.shares.incoming.filter((s) => s.folder).map((s) => [s.folderId, s.folder!.name] as const)]),
+    [data.folders, data.shares.incoming],
+  );
+  const all = useMemo<ListedMemory[]>(() => [...data.memories, ...shared], [data.memories, shared]);
   const results = useMemo(() => {
-    const pool = folder === "all" ? data.memories : data.memories.filter((m) => m.folderId === folder);
-    return search(
+    const pool = folder === "all" ? all : all.filter((m) => m.folderId === folder);
+    const vector = queryVector && queryVector.query === query.trim() ? queryVector.vector : null;
+    return hybridSearch(
       pool.map((m) => ({ ...m, text: m.body })),
       query,
-    ).map((h) => h.item);
-  }, [data.memories, folder, query]);
+      { queryVector: vector, vectors: semantic.vectors },
+    );
+  }, [all, folder, query, queryVector, semantic.vectors]);
 
-  const current = selected && selected !== "new" ? data.memories.find((m) => m.id === selected) ?? null : null;
+  const current = selected && selected !== "new" ? all.find((m) => m.id === selected) ?? null : null;
 
-  if (data.memories.length === 0 && selected !== "new") {
+  if (all.length === 0 && selected !== "new") {
     return (
       <Empty
         icon={<ImportIcon />}
@@ -63,7 +110,7 @@ export function MemoriesTab() {
             id="memory-search"
             className="input"
             type="search"
-            placeholder="Search titles, tags and text"
+            placeholder="Search by words or by meaning"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -89,11 +136,26 @@ export function MemoriesTab() {
               {f.name}
             </option>
           ))}
+          {data.shares.incoming
+            .filter((s) => s.acceptedAt && s.folder)
+            .map((s) => (
+              <option key={s.id} value={s.folderId}>
+                Shared: {s.folder!.name}
+              </option>
+            ))}
         </select>
+        <button type="button" className="button" onClick={() => setTidy((t) => !t)} aria-expanded={tidy}>
+          {tidy ? "Hide duplicates" : "Find duplicates"}
+        </button>
         <button type="button" className="button button-primary" onClick={() => setSelected("new")}>
           <PlusIcon /> New memory
         </button>
       </div>
+      <p className="small faint search-mode" data-state={semantic.status.state}>
+        {semanticLine(semantic.status)}
+      </p>
+
+      {tidy ? <Duplicates onOpen={(id) => setSelected(id)} /> : null}
 
       <div className="memory-layout">
         <div>
@@ -102,16 +164,24 @@ export function MemoriesTab() {
           ) : (
             <>
               <p className="small faint" aria-live="polite">
-                {query.trim() ? `${results.length} found` : `${results.length} ${results.length === 1 ? "memory" : "memories"}, newest first`}
+                {query.trim() ? `${results.length} found` : `${plural(results.length, "memory", "memories")}, newest first`}
               </p>
               <ul className="memory-list">
-                {results.slice(0, shown).map((m) => (
+                {results.slice(0, shown).map(({ item: m, match }) => (
                   <li key={m.id}>
-                    <button type="button" className="memory-item" aria-current={selected === m.id ? "true" : undefined} onClick={() => setSelected(m.id)}>
+                    <button
+                      type="button"
+                      className="memory-item"
+                      data-match={query.trim() ? match : undefined}
+                      aria-current={selected === m.id ? "true" : undefined}
+                      onClick={() => setSelected(m.id)}
+                    >
                       <span className="memory-item-title">{m.title}</span>
                       <span className="memory-item-meta">
                         <span>{folderName.get(m.folderId)}</span>
                         <span>{formatDate(m.editedAt)}</span>
+                        {m.sharedFrom ? <span className="chip">Shared by {m.sharedFrom}</span> : null}
+                        {query.trim() && match !== "words" ? <span className="chip chip-strong">{matchLabel(match)}</span> : null}
                         {m.tags.slice(0, 3).map((t) => (
                           <span key={t} className="chip">
                             {t}
@@ -135,7 +205,14 @@ export function MemoriesTab() {
         </div>
         <div>
           {selected === "new" ? (
-            <Editor key="new" memory={null} defaultFolder={folder !== "all" ? folder : data.folders[0]?.id} onClose={(id) => setSelected(id ?? null)} />
+            <Editor
+              key="new"
+              memory={null}
+              defaultFolder={folder !== "all" && data.folders.some((f) => f.id === folder) ? folder : data.folders[0]?.id}
+              onClose={(id) => setSelected(id ?? null)}
+            />
+          ) : current?.sharedFrom ? (
+            <SharedView key={current.id} memory={current} folder={folderName.get(current.folderId) ?? ""} onClose={() => setSelected(null)} />
           ) : current ? (
             <Editor key={current.id} memory={current} defaultFolder={current.folderId} onClose={(id) => setSelected(id ?? null)} />
           ) : (
@@ -149,8 +226,38 @@ export function MemoriesTab() {
   );
 }
 
+function matchLabel(match: MatchKind): string {
+  return match === "meaning" ? "By meaning" : "Words and meaning";
+}
+
+function SharedView({ memory, folder, onClose }: { memory: ListedMemory; folder: string; onClose(): void }) {
+  return (
+    <article className="editor editor-readonly" aria-label="Shared memory">
+      <h3 className="editor-title">{memory.title}</h3>
+      <p className="editor-meta">
+        In {folder}, shared with you by {memory.sharedFrom}. Read only. Edited {formatDateTime(memory.editedAt)}.
+      </p>
+      {memory.tags.length ? (
+        <div className="chips">
+          {memory.tags.map((t) => (
+            <span key={t} className="chip">
+              {t}
+            </span>
+          ))}
+        </div>
+      ) : null}
+      <div className="editor-body">{memory.body}</div>
+      <div className="form-actions">
+        <button type="button" className="button button-ghost" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; defaultFolder?: string; onClose(id?: string): void }) {
-  const { api, data, update } = useVault();
+  const { api, data, update, goTo } = useVault();
   const [title, setTitle] = useState(memory?.title ?? "");
   const [body, setBody] = useState(memory?.body ?? "");
   const [tags, setTags] = useState(memory?.tags.join(", ") ?? "");
@@ -241,8 +348,19 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
       </div>
       {memory ? (
         <p className="editor-meta">
-          {SOURCE_LABEL[memory.source.kind] ?? "Saved"}. Created {formatDateTime(memory.createdAt)}, edited {formatDateTime(memory.editedAt)}.
+          {sourceLabel(memory.source)}
+          {memory.source.kind === "web" && memory.source.ref ? `: ${memory.source.ref}` : ""}. Created {formatDateTime(memory.createdAt)}, edited{" "}
+          {formatDateTime(memory.editedAt)}.
         </p>
+      ) : null}
+      {memory?.source.kind === "profile" ? (
+        <Notice>
+          This is your Self card.{" "}
+          <button type="button" className="text-button" onClick={() => goTo("profile")}>
+            Edit it in the Self card tab
+          </button>{" "}
+          to keep its three parts in order.
+        </Notice>
       ) : null}
 
       {confirmDelete ? (

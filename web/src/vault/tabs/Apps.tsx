@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { AppKind, OpenFolder } from "@sigil/core";
-import { ChatGptIcon, ClaudeIcon, CursorIcon, McpIcon, PlusIcon } from "@/components/icons";
+import { ChatGptIcon, ClaudeIcon, CursorIcon, ExtensionIcon, GlobeIcon, McpIcon, PlusIcon } from "@/components/icons";
 import { CodeBlock } from "@/components/CodeBlock";
 import { configLocations, mcpConfig, shellCommand } from "@/lib/connector";
 import { formatDateTime } from "@/lib/format";
@@ -17,7 +17,12 @@ const KINDS: { kind: AppKind; label: string; Icon: typeof ClaudeIcon }[] = [
   { kind: "cursor", label: "Cursor", Icon: CursorIcon },
   { kind: "chatgpt", label: "ChatGPT", Icon: ChatGptIcon },
   { kind: "other", label: "Other MCP app", Icon: McpIcon },
+  { kind: "extension", label: "Browser extension", Icon: ExtensionIcon },
+  { kind: "web", label: "Web app", Icon: GlobeIcon },
 ];
+
+/** Web apps connect themselves through Sign in with Sigil, so they are not in the list to pick from. */
+const PICKABLE = KINDS.filter((k) => k.kind !== "web");
 
 const kindInfo = (k: AppKind) => KINDS.find((x) => x.kind === k) ?? KINDS[3];
 
@@ -26,12 +31,25 @@ function names(folders: OpenFolder[], ids: Set<string>) {
 }
 
 /** "This app will be able to read Work and Writing. It will not see Health." */
-function plainWords(folders: OpenFolder[], ids: Set<string>): string {
+function plainWords(folders: OpenFolder[], ids: Set<string>, canPropose = false): string {
   const yes = names(folders, ids);
   const no = folders.filter((f) => !ids.has(f.id)).map((f) => f.name);
   const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
-  if (yes.length === 0) return "Pick at least one folder.";
-  return `This app will be able to read ${list(yes)}.${no.length ? ` It will not see ${list(no)}.` : ""}`;
+  const suggest = canPropose ? " It may suggest memories to your inbox." : "";
+  if (yes.length === 0) return canPropose ? `This app will not read any folder.${suggest}` : "Pick at least one folder, or let it suggest memories.";
+  return `This app will be able to read ${list(yes)}.${no.length ? ` It will not see ${list(no)}.` : ""}${suggest}`;
+}
+
+function SuggestToggle({ id, checked, onChange }: { id: string; checked: boolean; onChange(v: boolean): void }) {
+  return (
+    <label className="checkbox suggest-toggle" htmlFor={id}>
+      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>
+        May suggest memories to your inbox
+        <span className="field-hint">Suggestions are encrypted for your vault on the app&apos;s side. Nothing is saved until you approve it.</span>
+      </span>
+    </label>
+  );
 }
 
 export function AppsTab() {
@@ -74,7 +92,8 @@ export function AppsTab() {
             </button>
           }
         >
-          Connect Claude Desktop, Cursor, ChatGPT or another MCP app, and choose which folders it may read. You can change or revoke it at any time.
+          Connect Claude Desktop, Cursor, ChatGPT, another MCP app or the browser extension, and choose which folders it may read and whether it may
+          suggest memories. You can change or revoke it at any time.
         </Empty>
       ) : null}
 
@@ -130,6 +149,7 @@ function ConnectForm({ onCancel, onCreated }: { onCancel(): void; onCreated(c: {
   const [name, setName] = useState("Claude Desktop");
   const [nameTouched, setNameTouched] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [canPropose, setCanPropose] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -139,7 +159,7 @@ function ConnectForm({ onCancel, onCreated }: { onCancel(): void; onCreated(c: {
     setError(null);
     try {
       const folders = data.folders.filter((f) => selected.has(f.id));
-      const { appKey } = await ops.connectApp(api, vault, { name, kind }, folders);
+      const { appKey } = await ops.connectApp(api, vault, { name, kind }, folders, { canPropose, boxPublic: data.boxPublic });
       onCreated({ appKey, kind, name });
       await reload();
     } catch (err) {
@@ -167,7 +187,7 @@ function ConnectForm({ onCancel, onCreated }: { onCancel(): void; onCreated(c: {
               if (!nameTouched) setName(k === "other" ? "" : kindInfo(k).label);
             }}
           >
-            {KINDS.map((k) => (
+            {PICKABLE.map((k) => (
               <option key={k.kind} value={k.kind}>
                 {k.label}
               </option>
@@ -195,13 +215,15 @@ function ConnectForm({ onCancel, onCreated }: { onCancel(): void; onCreated(c: {
       <div className="field">
         <span className="field-label">Folders it may read</span>
         <FolderPicker folders={data.folders} selected={selected} onChange={setSelected} idPrefix="new-app" />
+        <SuggestToggle id="new-app-suggest" checked={canPropose} onChange={setCanPropose} />
         <span className="field-hint" aria-live="polite">
-          {plainWords(data.folders, selected)} Read only: it can search and read, never change or delete.
+          {plainWords(data.folders, selected, canPropose)} It can never change or delete a memory.
+          {kind === "extension" ? " The browser extension only suggests, so it needs no folders." : ""}
         </span>
       </div>
       <Notice>Once an AI app has read a memory, what it does with that text is up to the app. Share folders with apps you trust.</Notice>
       <div className="form-actions">
-        <button type="submit" className="button button-primary" disabled={busy || selected.size === 0 || !name.trim()}>
+        <button type="submit" className="button button-primary" disabled={busy || (selected.size === 0 && !canPropose) || !name.trim()}>
           {busy ? "Creating key" : "Create app key"}
         </button>
         <button type="button" className="button button-ghost" onClick={onCancel} disabled={busy}>
@@ -248,6 +270,18 @@ function AppKeyPanel({ appKey, kind, name, onDone }: { appKey: string; kind: App
           <CodeBlock code={mcpConfig(appKey, origin)} label={kind === "cursor" ? "mcp.json" : "claude_desktop_config.json"} language="json" />
           <p className="small muted">Save the file and restart {info.label}. Sigil then shows up among its tools.</p>
         </>
+      ) : kind === "extension" ? (
+        <>
+          <ol className="small muted guide-steps">
+            <li>Build the extension once: npm run build -w sigil-extension, in the repository.</li>
+            <li>In Chrome, open chrome://extensions, turn on Developer mode, choose Load unpacked and pick the extension/dist folder.</li>
+            <li>Open the extension&apos;s options, enter the address of this site and paste the app key.</li>
+          </ol>
+          <CodeBlock code={origin} label="Address of this site" />
+          <p className="small muted">
+            The extension checks the key against your vault before it saves anything. More in the <Link href="/docs#extension">docs</Link>.
+          </p>
+        </>
       ) : kind === "chatgpt" ? (
         <>
           <p className="small muted">Run the connector in HTTP mode, reach it through an HTTPS tunnel, and add the address as a custom connector in ChatGPT.</p>
@@ -282,6 +316,7 @@ function AppRow({ app }: { app: ops.AppView }) {
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<null | "revoke" | "remove">(null);
   const [selected, setSelected] = useState<Set<string>>(new Set(app.folderIds));
+  const [suggest, setSuggest] = useState(app.canPropose);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { Icon, label } = kindInfo(app.kind);
@@ -321,6 +356,7 @@ function AppRow({ app }: { app: ops.AppView }) {
             ) : (
               <span className="chip">No folders</span>
             )}
+            {app.canPropose ? <span className="chip chip-strong">May suggest memories</span> : null}
           </div>
         ) : null}
         {error ? <Notice kind="error">{error}</Notice> : null}
@@ -328,7 +364,8 @@ function AppRow({ app }: { app: ops.AppView }) {
         {editing ? (
           <div className="subpanel">
             <FolderPicker folders={data.folders} selected={selected} onChange={setSelected} idPrefix={`edit-${app.id}`} />
-            <p className="field-hint">{plainWords(data.folders, selected)}</p>
+            <SuggestToggle id={`edit-${app.id}-suggest`} checked={suggest} onChange={setSuggest} />
+            <p className="field-hint">{plainWords(data.folders, selected, suggest)}</p>
             <div className="row form-actions">
               <button
                 type="button"
@@ -337,7 +374,8 @@ function AppRow({ app }: { app: ops.AppView }) {
                 onClick={() =>
                   void act(async () => {
                     await ops.setAppFolders(api, vault, app, data.folders.filter((f) => selected.has(f.id)));
-                    update((d) => ({ ...d, apps: d.apps.map((a) => (a.id === app.id ? { ...a, folderIds: [...selected] } : a)) }));
+                    if (suggest !== app.canPropose) await ops.setAppSuggestions(api, vault, app, data.boxPublic, suggest);
+                    update((d) => ({ ...d, apps: d.apps.map((a) => (a.id === app.id ? { ...a, folderIds: [...selected], canPropose: suggest } : a)) }));
                     setEditing(false);
                   })
                 }
@@ -368,7 +406,7 @@ function AppRow({ app }: { app: ops.AppView }) {
                     if (confirm === "revoke") {
                       await ops.revokeApp(api, app.id);
                       const at = new Date().toISOString();
-                      update((d) => ({ ...d, apps: d.apps.map((a) => (a.id === app.id ? { ...a, revokedAt: at, folderIds: [] } : a)) }));
+                      update((d) => ({ ...d, apps: d.apps.map((a) => (a.id === app.id ? { ...a, revokedAt: at, folderIds: [], canPropose: false } : a)) }));
                     } else {
                       await ops.removeApp(api, app.id);
                       update((d) => ({ ...d, apps: d.apps.filter((a) => a.id !== app.id) }));
@@ -395,6 +433,7 @@ function AppRow({ app }: { app: ops.AppView }) {
                 className="button button-small"
                 onClick={() => {
                   setSelected(new Set(app.folderIds));
+                  setSuggest(app.canPropose);
                   setEditing(true);
                 }}
               >

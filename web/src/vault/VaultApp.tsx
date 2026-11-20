@@ -6,6 +6,7 @@ import * as ops from "./ops";
 import { Gate, type GateMode } from "./Gate";
 import { PhraseScreen } from "./PhraseScreen";
 import { Dashboard } from "./Dashboard";
+import { Consent, type ConsentRequest } from "./Consent";
 import { Notice, Spinner } from "./ui";
 
 type Phase =
@@ -17,9 +18,11 @@ type Phase =
 
 /**
  * The vault page. The vault key lives only in this component's memory: closing
- * or reloading the page locks the vault again.
+ * or reloading the page locks the vault again. With a consent request it is the
+ * Sign in with Sigil window: once open, it asks about one web app instead of
+ * showing the dashboard.
  */
-export function VaultApp() {
+export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) {
   const api = useMemo(() => createApi(), []);
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
 
@@ -78,7 +81,8 @@ export function VaultApp() {
             <PhraseScreen phrase={phase.phrase} title="Save your recovery phrase" onDone={() => setPhase({ kind: "open", vault: phase.vault })} />
           </div>
         ) : null}
-        {phase.kind === "open" ? (
+        {phase.kind === "open" && consent !== undefined ? <Consent api={api} vault={phase.vault} request={consent} /> : null}
+        {phase.kind === "open" && consent === undefined ? (
           <Dashboard api={api} vault={phase.vault} onLock={() => setPhase({ kind: "gate", mode: "unlock" })} onSignOut={signOut} onDeleted={() => setPhase({ kind: "gate", mode: "create" })} />
         ) : null}
       </div>

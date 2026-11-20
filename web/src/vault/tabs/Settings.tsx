@@ -9,6 +9,7 @@ import { connectWallet, signVaultMessage, WalletRedirect } from "../wallet";
 import { PhraseScreen } from "../PhraseScreen";
 import { errorText, useVault } from "../context";
 import { download, Notice } from "../ui";
+import { clearVectorCache } from "../semantic";
 
 const CONFIRM_WORDS = "delete my vault";
 
@@ -236,6 +237,7 @@ export function SettingsTab({ onDeleted }: { onDeleted(): void }) {
           onClick={() =>
             void act("delete", async () => {
               await ops.deleteAccount(api);
+              await clearVectorCache();
               onDeleted();
             })
           }

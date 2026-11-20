@@ -4,7 +4,7 @@ import ts from "eslint-config-next/typescript";
 const config = [
   ...next,
   ...ts,
-  { ignores: [".next/**", "node_modules/**", "next-env.d.ts", "scripts/**"] },
+  { ignores: [".next/**", "node_modules/**", "next-env.d.ts", "scripts/**", "public/vendor/**"] },
   { rules: { "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", destructuredArrayIgnorePattern: "^_" }] } },
 ];
 

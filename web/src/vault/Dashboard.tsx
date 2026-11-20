@@ -12,15 +12,24 @@ import { AppsTab } from "./tabs/Apps";
 import { LogTab } from "./tabs/Log";
 import { ImportTab } from "./tabs/Import";
 import { SettingsTab } from "./tabs/Settings";
+import { InboxTab } from "./tabs/Inbox";
+import { TimelineTab } from "./tabs/Timeline";
+import { ProfileTab } from "./tabs/Profile";
+import { useSemanticIndex } from "./semantic";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "memories", label: "Memories" },
+  { id: "inbox", label: "Inbox" },
+  { id: "timeline", label: "Timeline" },
+  { id: "profile", label: "Self card" },
   { id: "folders", label: "Folders" },
   { id: "apps", label: "Apps" },
   { id: "log", label: "Read log" },
   { id: "import", label: "Import" },
   { id: "settings", label: "Settings" },
 ];
+
+const NO_MEMORIES: ops.VaultData["memories"] = [];
 
 function tabFromHash(): TabId {
   if (typeof window === "undefined") return "memories";
@@ -78,10 +87,25 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
     };
   }, [api, memories]);
 
+  const [focus, setFocus] = useState<string | null>(null);
   const goTo = useCallback((t: TabId) => {
+    setFocus(null);
     setTab(t);
     window.history.replaceState(null, "", `#${t}`);
   }, []);
+  const openMemory = useCallback((id: string) => {
+    setFocus(id);
+    setTab("memories");
+    window.history.replaceState(null, "", "#memories");
+  }, []);
+
+  // Everything readable in the vault, own memories and accepted shared folders, is understood on this device.
+  const incoming = data?.shares.incoming;
+  const indexed = useMemo(
+    () => [...(memories ?? NO_MEMORIES), ...(incoming ?? []).filter((s) => s.acceptedAt).flatMap((s) => s.memories)],
+    [memories, incoming],
+  );
+  const semantic = useSemanticIndex(api, vault, indexed);
 
   const ctx = useMemo<VaultCtx | null>(
     () =>
@@ -93,11 +117,14 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
             update: (fn) => setData((d) => (d ? fn(d) : d)),
             reload,
             goTo,
+            openMemory,
+            focus,
+            semantic,
             lock: onLock,
             signOut: onSignOut,
           }
         : null,
-    [api, vault, data, reload, goTo, onLock, onSignOut],
+    [api, vault, data, reload, goTo, openMemory, focus, semantic, onLock, onSignOut],
   );
 
   if (error && !data) {
@@ -157,12 +184,20 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
               onClick={() => goTo(t.id)}
             >
               {t.label}
+              {t.id === "inbox" && data.proposals.length > 0 ? (
+                <span className="tab-count" aria-label={`${data.proposals.length} waiting`}>
+                  {data.proposals.length}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>
 
         <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
           {tab === "memories" ? <MemoriesTab /> : null}
+          {tab === "inbox" ? <InboxTab /> : null}
+          {tab === "timeline" ? <TimelineTab /> : null}
+          {tab === "profile" ? <ProfileTab /> : null}
           {tab === "folders" ? <FoldersTab /> : null}
           {tab === "apps" ? <AppsTab /> : null}
           {tab === "log" ? <LogTab /> : null}

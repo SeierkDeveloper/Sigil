@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { FolderIcon, PlusIcon } from "@/components/icons";
-import { plural } from "@/lib/format";
+import { parseVaultCode, vaultFingerprint, type OpenFolder } from "@sigil/core";
+import { FolderIcon, PlusIcon, ShareIcon } from "@/components/icons";
+import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
-import { Notice } from "../ui";
+import { CopyButton, Notice } from "../ui";
 
 export function FoldersTab() {
   const { api, vault, data, update, reload } = useVault();
@@ -14,6 +15,7 @@ export function FoldersTab() {
   const [error, setError] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<string | null>(null);
 
   const counts = new Map<string, number>();
   for (const m of data.memories) counts.set(m.folderId, (counts.get(m.folderId) ?? 0) + 1);
@@ -84,10 +86,13 @@ export function FoldersTab() {
                       <FolderIcon /> {f.name}
                     </p>
                     <p className="list-row-meta">
+                      {f.kind === "profile" ? "Your Self card. " : ""}
                       {plural(n, "memory", "memories")}. {apps.length ? `Readable by ${apps.join(", ")}.` : "No app can read it."}
                     </p>
                   </>
                 )}
+                <FolderShares folder={f} />
+                {sharing === f.id ? <ShareForm folder={f} onDone={() => setSharing(null)} /> : null}
                 {deleting === f.id ? (
                   <div className="subpanel">
                     <p className="small">
@@ -115,10 +120,13 @@ export function FoldersTab() {
                   </div>
                 ) : null}
               </div>
-              {renaming?.id !== f.id && deleting !== f.id ? (
+              {renaming?.id !== f.id && deleting !== f.id && sharing !== f.id ? (
                 <div className="list-row-actions">
                   <button type="button" className="button button-small" onClick={() => setRenaming({ id: f.id, name: f.name })}>
                     Rename
+                  </button>
+                  <button type="button" className="button button-small" onClick={() => setSharing(f.id)}>
+                    Share
                   </button>
                   <button type="button" className="button button-small button-ghost" disabled={data.folders.length <= 1} onClick={() => setDeleting(f.id)} title={data.folders.length <= 1 ? "A vault keeps at least one folder" : undefined}>
                     Delete
@@ -141,6 +149,242 @@ export function FoldersTab() {
           <PlusIcon /> Add folder
         </button>
       </form>
+
+      <SharedWithYou />
+      <VaultCode />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- sharing a folder
+
+function ShareForm({ folder, onDone }: { folder: OpenFolder; onDone(): void }) {
+  const { api, vault, update } = useVault();
+  const [code, setCode] = useState("");
+  const [label, setLabel] = useState("");
+  const [from, setFrom] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  let fingerprint: string | null = null;
+  let codeError: string | null = null;
+  if (code.trim()) {
+    try {
+      fingerprint = vaultFingerprint(parseVaultCode(code));
+    } catch (err) {
+      codeError = errorText(err);
+    }
+  }
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const share = await ops.shareFolder(api, vault, folder, code, label, from);
+      update((d) => ({ ...d, shares: { ...d.shares, outgoing: [...d.shares.outgoing, share] } }));
+      onDone();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="subpanel share-form" onSubmit={submit} aria-label={`Share ${folder.name}`}>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <div className="field">
+        <label className="field-label" htmlFor={`share-code-${folder.id}`}>
+          Their vault code
+        </label>
+        <input
+          id={`share-code-${folder.id}`}
+          className="input mono"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="sigil_vault..."
+          autoComplete="off"
+          spellCheck={false}
+          required
+        />
+        <span className="field-hint" aria-live="polite">
+          {codeError ?? (fingerprint ? `Fingerprint ${fingerprint}. Ask them to read theirs to you; they must match.` : "They find it in their vault, under Folders.")}
+        </span>
+      </div>
+      <div className="grid grid-2">
+        <div className="field">
+          <label className="field-label" htmlFor={`share-label-${folder.id}`}>
+            What you call them
+          </label>
+          <input id={`share-label-${folder.id}`} className="input" value={label} maxLength={80} onChange={(e) => setLabel(e.target.value)} placeholder="Only you see this" required />
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor={`share-from-${folder.id}`}>
+            Your name, as they see it
+          </label>
+          <input id={`share-from-${folder.id}`} className="input" value={from} maxLength={80} onChange={(e) => setFrom(e.target.value)} required />
+        </div>
+      </div>
+      <Notice>
+        They can read everything in {folder.name}, now and later, and cannot change it. Every time their vault opens it, it shows in your read log.
+        Stopping the share gives the folder a new key.
+      </Notice>
+      <div className="form-actions">
+        <button type="submit" className="button button-primary" disabled={busy || !fingerprint || !label.trim() || !from.trim()}>
+          <ShareIcon /> {busy ? "Sharing" : "Share folder"}
+        </button>
+        <button type="button" className="button button-ghost" onClick={onDone} disabled={busy}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function FolderShares({ folder }: { folder: OpenFolder }) {
+  const { api, vault, data, reload } = useVault();
+  const shares = data.shares.outgoing.filter((s) => s.folderId === folder.id);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (shares.length === 0) return null;
+
+  const stop = async (shareId: string) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await ops.revokeShare(api, vault, data, folder, shareId);
+      setConfirm(null);
+      await reload();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="folder-shares">
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <ul className="share-list" aria-label={`${folder.name} is shared with`}>
+        {shares.map((s) => (
+          <li key={s.id} className="share-row" data-accepted={s.acceptedAt ? "true" : "false"}>
+            <span className="share-row-text">
+              <ShareIcon /> Shared with <strong>{s.label}</strong>, {s.acceptedAt ? `accepted ${formatDateTime(s.acceptedAt)}` : "waiting for them to accept"}.
+              {!s.verified ? " The server holds a different key for this share than you entered; stop sharing to be safe." : ""}
+            </span>
+            {confirm === s.id ? (
+              <span className="row">
+                <button type="button" className="button button-danger button-small" disabled={busy} onClick={() => void stop(s.id)}>
+                  {busy ? "Making a new key" : "Stop sharing"}
+                </button>
+                <button type="button" className="button button-ghost button-small" disabled={busy} onClick={() => setConfirm(null)}>
+                  Keep sharing
+                </button>
+              </span>
+            ) : (
+              <button type="button" className="button button-small button-ghost" onClick={() => setConfirm(s.id)}>
+                Stop sharing
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {confirm ? (
+        <p className="small muted">
+          Stopping gives {folder.name} a new key on this device and encrypts its {plural(data.memories.filter((m) => m.folderId === folder.id).length, "memory", "memories")} again.
+          Apps and anyone else you share it with keep access. What they already read, they keep.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function SharedWithYou() {
+  const { api, data, reload, update } = useVault();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const incoming = data.shares.incoming;
+  if (incoming.length === 0) return null;
+
+  const act = async (id: string, fn: () => Promise<void>) => {
+    setBusy(id);
+    setError(null);
+    try {
+      await fn();
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="settings-section" aria-labelledby="shared-with-you">
+      <h3 id="shared-with-you" className="settings-heading">
+        Shared with you
+      </h3>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <ul className="list">
+        {incoming.map((s) => (
+          <li key={s.id} className="list-row shared-row" data-accepted={s.acceptedAt ? "true" : "false"}>
+            <div className="list-row-main">
+              <p className="list-row-title">
+                <ShareIcon /> {s.folder ? s.folder.name : "A folder that could not be opened"}
+                <span className="badge">{s.acceptedAt ? "Read only" : "New"}</span>
+              </p>
+              <p className="list-row-meta">
+                From {s.from || "another vault"}, {formatDateTime(s.createdAt)}.{" "}
+                {s.acceptedAt ? `${plural(s.memories.length, "memory", "memories")}, in your Memories tab. Each time your vault opens it, the owner sees it in their read log.` : "Accept to read it in your vault."}
+              </p>
+            </div>
+            <div className="list-row-actions">
+              {!s.acceptedAt && s.folder ? (
+                <button type="button" className="button button-small button-primary" disabled={busy === s.id} onClick={() => void act(s.id, async () => (await ops.acceptShare(api, s.id), await reload()))}>
+                  {busy === s.id ? "Accepting" : "Accept"}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="button button-small button-ghost"
+                disabled={busy === s.id}
+                onClick={() =>
+                  void act(s.id, async () => {
+                    await ops.leaveShare(api, s.id);
+                    update((d) => ({ ...d, shares: { ...d.shares, incoming: d.shares.incoming.filter((x) => x.id !== s.id) } }));
+                  })
+                }
+              >
+                {s.acceptedAt ? "Remove" : "Decline"}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function VaultCode() {
+  const { data } = useVault();
+  const code = ops.vaultCode(data);
+  if (!code) return null;
+  return (
+    <section className="settings-section vault-code" aria-labelledby="vault-code">
+      <h3 id="vault-code" className="settings-heading">
+        Your vault code
+      </h3>
+      <p className="small muted">Give this to someone who wants to share a folder with you. It holds only your vault&apos;s public key: it lets them encrypt for you, and nothing else.</p>
+      <div className="app-key" data-testid="vault-code">
+        {code.code}
+      </div>
+      <p className="small">
+        Fingerprint <span className="mono">{code.fingerprint}</span>
+      </p>
+      <div className="form-actions">
+        <CopyButton text={code.code} label="Copy vault code" />
+      </div>
+    </section>
   );
 }

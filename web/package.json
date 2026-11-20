@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/vendor.mjs",
     "dev": "next dev --port 3000",
+    "prebuild": "node scripts/vendor.mjs",
     "build": "next build",
     "start": "next start --port ${PORT:-3000}",
     "test": "vitest run",
@@ -30,6 +32,7 @@
     "eslint": "^9.39.0",
     "eslint-config-next": "16.4.6",
     "typescript": "^5.9.3",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "esbuild": "^0.28.2"
   }
 }

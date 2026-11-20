@@ -16,3 +16,4 @@ contracts/broadcast/
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+web/public/vendor/

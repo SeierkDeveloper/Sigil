@@ -5,7 +5,7 @@
 // the vault uses (@sigil/core).
 
 import { useEffect, useId, useState } from "react";
-import { fromHex32, hex32, nodeHash, readEntryLeaf, verifyProof, type ReadEntryFields } from "@sigil/core";
+import { fromHex32, hex32, nodeHash, READ_KINDS, readEntryLeaf, verifyProof, type ReadEntryFields, type ReadKind } from "@sigil/core";
 import { formatSealPeriod } from "@/lib/format";
 import type { SealsResponse } from "./useLive";
 
@@ -73,10 +73,12 @@ function parseEntry(text: string): (ReadEntryFields & { hour: number }) | string
   const kind = str("kind");
   const at = str("at");
   const salt = str("salt");
-  if (!id || !appId || !at || !salt || (kind !== "folders" && kind !== "index" && kind !== "read")) return "The entry is missing a field. It needs id, appId, kind, memoryId, count, at, salt and hour.";
+  if (!id || !appId || !at || !salt || !kind || !(READ_KINDS as readonly string[]).includes(kind)) {
+    return "The entry is missing a field. It needs id, appId, kind, memoryId, count, at, salt and hour.";
+  }
   if (typeof v.count !== "number" || typeof v.hour !== "number") return "The entry needs count and hour as numbers.";
   const memoryId = typeof v.memoryId === "string" ? v.memoryId : null;
-  return { id, appId, kind, memoryId, count: v.count, at, salt, hour: v.hour };
+  return { id, appId, kind: kind as ReadKind, memoryId, count: v.count, at, salt, hour: v.hour };
 }
 
 export function Verifier({ modes = ["fingerprint", "entry", "manual"] }: { modes?: VerifierMode[] }) {

@@ -41,7 +41,11 @@ export function LogTab() {
     };
   }, [api]);
 
-  const appName = useMemo(() => new Map(data.apps.map((a) => [a.id, a.name])), [data.apps]);
+  const appName = useMemo(
+    () => new Map([...data.apps.map((a) => [a.id, a.name] as const), ...data.shares.outgoing.map((s) => [s.id, s.label] as const)]),
+    [data.apps, data.shares.outgoing],
+  );
+  const whoDid = (e: ops.LogEntryView) => appName.get(e.appId) ?? (e.kind === "shared" ? "A vault you no longer share with" : "Removed app");
   const title = useMemo(() => new Map(data.memories.map((m) => [m.id, m.title])), [data.memories]);
 
   if (!log && error) return <Notice kind="error">The read log could not be loaded: {error}</Notice>;
@@ -51,6 +55,8 @@ export function LogTab() {
   const appsInLog = [...new Set(log.entries.map((e) => e.appId))];
 
   const describe = (e: ops.LogEntryView) => {
+    if (e.kind === "propose") return "Suggested a memory to your inbox";
+    if (e.kind === "shared") return `Opened a folder you share with them (${plural(e.count, "memory", "memories")})`;
     if (e.kind === "folders") return `Listed the ${plural(e.count, "folder")} it may read`;
     if (e.kind === "index") return `Searched the titles, tags and first lines of ${plural(e.count, "memory", "memories")}`;
     const t = e.memoryId ? title.get(e.memoryId) : undefined;
@@ -91,7 +97,7 @@ export function LogTab() {
                 <option value="all">All apps</option>
                 {appsInLog.map((id) => (
                   <option key={id} value={id}>
-                    {appName.get(id) ?? "Removed app"}
+                    {appName.get(id) ?? "Removed app or share"}
                   </option>
                 ))}
               </select>
@@ -104,7 +110,7 @@ export function LogTab() {
       </div>
 
       <Notice>
-        Every request a connected app makes is written here. At the end of each hour all reads are sealed into one fingerprint you can verify in
+        Every request a connected app makes, every memory it suggests and every time another vault opens a folder you share is written here. At the end of each hour all reads are sealed into one fingerprint you can verify in
         this browser.{" "}
         {log.mode === "local" ? "Seals are kept by Sigil for now; publishing them on chain is planned." : "Seals are published on chain."}
       </Notice>
@@ -120,7 +126,8 @@ export function LogTab() {
             </button>
           }
         >
-          When a connected app lists folders, searches or reads a memory, it shows up here with the time and what it saw.
+          When a connected app lists folders, searches, reads or suggests a memory, or a vault you share with opens your folder, it shows up here
+          with the time and what it saw.
         </Empty>
       ) : (
         <ul className="list" aria-label="Reads">
@@ -131,7 +138,7 @@ export function LogTab() {
                 <div className="list-row-main">
                   <p className="list-row-title">{describe(e)}</p>
                   <p className="list-row-meta">
-                    {appName.get(e.appId) ?? "Removed app"}, {formatDateTime(e.at)}.
+                    {whoDid(e)}, {formatDateTime(e.at)}.
                     {e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
                   </p>
                   {check && "ok" in check ? (

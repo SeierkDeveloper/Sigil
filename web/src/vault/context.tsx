@@ -3,6 +3,7 @@
 import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { Unlocked, VaultData } from "./ops";
+import type { SemanticIndex } from "./semantic";
 
 export interface VaultCtx {
   api: Api;
@@ -13,11 +14,17 @@ export interface VaultCtx {
   /** Fetch and decrypt everything again. */
   reload(): Promise<void>;
   goTo(tab: TabId): void;
+  /** Opens one memory in the Memories tab. */
+  openMemory(id: string): void;
+  /** The memory another tab asked to open in the Memories tab. */
+  focus: string | null;
+  /** Search by meaning, computed on this device. */
+  semantic: SemanticIndex;
   lock(): void;
   signOut(): Promise<void>;
 }
 
-export type TabId = "memories" | "folders" | "apps" | "log" | "import" | "settings";
+export type TabId = "memories" | "inbox" | "timeline" | "profile" | "folders" | "apps" | "log" | "import" | "settings";
 
 export const Ctx = createContext<VaultCtx | null>(null);
 
