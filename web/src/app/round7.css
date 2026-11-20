@@ -1,253 +1,1992 @@
 /*
-  Round seven: storage and nodes, voice, capture keys, sessions with the
-  public AI self, and shared memory. Plain on purpose, in the existing tokens
-  and line language, so the design pass can finish it without touching logic.
-  Loaded last.
+  Round seven, finished: voice, capture keys, Storage and the restore page,
+  sessions with the public AI self, and Shared memory.
+
+  Loaded last. It uses the tokens of globals.css, identity.css and round5.css
+  (--ruled, --ruled-faint, --ruled-edge, --lean, --chamfer) and adds none. The
+  same few signs as everywhere, one to a component:
+
+  - three fine lines down the left edge of something sealed, signed or quoted
+    (the node the vault lives on, a key shown once, the house rules, the
+    signer of a bundle);
+  - a cut of ribbon on the top edge of something the owner has to carry out
+    (a signed move, a capture key just made);
+  - a run of lines with a brighter stretch travelling along it while
+    something is on its way (listening, reading aloud, a move under way);
+  - a count drawn in cuts (the questions of a session);
+  - dashed outlines for whatever still waits (voice not on, an heir, a draft
+    of a storage place, a member who has not accepted).
 */
 
 /* ------------------------------------------------------------------ voice */
 
+/* The strip above a question field. Dashed until voice is on. */
 .voice {
+  position: relative;
   display: grid;
-  gap: var(--space-2);
-  margin: var(--space-3) 0;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-sm);
-  background: var(--plate);
+  background: #060606;
+  transition: border-color var(--transition);
 }
 
-.voice[data-state="listening"] {
+.voice:is([data-state="off"], [data-state="unavailable"]) {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  border-style: dashed;
+}
+
+.voice[data-state="unavailable"] {
+  border-color: var(--color-line);
+}
+
+.voice-on {
+  min-height: 44px;
+}
+
+.voice-note,
+.voice-line {
+  min-width: 0;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.voice-note {
+  max-width: 64ch;
+  font-size: 0.8125rem;
+}
+
+.voice-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.voice-line > svg {
+  flex: none;
+  color: var(--color-accent);
+  font-size: 16px;
+}
+
+.voice-line[role="alert"] {
+  color: var(--color-text);
+}
+
+/* The model loading: a light runs along the top edge, as on anything that reads. */
+.voice[data-state="loading"]::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #fff 50%, transparent 100%) 0 0 / 40% 100% no-repeat;
+  pointer-events: none;
+}
+
+[data-motion] .voice[data-state="loading"]::before {
+  animation: proposal-run 1100ms linear infinite;
+}
+
+.voice[data-state="failed"] {
+  border-style: dashed;
   border-color: var(--color-line-bright);
-  background-image: var(--ruled-edge-faint), var(--plate);
-  background-size: 3px 100%, auto;
-  background-repeat: no-repeat;
 }
 
 .voice-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2) var(--space-4);
+  min-width: 0;
 }
 
-.voice-note,
-.voice-line {
+.voice-mic {
+  min-width: 9.5rem;
+  min-height: 44px;
+}
+
+/* While it records, the microphone is the white plate. */
+.voice .voice-mic.button[aria-pressed="true"],
+.voice .voice-mic.button[aria-pressed="true"]:not(:disabled):hover {
+  border-color: transparent;
+  background: var(--metal);
+  color: var(--color-accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.voice .voice-mic.button[aria-pressed="true"]:not(:disabled):hover {
+  background: var(--metal-hover);
+}
+
+.voice-speak {
+  align-items: center;
+  min-height: 44px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.voice-speak input {
   margin: 0;
 }
 
-.voice-mic[aria-pressed="true"] {
-  border-color: var(--color-line-bright);
-  background: var(--color-surface-3);
+.voice-speak > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-/* ------------------------------------------------------------------ long keys and links */
+.voice-speak svg {
+  flex: none;
+  font-size: 16px;
+}
 
+.voice-speak:has(input:checked) {
+  color: var(--color-text);
+}
+
+.voice-speak:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.voice-row > .text-button {
+  min-height: 44px;
+  margin-left: auto;
+  color: var(--color-text-muted);
+}
+
+.voice-row > .text-button:hover {
+  color: var(--color-text);
+}
+
+/* Sound on its way: a run of lines with a brighter stretch travelling along it.
+   Inwards while it listens, outwards while an answer is read aloud. */
+.voice:is([data-state="listening"], [data-state="writing"], [data-speaking="true"]) {
+  border-color: var(--color-line-bright);
+}
+
+.voice:is([data-state="listening"], [data-state="writing"], [data-speaking="true"])::after {
+  --cut: 6px;
+  content: "";
+  display: block;
+  height: 9px;
+  background:
+    var(--ruled) 30% 0 / 40% 100% no-repeat,
+    var(--ruled-faint),
+    rgba(255, 255, 255, 0.05);
+  clip-path: var(--lean);
+}
+
+/* Written down, not heard: the lines rest. */
+.voice[data-state="writing"]::after {
+  background: var(--ruled-faint), rgba(255, 255, 255, 0.05);
+}
+
+[data-motion] .voice[data-state="listening"]::after {
+  animation: proposal-run 1500ms linear infinite;
+}
+
+[data-motion] .voice[data-speaking="true"]:not([data-state="listening"], [data-state="writing"])::after {
+  animation: proposal-run 1900ms linear infinite reverse;
+}
+
+.voice-reading {
+  color: var(--color-text);
+}
+
+.self-chat .voice {
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .voice {
+    padding: var(--space-3);
+  }
+
+  .voice:is([data-state="off"], [data-state="unavailable"]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .voice-on,
+  .voice-mic {
+    width: 100%;
+  }
+
+  .voice-speak {
+    flex: 1 1 auto;
+  }
+
+  .voice-row > .text-button {
+    margin-left: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ keys and links shown once */
+
+/* A key or a link to carry somewhere: set as a key, with three fine lines down its left edge. */
 .capture-key-text,
 .session-link,
-.move-code,
+.move-code {
+  display: block;
+  margin: 0;
+  padding: var(--space-4) var(--space-4) var(--space-4) calc(7px + var(--space-4));
+  border: 1px solid var(--color-line-bright);
+  border-radius: var(--radius-sm);
+  background: var(--ruled-edge) left top / 7px 100% no-repeat, #060606;
+  color: var(--color-accent-strong);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+/* An address to paste into a shortcut: quieter, dashed. */
 .shortcut-url {
   display: block;
-  padding: var(--space-3);
-  border: 1px solid var(--color-line-strong);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-line-strong);
   border-radius: var(--radius-sm);
   background: #060606;
+  color: var(--color-accent-strong);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  -webkit-user-select: all;
+  user-select: all;
+}
+
+/* ------------------------------------------------------------------ capture keys (Devices) */
+
+.capture-keys {
+  margin: var(--space-6) 0;
+}
+
+.capture-keys > .settings-heading {
+  flex-wrap: wrap;
+  margin-top: 0;
+}
+
+.capture-keys > .settings-heading > svg {
+  flex: none;
+  font-size: 16px;
+}
+
+.capture-keys > .settings-heading .badge {
+  letter-spacing: 0.1em;
+}
+
+.capture-keys > .small.muted {
+  max-width: 82ch;
+  margin: 0 0 var(--space-5);
+  line-height: 1.6;
+}
+
+.capture-key-form .form-actions {
+  margin-top: 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.capture-key-form .checkbox .field-hint {
+  display: block;
+  max-width: 68ch;
+  margin-top: 2px;
+}
+
+/* A key just made: a bright plate with a cut of ribbon on its top edge, until Done. */
+.capture-made {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin-top: 0;
+  border-color: var(--color-line-bright);
+}
+
+.capture-made::before {
+  top: -5px;
+  left: var(--space-5);
+  right: auto;
+  width: 96px;
+  height: 9px;
+  background: var(--ruled), var(--color-surface);
+  clip-path: var(--lean);
+}
+
+.capture-made > * {
+  min-width: 0;
+  margin: 0;
+}
+
+.capture-made > .small:first-child {
+  max-width: 76ch;
+  line-height: 1.6;
+}
+
+/* The key itself needs no second mark inside a plate that already carries one. */
+.capture-made .capture-key-text {
+  padding-left: var(--space-4);
+  background: #060606;
+  font-size: var(--text-sm);
+}
+
+.capture-made > .button {
+  justify-self: start;
+}
+
+/* The steps per device: three leaves that open. */
+.shortcut-steps {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: #060606;
+}
+
+.shortcut-steps details {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.shortcut-steps details:first-child {
+  border-top: 0;
+}
+
+.shortcut-steps summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.35;
+  list-style: none;
+  cursor: pointer;
+  transition: color var(--transition);
+}
+
+.shortcut-steps summary::-webkit-details-marker {
+  display: none;
+}
+
+.shortcut-steps summary::after {
+  content: "";
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: auto;
+  background: var(--icon-chevron) center / 18px no-repeat;
+  transition: transform var(--transition);
+}
+
+.shortcut-steps summary:hover,
+.shortcut-steps details[open] > summary {
+  color: var(--color-text);
+}
+
+.shortcut-steps details[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.shortcut-steps details > :not(summary) {
+  margin: 0 var(--space-4) var(--space-4);
+}
+
+.shortcut-steps details > p {
+  max-width: 68ch;
+  color: var(--color-text-muted);
+}
+
+/* Steps are numbered, in the mono face. */
+.shortcut-steps .plain-list {
+  counter-reset: shortcut-step;
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--color-line);
+}
+
+.shortcut-steps .plain-list li {
+  counter-increment: shortcut-step;
+  padding: 6px 0 6px 2.5rem;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.shortcut-steps .plain-list li::before {
+  content: counter(shortcut-step, decimal-leading-zero);
+  top: 9px;
+  left: 0;
+  width: auto;
+  height: auto;
+  border: 0;
+  transform: none;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+}
+
+.shortcut-steps li > .mono:not(.shortcut-url) {
+  color: var(--color-accent-strong);
   overflow-wrap: anywhere;
   word-break: break-all;
 }
 
-.shortcut-url {
-  margin-top: var(--space-1);
+.capture-keys > .quiet,
+.capture-key-list {
+  margin-top: var(--space-5);
 }
 
-.shortcut-steps details {
-  margin: var(--space-3) 0;
-  border-top: 1px solid var(--color-line);
-  padding-top: var(--space-3);
+.capture-key-list .list-row {
+  align-items: flex-start;
 }
 
-.shortcut-steps summary {
-  cursor: pointer;
+.capture-key-list .list-row-title {
   font-weight: 500;
+  overflow-wrap: anywhere;
 }
 
-.capture-made,
-.move-started {
-  display: grid;
-  gap: var(--space-3);
+.capture-key-list .list-row[data-revoked="false"] .list-row-title > svg {
+  color: var(--color-accent-strong);
+}
+
+/* A revoked key stays in the list, struck back: muted, its badges dashed. */
+.capture-key-list .list-row[data-revoked="true"] .list-row-title {
+  color: var(--color-text-faint);
+}
+
+.capture-key-list .list-row[data-revoked="true"] .list-row-title > svg {
+  color: var(--color-text-faint);
+}
+
+.capture-key-list .list-row[data-revoked="true"] .badge {
+  border-style: dashed;
+  color: var(--color-text-faint);
+}
+
+@media (max-width: 640px) {
+  .capture-keys {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .capture-made {
+    padding: var(--space-5) var(--space-3) var(--space-4);
+  }
+
+  .capture-made::before {
+    left: var(--space-3);
+  }
+
+  .capture-made > .row .button,
+  .capture-made > .button,
+  .capture-key-form .form-actions .button {
+    flex: 1 1 100%;
+    justify-self: stretch;
+  }
+
+  .shortcut-steps summary {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .shortcut-steps details > :not(summary) {
+    margin: 0 var(--space-3) var(--space-3);
+  }
+
+  .shortcut-steps .plain-list li {
+    padding-left: 1.75rem;
+  }
+
+  .capture-key-list .list-row-actions,
+  .capture-key-list .list-row-actions .button {
+    width: 100%;
+  }
+}
+
+/* ------------------------------------------------------------------ the capture key page (/c) */
+
+.capture-card .capture-lead {
+  max-width: 52ch;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.capture-card .capture-lead svg {
+  color: var(--color-accent);
+}
+
+.capture-card > .notice {
+  margin: var(--space-5) 0 0;
+}
+
+.capture-card .capture-form .textarea {
+  min-height: 148px;
+  font-size: max(16px, 1.0625rem);
+}
+
+.capture-card .capture-form .button-block {
+  min-height: 52px;
+  margin-top: var(--space-2);
+}
+
+/* Sealing: a light runs along the top edge of the card. */
+.capture-card[data-phase="sending"]::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #fff 50%, transparent 100%) 0 0 / 40% 100% no-repeat;
+  pointer-events: none;
+}
+
+[data-motion] .capture-card[data-phase="sending"]::before {
+  animation: proposal-run 1100ms linear infinite;
+}
+
+/* Sent: the card stands sealed, a bright outline. */
+.capture-card[data-phase="sent"] {
+  border-color: var(--color-line-bright);
+}
+
+@media (max-width: 480px) {
+  .capture-card .page-title {
+    font-size: clamp(2rem, 9vw, 2.5rem);
+  }
 }
 
 /* ------------------------------------------------------------------ storage and nodes */
 
+.storage > .panel-header > p,
+.shared > .panel-header > p {
+  max-width: 82ch;
+}
+
+/* Where the vault lives. The node it is on carries three fine lines down its left edge. */
+.node-list .list-row {
+  align-items: flex-start;
+}
+
+.node-list .list-row-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.node-list .list-row-title > svg {
+  color: var(--color-text-faint);
+}
+
+.node-list .list-row-meta {
+  max-width: 82ch;
+}
+
 .node-list .list-row[data-role="here"] {
-  border-color: var(--color-line-bright);
+  background: var(--ruled-edge) left top / 7px 100% no-repeat;
+}
+
+.node-list .list-row[data-role="here"] .list-row-title {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.node-list .list-row[data-role="here"] .list-row-title > svg {
+  color: var(--color-accent-strong);
+}
+
+/* Where it came from and where it went: quieter. One that has not been told yet waits, dashed. */
+.node-list .list-row:is([data-role="previous"], [data-role="next"]) .list-row-title {
+  color: var(--color-text-muted);
+}
+
+.node-list .list-row[data-role="previous"][data-state="waiting"] {
+  border-top-style: dashed;
+  border-top-color: var(--color-line-strong);
+}
+
+.node-list .list-row[data-role="previous"][data-state="waiting"] .badge {
+  border-style: dashed;
+}
+
+/* The copies follow the nodes after a brighter rule. */
+.node-list .list-row:not([data-role="copy"]) + .list-row[data-role="copy"] {
+  border-top-color: var(--color-line-strong);
+}
+
+.node-list .list-row[data-role="copy"] .list-row-title > svg {
+  color: var(--color-accent);
 }
 
 .node-list .list-row-meta.mono,
 .storage-target-list .list-row-meta.mono {
-  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
-.storage-target-form,
-.move-form {
+/* A copy now. */
+.storage-backup > .row {
+  gap: var(--space-3);
+}
+
+.storage-backup > .settings-heading {
+  margin-top: var(--space-6);
+}
+
+.backup-runs .list-row {
+  padding-block: var(--space-3);
+}
+
+.backup-runs .list-row-title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.backup-runs .list-row-title .faint {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+
+.backup-runs .list-row-meta .mono {
+  margin-left: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+}
+
+/* Your storage. */
+.storage-targets .band .select {
+  max-width: 24rem;
+}
+
+.storage-target-list .list-row {
+  align-items: flex-start;
+}
+
+.storage-target-list .list-row-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.storage-targets > .band + .quiet,
+.storage-targets > .band + .list {
+  margin-top: 0;
+}
+
+.storage-targets > .form-actions {
   margin-top: var(--space-4);
 }
 
-.restore {
+/* A storage place being written: a dashed sheet until it is added. */
+.storage-target-form {
+  margin-top: var(--space-5);
+  padding: var(--space-5);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+}
+
+.storage-target-form .band-main .select {
+  max-width: none;
+}
+
+.storage-target-form > .form-actions {
+  margin-top: 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.storage-target-form .field-hint {
+  max-width: 78ch;
+}
+
+.storage-target-form .input[type="file"],
+.restore .input[type="file"] {
+  padding: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.storage-target-form .input[type="file"]::file-selector-button,
+.restore .input[type="file"]::file-selector-button {
+  min-height: 32px;
+  margin-right: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* While the vault is closed. */
+.storage-background .checkbox-list {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.storage-background .checkbox-list .checkbox {
+  min-width: 0;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  overflow-wrap: anywhere;
+}
+
+.storage-background .checkbox .field-hint {
+  display: block;
+}
+
+/* Moving. */
+.move-form {
+  margin-top: 0;
+}
+
+.move-form > .form-actions {
+  margin-top: 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+/* A signed move: the link to carry to the new node, on a bright plate with a cut of ribbon on its top edge. */
+.move-started {
   display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  margin-top: 0;
+  border-color: var(--color-line-bright);
+}
+
+.move-started::before {
+  top: -5px;
+  left: var(--space-5);
+  right: auto;
+  width: 96px;
+  height: 9px;
+  background: var(--ruled), var(--color-surface);
+  clip-path: var(--lean);
+}
+
+.move-started > * {
+  min-width: 0;
+  margin: 0;
+}
+
+.move-started > .small {
+  max-width: 76ch;
+  line-height: 1.6;
+}
+
+.move-started .move-code {
+  padding-left: var(--space-4);
+  background: #060606;
+}
+
+/* A move under way: dashed, with a run of lines on its top edge that something travels along. */
+.move-open {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  margin-top: 0;
+  border-style: dashed;
+}
+
+.move-open::before {
+  --cut: 6px;
+  top: -5px;
+  left: var(--space-5);
+  right: auto;
+  width: 168px;
+  height: 9px;
+  background:
+    var(--ruled) 30% 0 / 40% 100% no-repeat,
+    var(--ruled-faint),
+    var(--color-surface-2);
+  clip-path: var(--lean);
+}
+
+[data-motion] .move-open::before {
+  animation: proposal-run 1700ms linear infinite;
+}
+
+.move-open > .small {
+  flex: 1 1 280px;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .storage-backup > .row .button,
+  .storage-targets > .form-actions .button,
+  .move-form > .form-actions .button,
+  .move-started .row .button,
+  .move-open > .button {
+    flex: 1 1 100%;
+  }
+
+  .storage-targets .band .select {
+    max-width: none;
+  }
+
+  .storage-target-form {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .storage-target-list .list-row-actions,
+  .storage-target-list .list-row-actions .button,
+  .node-list .list-row-actions,
+  .node-list .list-row-actions .button {
+    width: 100%;
+  }
+
+  .move-started,
+  .move-open {
+    padding: var(--space-5) var(--space-3) var(--space-4);
+  }
+
+  .move-started::before,
+  .move-open::before {
+    left: var(--space-3);
+  }
+}
+
+/* ------------------------------------------------------------------ the restore page */
+
+/* One door: where the bundle is, what it holds and who signed it, then the way in. */
+.vault-gate.restore {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 640px;
+}
+
+.restore > * {
+  min-width: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.restore > .ask-seal {
+  justify-self: start;
+  margin: 8px;
+}
+
+/* Nothing read yet: the seal waits, dashed. */
+.restore[data-state="source"] > .ask-seal {
+  border-style: dashed;
+  outline-style: dashed;
+  outline-color: var(--color-line-strong);
+  color: var(--color-text-faint);
+}
+
+.restore > .vault-gate-title + .muted {
+  max-width: 58ch;
+  margin: calc(-1 * var(--space-2)) 0 0;
+  line-height: 1.6;
+}
+
+.restore > .notice,
+.restore > .loading {
+  margin: 0;
+}
+
+.restore > .segmented {
+  margin-bottom: 0;
+}
+
+.restore > .segmented button {
+  padding: 0 var(--space-2);
+  line-height: 1.2;
+}
+
+.restore > .field,
+.restore-source {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: #060606;
+}
+
+.restore > .field {
+  gap: var(--space-2);
+}
+
+.restore-source .field,
+.restore-source .grid {
+  margin: 0;
+}
+
+.restore-source .grid {
   gap: var(--space-4);
 }
 
-.restore .segmented {
-  flex-wrap: wrap;
+.restore-source > .small {
+  margin: 0;
+  line-height: 1.55;
 }
 
-.restore-source {
-  display: grid;
-  gap: var(--space-3);
+.restore-source > .button {
+  justify-self: start;
+}
+
+/* What the bundle holds. The time it was made is a line of text, the two counts are numbers. */
+.restore-facts {
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.restore-facts > div:first-child dd {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  padding-bottom: 5px;
+}
+
+/* Who signed it, set as a statement: three fine lines down its left edge. */
+.restore > .restore-facts + .small {
+  padding: var(--space-3) var(--space-4) var(--space-3) calc(7px + var(--space-4));
+  background: var(--ruled-edge) left top / 7px 100% no-repeat;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.restore > .restore-facts + .small .fingerprint {
+  display: block;
+  line-height: 1.9;
+}
+
+.restore .method-list .subpanel {
+  margin-top: 0;
+  padding: var(--space-5);
+}
+
+.restore .method-list .field-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.restore .method-list .field-label svg {
+  flex: none;
+  font-size: 15px;
+}
+
+.restore .method-list .textarea {
+  min-height: 108px;
+  font-family: var(--font-mono);
+  font-size: max(16px, 0.9375rem);
 }
 
 .restore-done {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-5);
   justify-items: start;
 }
 
-/* ------------------------------------------------------------------ sessions */
-
-.session-book {
-  margin-top: var(--space-5);
-}
-
-.session-rules {
-  margin: var(--space-3) 0;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-line-strong);
-  border-left: 3px solid var(--color-line-bright);
-  border-radius: var(--radius-sm);
-  background: var(--plate);
-}
-
-.session-rules p {
+.restore-done > .notice {
+  width: 100%;
   margin: 0;
 }
 
-.session-rules .eyebrow {
-  margin-bottom: var(--space-1);
+.restore > .gate-signout {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
 }
 
-.session-form,
+.restore > .gate-signout .text-button {
+  min-height: 44px;
+}
+
+@media (max-width: 640px) {
+  /* Five places: three, then two, each cell wide enough for a thumb. */
+  .restore > .segmented {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .restore > .segmented button {
+    grid-column: span 2;
+    min-height: 44px;
+  }
+
+  .restore > .segmented button:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+
+  .restore > .field,
+  .restore-source,
+  .restore .method-list .subpanel {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .restore-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .restore-facts > div:first-child {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .restore-facts > div:nth-child(2) {
+    border-left: 0;
+  }
+
+  .restore-source > .button,
+  .restore .method-list .button,
+  .restore-done > .button {
+    width: 100%;
+    justify-self: stretch;
+  }
+}
+
+/* ------------------------------------------------------------------ sessions: the owner's side */
+
+/* The offer in three facts. They are words, not counts, so they are set smaller than a number. */
+.self-sessions .public-facts dd {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.self-sessions .public-facts + .small {
+  max-width: 82ch;
+  margin: 0 0 var(--space-4);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  line-height: 1.7;
+}
+
 .session-offer {
-  display: grid;
-  gap: var(--space-3);
+  display: block;
 }
 
-.session-consent span {
-  color: var(--color-text-muted);
+.session-offer > .notice {
+  margin-bottom: var(--space-5);
 }
 
-.session-booked .row {
-  margin-top: var(--space-2);
+.session-offer .band-main > .button-small {
+  margin-bottom: var(--space-5);
 }
 
+.session-offer .band-main > .checkbox:last-child {
+  min-height: 44px;
+  align-items: center;
+}
+
+.session-offer .band-main > .checkbox:last-child input {
+  margin: 0;
+}
+
+/* One window: the days of the week as a strip of seven cells, then from and to. */
 .session-window {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-line);
-}
-
-.session-days {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-3);
-  margin: 0;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
   padding: 0;
   border: 0;
 }
 
+.session-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 3px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+}
+
 .session-day {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 40px;
+  border-radius: 1px;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color var(--transition), background var(--transition);
+}
+
+/* The box itself covers its cell, unseen; the cell is the switch. */
+.checkbox.session-day input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+}
+
+.session-day:hover {
+  color: var(--color-text);
+}
+
+.session-day:has(input:checked) {
+  background: var(--metal);
+  color: var(--color-accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), inset 1px 0 0 rgba(0, 0, 0, 0.22);
+}
+
+.session-day:has(input:focus-visible) {
+  outline: 3px double var(--color-focus);
+  outline-offset: 2px;
+  z-index: 1;
+}
+
+.session-window .rules-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: center;
+  margin: 0;
+}
+
+.session-window .rules-row .input {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* An intake question: the question, whether it must be answered, and Remove. */
+.session-offer .rules-row-wide {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.session-offer .rules-row-wide .checkbox {
+  align-items: center;
   min-height: 44px;
+  white-space: nowrap;
+}
+
+.session-offer .rules-row-wide .checkbox input {
+  margin: 0;
+}
+
+/* Booked sessions. */
+.session-bookings .settings-heading {
+  margin-top: var(--space-6);
+}
+
+.session-booking-list .list-row {
+  align-items: flex-start;
+}
+
+.session-booking-list .list-row-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.session-booking-list .list-row-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+.session-booking-list .list-row .badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.session-booking-list .list-row[data-state="booked"] .badge {
+  border-color: var(--color-line-bright);
+  color: var(--color-text);
+}
+
+.session-booking-list .list-row[data-state="booked"] .badge::before {
+  background: currentColor;
+}
+
+.session-booking-list .list-row:is([data-state="ended"], [data-state="blocked"]) .list-row-title {
+  color: var(--color-text-muted);
+}
+
+.session-booking-list .list-row[data-state="blocked"] .badge {
+  border-style: dashed;
+}
+
+/* A session opened to read: it takes the whole row. What the visitor wrote is a statement,
+   three fine lines down its left edge; the conversation follows as it was held. */
+.session-booking-list .list-row:has(.session-detail) .list-row-main {
+  flex-basis: 100%;
 }
 
 .session-detail {
-  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px dashed var(--color-line-strong);
 }
 
-/* ------------------------------------------------------------------ shared memory */
-
-.shared-pick {
-  flex-wrap: wrap;
-  margin-bottom: var(--space-4);
-}
-
-.history {
-  list-style: none;
+.session-detail > * {
+  min-width: 0;
   margin: 0;
-  padding: 0;
 }
 
-.history-year {
-  position: relative;
-  padding: 0 0 var(--space-4) var(--space-5);
-  border-left: 1px solid var(--color-line-strong);
+.session-detail > .ask-note-turns {
+  padding: var(--space-3) var(--space-4) var(--space-3) calc(7px + var(--space-4));
+  background: var(--ruled-edge) left top / 7px 100% no-repeat;
 }
 
-.history-year-label {
-  margin: 0 0 var(--space-3);
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
+.session-detail > .ask-note-turns > div {
+  grid-template-columns: minmax(6.5rem, 12rem) minmax(0, 1fr);
 }
 
-.history-year-label::before {
-  content: "";
-  position: absolute;
-  left: -5px;
-  top: 0.55em;
-  width: 9px;
-  height: 9px;
-  background: var(--color-text);
-  clip-path: var(--lean);
+.session-detail > .ask-note-turns dt {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.history-stories {
-  list-style: none;
+@media (max-width: 900px) {
+  .session-window {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .self-sessions .public-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .self-sessions .public-facts > div {
+    border-left: 0;
+    border-top: 1px solid var(--color-line);
+  }
+
+  .self-sessions .public-facts > div:first-child {
+    border-top: 0;
+  }
+
+  .self-sessions > .row .button,
+  .session-offer .band-main > .button-small {
+    width: 100%;
+  }
+
+  .session-day {
+    min-height: 44px;
+    font-size: 0.6875rem;
+    letter-spacing: 0.02em;
+  }
+
+  /* From and to side by side, Remove under them. */
+  .session-window .rules-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .session-window .rules-row > .button {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  /* The question across, then Required and Remove. */
+  .session-offer .rules-row-wide {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .session-offer .rules-row-wide > .input {
+    grid-column: 1 / -1;
+  }
+
+  .session-offer .rules-row-wide > .button {
+    grid-column: auto;
+    justify-self: end;
+  }
+
+  .session-booking-list .list-row-actions {
+    width: 100%;
+  }
+
+  .session-booking-list .list-row-actions .button {
+    flex: 1 1 auto;
+  }
+
+  .session-detail > .ask-note-turns > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------------ sessions: house rules, booking and the session page */
+
+/* The house rules, quoted: three fine lines down their left edge. */
+.session-rules {
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-3) calc(7px + var(--space-4));
+  border: 0;
+  border-radius: 0;
+  background: var(--ruled-edge) left top / 7px 100% no-repeat;
+}
+
+.session-rules .eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+}
+
+.session-rules .eyebrow::before {
+  display: none;
+}
+
+.session-rules p:not(.eyebrow) {
+  max-width: 68ch;
   margin: 0;
-  padding: 0;
+  color: var(--color-text);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Booking, under the chat on the public page. */
+.session-book {
+  margin-top: var(--space-6);
+}
+
+.session-book .plate-number svg {
+  font-size: 17px;
+}
+
+.session-book .plate-lead {
+  max-width: 62ch;
+}
+
+.session-book > .quiet {
+  margin: 0;
+}
+
+.session-form {
   display: grid;
   gap: var(--space-4);
 }
 
-.history-story-title {
+.session-form > * {
+  min-width: 0;
+}
+
+.session-form .field,
+.session-form > .notice {
   margin: 0;
+}
+
+.session-form .grid {
+  gap: var(--space-4);
+}
+
+.session-form .textarea {
+  min-height: 76px;
+}
+
+/* What the visitor agrees to: a dashed sheet until it is ticked. */
+.session-consent {
+  padding: var(--space-4);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  transition: border-color var(--transition);
+}
+
+.session-consent span {
+  min-width: 0;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.session-consent:has(input:checked) {
+  border-style: solid;
+  border-color: var(--color-line-bright);
+}
+
+.session-consent:has(input:checked) span {
+  color: var(--color-text);
+}
+
+.session-form .form-actions {
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  margin-top: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.session-form .form-actions > .small {
+  display: inline-flex;
+  flex: 1 1 220px;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.session-form .form-actions > .small svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-accent);
+  font-size: 15px;
+}
+
+/* Booked: the link is the only way in, so it is set as a key on a bright plate. */
+.session-booked {
+  margin: 0;
+  border-color: var(--color-line-bright);
+}
+
+.session-booked > div {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.session-booked p {
+  min-width: 0;
+  margin: 0;
+}
+
+.session-booked .row {
+  margin-top: 0;
+}
+
+/* The session itself. */
+.session-card .ask-status {
+  flex-wrap: wrap;
+}
+
+.session-card .ask-status > span:not([class]) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Its questions, drawn: one cut of ribbon for each, bright while it is still to ask. */
+.session-meter {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 5px 2px;
+  padding-left: calc(9px + var(--space-3));
+}
+
+.session-meter i {
+  --cut: 4px;
+  flex: none;
+  width: 20px;
+  height: 7px;
+  background: var(--ruled-faint), rgba(255, 255, 255, 0.04);
+  clip-path: var(--lean);
+}
+
+.session-meter i[data-left="true"] {
+  background: var(--ruled);
+}
+
+.session-card:not([data-state="active"]) .session-meter i[data-left="true"] {
+  opacity: 0.4;
+}
+
+.session-card .chat-by-kind {
+  --cut: 4px;
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 0;
+  background: var(--metal);
+  color: var(--color-accent-ink);
   font-weight: 500;
+  letter-spacing: 0.12em;
+  clip-path: var(--chamfer);
 }
 
+.session-card .chat-source {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+  overflow-wrap: anywhere;
+}
+
+.session-card[data-online="false"] .chat-form .textarea {
+  border-style: dashed;
+}
+
+@media (max-width: 640px) {
+  /* Inside the public card the booking is a section, not a plate within a plate. */
+  .public-card .session-book {
+    padding: var(--space-5) 0 0;
+    border-width: 1px 0 0;
+    border-radius: 0;
+    background: none;
+  }
+
+  .session-rules {
+    padding: var(--space-3) var(--space-3) var(--space-3) calc(7px + var(--space-3));
+  }
+
+  .session-form .form-actions .button,
+  .session-booked .row .button {
+    flex: 1 1 100%;
+  }
+
+  /* The link needs the width more than the plate needs its sign. */
+  .session-booked::before {
+    display: none;
+  }
+
+  .session-card .chat-keys {
+    display: none;
+  }
+
+  .session-card .chat-form .button {
+    flex: 1 1 auto;
+  }
+
+  .session-card .chat-question,
+  .session-card .chat-answer {
+    max-width: 96%;
+  }
+}
+
+/* ------------------------------------------------------------------ shared memory */
+
+/* Which history: as many switches as there are, wrapping. */
+.shared-pick {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-bottom: var(--space-5);
+}
+
+.shared-pick button {
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.shared > .form-actions {
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.shared .fingerprint {
+  display: block;
+  margin-top: var(--space-1);
+}
+
+/* The timeline. The years stand in the display face beside one rail; each year sits
+   on the rail with a short cut of ribbon, and its stories hang from it. */
+.history {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-year {
+  --rail: 132px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  padding: 0;
+  border: 0;
+}
+
+.history-year-label {
+  margin: 0;
+  padding: 0 var(--space-5) 0 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-size: clamp(2rem, 3.4vw, 2.75rem);
+  font-weight: 400;
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.015em;
+  text-align: right;
+}
+
+.history-year-label::before {
+  display: none;
+}
+
+/* On a wide screen the year stays in view while its stories pass. */
+@media (min-width: 761px) {
+  .history-year-label {
+    position: sticky;
+    top: calc(var(--header-height) + var(--space-4));
+    align-self: start;
+  }
+}
+
+.history-stories {
+  position: relative;
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 var(--space-7) var(--space-6);
+  border-left: 1px solid var(--color-line-strong);
+  list-style: none;
+}
+
+.history-stories::before {
+  --cut: 4px;
+  content: "";
+  position: absolute;
+  top: calc(clamp(2rem, 3.4vw, 2.75rem) / 2 - 4px);
+  left: -11px;
+  width: 21px;
+  height: 9px;
+  background: var(--ruled), var(--color-surface);
+  clip-path: var(--lean);
+}
+
+/* The rail runs out under the last year. */
+.history-year:last-child .history-stories {
+  padding-bottom: var(--space-2);
+  border-image: linear-gradient(180deg, var(--color-line-strong) 55%, transparent) 1;
+}
+
+.history-story {
+  min-width: 0;
+  padding: 0 0 var(--space-5);
+}
+
+.history-story + .history-story {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.history-story:last-child {
+  padding-bottom: 0;
+}
+
+.history-story-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: 0.2em;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.history-story-title > svg {
+  flex: none;
+  align-self: center;
+  color: var(--color-text-faint);
+  font-size: 16px;
+}
+
+/* When, who is in it, who added it. */
 .history-story-meta {
-  margin: var(--space-1) 0 var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
-.history-story-body {
-  margin: var(--space-2) 0;
-  white-space: pre-wrap;
+/* A photo is mounted on a dark plate the size of the picture. */
+.history-photo {
+  width: fit-content;
+  max-width: min(100%, 480px);
+  margin: var(--space-4) 0 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
 }
 
 .history-photo img {
-  max-width: min(100%, 420px);
+  max-width: 100%;
+  max-height: 420px;
   height: auto;
+  margin: 0;
+  border-radius: 1px;
+}
+
+.history-story-body {
+  max-width: 68ch;
+  margin: var(--space-4) 0 0;
+  color: var(--color-text);
+  font-size: 1rem;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.history-story > .text-button {
+  min-height: 32px;
+  margin-top: var(--space-3);
+  color: var(--color-text-faint);
+  text-decoration-color: var(--color-line-strong);
+}
+
+.history-story > .text-button:hover {
+  color: var(--color-text);
+}
+
+/* Adding a story. */
+.shared-story fieldset.checkbox-list {
+  margin-bottom: var(--space-5);
+}
+
+.shared-story fieldset.checkbox-list > legend {
+  padding: 0 var(--space-2);
+  margin-left: var(--space-2);
+}
+
+.shared-story .checkbox-list .checkbox {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.shared-story .capture-photo {
+  margin: 0;
+}
+
+.shared-story .memory-photo {
+  width: fit-content;
+  min-width: 11rem;
+  max-width: min(100%, 420px);
+  margin: 0;
+}
+
+.shared-story .memory-photo .text-button {
+  min-height: 44px;
+}
+
+.shared-story > .form-actions,
+.shared-new > .form-actions {
+  margin-top: 0;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+/* People. */
+.shared-people-list .list-row,
+.shared-member-list .list-row,
+.shared-heir-list .list-row {
+  padding-block: var(--space-3);
+}
+
+.shared-people-list .list-row-title,
+.shared-member-list .list-row-title,
+.shared-heir-list .list-row-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.shared-people-list .list-row-title .faint {
+  font-size: var(--text-sm);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.shared-people-list .list-row-meta {
+  max-width: 78ch;
+  padding-left: calc(18px + var(--space-3));
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .shared-person-form {
   display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
 }
 
-@media (max-width: 560px) {
+.shared-person-form .rules-row {
+  align-items: center;
+  margin: 0;
+}
+
+/* Members and heirs. */
+.shared-member-list .list-row[data-accepted="false"] .list-row-title {
+  color: var(--color-text-muted);
+}
+
+.shared-member-list .list-row[data-accepted="false"] .badge:not(.badge-strong) {
+  border-style: dashed;
+}
+
+.shared-member-list .list-row-title .faint {
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
+
+/* An heir waits for a release: the list is dashed until then. */
+.shared-heir-list,
+.shared-heir-list .list-row {
+  border-style: dashed;
+  border-color: var(--color-line-strong);
+}
+
+.shared-heir-list .list-row-title {
+  color: var(--color-text-muted);
+}
+
+.shared-members .settings-heading {
+  margin-top: var(--space-6);
+}
+
+.shared-member-form,
+.shared-heir-form {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+/* Keep a copy. Leaving sits apart, under a rule. */
+.shared-keep > .row + .text-button,
+.shared-keep > .row + .subpanel {
+  margin-top: var(--space-5);
+}
+
+.shared-keep > .text-button {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+  color: var(--color-text-faint);
+  text-align: left;
+  text-decoration-color: var(--color-line-strong);
+}
+
+.shared-keep > .text-button:hover {
+  color: var(--color-text);
+}
+
+.shared-keep > .subpanel {
+  border-style: dashed;
+}
+
+.shared-keep > .subpanel > .small {
+  max-width: 68ch;
+}
+
+@media (max-width: 760px) {
+  /* The year stands over its stories. */
   .history-year {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .history-year-label {
+    padding: 0 0 var(--space-3);
+    font-size: 2.25rem;
+    text-align: left;
+  }
+
+  .history-stories {
+    margin-left: 4px;
+    padding: 0 0 var(--space-6) var(--space-5);
+  }
+
+  .history-stories::before {
+    top: 0.75rem;
+  }
+
+  .history-story-title {
+    font-size: 1.3125rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .shared-pick {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .shared-pick button {
+    min-height: 44px;
+    text-align: left;
+  }
+
+  .history-stories {
     padding-left: var(--space-4);
   }
-  .voice-row {
-    align-items: stretch;
+
+  .history-story > .text-button {
+    min-height: 44px;
+  }
+
+  /* The person: the name across, relation and membership side by side, Add under them. */
+  .shared-person-form .rules-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .shared-person-form .rules-row > :first-child,
+  .shared-person-form .rules-row > .button {
+    grid-column: 1 / -1;
+  }
+
+  .shared-person-form .rules-row > .button {
+    justify-self: stretch;
+  }
+
+  .shared-people-list .list-row-meta {
+    padding-left: 0;
+  }
+
+  .shared > .form-actions .button,
+  .shared-keep > .row .button,
+  .shared-member-form .band-main > .button,
+  .shared-heir-form .band-main > .button,
+  .shared-heir-list .list-row-actions,
+  .shared-heir-list .list-row-actions .button {
+    width: 100%;
+  }
+
+  .shared-keep > .row .button {
+    white-space: normal;
+    padding-block: var(--space-2);
   }
 }
