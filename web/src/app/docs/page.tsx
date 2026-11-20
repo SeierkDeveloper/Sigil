@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { CodeBlock } from "@/components/CodeBlock";
-import { buildFromSource, configLocations, mcpConfig, shellCommand } from "@/lib/connector";
+import { buildFromSource, claudeCodeCommand, configLocations, mcpConfig, shellCommand, vscodeConfig } from "@/lib/connector";
 import { site } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Set up the Sigil connector for Claude Desktop, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, the browser extension, Sign in with Sigil, sharing, the API and the encryption model.",
+    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the API and the encryption model.",
 };
 
 const KEY = "sigil_app.<app id>.<secret>";
@@ -30,6 +30,11 @@ const toc = [
   ["extension", "Browser extension"],
   ["sign-in-with-sigil", "Sign in with Sigil"],
   ["sharing", "Sharing a folder"],
+  ["legacy", "Legacy"],
+  ["devices", "Phone and devices"],
+  ["agents", "Agent vaults"],
+  ["spaces", "Team spaces"],
+  ["proof", "Proof of a real life"],
   ["import", "Importing"],
   ["api", "API"],
   ["encryption", "Encryption model"],
@@ -507,6 +512,214 @@ export default function Docs() {
                 old key, which opens nothing that is stored now.
               </li>
             </ol>
+          </section>
+
+          <section id="legacy" className="doc-section">
+            <h2>Legacy</h2>
+            <p>
+              Under <strong>Legacy</strong> you name the people who receive your vault if you stop using it: which folders each one gets, whether
+              they may talk to your AI self, how long without a sign of you counts (3, 6 or 12 months), and how many of them must act together.
+            </p>
+            <ol>
+              <li>
+                <strong>Naming someone.</strong> Paste their vault code and compare its fingerprint with them, or send them an invite link. The link
+                carries a one-time secret after the <code>#</code>; their vault answers with its public key and a tag made with that secret, and your
+                vault checks the tag and shows their fingerprint before it seals anything to them.
+              </li>
+              <li>
+                <strong>Sealing.</strong> Your browser makes a legacy key, splits it with Shamir&apos;s secret sharing (the audited{" "}
+                <code>shamir-secret-sharing</code> library), and seals each share to one person&apos;s vault public key. Each person&apos;s bundle (the keys
+                of their folders and, if allowed, your AI self&apos;s rules and model key) is encrypted under a key from the legacy key and then sealed
+                to that person&apos;s vault, so opening it takes the shares and that person&apos;s own vault. Every change makes a new legacy key, so
+                shares from before stop fitting.
+              </li>
+              <li>
+                <strong>The heartbeat.</strong> Any sign-in or vault action counts as alive, and Check in does it by hand. The tab shows when the next
+                check-in is due. A first warning comes a month before the end (a third of the period for short ones) and a last one a week before; each
+                is written to your read log and shown in the vault when you come back. Sigil has no email or other channel to reach you.
+              </li>
+              <li>
+                <strong>Release.</strong> Once the whole period has passed, the server hands each person their share. One asks for a release; the
+                others pass their share to them, sealed to the key you named for that person (taken from their own copy of the plan, not from the
+                server). The shares are combined in their browser, their bundle opens, and they keep a copy under their own vault key. They read
+                exactly the folders you left them and, if you allowed it, talk to your AI self in legacy mode: your rules, only those folders, and
+                every question and answer sealed into your log.
+              </li>
+              <li>
+                <strong>Coming back.</strong> Your next sign-in closes the plan again, and the vault tells you what was reached while you were away. If
+                it was released, seal the plan again for a new legacy key.
+              </li>
+            </ol>
+            <p>
+              <strong>Limits.</strong> The server decides when the period is over. It cannot open a share or a bundle, but a server that worked
+              together with enough of your trusted people could hand out shares early. What a person opened while the plan was released stays with
+              them. The full picture is on the <Link href="/legacy">legacy page</Link> and in the <Link href="/threat-model">threat model</Link>.
+            </p>
+          </section>
+
+          <section id="devices" className="doc-section">
+            <h2>Phone and devices</h2>
+            <p>
+              Sigil installs as an app on a phone or a computer: in Safari use Share, Add to Home Screen; in Chrome use Install. The app shell
+              works offline. Installed on Android, Sigil also appears in the share sheet; Safari on iPhone does not offer that to web apps, so there the capture screen is the way in.
+            </p>
+            <h3>Add a device by QR code</h3>
+            <ol>
+              <li>On the new device, open the vault and choose <strong>Add this device</strong>. It makes a one-time key pair and shows a QR code and a ten-character code made from the public key.</li>
+              <li>
+                On a device where your vault is open, go to <strong>Devices</strong> and scan the code, scan it with the phone&apos;s camera app, or type
+                it. The vault checks that the key the server returns is the one the code was made from, and both screens show the same fingerprint.
+              </li>
+              <li>
+                <strong>It matches: send my vault</strong> makes a key slot for the new device (a device secret from which its sign-in token and the key
+                that wraps your vault key are derived) and seals the vault key and that secret to the one-time key. The relay keeps the sealed box
+                for at most ten minutes and hands it out once.
+              </li>
+              <li>The new device opens the box, signs in with its own key slot and keeps its device key in the browser as a key the page can use but never read out.</li>
+            </ol>
+            <p>
+              <strong>Revoke</strong> deletes the device&apos;s key slot and ends every session it opened at once; the next time it reaches Sigil it
+              forgets its device key and its offline copy. What it already showed cannot be taken back.
+            </p>
+            <h3>Quick capture</h3>
+            <p>
+              Share text, a link or a photo to Sigil from any app, or open <Link href="/capture">/capture</Link>. It is sealed on the phone to your
+              vault&apos;s public key (checked against the key the device saw when the vault was last open) and waits in your inbox. The vault does not
+              have to be unlocked. Photos are made smaller on the device and kept inside the memory&apos;s encrypted body. Offline, the capture is
+              sealed and waits on the device until there is a connection.
+            </p>
+            <h3>Offline copy</h3>
+            <p>
+              Under Devices you can keep an encrypted copy of the vault on a device: the server&apos;s answer as it came (ciphertext) and the locked
+              vault key for the way you signed in there. Without a network the vault offers to open that copy, read only, with the same passkey,
+              wallet, phrase or device key.
+            </p>
+          </section>
+
+          <section id="agents" className="doc-section">
+            <h2>Agent vaults</h2>
+            <p>
+              Under <strong>Agents</strong> you give an AI agent a memory of its own: its own folder, which only it and you write, other folders it may
+              read or also write, and a switch for each tool. Its key is an ordinary app key, so it runs through the same connector; the connector sees
+              that the key belongs to an agent and adds these tools:
+            </p>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tool</th>
+                    <th>What it does</th>
+                    <th>In your log</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>
+                      <code>remember</code>
+                    </td>
+                    <td>Writes a memory to its own folder, or a folder or team space it may write, encrypted on your machine</td>
+                    <td>Remembered, with the memory</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>recall</code>
+                    </td>
+                    <td>Searches what it may read, by meaning and words on your machine, and returns the best matches in full</td>
+                    <td>The index and each memory read</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>forget</code>
+                    </td>
+                    <td>Deletes memories for good, only where it may write. Off until you turn it on</td>
+                    <td>Forgot, with the memory id</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>leave_handoff</code>
+                    </td>
+                    <td>Leaves an encrypted note for its next session, or for the agents in a team space</td>
+                    <td>Left a handoff note</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>pick_up_handoffs</code>
+                    </td>
+                    <td>Returns the notes waiting for it and marks them picked up</td>
+                    <td>Picked up a handoff note</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p>
+              The server enforces each switch and each folder&apos;s read or write mode on every call. Notes for the next session are encrypted with a
+              key derived from the agent&apos;s secret; you hold that secret under your vault key, so you can read them under Agents.
+            </p>
+            <h3>Setting it up</h3>
+            <p>Make the agent in your vault, copy its key once, and add the connector to the client with it.</p>
+            <p>
+              <strong>Claude Code</strong>, for every project of your user:
+            </p>
+            <CodeBlock code={claudeCodeCommand(KEY)} label="Terminal" />
+            <p>
+              <strong>Cursor</strong>, in <code>~/.cursor/mcp.json</code> or <code>.cursor/mcp.json</code> in one project:
+            </p>
+            <CodeBlock code={mcpConfig(KEY)} label="mcp.json" language="json" />
+            <p>
+              <strong>VS Code</strong>, in <code>.vscode/mcp.json</code>:
+            </p>
+            <CodeBlock code={vscodeConfig(KEY)} label=".vscode/mcp.json" language="json" />
+            <p>
+              <strong>Claude Desktop</strong> takes the same JSON as Cursor, in the file named <Link href="#claude-desktop">above</Link>. Any other MCP
+              client that starts a server over stdio uses the command and environment shown under <Link href="#other-clients">other clients</Link>.
+            </p>
+            <p>
+              Agents are told to call <code>pick_up_handoffs</code> at the start of a session and <code>leave_handoff</code> before they stop. The
+              connector routes they use: <code>GET /api/connector/v1/agent</code>, <code>POST /api/connector/v1/remember</code>,{" "}
+              <code>POST /api/connector/v1/forget</code>, <code>GET</code> and <code>POST /api/connector/v1/handoffs</code>,{" "}
+              <code>POST /api/connector/v1/handoffs/picked</code>, <code>GET /api/connector/v1/spaces</code> and{" "}
+              <code>POST /api/connector/v1/spaces/&lt;id&gt;/memories</code> and <code>/forget</code>. Each is in the{" "}
+              <Link href="/docs/api">API reference</Link>.
+            </p>
+          </section>
+
+          <section id="spaces" className="doc-section">
+            <h2>Team spaces</h2>
+            <p>
+              A team space is one shared memory that several vaults and agents read and write. Make one under Agents, then add people by vault code and
+              your agents by name, each with a role: <strong>reads</strong>, <strong>reads and writes</strong>, or <strong>admin</strong> (who also adds
+              and removes members). A member who may write can add their own agents.
+            </p>
+            <ul>
+              <li>The space has its own key. Every member, you included, receives it sealed to their own public key: a vault&apos;s box key, or the key an agent derives from its secret.</li>
+              <li>
+                Each member entry carries a tag made with the space key over its id, kind, key and role. The server cannot make one, so a member it
+                slipped in shows as not added by a key holder, and nothing is sealed until an admin removes it.
+              </li>
+              <li>Removing a member gives the space a new key on an admin&apos;s device: every memory encrypted again, the key and names sealed again for each member who stays. The agents of a removed vault go with it.</li>
+              <li>Agents in a space recall what is in it, remember into it, and leave handoff notes for the other agents there.</li>
+            </ul>
+          </section>
+
+          <section id="proof" className="doc-section">
+            <h2>Proof of a real life</h2>
+            <p>
+              A <strong>life certificate</strong> shows that a vault has a long, continuous sealed history without showing anything in it. While your
+              vault is open, your browser signs one presence statement per seal period with an Ed25519 key derived from your vault key; the server
+              checks the signature and writes a presence entry, which is sealed with the hour like every other entry.
+            </p>
+            <p>
+              Under <strong>Proof</strong>, Make a certificate gathers every sealed presence hour with its proof, counts first and last seal, hours and
+              days with activity, the longest gap and how long the history has run with no gap over 30 days, and signs the whole with the same key.
+              Download it as a file, or publish it by link; the link opens the <Link href="/verify#certificate">verify page</Link>, which checks the
+              signature, every statement, every proof and the summary in the browser, compares the roots with the seals the site publishes and, when
+              the seals are anchored and a public read address is set, with SigilSeal on chain.
+            </p>
+            <p>
+              <strong>What it proves, and what it does not.</strong> It proves that whoever could open this vault signed in each listed hour and that
+              the site sealed it then. It does not prove who that is, that it is one person, that a person rather than a program kept the vault open,
+              or anything about the vault&apos;s contents. While seals are local, the site holds the list of roots.
+            </p>
           </section>
 
           <section id="import" className="doc-section">

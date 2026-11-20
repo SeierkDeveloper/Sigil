@@ -119,6 +119,58 @@ const publicEndpoints: Endpoint[] = [
     response: "The file itself, JSON or binary.",
     notes: "Any other model or file is 404. Missing files are fetched once from the public model hub unless SIGIL_MODEL_FETCH is off.",
   },
+  {
+    id: "seal-roots",
+    method: "POST",
+    path: "/api/seals/roots",
+    summary: "The published roots of many hours at once, for checking a life certificate.",
+    params: [["hours", "Up to 20,000 seal numbers."]],
+    response: `{ "roots": { "496233": "0x...", "496234": "0x..." } }`,
+    notes: "Hours without a seal are left out.",
+  },
+  {
+    id: "certificate",
+    method: "GET",
+    path: "/api/certificates/:id",
+    summary: "A life certificate its owner published by link, exactly as it was signed. It holds no content of the vault.",
+    response: `{
+  "format": "sigil-life-certificate",
+  "version": 1,
+  "body": {
+    "origin": "https://<your Sigil site>",
+    "periodSeconds": 3600,
+    "signingKey": "<Ed25519 public key, base64url>",
+    "issuedAt": "2026-11-20T10:00:00.000Z",
+    "summary": { "firstHour": 490000, "lastHour": 496233, "activeHours": 812, "activeDays": 203, "longestGapHours": 70, "continuousMonths": 8, "...": "..." },
+    "hours": [{ "hour": 490000, "entry": { "id": "...", "at": "...", "salt": "...", "sig": "..." }, "index": 3, "proof": ["0x..."], "root": "0x..." }]
+  },
+  "signature": "<Ed25519 signature, base64url>"
+}`,
+    notes: "404 no_certificate once the owner takes it down. How to check one is on the verify page.",
+  },
+  {
+    id: "pairing-open",
+    method: "POST",
+    path: "/api/devices/pairings",
+    summary: "A new device opens a pairing: its one-time X25519 public key, the ten-character code made from that key, and a secret only it holds.",
+    params: [
+      ["id", "A new random id."],
+      ["publicKey", "The one-time public key, base64url."],
+      ["code", "XXXXX-XXXXX, the hash of the key in Crockford base32. Refused when it does not match the key."],
+      ["pollSecret", "32 random bytes, base64url. The server keeps its hash."],
+    ],
+    response: `{ "expiresAt": "2026-11-20T10:10:00.000Z" }`,
+    notes: "A pairing lasts ten minutes. 20 a minute per address.",
+  },
+  {
+    id: "pairing-poll",
+    method: "POST",
+    path: "/api/devices/pairings/:id/poll",
+    summary: "The new device asks for its sealed box with its poll secret. It is handed out once and then deleted.",
+    params: [["pollSecret", "The secret from opening the pairing."]],
+    response: `{ "state": "ready", "sealed": "s1..." }`,
+    notes: "state is waiting, ready or gone. The box is sealed to the one-time key; only the new device opens it.",
+  },
 ];
 
 const askEndpoints: Endpoint[] = [
@@ -283,6 +335,48 @@ const connectorEndpoints: Endpoint[] = [
     response: `{ "ok": true }`,
     notes: "30 a minute per app.",
   },
+  {
+    id: "agent",
+    method: "GET",
+    path: "/api/connector/v1/agent",
+    summary: "For an agent key: its own folder, its tool rules and the folders it may write.",
+    response: `{ "appId": "...", "homeFolderId": "...", "rules": { "remember": true, "recall": true, "forget": false, "handoff": true }, "writable": ["..."], "publicKey": "..." }`,
+    notes: "403 not_agent for an ordinary app key. The tools of an agent with recall off still get the folders they may write from /folders, so they can encrypt for them.",
+  },
+  {
+    id: "remember",
+    method: "POST",
+    path: "/api/connector/v1/remember",
+    summary: "Memories an agent encrypted on its machine with the key of a folder it may write.",
+    params: [["memories", "1 to 20 of { id, folderId, head, body }, each an envelope."]],
+    response: `{ "appId": "...", "saved": 1 }`,
+    notes: "403 remember_off, or read_only for a folder it may not write. 300 an hour per agent. Each is logged as remember.",
+  },
+  {
+    id: "forget",
+    method: "POST",
+    path: "/api/connector/v1/forget",
+    summary: "Deletes memories for good, only in folders the agent may write.",
+    params: [["ids", "1 to 50 memory ids."]],
+    response: `{ "appId": "...", "deleted": ["..."], "refused": ["..."] }`,
+    notes: "403 forget_off unless the owner allowed it. Each deletion is logged as forget.",
+  },
+  {
+    id: "handoffs",
+    method: "GET",
+    path: "/api/connector/v1/handoffs",
+    summary: "Handoff notes waiting for this agent: its own from earlier sessions, and notes other agents left in its spaces.",
+    response: `{ "appId": "...", "handoffs": [{ "id": "...", "fromApp": "...", "spaceId": null, "sealed": "v1...", "createdAt": "..." }] }`,
+    notes: "POST the same path with { id, sealed, spaceId } to leave one, and POST /handoffs/picked with { ids } to mark them picked up. 403 handoff_off when the owner turned the tool off.",
+  },
+  {
+    id: "agent-spaces",
+    method: "GET",
+    path: "/api/connector/v1/spaces",
+    summary: "The team spaces this agent is in: the space key sealed to the agent's own key, the members and the memories.",
+    response: `{ "appId": "...", "spaces": [{ "id": "...", "meta": "v1...", "epoch": 2, "me": { "id": "...", "role": "write", "sealedKey": "s1..." }, "members": [], "memories": [] }] }`,
+    notes: "POST /spaces/:id/memories with { memories } writes, POST /spaces/:id/forget with { ids } deletes, with a write role. Every call is logged as space.",
+  },
 ];
 
 const errors: [string, string, string][] = [
@@ -301,6 +395,13 @@ const errors: [string, string, string][] = [
   ["429", "rate_limited", "Too many requests. Wait a little and try again."],
   ["429", "propose_limit", "The app sent 30 suggestions in the last hour."],
   ["429", "link_busy", "The ask link had as many questions as it takes in an hour."],
+  ["403", "not_releasable", "A legacy plan was asked for a share or a bundle while its owner is still active."],
+  ["403", "not_agent", "An agent route was called with an ordinary app key."],
+  ["403", "remember_off", "The owner turned this agent's tool off. Also recall_off, forget_off and handoff_off."],
+  ["403", "read_only", "An agent tried to write a folder it may only read."],
+  ["403", "role", "A space member tried something their role does not allow."],
+  ["404", "no_pairing", "No device is waiting with that code, or it expired or was used."],
+  ["404", "unknown_device", "A device that was revoked tried to sign in."],
 ];
 
 function EndpointBlock({ e }: { e: Endpoint }) {

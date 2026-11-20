@@ -16,3 +16,8 @@ export * from "./model";
 export * from "./self";
 export * from "./relay";
 export * from "./thinks";
+export * from "./legacy";
+export * from "./pairing";
+export * from "./agent";
+export * from "./space";
+export * from "./life";

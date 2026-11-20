@@ -114,6 +114,43 @@ const settings: [string, string][] = [
   ["--help, --version", "Print the usage, or the version."],
 ];
 
+const agentTools = [
+  {
+    name: "remember",
+    text: "Writes a memory to the agent's own folder, or to a folder or team space it may write. Encrypted on your computer.",
+    logged: "The agent remembered that memory.",
+    example: `Remembered "Parser state" in Cursor memory (id 7Rk2pWq9Lm4c).`,
+  },
+  {
+    name: "recall",
+    text: "Finds what the agent may read, its team spaces included, by meaning and words on your computer, and returns the best matches in full.",
+    logged: "The index, and each memory read.",
+    example: `1. Parser state
+   id: 7Rk2pWq9Lm4c | in Cursor memory | edited 2026-11-20
+
+Half done: tokens work, the tree does not yet.`,
+  },
+  {
+    name: "forget",
+    text: "Deletes memories by id, for good, only where the agent may write. Off until the owner allows it.",
+    logged: "The agent forgot that memory.",
+    example: "Forgot 1 memory.",
+  },
+  {
+    name: "leave_handoff",
+    text: "Leaves an encrypted note for the agent's next session, or for the other agents in a team space.",
+    logged: "The agent left a handoff note.",
+    example: "Left a note for this agent's next session.",
+  },
+  {
+    name: "pick_up_handoffs",
+    text: "Returns the notes waiting for the agent and marks them picked up. Agents are told to call it first.",
+    logged: "The agent picked up a handoff note.",
+    example: `From cursor, 2026-11-20:
+Next: wire the parser into the CLI.`,
+  },
+];
+
 export default function ConnectorPage() {
   return (
     <div className="page">
@@ -212,6 +249,37 @@ export default function ConnectorPage() {
               </article>
             ))}
           </div>
+        </section>
+
+        <section className="page-section" aria-labelledby="agent-tools-title">
+          <div className="section-header">
+            <h2 id="agent-tools-title" className="section-title">
+              Five more for an agent key
+            </h2>
+            <p className="section-lead">
+              When the key belongs to an agent vault, the connector notices at start and adds tools for the agent&apos;s own memory. The owner sets a
+              switch for each, and the server enforces it on every call.
+            </p>
+          </div>
+          <div className="tools">
+            {agentTools.map((t) => (
+              <article key={t.name} className="tool">
+                <div className="tool-main">
+                  <h3 className="tool-name">
+                    <code>{t.name}</code>
+                  </h3>
+                  <p className="tool-text">{t.text}</p>
+                  <p className="tool-logged">
+                    <span>In your read log</span> {t.logged}
+                  </p>
+                </div>
+                <CodeBlock code={t.example} label="What the agent receives" />
+              </article>
+            ))}
+          </div>
+          <p className="muted">
+            Setup for Claude Code, Cursor, VS Code and other clients is in the <Link href="/docs#agents">docs</Link>.
+          </p>
         </section>
 
         <section className="page-section" aria-labelledby="modes-title">

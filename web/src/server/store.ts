@@ -24,13 +24,15 @@ const str = (v: unknown) => (v == null ? null : String(v));
 
 // ---------------------------------------------------------------- users and key slots
 
-export type KeyslotKind = "passkey" | "wallet" | "phrase";
+export type KeyslotKind = "passkey" | "wallet" | "phrase" | "device";
 
 export interface KeyslotInput {
   kind: KeyslotKind;
   ref: string;
   authToken?: string;
   wrappedKey: string;
+  /** For a device: its name under the vault key. */
+  note?: string | null;
 }
 
 export interface PasskeyInput {
@@ -67,11 +69,11 @@ export function createUser(db: Db, init: VaultInit, userId = randomId()): string
   });
 }
 
-function insertKeyslot(db: Db, userId: string, slot: KeyslotInput): string {
+export function insertKeyslot(db: Db, userId: string, slot: KeyslotInput): string {
   const id = randomId();
   db.prepare(
-    "INSERT INTO keyslots (id, user_id, kind, ref, auth_hash, wrapped_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-  ).run(id, userId, slot.kind, slot.ref, slot.authToken ? tokenHash(slot.authToken) : null, slot.wrappedKey, now());
+    "INSERT INTO keyslots (id, user_id, kind, ref, auth_hash, wrapped_key, created_at, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  ).run(id, userId, slot.kind, slot.ref, slot.authToken ? tokenHash(slot.authToken) : null, slot.wrappedKey, now(), slot.note ?? null);
   return id;
 }
 
@@ -102,8 +104,8 @@ function toKeyslot(r: Row): KeyslotRow {
   return { id: String(r.id), userId: String(r.user_id), kind: r.kind as KeyslotKind, ref: String(r.ref), wrappedKey: String(r.wrapped_key) };
 }
 
-/** Finds a wallet or phrase key slot by its token. Compares hashes, so the token itself is never stored. */
-export function keyslotByToken(db: Db, kind: "wallet" | "phrase", ref: string, authToken: string): KeyslotRow | null {
+/** Finds a wallet, phrase or device key slot by its token. Compares hashes, so the token itself is never stored. */
+export function keyslotByToken(db: Db, kind: "wallet" | "phrase" | "device", ref: string, authToken: string): KeyslotRow | null {
   const r = db.prepare("SELECT * FROM keyslots WHERE kind = ? AND ref = ?").get(kind, ref) as Row | undefined;
   if (!r || !r.auth_hash || r.auth_hash !== tokenHash(authToken)) return null;
   db.prepare("UPDATE keyslots SET last_used_at = ? WHERE id = ?").run(now(), r.id as string);
@@ -134,13 +136,14 @@ export function updatePasskeyCounter(db: Db, credentialId: string, counter: numb
 }
 
 export function listKeyslots(db: Db, userId: string) {
-  return (db.prepare("SELECT id, kind, ref, created_at, last_used_at FROM keyslots WHERE user_id = ? ORDER BY created_at").all(userId) as Row[]).map((r) => ({
+  return (db.prepare("SELECT id, kind, ref, created_at, last_used_at, note FROM keyslots WHERE user_id = ? ORDER BY created_at").all(userId) as Row[]).map((r) => ({
     id: String(r.id),
     kind: r.kind as KeyslotKind,
-    // Wallet addresses are shown so the owner can tell wallets apart; other refs are not needed by the client.
-    label: r.kind === "wallet" ? String(r.ref) : null,
+    // Wallet addresses are shown so the owner can tell wallets apart; a device's id lets this device find itself in the list.
+    label: r.kind === "wallet" || r.kind === "device" ? String(r.ref) : null,
     createdAt: String(r.created_at),
     lastUsedAt: str(r.last_used_at),
+    ...(r.kind === "device" ? { note: str(r.note) } : {}),
   }));
 }
 
@@ -166,17 +169,36 @@ export function removeKeyslot(db: Db, userId: string, keyslotId: string): void {
     const others = db.prepare("SELECT COUNT(*) AS n FROM keyslots WHERE user_id = ? AND kind != 'phrase' AND id != ?").get(userId, keyslotId) as Row;
     if (Number(others.n) === 0) throw new HttpError(400, "Add another passkey or wallet before removing your last one.");
     db.prepare("DELETE FROM keyslots WHERE id = ?").run(keyslotId);
+    db.prepare("DELETE FROM sessions WHERE keyslot_id = ?").run(keyslotId);
     if (r.kind === "passkey") db.prepare("DELETE FROM passkeys WHERE credential_id = ? AND user_id = ?").run(String(r.ref), userId);
   });
 }
 
 // ---------------------------------------------------------------- sessions and challenges
 
-export function createSession(db: Db, userId: string): string {
+export function createSession(db: Db, userId: string, keyslotId: string | null = null): string {
   const token = toBase64Url(randomBytes(32));
   const expires = Date.now() + serverConfig.sessionDays * 86400_000;
-  db.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?)").run(tokenHash(token), userId, now(), expires);
+  db.prepare("INSERT INTO sessions (token_hash, user_id, created_at, expires_at, keyslot_id) VALUES (?, ?, ?, ?, ?)").run(tokenHash(token), userId, now(), expires, keyslotId);
   return token;
+}
+
+// ---------------------------------------------------------------- the heartbeat
+
+/** Any sign-in or vault action counts as alive. Written at most once a minute (once a legacy day where tests shorten days). */
+export function touchActive(db: Db, userId: string, at = new Date()): boolean {
+  const r = db.prepare("SELECT last_active_at FROM users WHERE id = ?").get(userId) as Row | undefined;
+  if (!r) return false;
+  const last = r.last_active_at ? Date.parse(String(r.last_active_at)) : 0;
+  if (at.getTime() - last < Math.min(60_000, serverConfig.legacyDayMs)) return false;
+  db.prepare("UPDATE users SET last_active_at = ? WHERE id = ?").run(at.toISOString(), userId);
+  return true;
+}
+
+export function lastActive(db: Db, userId: string): string | null {
+  const r = db.prepare("SELECT last_active_at, created_at FROM users WHERE id = ?").get(userId) as Row | undefined;
+  if (!r) return null;
+  return str(r.last_active_at) ?? String(r.created_at);
 }
 
 export function sessionUser(db: Db, token: string | null | undefined): string | null {
@@ -332,11 +354,11 @@ export function createApp(db: Db, userId: string, app: StoredApp): void {
 function writeGrants(db: Db, userId: string, appId: string, grants: StoredGrant[]): void {
   db.prepare("DELETE FROM grants WHERE app_id = ?").run(appId);
   const folderOk = db.prepare("SELECT 1 FROM folders WHERE user_id = ? AND id = ?");
-  const ins = db.prepare("INSERT INTO grants (app_id, user_id, folder_id, wrapped_key, created_at) VALUES (?, ?, ?, ?, ?)");
+  const ins = db.prepare("INSERT INTO grants (app_id, user_id, folder_id, wrapped_key, created_at, mode) VALUES (?, ?, ?, ?, ?, ?)");
   const at = now();
   for (const g of grants) {
     if (!folderOk.get(userId, g.folderId)) throw new HttpError(400, "A permission points at a folder that does not exist.");
-    ins.run(appId, userId, g.folderId, g.wrappedKey, at);
+    ins.run(appId, userId, g.folderId, g.wrappedKey, at, g.mode === "write" ? "write" : "read");
   }
 }
 
@@ -358,6 +380,8 @@ export function revokeApp(db: Db, userId: string, appId: string): void {
     db.prepare("DELETE FROM app_inbox WHERE app_id = ?").run(appId);
     db.prepare("DELETE FROM self_apps WHERE app_id = ?").run(appId);
     db.prepare("UPDATE ask_links SET revoked_at = COALESCE(revoked_at, ?) WHERE app_id = ?").run(now(), appId);
+    // A revoked agent leaves its team spaces: its token no longer works, and no admin seals to it again.
+    db.prepare("DELETE FROM space_members WHERE app_id = ?").run(appId);
   });
 }
 
@@ -370,7 +394,7 @@ export function deleteApp(db: Db, userId: string, appId: string): void {
 
 export function listApps(db: Db, userId: string) {
   const apps = db.prepare("SELECT * FROM apps WHERE user_id = ? ORDER BY created_at").all(userId) as Row[];
-  const grants = db.prepare("SELECT folder_id, wrapped_key FROM grants WHERE app_id = ? ORDER BY folder_id");
+  const grants = db.prepare("SELECT folder_id, wrapped_key, mode FROM grants WHERE app_id = ? ORDER BY folder_id");
   return apps.map((a) => ({
     id: String(a.id),
     meta: String(a.meta),
@@ -378,7 +402,7 @@ export function listApps(db: Db, userId: string) {
     createdAt: String(a.created_at),
     revokedAt: str(a.revoked_at),
     lastUsedAt: str(a.last_used_at),
-    grants: (grants.all(String(a.id)) as Row[]).map((g) => ({ folderId: String(g.folder_id), wrappedKey: String(g.wrapped_key) })),
+    grants: (grants.all(String(a.id)) as Row[]).map((g) => ({ folderId: String(g.folder_id), wrappedKey: String(g.wrapped_key), mode: g.mode === "write" ? ("write" as const) : ("read" as const) })),
   }));
 }
 
@@ -400,12 +424,12 @@ export function appFolders(db: Db, auth: AppAuth) {
   return (
     db
       .prepare(
-        `SELECT f.id, f.meta, g.wrapped_key, (SELECT COUNT(*) FROM memories m WHERE m.user_id = f.user_id AND m.folder_id = f.id) AS n
+        `SELECT f.id, f.meta, g.wrapped_key, g.mode, (SELECT COUNT(*) FROM memories m WHERE m.user_id = f.user_id AND m.folder_id = f.id) AS n
          FROM grants g JOIN folders f ON f.user_id = g.user_id AND f.id = g.folder_id
          WHERE g.app_id = ? AND g.user_id = ? ORDER BY f.created_at, f.id`,
       )
       .all(auth.appId, auth.userId) as Row[]
-  ).map((r) => ({ id: String(r.id), meta: String(r.meta), wrappedKey: String(r.wrapped_key), count: Number(r.n) }));
+  ).map((r) => ({ id: String(r.id), meta: String(r.meta), wrappedKey: String(r.wrapped_key), count: Number(r.n), mode: r.mode === "write" ? ("write" as const) : ("read" as const) }));
 }
 
 export function appIndex(db: Db, auth: AppAuth) {
@@ -503,8 +527,8 @@ function toEntry(r: Row): LogEntry {
 
 export function listLog(db: Db, userId: string, limit = 200, before?: string): LogEntry[] {
   const rows = before
-    ? db.prepare("SELECT * FROM read_log WHERE user_id = ? AND at < ? ORDER BY at DESC, id DESC LIMIT ?").all(userId, before, limit)
-    : db.prepare("SELECT * FROM read_log WHERE user_id = ? ORDER BY at DESC, id DESC LIMIT ?").all(userId, limit);
+    ? db.prepare("SELECT * FROM read_log WHERE user_id = ? AND at < ? ORDER BY at DESC, rowid DESC LIMIT ?").all(userId, before, limit)
+    : db.prepare("SELECT * FROM read_log WHERE user_id = ? ORDER BY at DESC, rowid DESC LIMIT ?").all(userId, limit);
   return (rows as Row[]).map(toEntry);
 }
 

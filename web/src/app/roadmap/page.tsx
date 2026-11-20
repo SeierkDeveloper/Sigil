@@ -96,12 +96,12 @@ const stages: Stage[] = [
   },
   {
     title: "Agents get memory",
-    status: "planned",
+    status: "core",
     summary: "The same vault, for the AI agents that work for you and your team.",
     items: [
-      { text: "Vaults for AI agents" },
-      { text: "Shared spaces for teams" },
-      { text: "Clean handoff from one agent to the next" },
+      { text: "Vaults for AI agents: their own folder and key, read and write rules, remember, recall, forget", built: true },
+      { text: "Team spaces shared by vaults and agents, with roles and a new key when someone is removed", built: true },
+      { text: "Sealed handoff notes from one agent session, or one agent, to the next", built: true },
       { text: "A memory for a whole company" },
     ],
   },
@@ -126,12 +126,14 @@ const stages: Stage[] = [
   },
   {
     title: "Everywhere",
-    status: "planned",
+    status: "started",
     summary: "Your vault on every device, and safe for the long run.",
     items: [
-      { text: "A phone app" },
+      { text: "An installable app for phones and computers: offline, a share target, quick capture with photos", built: true },
+      { text: "Add a device by QR code, with keys sealed to that device only, and revoke it", built: true },
+      { text: "Legacy: trusted people, split keys, an inactivity period and a release they open together", built: true },
       { text: "Recovery through people you trust" },
-      { text: "Legacy: what happens to your vault, decided in advance" },
+      { text: "Native apps in the app stores" },
       { text: "A network of nodes that store sealed data" },
     ],
   },
@@ -158,9 +160,10 @@ const stages: Stage[] = [
   },
   {
     title: "Proof of a real life",
-    status: "planned",
+    status: "started",
     summary: "Years of sealed history become a way to prove you are a real, continuous person, without biometrics.",
     items: [
+      { text: "Version 1: a signed certificate of continuous sealed history, checked in any browser against the seals", built: true },
       { text: "Proof of human from sealed history, with zero-knowledge proofs" },
       { text: "Sealed agreements" },
       { text: "A learning record you own" },

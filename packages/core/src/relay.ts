@@ -199,7 +199,7 @@ export function linkPair(secret: AskLinkSecret): BoxKeyPair {
 /** One question and its answer, sealed to the vault's own public key for the read log. */
 export interface AskNote {
   v: 1;
-  via: "link" | "app";
+  via: "link" | "app" | "legacy";
   /** The link's label or the app's name. */
   label: string;
   question: string;
@@ -210,4 +210,9 @@ export interface AskNote {
 
 export function askNoteContext(entryRef: string, by: string): string {
   return `ask-note:${entryRef}:${by}`;
+}
+
+/** A question to the AI self in legacy mode, sealed by the trusted person's browser to the owner's vault key for the log. */
+export function legacyAskContext(planId: string, noteId: string): string {
+  return `legacy-ask:${planId}:${noteId}`;
 }

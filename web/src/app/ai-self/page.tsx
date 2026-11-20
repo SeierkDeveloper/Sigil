@@ -6,7 +6,7 @@ import { ArrowIcon } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "The AI self",
-  description: "The long-term idea behind Sigil: an AI self that is yours, built on a memory you own. Its first version exists; most of this page is a vision, not a list of features.",
+  description: "The long-term idea behind Sigil: an AI self that is yours, built on a memory you own. Its first version exists, and so do the first steps of a self that outlives you; much of this page is a vision, not a list of features.",
 };
 
 const chapters = [
@@ -47,12 +47,12 @@ const chapters = [
     ],
   },
   {
-    when: "Far",
-    status: "Vision",
+    when: "Started",
+    status: "Version 1",
     title: "A self that outlives you",
     text: [
-      "Years of sealed history are something no one can fake in an afternoon. They could become a way to prove that a real, continuous person stands behind an AI self, without biometrics.",
-      "And they could let the people you choose talk to it after you are gone, by rules you wrote in advance: who, what, and for how long. Your memory, on your terms, forever.",
+      "The first steps exist. A legacy plan names the people who receive your vault, the folders each one gets, and whether they may talk to your AI self. Only together, only after the time you chose without a sign of you, they open it in their own browsers, and your AI self answers them in legacy mode, within your rules. And a life certificate shows that a vault has a long, continuous sealed history, without showing a word of it.",
+      "What is still a vision: turning years of sealed history into proof that a real, continuous person stands behind an AI self, without biometrics and without revealing anything, and recovery through the people you trust. Your memory, on your terms, forever.",
     ],
   },
 ];
@@ -73,13 +73,13 @@ export default function AiSelf() {
         <PageHeader
           eyebrow="Vision"
           title="An AI self that is yours"
-          lead="This page is mostly where Sigil is going. Today Sigil is an encrypted memory vault with a connector, a read log, hourly seals, imports from your notes, mail, calendar and code, and a first version of your AI self. Everything past the third chapter below is a plan."
+          lead="This page is mostly where Sigil is going. Today Sigil is an encrypted memory vault with a connector, a read log, hourly seals, imports from your notes, mail, calendar and code, a first version of your AI self, legacy plans and life certificates. The fourth chapter below is a plan."
         />
 
         <p className="notice vision-note">
           <span>
-            The first chapter exists, the second has started and the third has its first version. The rest is the long-term idea, told as a
-            story. No dates are promised, plans can change, and nothing
+            The first chapter exists, the second has started, the third and the fifth have their first versions. The fourth, and what each
+            chapter says is still to come, is the long-term idea, told as a story. No dates are promised, plans can change, and nothing
             here is an offer or a promise of any return. What is built and what is planned, item by item, is on the{" "}
             <Link href="/roadmap">roadmap</Link>.
           </span>

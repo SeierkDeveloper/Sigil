@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { AppKind, OpenFolder } from "@sigil/core";
 import { ChatGptIcon, ClaudeIcon, CursorIcon, ExtensionIcon, GlobeIcon, McpIcon, PlusIcon } from "@/components/icons";
 import { CodeBlock } from "@/components/CodeBlock";
-import { configLocations, mcpConfig, shellCommand } from "@/lib/connector";
+import { claudeCodeCommand, configLocations, mcpConfig, shellCommand } from "@/lib/connector";
 import { formatDateTime } from "@/lib/format";
 import { site } from "@/lib/site";
 import * as ops from "../ops";
@@ -14,6 +14,7 @@ import { CopyButton, Empty, Notice } from "../ui";
 
 const KINDS: { kind: AppKind; label: string; Icon: typeof ClaudeIcon }[] = [
   { kind: "claude-desktop", label: "Claude Desktop", Icon: ClaudeIcon },
+  { kind: "claude-code", label: "Claude Code", Icon: ClaudeIcon },
   { kind: "cursor", label: "Cursor", Icon: CursorIcon },
   { kind: "chatgpt", label: "ChatGPT", Icon: ChatGptIcon },
   { kind: "other", label: "Other MCP app", Icon: McpIcon },
@@ -24,7 +25,7 @@ const KINDS: { kind: AppKind; label: string; Icon: typeof ClaudeIcon }[] = [
 /** Web apps connect themselves through Sign in with Sigil, so they are not in the list to pick from. */
 const PICKABLE = KINDS.filter((k) => k.kind !== "web");
 
-const kindInfo = (k: AppKind) => KINDS.find((x) => x.kind === k) ?? KINDS[3];
+const kindInfo = (k: AppKind) => KINDS.find((x) => x.kind === k) ?? KINDS.find((x) => x.kind === "other")!;
 
 function names(folders: OpenFolder[], ids: Set<string>) {
   return folders.filter((f) => ids.has(f.id)).map((f) => f.name);
@@ -56,8 +57,11 @@ export function AppsTab() {
   const { data } = useVault();
   const [connecting, setConnecting] = useState(false);
   const [created, setCreated] = useState<{ appKey: string; kind: AppKind; name: string } | null>(null);
-  const active = data.apps.filter((a) => !a.revokedAt);
-  const revoked = data.apps.filter((a) => a.revokedAt);
+  // Agents have their own tab.
+  const agentIds = new Set(data.agents.map((a) => a.appId));
+  const apps = data.apps.filter((a) => !agentIds.has(a.id));
+  const active = apps.filter((a) => !a.revokedAt);
+  const revoked = apps.filter((a) => a.revokedAt);
 
   if (created) return <AppKeyPanel {...created} onDone={() => setCreated(null)} />;
 
@@ -82,7 +86,7 @@ export function AppsTab() {
         />
       ) : null}
 
-      {data.apps.length === 0 && !connecting ? (
+      {apps.length === 0 && !connecting ? (
         <Empty
           icon={<McpIcon />}
           title="No apps connected yet"
@@ -269,6 +273,11 @@ function AppKeyPanel({ appKey, kind, name, onDone }: { appKey: string; kind: App
           </ul>
           <CodeBlock code={mcpConfig(appKey, origin)} label={kind === "cursor" ? "mcp.json" : "claude_desktop_config.json"} language="json" />
           <p className="small muted">Save the file and restart {info.label}. Sigil then shows up among its tools.</p>
+        </>
+      ) : kind === "claude-code" ? (
+        <>
+          <p className="small muted">One command in a terminal adds Sigil to Claude Code for every project.</p>
+          <CodeBlock code={claudeCodeCommand(appKey, origin)} label="Terminal" />
         </>
       ) : kind === "extension" ? (
         <>

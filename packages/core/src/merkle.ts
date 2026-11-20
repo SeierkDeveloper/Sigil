@@ -75,10 +75,30 @@ export const fromHex32 = (hex: string) => {
  * suggesting a memory, another vault opening a shared folder, or the AI self
  * answering a question (through an ask link or an app). For "ask" entries the
  * memory id field holds the question's id, which the sealed note is bound to.
+ *
+ * Later kinds:
+ *   legacy     a step of the legacy plan (made, changed, check-in, warning, request, share passed, released, opened, a question)
+ *   device     a device added, signed in for the first time, or revoked
+ *   presence   the owner's vault was open in that hour; the memory id field holds the vault's signature over the hour
+ *   remember   an agent wrote a memory          forget    an agent deleted one
+ *   handoff    an agent left or picked up a note space     a team space was read, written or changed
  */
-export type ReadKind = "folders" | "index" | "read" | "propose" | "shared" | "ask";
+export type ReadKind =
+  | "folders"
+  | "index"
+  | "read"
+  | "propose"
+  | "shared"
+  | "ask"
+  | "legacy"
+  | "device"
+  | "presence"
+  | "remember"
+  | "forget"
+  | "handoff"
+  | "space";
 
-export const READ_KINDS: readonly ReadKind[] = ["folders", "index", "read", "propose", "shared", "ask"];
+export const READ_KINDS: readonly ReadKind[] = ["folders", "index", "read", "propose", "shared", "ask", "legacy", "device", "presence", "remember", "forget", "handoff", "space"];
 
 export interface ReadEntryFields {
   id: string;

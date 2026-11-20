@@ -91,11 +91,30 @@ describe("upgrading the database", () => {
     expect(db.prepare("SELECT id, kind, sealed FROM read_log").all()).toEqual([{ id: "e1", kind: "read", sealed: 1 }]);
     db.prepare("INSERT INTO read_log VALUES ('e2', 'u1', 'a1', 'propose', 'p1', 1, '2026-01-01T00:00:01.000Z', 'cd', '0x02', 5, 0, NULL)").run();
     expect(() => db.prepare("INSERT INTO read_log VALUES ('e3', 'u1', 'a1', 'write', null, 1, 'x', 'ef', '0x03', 5, 0, NULL)").run()).toThrow();
-    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(3);
+    db.prepare("INSERT INTO read_log VALUES ('e4', 'u1', 'vault', 'presence', 'sig', 1, '2026-01-01T00:00:02.000Z', 'ef', '0x04', 5, 0, NULL)").run();
+    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(4);
     db.close();
     // Opening again changes nothing.
     const again = openDb(file);
-    expect(again.prepare("SELECT COUNT(*) AS n FROM read_log").get()).toEqual({ n: 2 });
+    expect(again.prepare("SELECT COUNT(*) AS n FROM read_log").get()).toEqual({ n: 3 });
     again.close();
+  });
+
+  it("keeps every key slot and allows paired devices", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "sigil-migrate-"));
+    const file = path.join(dir, "old.db");
+    const old = new DatabaseSync(file);
+    old.exec(`CREATE TABLE users (id TEXT PRIMARY KEY, created_at TEXT NOT NULL);
+      CREATE TABLE keyslots (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL CHECK (kind IN ('passkey', 'wallet', 'phrase')), ref TEXT NOT NULL, auth_hash TEXT, wrapped_key TEXT NOT NULL,
+        created_at TEXT NOT NULL, last_used_at TEXT, UNIQUE (kind, ref));
+      INSERT INTO users VALUES ('u1', '2026-01-01');
+      INSERT INTO keyslots VALUES ('k1', 'u1', 'phrase', 'ref1', 'h', 'v1.x.y', '2026-01-01', NULL);`);
+    old.close();
+    const db = openDb(file);
+    expect(db.prepare("SELECT id, kind, note FROM keyslots").all()).toEqual([{ id: "k1", kind: "phrase", note: null }]);
+    db.prepare("INSERT INTO keyslots (id, user_id, kind, ref, wrapped_key, created_at) VALUES ('k2', 'u1', 'device', 'd1', 'v1.x.y', '2026-01-02')").run();
+    expect(db.prepare("SELECT COUNT(*) AS n FROM keyslots").get()).toEqual({ n: 2 });
+    db.close();
   });
 });

@@ -1,6 +1,6 @@
 # sigil-connector
 
-Lets Claude Desktop, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, suggest memories to your inbox, and ask your AI self, when you allow it. It runs on your own machine: it decrypts, searches, seals and calls your model there.
+Lets Claude Desktop, Claude Code, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, suggest memories to your inbox, and ask your AI self, when you allow it. With an agent key, an agent also gets a memory of its own. It runs on your own machine: it decrypts, searches, seals and calls your model there.
 
 ## Setup
 
@@ -33,7 +33,28 @@ Build `dist/index.js` with `npm run build -w sigil-connector` from the repositor
 - `propose_memory`: suggest a memory to the vault's inbox (`title`, `body`, optional `tags` and `folder`). Sealed here for the vault; it becomes a memory only when the owner approves it. Needs "May suggest memories" on for this app.
 - `ask_self`: ask the owner's AI self a `question`. It answers as the owner, only from the folders the owner's rules allow that this app may also read, with the owner's own model key, called from this machine. Needs "May answer as your AI self" on for this app, under AI self in the vault.
 
-No tool changes or deletes a memory, and every request shows up in the vault's read log.
+No tool above changes or deletes a memory, and every request shows up in the vault's read log.
+
+## Agent keys
+
+When the key belongs to an agent (made under Agents in the vault), the connector checks that at start and adds five tools. The server enforces the switch the owner set for each, and which folders the agent may write.
+
+- `remember`: write a memory (`title`, `body`, optional `tags` and `folder`) to the agent's own folder, or to a folder or team space it may write. Encrypted here.
+- `recall`: search what it may read, its team spaces included, by meaning and words here, and return the best matches in full (`query`, optional `limit`).
+- `forget`: delete memories by `ids`, for good, only where it may write. Off unless the owner allows it.
+- `leave_handoff`: an encrypted note (`text`) for its next session, or (`space`, optional `to`) for the agents in a team space.
+- `pick_up_handoffs`: the notes waiting for it, marked as picked up.
+
+Claude Code, for every project:
+
+```sh
+claude mcp add sigil --scope user \
+  --env SIGIL_APP_KEY=sigil_app.<app id>.<secret> \
+  --env SIGIL_URL=<address of your Sigil site> \
+  -- node /path/to/Sigil/connector/dist/index.js
+```
+
+Cursor (`~/.cursor/mcp.json`), Claude Desktop and VS Code (`.vscode/mcp.json`, under `servers` with `"type": "stdio"`) take the JSON above. The handoff notes are signed with the name the MCP client gives itself.
 
 ## Answering ask links
 

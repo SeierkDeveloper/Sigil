@@ -42,6 +42,9 @@ export default function Security() {
             <a href="#seals">Seals</a>
           </li>
           <li>
+            <a href="#legacy-devices-agents">Legacy, devices and agents</a>
+          </li>
+          <li>
             <a href="#limits">Limits</a>
           </li>
           <li>
@@ -188,6 +191,33 @@ export default function Security() {
             <SealList />
           </section>
 
+          <section id="legacy-devices-agents">
+            <h2>Legacy, devices and agents</h2>
+            <ul>
+              <li>
+                <strong>Legacy.</strong> The legacy key is made and split in your browser with Shamir&apos;s secret sharing (the independently audited{" "}
+                <code>shamir-secret-sharing</code> library). Each share and each bundle is sealed to one trusted person&apos;s vault public key; a bundle
+                is also encrypted under a key from the legacy key, so it takes the shares and that person&apos;s vault to open. Shares are passed
+                between trusted people sealed to the keys you named, which they take from their own copy of the plan. Every change makes a new key.
+              </li>
+              <li>
+                <strong>Devices.</strong> A new device makes a one-time X25519 key pair. Its pairing code is a hash of the public key, so the vault
+                that sends the keys can tell a key the server swapped in. The vault key and a fresh device secret travel sealed to that one-time key;
+                the device keeps its secret as a non-extractable WebCrypto key. A captured note or photo is sealed on the phone to your vault&apos;s
+                public key, checked against the key the device saw when the vault was last open.
+              </li>
+              <li>
+                <strong>Agents and spaces.</strong> An agent&apos;s X25519 key pair is derived from its secret on your device and in the connector. Team
+                space keys are sealed to every member; member tags are MACs under the space key, checked before anything is sealed. Removing a member
+                encrypts the space again under a new key.
+              </li>
+              <li>
+                <strong>Presence.</strong> A signing key (Ed25519) is derived from your vault key. One statement per hour you have the vault open is
+                signed in your browser and sealed with that hour, which is what a life certificate is built from.
+              </li>
+            </ul>
+          </section>
+
           <section id="limits">
             <h2>Limits, plainly</h2>
             <ul>
@@ -213,6 +243,13 @@ export default function Security() {
               <li>
                 <strong>The ask page is served by the server.</strong> Like any web page with end to end encryption, it is only as honest as the code
                 the server sends. The code is open source, so it can be checked.
+              </li>
+              <li>
+                <strong>The server keeps the legacy clock.</strong> It cannot open a share, but it decides when a plan may be released. A server
+                working with enough of your trusted people could release early.
+              </li>
+              <li>
+                <strong>A revoked device keeps what it showed.</strong> Revoking ends its access from then on; it cannot reach into the device.
               </li>
               <li>
                 <strong>Early software.</strong> The code is open source and has not had an independent audit yet.

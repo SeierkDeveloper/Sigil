@@ -14,7 +14,7 @@ import { clearVectorCache } from "../semantic";
 const CONFIRM_WORDS = "delete my vault";
 
 export function SettingsTab({ onDeleted }: { onDeleted(): void }) {
-  const { api, vault, data, update, lock, signOut } = useVault();
+  const { api, vault, data, update, lock, signOut, goTo } = useVault();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -67,9 +67,15 @@ export function SettingsTab({ onDeleted }: { onDeleted(): void }) {
             Ways into your vault
           </h2>
         </div>
-        <p className="small muted">Each one holds its own locked copy of your vault key. Keep at least two, so losing one device does not lock you out.</p>
+        <p className="small muted">
+          Each one holds its own locked copy of your vault key. Keep at least two, so losing one device does not lock you out. Devices added by QR code are under{" "}
+          <button type="button" className="text-button" onClick={() => goTo("devices")}>
+            Devices
+          </button>
+          .
+        </p>
         <ul className="list">
-          {data.keyslots.map((s) => (
+          {data.keyslots.filter((s) => s.kind !== "device").map((s) => (
             <li key={s.id} className="list-row">
               <div className="list-row-main">
                 <p className="list-row-title">

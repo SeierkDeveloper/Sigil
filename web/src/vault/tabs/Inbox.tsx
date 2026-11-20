@@ -6,11 +6,11 @@ import { CheckIcon, CloseIcon, FolderIcon, InboxIcon, LockIcon } from "@/compone
 import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
-import { AppMark } from "../marks";
+import { AppMark, SourceMark } from "../marks";
 import { Empty, Notice } from "../ui";
 
 const NEW_FOLDER = "__new__";
-const VIA: Record<string, string> = { mcp: "through the connector", extension: "from the browser extension", sdk: "from a signed-in web app" };
+const VIA: Record<string, string> = { mcp: "through the connector", extension: "from the browser extension", sdk: "from a signed-in web app", capture: "with quick capture" };
 
 type Outcome = "approved" | "merged" | "updated" | "rejected";
 const OUTCOME: Record<Outcome, string> = { approved: "Approved", merged: "Merged", updated: "Updated", rejected: "Rejected" };
@@ -195,7 +195,8 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
       leave("rejected", () => update(removeProposal));
     });
 
-  const from = appName ?? "A removed app";
+  const captured = proposal.appId === "capture";
+  const from = captured ? "You" : (appName ?? "A removed app");
   const folderHint = !p ? null : suggested ? suggested.name : p.folder ? `${p.folder} (new)` : null;
   return (
     <li className="proposal" data-testid="proposal" data-state={leaving ?? (busy ? "busy" : "idle")} data-close={synced ? "synced" : close?.how}>
@@ -208,7 +209,7 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
             </div>
           ) : null}
           <div className="proposal-head">
-            <AppMark kind={appKind} className="proposal-mark" />
+            {captured ? <SourceMark kind="capture" className="proposal-mark" /> : <AppMark kind={appKind} className="proposal-mark" />}
             <div className="proposal-source">
               <p className="proposal-from">
                 <strong>{from}</strong> {p ? VIA[p.via] : ""}, {formatDateTime(proposal.createdAt)}
@@ -251,6 +252,13 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
                   </label>
                   <textarea id={`p-body-${proposal.id}`} className="textarea" rows={Math.min(14, Math.max(4, body.split("\n").length + 1))} value={body} onChange={(e) => setBody(e.target.value)} />
                 </div>
+                {p.image ? (
+                  <figure className="memory-photo">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a photo decrypted on this device, as a data: address */}
+                    <img src={`data:${p.image.type};base64,${p.image.data}`} alt={`Photo with ${title || "this capture"}`} />
+                    <figcaption className="small faint">Sealed on your device with the text, and kept with the memory when you approve it.</figcaption>
+                  </figure>
+                ) : null}
                 <div className="field">
                   <label className="field-label" htmlFor={`p-tags-${proposal.id}`}>
                     Tags

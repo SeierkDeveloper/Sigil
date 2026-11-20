@@ -5,10 +5,10 @@
 // Nothing becomes a memory without that step.
 
 import { openSealedJson, sealJson, type BoxKeyPair } from "./box";
-import { cleanTags, MAX_TITLE, type MemorySource } from "./vault";
+import { cleanImage, cleanTags, MAX_TITLE, type MemoryImage, type MemorySource } from "./vault";
 
 /** How a proposal reached the inbox. */
-export type ProposalVia = "mcp" | "extension" | "sdk";
+export type ProposalVia = "mcp" | "extension" | "sdk" | "capture";
 
 export interface ProposalDraft {
   title: string;
@@ -24,6 +24,8 @@ export interface ProposalDraft {
    * the memory with the same source instead of adding a second one.
    */
   source?: { kind: SyncSourceKind; ref: string };
+  /** A photo, for quick capture from the owner's own phone. */
+  image?: MemoryImage;
 }
 
 /** Sources that can send changes through the inbox. */
@@ -39,6 +41,7 @@ export interface ProposalPayload {
   via: ProposalVia;
   createdAt: string;
   source?: MemorySource | null;
+  image?: MemoryImage | null;
 }
 
 /** A proposal as the server stores it: ids, a time and one sealed box. */
@@ -58,7 +61,8 @@ export function proposalContext(proposalId: string, appId: string): string {
 export function cleanProposal(draft: ProposalDraft, via: ProposalVia, now = new Date().toISOString()): ProposalPayload {
   const title = (draft.title ?? "").replace(/\s+/g, " ").trim().slice(0, MAX_TITLE);
   const body = (draft.body ?? "").replace(/\r\n/g, "\n").trim().slice(0, MAX_PROPOSAL_BODY);
-  if (!title && !body) throw new Error("A suggested memory needs a title or some text.");
+  const image = via === "capture" ? cleanImage(draft.image) : undefined;
+  if (!title && !body && !image) throw new Error("A suggested memory needs a title or some text.");
   let url: string | null = null;
   if (draft.url) {
     try {
@@ -70,7 +74,18 @@ export function cleanProposal(draft: ProposalDraft, via: ProposalVia, now = new 
   }
   const folder = draft.folder?.trim().slice(0, 120) || null;
   const source = cleanSyncSource(draft.source);
-  return { v: 1, title: title || body.slice(0, 80), body, tags: cleanTags(draft.tags), folder, url, via, createdAt: now, ...(source ? { source } : {}) };
+  return {
+    v: 1,
+    title: title || body.slice(0, 80) || (image ? "Photo" : ""),
+    body,
+    tags: cleanTags(draft.tags),
+    folder,
+    url,
+    via,
+    createdAt: now,
+    ...(source ? { source } : {}),
+    ...(image ? { image } : {}),
+  };
 }
 
 function cleanSyncSource(s: unknown): MemorySource | null {
@@ -95,9 +110,10 @@ export function openProposal(pair: BoxKeyPair, stored: Pick<StoredProposal, "id"
     tags: cleanTags(Array.isArray(p.tags) ? p.tags.map(String) : []),
     folder: typeof p.folder === "string" ? p.folder : null,
     url: typeof p.url === "string" ? p.url : null,
-    via: p.via === "extension" || p.via === "sdk" ? p.via : "mcp",
+    via: p.via === "extension" || p.via === "sdk" || p.via === "capture" ? p.via : "mcp",
     createdAt: typeof p.createdAt === "string" ? p.createdAt : new Date(0).toISOString(),
     source: cleanSyncSource(p.source),
+    image: p.via === "capture" ? (cleanImage(p.image) ?? null) : null,
   };
 }
 

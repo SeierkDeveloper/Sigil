@@ -70,6 +70,10 @@ import {
   type ThinkingSettings,
 } from "@sigil/core";
 import type { Api } from "./api";
+import { openLegacyState, openTrusted, type LegacyState, type ServerLegacy, type ServerTrusted, type TrustedView } from "./legacyOps";
+import { openSpaces, type AgentView, type ServerAgent, type ServerSpace, type SpaceView } from "./agentOps";
+import { ensureSignKey, type CertificateView, type PresenceCounts } from "./lifeOps";
+import { rememberKeyslot } from "./offline";
 
 // ---------------------------------------------------------------- types
 
@@ -84,6 +88,8 @@ export interface KeyslotView {
   label: string | null;
   createdAt: string;
   lastUsedAt: string | null;
+  /** For a device: its name, encrypted under the vault key. */
+  note?: string | null;
 }
 
 export interface AppView {
@@ -100,6 +106,8 @@ export interface AppView {
   canPropose: boolean;
   /** May answer as the AI self (the ask_self tool, and links it serves). */
   canAskSelf: boolean;
+  /** Folders it may write: only agents have any. */
+  writeIds: string[];
 }
 
 export interface AskLinkView {
@@ -175,6 +183,16 @@ export interface VaultData {
   askLinks: AskLinkView[];
   /** When the vault's first folder was made: the vault's age, for the first weekly brief. */
   createdAt: string | null;
+  /** The owner's legacy plan, opened on this device. */
+  legacy: LegacyState;
+  /** Plans of other vaults that name this one as a trusted person. */
+  trusted: TrustedView[];
+  agents: AgentView[];
+  spaces: SpaceView[];
+  /** The vault's signing key for presence statements. */
+  signKey: string | null;
+  presence: PresenceCounts;
+  certificates: CertificateView[];
 }
 
 export interface LogEntryView {
@@ -198,7 +216,7 @@ export interface LogData {
   entries: LogEntryView[];
 }
 
-interface ServerVault {
+export interface ServerVault {
   folders: (StoredFolder & { createdAt: string })[];
   memories: (StoredMemory & { updatedAt: string })[];
   apps: {
@@ -208,7 +226,7 @@ interface ServerVault {
     createdAt: string;
     revokedAt: string | null;
     lastUsedAt: string | null;
-    grants: { folderId: string }[];
+    grants: { folderId: string; mode?: "read" | "write" }[];
     canPropose?: boolean;
     canAskSelf?: boolean;
   }[];
@@ -230,6 +248,13 @@ interface ServerVault {
   }[];
   keyslots: KeyslotView[];
   usage: { memories: number; bytes: number };
+  legacy?: ServerLegacy;
+  trusted?: ServerTrusted[];
+  agents?: ServerAgent[];
+  spaces?: ServerSpace[];
+  signKey?: string | null;
+  presence?: PresenceCounts;
+  certificates?: CertificateView[];
   box?: StoredBoxKey | null;
   proposals?: { id: string; appId: string; sealed: string; createdAt: string }[];
   shares?: {
@@ -286,18 +311,21 @@ export async function signUpWithWallet(api: Api, address: string, signature: str
   const wk = await walletKeys(address, signature);
   const init = await vaultInit(wk.kek, "wallet");
   await api.post("auth/wallet/register", { address, authToken: wk.authToken, ...init.body });
+  rememberKeyslot({ kind: "wallet", wrappedKey: init.body.wrappedKey, address });
   return { vault: init.vault, phrase: init.phrase };
 }
 
 export async function signInWithWallet(api: Api, address: string, signature: string): Promise<Unlocked> {
   const wk = await walletKeys(address, signature);
   const r = await api.post<{ keyslot: { wrappedKey: string } }>("auth/wallet/login", { address, authToken: wk.authToken });
+  rememberKeyslot({ kind: "wallet", wrappedKey: r.keyslot.wrappedKey, address });
   return unlockedFrom(await unwrapVaultKey(wk.kek, r.keyslot.wrappedKey, "wallet"));
 }
 
 export async function signInWithPhrase(api: Api, phrase: string): Promise<Unlocked> {
   const pk = await phraseKeys(phrase);
   const r = await api.post<{ keyslot: { wrappedKey: string } }>("auth/phrase/login", { lookupId: pk.lookupId, authToken: pk.authToken });
+  rememberKeyslot({ kind: "phrase", wrappedKey: r.keyslot.wrappedKey });
   return unlockedFrom(await unwrapVaultKey(pk.kek, r.keyslot.wrappedKey, "phrase"));
 }
 
@@ -327,6 +355,7 @@ export async function signUpWithPasskey(api: Api, driver: PasskeyDriver): Promis
   if (!prf) throw new PasskeyPrfUnsupported();
   const init = await vaultInit(await passkeyKek(prf), "passkey");
   await api.post("auth/passkey/register", { challengeId, response: created.response, ...init.body });
+  rememberKeyslot({ kind: "passkey", wrappedKey: init.body.wrappedKey });
   return { vault: init.vault, phrase: init.phrase };
 }
 
@@ -335,6 +364,7 @@ export async function signInWithPasskey(api: Api, driver: PasskeyDriver): Promis
   const got = await driver.get(options);
   if (!got.prf) throw new PasskeyPrfUnsupported();
   const r = await api.post<{ keyslot: { wrappedKey: string } }>("auth/passkey/login", { challengeId, response: got.response });
+  rememberKeyslot({ kind: "passkey", wrappedKey: r.keyslot.wrappedKey });
   return unlockedFrom(await unwrapVaultKey(await passkeyKek(got.prf), r.keyslot.wrappedKey, "passkey"));
 }
 
@@ -371,8 +401,18 @@ export async function removeKeyslot(api: Api, id: string): Promise<KeyslotView[]
 
 // ---------------------------------------------------------------- loading
 
-export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
+export async function loadVault(api: Api, vault: Unlocked, opts: { onRaw?: (raw: ServerVault) => void } = {}): Promise<VaultData> {
   const data = await api.get<ServerVault>("vault");
+  opts.onRaw?.(data);
+  return decodeVault(data, vault, api);
+}
+
+/**
+ * Opens what the server sent, on this device. Without an api (the copy kept on
+ * this device for offline reading) nothing is sent back: a vault from before
+ * box keys or signing keys existed simply stays without them until it is next opened online.
+ */
+export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api | null): Promise<VaultData> {
   let unreadable = 0;
   const folders: OpenFolder[] = [];
   for (const f of data.folders) {
@@ -410,6 +450,7 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
       revokedAt: a.revokedAt,
       lastUsedAt: a.lastUsedAt,
       folderIds: a.grants.map((g) => g.folderId),
+      writeIds: a.grants.filter((g) => g.mode === "write").map((g) => g.folderId),
       meta: a.meta,
       secret: a.secret,
       canPropose: a.canPropose === true,
@@ -454,7 +495,7 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
     } catch {
       unreadable++;
     }
-  } else {
+  } else if (api) {
     const made = await createBoxKey(vault.key);
     try {
       await api.post("vault/box-key", made.stored);
@@ -512,7 +553,21 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
     incoming.push({ id: s.id, folderId: s.folderId, folder, from, createdAt: s.createdAt, acceptedAt: s.acceptedAt, memories: shared });
   }
 
+  const legacy = await openLegacyState(vault, data.legacy ?? { lastActiveAt: null, plan: null });
+  if (legacy.unreadable) unreadable++;
+  const trusted = await openTrusted(vault, box, data.trusted ?? []);
+  const { spaces, unreadable: badSpaces } = await openSpaces(box, data.spaces ?? []);
+  unreadable += badSpaces;
+  const signKey = api ? await ensureSignKey(api, vault, data.signKey ?? null) : (data.signKey ?? null);
+
   return {
+    legacy,
+    trusted,
+    agents: (data.agents ?? []).map((a) => ({ appId: a.appId, homeFolderId: a.homeFolderId, rules: a.rules, publicKey: a.publicKey, createdAt: a.createdAt })),
+    spaces,
+    signKey,
+    presence: data.presence ?? { total: 0, sealed: 0, firstHour: null, lastHour: null },
+    certificates: data.certificates ?? [],
     folders,
     memories,
     apps,
@@ -591,6 +646,7 @@ export async function updateMemory(
       createdAt: memory.createdAt,
       editedAt: new Date().toISOString(),
       expiresAt: changes.expiresAt === undefined ? memory.expiresAt : changes.expiresAt,
+      image: memory.image ?? null,
     },
     changes.folderId ?? memory.folderId,
     memory.id,
@@ -701,6 +757,7 @@ export interface ProposalEdits {
 
 function proposalSource(app: Pick<AppView, "name"> | undefined, payload: ProposalPayload): Memory["source"] {
   if (payload.source?.ref) return payload.source;
+  if (payload.via === "capture") return payload.url ? { kind: "capture", ref: payload.url } : { kind: "capture" };
   if (payload.via === "extension" && payload.url) return { kind: "web", ref: payload.url };
   return { kind: "app", ref: app?.name ?? "an app" };
 }
@@ -708,7 +765,7 @@ function proposalSource(app: Pick<AppView, "name"> | undefined, payload: Proposa
 /** Approves a suggestion as a new memory, encrypted on this device into the chosen folder. */
 export async function approveProposal(api: Api, folder: OpenFolder, proposal: ProposalView, edits: ProposalEdits, app?: Pick<AppView, "name">): Promise<Memory> {
   if (!proposal.payload) throw new Error("This suggestion could not be opened with your vault key.");
-  const memory = buildMemory({ title: edits.title, body: edits.body, tags: edits.tags, source: proposalSource(app, proposal.payload) }, folder.id);
+  const memory = buildMemory({ title: edits.title, body: edits.body, tags: edits.tags, source: proposalSource(app, proposal.payload), image: proposal.payload.image ?? null }, folder.id);
   await api.post(`proposals/${proposal.id}/approve`, { memory: await encryptMemory(folder, memory) });
   return memory;
 }
@@ -726,6 +783,7 @@ export async function mergeProposal(api: Api, folders: OpenFolder[], proposal: P
       createdAt: into.createdAt,
       editedAt: new Date().toISOString(),
       expiresAt: into.expiresAt,
+      image: into.image ?? proposal.payload?.image ?? null,
     },
     into.folderId,
     into.id,
@@ -915,6 +973,14 @@ export interface VaultExport {
     links: { label: string; createdAt: string; expiresAt: string; uses: number; answered: number; revokedAt: string | null }[];
   };
   thinking: ThinkingSettings;
+  /** The legacy plan as the owner sees it, without the legacy key. */
+  legacy: { owner: string; periodDays: number; threshold: number; people: { label: string; folders: string[]; aiSelf: boolean; added: "vault code" | "invite" }[] } | null;
+  /** Plans of other vaults that name this one. */
+  namedIn: { owner: string; as: string; folders: string[] }[];
+  agents: { name: string; ownFolder: string | null; rules: AgentView["rules"]; revokedAt: string | null }[];
+  spaces: { name: string; role: string; members: { name: string; kind: string; role: string }[]; memories: { title: string; body: string; editedAt: string }[] }[];
+  devices: { addedAt: string; lastUsedAt: string | null }[];
+  certificates: { link: string; from: string; to: string; createdAt: string }[];
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -957,6 +1023,27 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
       links: data.askLinks.map((l) => ({ label: l.label, createdAt: l.createdAt, expiresAt: l.expiresAt, uses: l.uses, answered: l.answered, revokedAt: l.revokedAt })),
     },
     thinking: data.thinking,
+    legacy: data.legacy.record
+      ? {
+          owner: data.legacy.record.owner,
+          periodDays: data.legacy.record.periodDays,
+          threshold: data.legacy.record.threshold,
+          people: data.legacy.record.people.map((p) => ({ label: p.label, folders: p.folderIds.map((id) => folderName.get(id) ?? id), aiSelf: p.self, added: p.publicKey ? ("vault code" as const) : ("invite" as const) })),
+        }
+      : null,
+    namedIn: data.trusted.flatMap((t) => (t.note ? [{ owner: t.note.owner, as: t.note.label, folders: t.note.folders }] : [])),
+    agents: data.agents.map((a) => {
+      const app = data.apps.find((x) => x.id === a.appId);
+      return { name: app?.name ?? "Removed agent", ownFolder: folderName.get(a.homeFolderId) ?? null, rules: a.rules, revokedAt: app?.revokedAt ?? null };
+    }),
+    spaces: data.spaces.map((sp) => ({
+      name: sp.name,
+      role: sp.me.role,
+      members: sp.members.map((m) => ({ name: m.label, kind: m.kind, role: m.role })),
+      memories: sp.memories.map((m) => ({ title: m.title, body: m.body, editedAt: m.editedAt })),
+    })),
+    devices: data.keyslots.filter((k) => k.kind === "device").map((k) => ({ addedAt: k.createdAt, lastUsedAt: k.lastUsedAt })),
+    certificates: data.certificates.map((c) => ({ link: `/verify?certificate=${c.id}`, from: c.summary.from, to: c.summary.to, createdAt: c.createdAt })),
   };
 }
 

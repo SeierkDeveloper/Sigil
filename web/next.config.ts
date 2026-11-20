@@ -9,6 +9,18 @@ const isProd = process.env.NODE_ENV === "production";
 // styles, fonts or frames. Next.js needs inline scripts for hydration; dev mode also needs eval.
 // 'wasm-unsafe-eval' lets the vault run the search model (WebAssembly) it loads
 // from this same site; it does not allow eval of JavaScript.
+// When the seals are anchored and a public read-only address is set, the verify
+// page reads roots from the contract in the visitor's browser: that one origin
+// is added. Nothing is sent there but the hours being checked.
+const chainRead = (() => {
+  try {
+    const v = process.env.SIGIL_CHAIN_READ_RPC?.trim();
+    return v && v.startsWith("https://") ? ` ${new URL(v).origin}` : "";
+  } catch {
+    return "";
+  }
+})();
+
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${isProd ? "" : " 'unsafe-eval'"}`,
@@ -16,7 +28,8 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com${isProd ? "" : " ws: wss:"}`,
+  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com${chainRead}${isProd ? "" : " ws: wss:"}`,
+  "manifest-src 'self'",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -38,7 +51,8 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)" },
+          // The camera is allowed for this site only: the vault reads a device's pairing code with it, on this page.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(), publickey-credentials-get=(self), publickey-credentials-create=(self)" },
           ...(isProd ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
         ],
       },

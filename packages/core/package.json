@@ -17,7 +17,8 @@
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "@scure/bip39": "^2.4.0",
-    "fflate": "^0.8.3"
+    "fflate": "^0.8.3",
+    "shamir-secret-sharing": "0.0.4"
   },
   "devDependencies": {
     "@huggingface/tokenizers": "^0.2.0",

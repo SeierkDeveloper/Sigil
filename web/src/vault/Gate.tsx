@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { isValidPhrase } from "@sigil/core";
-import { PasskeyIcon, PhraseIcon, WalletIcon, ArrowIcon } from "@/components/icons";
+import { PasskeyIcon, PhraseIcon, WalletIcon, ArrowIcon, PhoneIcon, QrIcon } from "@/components/icons";
 import type { Api } from "./api";
 import { ApiError } from "./api";
 import * as ops from "./ops";
@@ -10,6 +10,9 @@ import { browserPasskeys, passkeysAvailable } from "./passkey";
 import { connectWallet, listenForWallets, signVaultMessage, WalletRedirect } from "./wallet";
 import { errorText } from "./context";
 import { Notice } from "./ui";
+import { PairNewDevice } from "./PairNewDevice";
+import { DeviceRevoked, signInWithDevice } from "./deviceOps";
+import { thisDevice } from "./offline";
 
 export type GateMode = "create" | "signin" | "unlock";
 
@@ -22,7 +25,7 @@ interface Props {
   onSignOut?(): void;
 }
 
-type Busy = null | "passkey" | "wallet" | "phrase";
+type Busy = null | "passkey" | "wallet" | "phrase" | "device";
 
 export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Props) {
   const [busy, setBusy] = useState<Busy>(null);
@@ -30,8 +33,19 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
   const [error, setError] = useState<string | null>(null);
   const [showPhrase, setShowPhrase] = useState(false);
   const [phrase, setPhrase] = useState("");
+  const [pairing, setPairing] = useState(false);
+  const [deviceName, setDeviceName] = useState<string | null>(null);
 
   useEffect(() => listenForWallets(), []);
+  useEffect(() => {
+    let alive = true;
+    thisDevice()
+      .then((d) => alive && setDeviceName(d?.name ?? null))
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const run = async (which: Exclude<Busy, null>, fn: () => Promise<void>) => {
     setBusy(which);
@@ -86,6 +100,17 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
       }
     });
 
+  const withDevice = () =>
+    run("device", async () => {
+      setStep("Opening your vault with this device's key.");
+      try {
+        onUnlocked(await signInWithDevice(api));
+      } catch (err) {
+        if (err instanceof DeviceRevoked) setDeviceName(null);
+        throw err;
+      }
+    });
+
   const withPhrase = (e: React.FormEvent) => {
     e.preventDefault();
     void run("phrase", async () => {
@@ -103,6 +128,8 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
       : mode === "unlock"
         ? "Your vault locks whenever the page is closed or reloaded. Sign in again to unlock it on this device."
         : "Use the passkey or wallet you created your vault with, or your recovery phrase.";
+
+  if (pairing) return <PairNewDevice api={api} onUnlocked={onUnlocked} onCancel={() => setPairing(false)} />;
 
   return (
     <section className="vault-gate" aria-labelledby="gate-title" data-mode={mode}>
@@ -126,6 +153,16 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
       {step && busy ? <Notice>{step}</Notice> : null}
 
       <div className="method-list">
+        {deviceName && mode !== "create" ? (
+          <button type="button" className="method" onClick={withDevice} disabled={!!busy} data-testid="method-device">
+            <PhoneIcon className="method-icon" />
+            <span>
+              <span className="method-title">Open with this device</span>
+              <span className="method-text">The key this browser keeps for &quot;{deviceName}&quot;, added from your other device.</span>
+            </span>
+            {busy === "device" ? <span className="spinner" aria-hidden="true" /> : <ArrowIcon />}
+          </button>
+        ) : null}
         <button type="button" className="method" onClick={withPasskey} disabled={!!busy} data-testid="method-passkey">
           <PasskeyIcon className="method-icon" />
           <span>
@@ -142,6 +179,16 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
           </span>
           {busy === "wallet" ? <span className="spinner" aria-hidden="true" /> : <ArrowIcon />}
         </button>
+        {mode !== "create" ? (
+          <button type="button" className="method" onClick={() => setPairing(true)} disabled={!!busy} data-testid="method-pair">
+            <QrIcon className="method-icon" />
+            <span>
+              <span className="method-title">Add this device</span>
+              <span className="method-text">Show a code here and scan it with a device where your vault is open.</span>
+            </span>
+            <ArrowIcon />
+          </button>
+        ) : null}
         {mode !== "create" ? (
           <button type="button" className="method" onClick={() => setShowPhrase((v) => !v)} disabled={!!busy} aria-expanded={showPhrase} data-testid="method-phrase">
             <PhraseIcon className="method-icon" />
@@ -184,6 +231,14 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
           Not your vault?{" "}
           <button type="button" className="text-button" onClick={onSignOut}>
             Sign out
+          </button>
+        </p>
+      ) : null}
+      {mode === "create" ? (
+        <p className="small muted gate-signout">
+          Your vault is already open on another device?{" "}
+          <button type="button" className="text-button" onClick={() => setPairing(true)}>
+            Add this device
           </button>
         </p>
       ) : null}

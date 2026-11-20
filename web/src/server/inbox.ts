@@ -118,3 +118,20 @@ export function rejectProposal(db: Db, userId: string, proposalId: string): void
   const r = db.prepare("DELETE FROM proposals WHERE id = ? AND user_id = ?").run(proposalId, userId);
   if (r.changes === 0) throw new HttpError(404, "That suggestion was not found. It may have been handled on another device.");
 }
+
+// ---------------------------------------------------------------- quick capture
+
+/** The owner's own captures, from a phone or the share sheet, wait in the inbox like suggestions. */
+export const CAPTURE_APP = "capture";
+
+export function createCapture(db: Db, userId: string, id: string, sealed: string, at = new Date()): ProposalRow {
+  return tx(db, () => {
+    if (!getBoxKey(db, userId)) throw new HttpError(409, "Open your vault once on this device first.", "no_box");
+    const waiting = db.prepare("SELECT COUNT(*) AS n FROM proposals WHERE user_id = ?").get(userId) as Row;
+    if (Number(waiting.n) >= INBOX_LIMIT) throw new HttpError(429, "Your inbox is full. Review it, then capture again.", "inbox_full");
+    if (db.prepare("SELECT 1 FROM proposals WHERE id = ?").get(id)) throw new HttpError(409, "This was already captured.", "duplicate");
+    const createdAt = at.toISOString();
+    db.prepare("INSERT INTO proposals (id, user_id, app_id, sealed, size, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(id, userId, CAPTURE_APP, sealed, sealed.length, createdAt);
+    return { id, appId: CAPTURE_APP, sealed, createdAt };
+  });
+}
