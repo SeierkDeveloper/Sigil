@@ -47,5 +47,10 @@ export const serverConfig = {
   get modelFetch(): boolean {
     return flag("SIGIL_MODEL_FETCH", true);
   },
+  /** How long the owner's agent counts as online after it last checked in for questions (seconds). 30 by default; tests shorten it. */
+  get agentOnlineMs(): number {
+    const n = Number(process.env.SIGIL_AGENT_ONLINE_SECONDS);
+    return (Number.isInteger(n) && n >= 2 && n <= 600 ? n : 30) * 1000;
+  },
   sessionDays: 30,
 };

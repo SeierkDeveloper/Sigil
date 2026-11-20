@@ -6,7 +6,7 @@ import { ArrowIcon } from "@/components/icons";
 
 export const metadata: Metadata = {
   title: "The AI self",
-  description: "The long-term idea behind Sigil: an AI self that is yours, built on a memory you own. A vision, not a list of features that exist.",
+  description: "The long-term idea behind Sigil: an AI self that is yours, built on a memory you own. Its first version exists; most of this page is a vision, not a list of features.",
 };
 
 const chapters = [
@@ -20,21 +20,21 @@ const chapters = [
     ],
   },
   {
-    when: "Next",
-    status: "Vision",
+    when: "Now",
+    status: "Started",
     title: "A memory that fills itself and thinks",
     text: [
-      "A vault you fill by hand stays small. The plan is for it to fill from the places your life already happens, with your permission each time: mail, calendar, notes, code, meetings.",
-      "Then it starts to help. The first pieces are here: search by meaning that runs on your device, duplicates found for you, a timeline, and a Self card your apps read first. Still to come: stale facts flagged, timelines of the people and projects in your life, a brief before a meeting. Still encrypted, still yours.",
+      "A vault you fill by hand stays small. It now fills from the places your life already happens, read and encrypted in your browser: notes from Obsidian, Apple Notes and Notion, mail and calendar from Google Takeout, your code history from GitHub. An Obsidian folder stays in sync through your inbox. Meetings and live connections are still to come.",
+      "And it has started to help: search by meaning on your device, duplicates merged in one step, a timeline, a Self card, a weekly brief, memories that disagree shown side by side, and memories that expire when you say. Still to come: timelines of the people and projects in your life, a brief before a meeting. Still encrypted, still yours.",
     ],
   },
   {
-    when: "Later",
-    status: "Vision",
+    when: "Now",
+    status: "Version 1",
     title: "A self that can answer for you",
     text: [
-      "With enough memory, a model can answer the way you would. Not a chatbot with your name on it: a model trained only on what you allow, that answers only from your vault, says so when it does not know, and is always marked as AI.",
-      "It could reply to the questions you get every week, negotiate within limits you set, and stand in for you where you choose. You would see everything it said, the same way you see every read today.",
+      "The first version exists: an AI that answers as you, with your own model key, only from the folders you allow and within rules you write: topics it may and may not discuss, things it must never say, its tone, and that it says so when it does not know. You can give someone a link to ask it; the conversation is encrypted between their browser and your vault, and every answer is on your record.",
+      "Later it could reply to the questions you get every week, negotiate within limits you set, and stand in for you where you choose, always marked as AI. You would see everything it said, the same way you see every read today.",
     ],
   },
   {
@@ -73,12 +73,13 @@ export default function AiSelf() {
         <PageHeader
           eyebrow="Vision"
           title="An AI self that is yours"
-          lead="This page is where Sigil is going, not what it does today. Today Sigil is an encrypted memory vault with a connector, a read log and hourly seals. Everything past the first chapter below is a plan."
+          lead="This page is mostly where Sigil is going. Today Sigil is an encrypted memory vault with a connector, a read log, hourly seals, imports from your notes, mail, calendar and code, and a first version of your AI self. Everything past the third chapter below is a plan."
         />
 
         <p className="notice vision-note">
           <span>
-            Only the first chapter exists. The rest is the long-term idea, told as a story. No dates are promised, plans can change, and nothing
+            The first chapter exists, the second has started and the third has its first version. The rest is the long-term idea, told as a
+            story. No dates are promised, plans can change, and nothing
             here is an offer or a promise of any return. What is built and what is planned, item by item, is on the{" "}
             <Link href="/roadmap">roadmap</Link>.
           </span>
@@ -86,11 +87,11 @@ export default function AiSelf() {
 
         <ol className="chapters">
           {chapters.map((c, i) => (
-            <li key={c.title} className="chapter" data-built={c.status === "Built" ? "true" : "false"}>
+            <li key={c.title} className="chapter" data-built={c.status === "Vision" ? "false" : "true"}>
               <div className="chapter-side">
                 <span className="chapter-number">{String(i + 1).padStart(2, "0")}</span>
                 <span className="chapter-when">{c.when}</span>
-                <span className={c.status === "Built" ? "badge badge-strong" : "badge"}>{c.status}</span>
+                <span className={c.status === "Vision" ? "badge" : "badge badge-strong"}>{c.status}</span>
               </div>
               <div className="chapter-main">
                 <h2 className="chapter-title">{c.title}</h2>
@@ -124,7 +125,7 @@ export default function AiSelf() {
             <h2 id="start-title" className="section-title">
               It starts with the vault
             </h2>
-            <p className="section-lead">An AI self is only as real as the memory under it. That part exists, and you can start filling it today.</p>
+            <p className="section-lead">An AI self is only as real as the memory under it. That part exists, and you can start filling it, and asking it, today.</p>
             <div className="hero-actions">
               <Link href="/vault" className="button button-primary">
                 Open your vault <ArrowIcon />

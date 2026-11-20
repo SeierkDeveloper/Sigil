@@ -97,7 +97,7 @@ describe("contradictions", () => {
     expect(disagreementSignals("Same text", "Same text")).toEqual([]);
   });
 
-  it("uses meaning when vectors are given, and skips pairs that are duplicates", () => {
+  it("uses meaning when vectors are given, as well as shared words", () => {
     const items = [item("a", "Floor", "Office on floor 3"), item("bb", "Desk", "Desk on level 5"), item("ccc", "Copy", "Office on floor 4")];
     const vectors = new Map([
       ["a", new Float32Array([1, 0])],
@@ -105,7 +105,8 @@ describe("contradictions", () => {
       ["ccc", new Float32Array([1, 0])],
     ]);
     const found = findContradictions(items, { vectors });
-    expect(found.map((c) => [c.a.id, c.b.id].sort().join("+")).sort()).toEqual(["a+bb", "bb+ccc"]);
+    // a and ccc share their words and differ in a number; bb is close to both in meaning.
+    expect(found.map((c) => [c.a.id, c.b.id].sort().join("+")).sort()).toEqual(["a+bb", "a+ccc", "bb+ccc"]);
   });
 
   it("asks the owner's model and reads its verdict", async () => {

@@ -12,7 +12,7 @@
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
 
-[How it works](#how-it-works) · [Encryption](#the-encryption-model) · [Connector](#the-connector) · [Inbox](#the-memory-inbox) · [Meaning](#search-by-meaning) · [Extension](#the-browser-extension) · [Sign in with Sigil](#sign-in-with-sigil) · [Sharing](#sharing-a-folder) · [Threat model](#threat-model) · [Run it](#run-it) · [Roadmap](#roadmap)
+[How it works](#how-it-works) · [Encryption](#the-encryption-model) · [Connector](#the-connector) · [AI self](#your-ai-self) · [Ask links](#ask-links) · [Inbox](#the-memory-inbox) · [Meaning](#search-by-meaning) · [Thinking](#memory-that-thinks) · [Imports](#your-whole-digital-life) · [Extension](#the-browser-extension) · [Sign in with Sigil](#sign-in-with-sigil) · [Sharing](#sharing-a-folder) · [Threat model](#threat-model) · [Run it](#run-it) · [Roadmap](#roadmap)
 
 </div>
 
@@ -32,7 +32,9 @@ Every AI app keeps its own memory of you, locked inside that app, readable by th
 - **Save from the browser.** The extension saves a selection, a page or a ChatGPT or Claude conversation to your inbox.
 - **Sign in with Sigil.** Web apps ask for the folders they need; you choose, and you can revoke.
 - **Share with people.** Share a folder with another vault, read only, and take it back with a new key.
-- **Bring your history.** Import a ChatGPT or Claude data export in one step. It is parsed and encrypted in the browser.
+- **Your AI self.** An AI that answers as you, from the folders you choose and within rules you write, with your own model key, run in your browser or in the connector. Share it with a link: questions and answers are end to end encrypted, and every one is in your log.
+- **Memory that thinks.** A weekly brief, memories that disagree, every duplicate group merged at once, and expiry dates with real deletion.
+- **Bring your history.** Import ChatGPT, Claude, Obsidian, Apple Notes, Gmail and Google Calendar, Notion and GitHub. Parsed and encrypted in the browser, with no app approvals.
 - **Real delete.** Delete a memory, a folder or the whole account, and it is gone. Export everything, decrypted on your device, at any time.
 
 ---
@@ -100,7 +102,9 @@ sequenceDiagram
 | **Vault key** (256-bit) | Your browser, at sign-up | Each sign-in method separately: passkey PRF output, a wallet signature over a fixed message, the 24-word recovery phrase | Wrapping the folder keys |
 | **Folder key** | Your browser | The vault key | Encrypting every memory in that folder |
 | **App key** `sigil_app.<id>.<secret>` | Your browser, shown once | Never stored | Deriving the app's bearer token, the key that unwraps only its granted folder keys, and the key that checks the vault public key |
-| **Vault box key** (X25519) | Your browser, at sign-up | The vault key (private half); the public half is in the clear | Opening suggestions and folders shared with you, which others seal to the public half |
+| **Vault box key** (X25519) | Your browser, at sign-up | The vault key (private half); the public half is in the clear | Opening suggestions, folders shared with you and the sealed notes of your AI self's answers, which others seal to the public half |
+| **Ask link key** (X25519) | Your browser, one per link | The vault key, and for a link an app answers, a key from that app's secret; the public half rides in the link after `#` | The conversation key each asker derives with a fresh key pair of their own |
+| **Model key** (yours, from Anthropic or OpenAI) | You paste it | The vault key, and for an app you allow, a key from that app's secret | Your AI self's model calls, made from your browser or your connector |
 
 Every ciphertext is AES-256-GCM, bound to its own record with associated data, so an envelope cannot be swapped into another record. Keys are derived with HKDF.
 
@@ -117,12 +121,14 @@ Data for a vault that is not open is a **sealed box**: a fresh X25519 key pair p
 | The vault public key; that a suggestion arrived and from which app | What a suggestion says (a sealed box only your vault opens) |
 | That a folder is shared with another vault | The folder key (sealed to that vault), who you call them |
 | The files of the search model (the same for everyone) | Your search queries and the vectors made from your memories |
+| That an ask link exists, its limits, how often it was used, when your AI self last checked in | Your model key, your AI self's rules, the questions and answers of your links |
+| For a memory with an expiry, the time to delete it | The expiry date itself, and anything else about the memory |
 
 ---
 
 ## The connector
 
-`sigil-connector` is a small MCP server you run on your own machine. It offers four tools that read and one that suggests:
+`sigil-connector` is a small MCP server you run on your own machine. It offers four tools that read, one that suggests, and one that asks your AI self:
 
 | Tool | What it does | What lands in your read log |
 | --- | --- | --- |
@@ -131,6 +137,7 @@ Data for a vault that is not open is a **sealed box**: a fresh X25519 key pair p
 | `search_memories` | Searches by meaning and by the words in titles, tags and first lines, decrypted and searched locally | The app read the index of its folders |
 | `read_memory` | Returns one memory in full | The app read that memory |
 | `propose_memory` | Suggests a memory to your inbox, sealed on your machine for your vault. Only for apps you allowed | The app suggested a memory |
+| `ask_self` | Asks your AI self: it answers as you, from the folders your rules allow that this app may read, with your model key, on your machine. Only for apps you allowed | The memories it read, and the question and answer, sealed for your vault |
 
 There is no tool to change or delete a memory: a suggestion becomes a memory only when you approve it.
 
@@ -181,6 +188,52 @@ ChatGPT reaches it through a tunnel you run yourself; what it may connect depend
 
 </details>
 
+<details>
+<summary><b>Answering ask links, and keeping Obsidian in sync</b></summary>
+
+```sh
+node /path/to/Sigil/connector/dist/index.js --self                    # answers the ask links you gave this app
+node /path/to/Sigil/connector/dist/index.js --watch ~/Obsidian        # suggests new and changed notes to your inbox
+```
+
+Both use the same `SIGIL_APP_KEY` and `SIGIL_URL`.
+
+</details>
+
+---
+
+## Your AI self
+
+Under **AI self** in the vault you set up an AI that answers as you.
+
+- **Your model, your key.** Anthropic (`claude-opus-5-5` by default) or OpenAI. The key is encrypted with your vault key in the browser before it is saved, and the browser (or the connector, for an app you allow) calls the provider directly. The site's content security policy allows exactly those two addresses, plus GitHub for imports.
+- **Rules you write.** The folders it may use (nothing else is ever given to the model), topics it may and may not discuss, things it must never say, its tone, what it says when it does not know, and how many memories it reads per answer. Denied topics are refused before the model is asked; an answer containing something it must never say is replaced on the device; with nothing to go on it says it does not know without calling the model.
+- **A test chat** shows each answer with the memories it came from.
+- **Apps that answer as you.** For an app you allow, the vault wraps the rules, your model key and the vault public key under a key derived from that app's secret. The connector then offers `ask_self` and can answer your links.
+
+## Ask links
+
+An ask link lets anyone who has it ask your AI self, within that link's own rules (folders and topics), until it expires, runs out of questions or you turn it off. Each link has an hourly limit too.
+
+```mermaid
+sequenceDiagram
+    participant G as Asker's browser
+    participant S as Sigil server
+    participant V as Your open vault (or connector --self)
+    Note over G: link = /ask/<id>#<link public key>.<greeting key>
+    G->>S: GET /api/ask/<id>
+    S-->>G: link public key, sealed greeting, online or not
+    G->>G: compare the key with the one after #, make a key pair for this conversation
+    V->>S: GET /api/self/pending (marks the link online)
+    G->>S: question, sealed with the conversation key
+    S-->>V: the sealed question
+    V->>V: open it, answer within the link's rules with your model key
+    V->>S: answer sealed for the asker + question and answer sealed to your vault key (read log)
+    S-->>G: the sealed answer
+```
+
+Both sides derive the conversation key from X25519 (the link's key and the asker's fresh key), HKDF-SHA256 and XChaCha20-Poly1305 bound to the link, the conversation, the message and its direction. The server relays boxes, counts and enforces limits; it cannot read a question, an answer, the greeting or the rules. When neither your vault nor your connector is checking in, the link says your AI self is offline and takes no question. Every question and answer is a read log entry, sealed with the hour, and opens in your vault.
+
 ---
 
 ## The memory inbox
@@ -192,6 +245,28 @@ Each app has a switch, **May suggest memories to your inbox**, off until you tur
 3. The **Inbox** tab opens each suggestion with your key. Edit it, approve it into a folder, merge it into an existing memory, or reject it. The vault points out suggestions that are already there.
 
 Suggestions are written to the read log. One app may send 30 an hour, and an inbox holds up to 500.
+
+## Memory that thinks
+
+The **Review** tab looks over the vault on your device.
+
+- **Weekly brief:** what is new, what changed and what you may have forgotten, saved as a memory in a Briefs folder when you open the vault and the last brief is a week old. Written by your model if you allow it, as three plain lists otherwise.
+- **Memories that disagree:** pairs about the same thing (close in meaning, or sharing most words) with a sign of disagreement (yes against no, opposite words, other numbers or dates). Keep one, or mark both true; your model can check a pair if you allow it.
+- **Merge every group:** all duplicate groups merged after one approval, each into its newest memory.
+- **Expiry:** an optional date per memory. Expired memories leave the list and apps and wait under Expired; after the grace period you set (30 days by default) the server deletes them for real, even while the vault is closed. For that it keeps one readable time per expiring memory.
+
+## Your whole digital life
+
+Under **Import**, parsed and encrypted in the browser, each with a preview, a folder choice and dedupe against what the vault holds (same source, or same title and text):
+
+| Source | What you pick | What it becomes |
+| --- | --- | --- |
+| ChatGPT, Claude | The data export zip | One memory per conversation, plus Claude projects and memory |
+| Obsidian | The vault folder | One memory per note, with front matter and inline tags; `sigil-connector --watch` keeps it in sync through the inbox |
+| Apple Notes | The iCloud data copy, or exported text, Markdown or HTML files | One memory per note |
+| Gmail, Google Calendar | The Google Takeout zip, or its `.mbox` and `.ics` files | One memory per thread (4,000 characters a message, 20,000 a thread, spam and trash left out), one per event |
+| Notion | The Markdown and CSV export zip | One memory per page |
+| GitHub | A repository, or your user name, and a token if needed | Commits or activity grouped by day; the token is used from the browser and never saved |
 
 ## Search by meaning
 
@@ -255,6 +330,9 @@ Every request a connected app makes is written to your read log with a random sa
 | You revoke an app | Its token hash and wrapped keys are deleted; its next request fails. What it already read, it keeps. |
 | You lose your passkey | Sign in with a wallet or your recovery phrase. Keep at least two ways in. |
 | You lose every way in | The vault cannot be recovered, by you or by Sigil. That is the price of keys only you hold. |
+| The server tries to read an ask link conversation | It holds relay boxes under a key derived from the link key (only in the link, after `#`) and the asker's fresh key. A server that hands out another link key is caught by the asker's page, which then sends nothing. |
+| Someone asks your AI self what it should not answer | It uses only the link's folders; denied topics are refused before the model, phrases it must never say are filtered on the device. Rules written as words can be worked around, so give a link only folders you would be happy to see quoted. |
+| Your model provider | Sees the question and the memories given to it for each answer, under your key and its terms. |
 | An AI app or a person misuses text they were allowed to read | Sigil cannot control that. Share folders only with apps and people you trust. |
 
 ---
@@ -265,7 +343,8 @@ Every request a connected app makes is written to your read log with a random sa
 Sigil
 ├── packages/core   client-side cryptography, key slots, app keys, sealed boxes,
 │                   sharing and key rotation, Merkle seals, search by words and
-│                   meaning, the on-device model runtime, export parsers
+│                   meaning, the on-device model runtime, the AI self and its
+│                   relay, the model caller, briefs and contradictions, parsers
 ├── packages/sdk    Sign in with Sigil for web apps
 ├── web             the site and the server: Next.js App Router, the vault
 │                   dashboard, the API in web/src/server, SQLite storage
@@ -291,8 +370,15 @@ Sigil
 | `POST /api/connector/v1/read` | One memory's ciphertext, logged before it is answered (app token) |
 | `GET /api/connector/v1/inbox` | The vault public key and the tag for this app, if it may suggest (app token) |
 | `POST /api/connector/v1/proposals` | One sealed suggestion into the inbox, logged (app token) |
+| `GET /api/connector/v1/self` | The AI self config and links, encrypted for this app (app token) |
+| `GET /api/connector/v1/self/pending` | Questions for this app's links; marks it online (app token) |
+| `POST /api/connector/v1/self/questions/<id>/answer` | A sealed answer and its sealed log note (app token) |
+| `POST /api/connector/v1/self/asked` | The sealed log note of an `ask_self` answer (app token) |
+| `GET /api/ask/<link>` | A link's public key, sealed greeting, state and whether it is online |
+| `POST /api/ask/<link>/questions` | One sealed question, if the link is active, online and within limits |
+| `GET /api/ask/<link>/questions/<id>` | The sealed answer, once there is one |
 
-The connector routes answer any origin, since they take a bearer token and never a cookie. The vault's own routes (sign-up, sign-in, memories, folders and their key rotation, apps, the inbox, shares, export, delete) are under `web/src/server/api.ts`.
+The connector routes answer any origin, since they take a bearer token and never a cookie. The vault's own routes (sign-up, sign-in, memories, folders and their key rotation, apps, the inbox, shares, encrypted settings, ask links and the open vault answering them, export, delete) are under `web/src/server/api.ts`.
 
 </details>
 
@@ -320,6 +406,7 @@ For development: `npm run dev`. Settings are in `web/.env.example`:
 | `SIGIL_MODEL_FETCH` | `on` | Fetch missing model files once from the public model hub |
 | `NEXT_PUBLIC_SITE_URL` | | The public address, used in connector snippets |
 | `SIGIL_ORIGIN` | | The origin trusted for passkeys in production |
+| `SIGIL_AGENT_ONLINE_SECONDS` | `30` | How long after it last checked in your AI self counts as online for an ask link |
 
 ## Tests
 
@@ -341,9 +428,9 @@ The server tests check that no plaintext ever reaches the database or leaves the
 | --- | --- | --- |
 | 1 | **The vault**: passkey and wallet sign-in, client-side encryption, folders, ChatGPT and Claude import, export, real delete | Built |
 | 2 | **Every AI, one memory**: the MCP connector, per-app folder grants, revoke, the read log, hourly seals, the memory inbox, the browser extension, Sign in with Sigil, sharing between vaults | Built |
-| 3 | **Your whole digital life**: mail, calendar, code and documents into the vault | Planned |
-| 4 | **Memory that thinks**: search by meaning on the device, duplicates, a timeline and the Self card are built; stale facts, timelines of people and projects, briefs and a fully local mode are next | Started |
-| 5 | **Your AI self**: a model of you that answers within your rules | Planned |
+| 3 | **Your whole digital life**: local imports from Obsidian (kept in sync by the connector), Apple Notes, Gmail and Google Calendar, Notion and GitHub are built; live sync and meetings are next | Started |
+| 4 | **Memory that thinks**: search by meaning on the device, duplicates merged by group, a timeline, the Self card, a weekly brief, contradictions and expiry are built; timelines of people and projects, briefs before meetings and a fully local mode are next | Started |
+| 5 | **Your AI self**: version 1 is built: answers as you within your rules with your own model key, ask links end to end encrypted, `ask_self` in the connector; a personal model and acting within limits are next | Version 1 |
 | 6 | **Agents get memory**: vaults for AI agents and shared spaces | Planned |
 | 7 | **The memory economy**: what you know, licensed on your terms | Planned |
 | 8 | **Trust**: an open standard for apps that read personal memory | Planned |

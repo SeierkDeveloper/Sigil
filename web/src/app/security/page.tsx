@@ -33,6 +33,9 @@ export default function Security() {
             <a href="#apps">Connected apps</a>
           </li>
           <li>
+            <a href="#ai-self">Your AI self</a>
+          </li>
+          <li>
             <a href="#delete">Deleting</a>
           </li>
           <li>
@@ -95,12 +98,14 @@ export default function Security() {
             <h2>What the server can and cannot see</h2>
             <p>
               <strong>It cannot see</strong> the title, body or tags of any memory, the names of your folders, the names of your connected apps, your
-              search words, or any of your keys.
+              search words, any of your keys, your model key, your AI self&apos;s rules, or the questions and answers of your ask links.
             </p>
             <p>
               <strong>It can see</strong> that your account exists; your passkey&apos;s public key or your wallet address (needed to find your vault
               when you sign in); how many folders and memories you have, their sizes and when they changed; which app is allowed to read which folder;
-              and the read log: which app read which memory, and when. This metadata is needed to run the service, and it is covered by the{" "}
+              the read log: which app read which memory, and when; that an ask link exists, how often it is used and when your AI self last checked
+              in; and, for a memory you gave an expiry, the time it is to be deleted. This metadata is needed to run the service, and it is covered by
+              the{" "}
               <Link href="/privacy">privacy notice</Link>.
             </p>
           </section>
@@ -130,12 +135,34 @@ export default function Security() {
             </p>
           </section>
 
+          <section id="ai-self">
+            <h2>Your AI self</h2>
+            <p>
+              Your AI self runs where your keys are: in your open vault, or in the connector on your machine for an app you allow. It calls your own
+              model provider with your own key, straight from there. The key and the rules are saved only as envelopes under your vault key; for an
+              app you allow they are wrapped again under a key derived from that app&apos;s secret, which never reaches the server. Only the folders
+              your rules allow are given to the model, and the rules are checked on the device before and after the model answers.
+            </p>
+            <p>
+              An ask link carries the link&apos;s public key after the <code>#</code>, which browsers never send to a server. The asker&apos;s browser
+              checks the key the server holds against it and refuses a different one, makes a fresh X25519 key pair for the conversation, and seals
+              each question with a key derived from both sides (HKDF-SHA256, then XChaCha20-Poly1305 bound to the link, the conversation, the message
+              and its direction). The server stores and forwards these boxes and cannot open them. Each question and answer is also sealed to your
+              vault&apos;s public key for your read log, where the entry is part of the hourly seal.
+            </p>
+            <p>
+              The model provider you choose does see the question and the memories given to it for that answer: that is how a model answers. Its own
+              terms apply to what it receives. Imports from GitHub are asked from your browser in the same way, with a token that is never saved.
+            </p>
+          </section>
+
           <section id="delete">
             <h2>Deleting means deleted</h2>
             <p>
               Deleting a memory, a folder or your account removes the rows from the database, and the database is set to overwrite deleted content on
               disk rather than just unlinking it. Deleting your account removes your sign-in methods, sessions, folders, memories, apps and read log in
-              one step. Export everything first if you want to keep a copy: the export is decrypted on your device.
+              one step. A memory you gave an expiry is deleted by the server when its grace period is over, whether or not your vault is open. Export
+              everything first if you want to keep a copy: the export is decrypted on your device.
             </p>
           </section>
 
@@ -178,6 +205,14 @@ export default function Security() {
               </li>
               <li>
                 <strong>Metadata is visible to the server,</strong> as listed above.
+              </li>
+              <li>
+                <strong>Your model provider sees what it answers from.</strong> Each answer of your AI self, each brief written by your model and each
+                pair it checks sends that text to the provider you chose, under your key and its terms.
+              </li>
+              <li>
+                <strong>The ask page is served by the server.</strong> Like any web page with end to end encryption, it is only as honest as the code
+                the server sends. The code is open source, so it can be checked.
               </li>
               <li>
                 <strong>Early software.</strong> The code is open source and has not had an independent audit yet.

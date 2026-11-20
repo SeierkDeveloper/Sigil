@@ -34,7 +34,12 @@ const sections = [
           A memory has a title, a body, tags and a folder. Write them yourself, or import the data export you can download from ChatGPT or Claude:
           every conversation becomes one memory, with the date it happened. Claude projects, their documents and what Claude remembered come along too.
         </p>
-        <p>The export file is opened and encrypted in your browser. Sigil&apos;s server only ever receives the encrypted result.</p>
+        <p>
+          The rest of your digital life comes in the same way: an Obsidian vault, Apple Notes, Gmail threads and calendar events from Google
+          Takeout, a Notion export, and a GitHub repository&apos;s history or your recent activity. Each shows a preview, lets you choose the folder,
+          and leaves out what is already there. The connector can watch an Obsidian folder and suggest changed notes to your inbox.
+        </p>
+        <p>Files are opened and encrypted in your browser. Sigil&apos;s server only ever receives the encrypted result.</p>
       </>
     ),
   },
@@ -72,7 +77,7 @@ const sections = [
       <>
         <p>
           The connector gives the AI four tools that read: your Self card, the folders it may read, a search, and one memory in full. A fifth tool
-          lets it suggest a memory, if you allow that app to.
+          lets it suggest a memory, and a sixth asks your AI self, if you allow that app to.
         </p>
         <p>
           When the AI searches, the connector downloads the encrypted titles, tags and first lines of the memories in its folders, decrypts them on
@@ -89,8 +94,30 @@ const sections = [
     ),
   },
   {
+    id: "self",
+    title: "6. Your AI self answers as you",
+    body: (
+      <>
+        <p>
+          Under <strong>AI self</strong> you add your own model key and write rules: which folders it may use, topics it may and may not discuss,
+          things it must never say, its tone, and what it says when it does not know. A test chat shows each answer with the memories it came from.
+          Your key and rules are encrypted with your vault key; the model is called from your browser, or from the connector on your machine.
+        </p>
+        <p>
+          An <strong>ask link</strong> lets someone else ask it, within that link&apos;s own rules, until it expires or runs out. Their questions are
+          encrypted in their browser for your AI self and answered where your keys are: your open vault, or your connector. The server only passes
+          sealed boxes along. When neither is running, the link says so. Every question and answer goes into your read log.
+        </p>
+        <p>
+          In <strong>Review</strong> your vault looks over itself on your device: a weekly brief in a Briefs folder, memories that seem to disagree,
+          and memories past the expiry date you gave them, which are deleted for real after a grace period you choose.
+        </p>
+      </>
+    ),
+  },
+  {
     id: "log",
-    title: "6. Every read goes on the record",
+    title: "7. Every read goes on the record",
     body: (
       <p>
         The <strong>read log</strong> in your vault shows which app read what, and when. At the end of every hour, all reads from that hour are
@@ -102,7 +129,7 @@ const sections = [
   },
   {
     id: "control",
-    title: "7. Change your mind at any time",
+    title: "8. Change your mind at any time",
     body: (
       <>
         <p>
@@ -132,6 +159,8 @@ const serverSees = [
   "How many folders and memories there are, their sizes and when they changed",
   "Which app read which memory, and when (the read log)",
   "That an app suggested a memory, and that a folder is shared with another vault",
+  "That an ask link exists, how often it is used, and when your AI self last checked in",
+  "When a memory you gave an expiry is to be deleted",
 ];
 
 const onlyYouSee = [
@@ -140,6 +169,7 @@ const onlyYouSee = [
   "Your search words, and the search vectors made from your memories",
   "What a suggestion says, and who you share with",
   "Your vault key, folder keys, app keys and recovery phrase",
+  "Your model key, your AI self's rules, and the questions and answers of your ask links",
 ];
 
 export default function HowItWorks() {

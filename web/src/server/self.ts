@@ -5,14 +5,16 @@
 // read a question, an answer, a rule or a model key.
 
 import { tx, type Db } from "./db";
+import { serverConfig } from "./config";
 import { HttpError, logRead, type AppAuth } from "./store";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
 const str = (v: unknown) => (v == null ? null : String(v));
 
-/** How long the owner's agent counts as online after it last asked for questions. */
+/** How long the owner's agent counts as online after it last asked for questions (30 seconds unless set). */
 export const AGENT_ONLINE_MS = 30_000;
+const onlineMs = () => serverConfig.agentOnlineMs;
 /** How long an asker waits for an answer before the question is given up. */
 export const ANSWER_WAIT_MS = 120_000;
 /** Questions are deleted this long after they were asked, answered or not. */
@@ -110,7 +112,7 @@ export function createLink(db: Db, userId: string, l: LinkInput): void {
 }
 
 function online(seen: unknown, at = Date.now()): boolean {
-  return seen != null && at - Number(seen) < AGENT_ONLINE_MS;
+  return seen != null && at - Number(seen) < onlineMs();
 }
 
 export function listLinks(db: Db, userId: string) {

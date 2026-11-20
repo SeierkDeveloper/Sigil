@@ -189,8 +189,10 @@ function overlap(a: string, b: string): number {
 
 export interface ContradictionOptions {
   vectors?: Map<string, Float32Array>;
-  /** From this closeness two memories are about the same thing (0.6 with vectors, 0.5 word overlap without). */
+  /** From this cosine similarity two memories are about the same thing (0.6). */
   minCloseness?: number;
+  /** From this share of words two memories are about the same thing (0.5). */
+  minOverlap?: number;
   /** At or above this closeness they are duplicates, not contradictions (0.97). */
   maxCloseness?: number;
   maxPairwise?: number;
@@ -200,8 +202,8 @@ const CONTRADICTION_TEXT = 2000;
 
 /**
  * Pairs of memories about the same thing that may say different things: close
- * in meaning (or in words, without vectors) and with at least one sign of
- * disagreement. The owner, or the owner's model, decides.
+ * in meaning (with vectors) or sharing most of their words, and with at least
+ * one sign of disagreement. The owner, or the owner's model, decides.
  */
 export function findContradictions<T extends Searchable>(items: T[], opts: ContradictionOptions = {}): ContradictionCandidate<T>[] {
   const recent = [...items].sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1)).slice(0, opts.maxPairwise ?? 600);
@@ -212,9 +214,13 @@ export function findContradictions<T extends Searchable>(items: T[], opts: Contr
     for (let j = i + 1; j < recent.length; j++) {
       const va = opts.vectors?.get(recent[i].id);
       const vb = opts.vectors?.get(recent[j].id);
-      const closeness = va && vb ? cosine(va, vb) : overlap(texts[i], texts[j]);
-      const min = opts.minCloseness ?? (va && vb ? 0.6 : 0.5);
-      if (closeness < min || closeness >= max) continue;
+      // Close in meaning (but not the same thing said twice), or sharing most of their words.
+      const cos = va && vb ? cosine(va, vb) : null;
+      const words = overlap(texts[i], texts[j]);
+      const byMeaning = cos !== null && cos >= (opts.minCloseness ?? 0.6) && cos < max;
+      const byWords = words >= (opts.minOverlap ?? 0.5);
+      if (!byMeaning && !byWords) continue;
+      const closeness = Math.max(byMeaning ? cos! : 0, words);
       if (texts[i].trim().toLowerCase() === texts[j].trim().toLowerCase()) continue;
       const signals = disagreementSignals(texts[i], texts[j]);
       if (signals.length) out.push({ a: recent[i], b: recent[j], closeness, signals });

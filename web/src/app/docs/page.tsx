@@ -8,7 +8,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Set up the Sigil connector for Claude Desktop, Cursor and ChatGPT, the memory inbox, search by meaning, the browser extension, Sign in with Sigil, sharing, the API and the encryption model.",
+    "Set up the Sigil connector for Claude Desktop, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, the browser extension, Sign in with Sigil, sharing, the API and the encryption model.",
 };
 
 const KEY = "sigil_app.<app id>.<secret>";
@@ -21,9 +21,12 @@ const toc = [
   ["chatgpt", "ChatGPT"],
   ["other-clients", "Other MCP clients"],
   ["tools", "Tools"],
+  ["ai-self", "Your AI self"],
+  ["ask-links", "Ask links"],
   ["inbox", "Memory inbox"],
   ["meaning", "Search by meaning"],
   ["self-card", "Self card"],
+  ["thinking", "Memory that thinks"],
   ["extension", "Browser extension"],
   ["sign-in-with-sigil", "Sign in with Sigil"],
   ["sharing", "Sharing a folder"],
@@ -212,7 +215,7 @@ export default function Docs() {
 
           <section id="tools" className="doc-section">
             <h2>Tools</h2>
-            <p>The connector gives AI apps four tools that read and one that only suggests.</p>
+            <p>The connector gives AI apps four tools that read, one that only suggests, and one that asks your AI self.</p>
             <div className="table-wrap">
               <table className="table">
                 <thead>
@@ -266,10 +269,83 @@ export default function Docs() {
                     </td>
                     <td>The app suggested a memory.</td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>ask_self</code>
+                    </td>
+                    <td>
+                      Asks your AI self a <code>question</code>. It answers as you, from the folders your rules allow that this app may also read, with your
+                      own model key, on your computer. Works only if you let this app answer as your AI self.
+                    </td>
+                    <td>The app read the index and the memories it used, and your AI self answered a question (the question and answer, sealed for your vault).</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>No tool changes or deletes a memory. A suggestion becomes a memory only when you approve it.</p>
+          </section>
+
+          <section id="ai-self" className="doc-section">
+            <h2>Your AI self</h2>
+            <p>
+              Under <strong>AI self</strong> in the vault you set up an AI that answers as you. It is built from your memories at the moment of each
+              question: nothing is trained, and nothing leaves your device except the request to your own model provider.
+            </p>
+            <ol>
+              <li>
+                <strong>Model.</strong> Choose Anthropic (the default) or OpenAI, a model, and paste your own API key. The key is encrypted with your
+                vault key in your browser before it is saved. Calls go from your browser straight to the provider and are billed to your key.
+              </li>
+              <li>
+                <strong>Rules.</strong> The folders it may use (nothing else is ever given to the model), topics it may and may not discuss, things it
+                must never say, its tone, what it says when it does not know, and how many memories it may read per answer. A question about a topic
+                it never discusses is refused before the model is asked. An answer that contains something it must never say is replaced by a refusal
+                on your device. When nothing in its folders matches, it says it does not know without calling the model.
+              </li>
+              <li>
+                <strong>Test chat.</strong> Ask what others would ask. Each answer shows the memories it used; click one to open it.
+              </li>
+              <li>
+                <strong>Apps that answer as you.</strong> Let a connected app use <code>ask_self</code> and answer links. Your vault wraps the rules,
+                your model key and your vault public key for that app&apos;s key only. The app reads memories through its own folders, so a folder
+                must be both in the rules and given to the app.
+              </li>
+            </ol>
+            <p>The rules and the key are saved as encrypted settings. Changing them updates every app you allowed.</p>
+          </section>
+
+          <section id="ask-links" className="doc-section">
+            <h2>Ask links</h2>
+            <p>
+              An ask link lets anyone who has it ask your AI self questions. Each link has its own rules (folders and topics), an expiry, a number
+              of questions in all and an hourly limit, and you can turn it off at any time.
+            </p>
+            <ol>
+              <li>
+                Making a link creates a key pair on your device. The link looks like <code>/ask/&lt;id&gt;#&lt;public key&gt;.&lt;greeting key&gt;</code>
+                . Browsers never send the part after <code>#</code>, so the server never has it.
+              </li>
+              <li>
+                The asker&apos;s browser checks that the server holds the same public key as the link, makes its own key pair for the conversation, and
+                seals each question with a key both sides derive (X25519, HKDF-SHA256, XChaCha20-Poly1305).
+              </li>
+              <li>
+                The question is answered where your keys are: your open vault, or the connector of an app you chose, run with{" "}
+                <code>sigil-connector --self</code>. The answer is sealed back the same way. The server only relays the boxes.
+              </li>
+              <li>
+                When neither is running, the link says your AI self is offline and takes no question. A question not answered within two minutes is
+                given up.
+              </li>
+              <li>
+                Every question and its answer go into your read log, sealed to your vault&apos;s public key, and are part of the hourly seal like
+                every read. Open them in the log with <strong>Show the question and answer</strong>.
+              </li>
+            </ol>
+            <p>
+              The asker sees the answer only, never which memories it came from. Limits: up to 1,000 questions per link, up to 120 an hour, 8 a
+              minute from one address, and one question at a time per conversation.
+            </p>
           </section>
 
           <section id="inbox" className="doc-section">
@@ -333,6 +409,34 @@ export default function Docs() {
               <strong>Self card</strong> in your vault. It is a memory like any other, encrypted the same way, in a folder of its own, so an app reads
               it only if you give it that folder. Apps read it with <code>get_profile</code>, and the connector tells them to read it first.
             </p>
+          </section>
+
+          <section id="thinking" className="doc-section">
+            <h2>Memory that thinks</h2>
+            <p>
+              The <strong>Review</strong> tab looks over your vault on your device.
+            </p>
+            <ul>
+              <li>
+                <strong>Weekly brief.</strong> What is new, what changed and what you may have forgotten (untouched for 120 days), saved as a memory in
+                a folder called Briefs. It is made when you open your vault and the last one is a week old (you can turn that off), or when you ask.
+                With your model key and your permission, your model writes it; otherwise it is three plain lists.
+              </li>
+              <li>
+                <strong>Memories that disagree.</strong> Pairs that are about the same thing (close in meaning, or sharing many words) and show a sign
+                of disagreement: one says no where the other says yes, opposite words, or different numbers and dates. Keep one, or mark both as
+                true. With your permission your model can check a pair.
+              </li>
+              <li>
+                <strong>Merge every group.</strong> Under Find duplicates, all duplicate groups are merged after one approval: each into its newest
+                memory, with what the others add and all their tags.
+              </li>
+              <li>
+                <strong>Expiry.</strong> Give a memory an expiry date in its editor. After that day it leaves the list, apps no longer see it, and it
+                waits under Expired. When the grace period you set (30 days unless you change it) is over, the server deletes it for real, even while
+                your vault is closed. For that the server keeps one time in the clear per expiring memory: when to delete it.
+              </li>
+            </ul>
           </section>
 
           <section id="extension" className="doc-section">
@@ -418,8 +522,44 @@ export default function Docs() {
               In Claude, open Settings, Privacy, Export data. Drop the zip you receive into Import. Conversations, projects with their instructions
               and documents, and Claude&apos;s saved memory (when present) become memories in a folder called Claude.
             </p>
+            <h3>From Obsidian</h3>
             <p>
-              Files are read and encrypted in your browser. Very long conversations are shortened to 500,000 characters, and the memory says so.
+              Choose the folder of your Obsidian vault. Each Markdown note becomes a memory with its front matter and inline tags; the settings
+              folder and attachments are left out. To keep it in sync, run the connector with <code>--watch</code>:
+            </p>
+            <CodeBlock label="Terminal" code={`SIGIL_APP_KEY=${KEY} \\\nSIGIL_URL=${site.url} \\\nnode connector/dist/index.js --watch "/path/to/your/Obsidian vault"`} />
+            <p>
+              Use an app key that may suggest memories and read the folder you imported into. New and changed notes are sealed on your computer and
+              wait in your inbox, where a change offers to update the memory imported from the same note. Up to 8 notes go in one pass; the rest
+              follow a minute later.
+            </p>
+            <h3>From Apple Notes</h3>
+            <p>
+              Ask Apple for a copy of your iCloud data, choose iCloud Notes, and pick the zip or the unpacked Notes folder. Notes exported as text,
+              Markdown or HTML files work too. The first line of a note is its title.
+            </p>
+            <h3>From Gmail and Google Calendar</h3>
+            <p>
+              In Google Takeout, choose Mail and Calendar. Pick the zip, or the <code>.mbox</code> and <code>.ics</code> files inside it. Each mail
+              thread becomes one memory with the sender, recipient, date and text of each message (quoted replies left out), up to 4,000 characters
+              a message and 20,000 a thread, and the newest 5,000 threads at most. Spam and trash are left out. Each calendar event becomes one
+              memory with its time, place and description.
+            </p>
+            <h3>From Notion</h3>
+            <p>
+              In Notion, export all workspace content as Markdown and CSV, and pick the zip (a zip inside the zip is opened too). Each page becomes a
+              memory titled without Notion&apos;s page id, with its parent pages named at the top. Databases are left out.
+            </p>
+            <h3>From GitHub</h3>
+            <p>
+              Write a repository (owner/name) for its commit history, up to the newest 1,000 commits, or your user name for your recent activity
+              (GitHub keeps about 90 days). Your browser asks GitHub directly. A token is needed only for private repositories or more requests; it
+              is used for that import only and never saved or sent to Sigil. Commits and activity are grouped into one memory per day.
+            </p>
+            <p>
+              Files are read and encrypted in your browser, up to 1 GB at once. Every import shows a preview first, lets you choose the folder, and
+              leaves out what is already in your vault: the same source (a note path, a mail thread, an event) or the same title and text. Very
+              long items are shortened to 500,000 characters, and the memory says so.
             </p>
           </section>
 
@@ -480,6 +620,38 @@ export default function Docs() {
                       <code>{"{ appId, id, createdAt }"}</code>
                     </td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>GET /api/connector/v1/self</code>
+                    </td>
+                    <td>
+                      <code>{"{ appId, config, links: [{ id, publicKey, box }] }"}</code>, or <code>403</code> when the app may not answer as the AI self
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>GET /api/connector/v1/self/pending</code>
+                    </td>
+                    <td>
+                      <code>{"{ appId, questions: [{ id, linkId, sessionId, askerKey, sealed, createdAt }] }"}</code>; marks the app online for its links
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>POST /api/connector/v1/self/questions/&lt;id&gt;/answer</code> with <code>{"{ sealed, note, cited }"}</code>
+                    </td>
+                    <td>
+                      <code>{"{ ok }"}</code>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>POST /api/connector/v1/self/asked</code> with <code>{"{ id, note, cited }"}</code>
+                    </td>
+                    <td>
+                      <code>{"{ ok }"}</code>; the log line for an <code>ask_self</code> answer
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -511,12 +683,21 @@ export default function Docs() {
                     </td>
                     <td>Whether sealing is on, and whether seals are local or anchored.</td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>GET /api/ask/&lt;link id&gt;</code>
+                    </td>
+                    <td>
+                      <code>{"{ id, publicKey, intro, state, online, expiresAt, remaining }"}</code> for an ask link; the greeting is encrypted
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
             <p>
               The vault page itself uses a session API (<code>/api/vault</code>, <code>/api/memories</code>, <code>/api/folders</code>,{" "}
-              <code>/api/apps</code>, <code>/api/proposals</code>, <code>/api/shares</code>, <code>/api/log</code> and the sign-in routes under{" "}
+              <code>/api/apps</code>, <code>/api/proposals</code>, <code>/api/shares</code>, <code>/api/settings</code>, <code>/api/self</code>,{" "}
+              <code>/api/log</code> and the sign-in routes under{" "}
               <code>/api/auth</code>). It accepts only encrypted payloads
               and only requests from the site itself. It is described in the source in <code>web/src/server/api.ts</code>.
             </p>

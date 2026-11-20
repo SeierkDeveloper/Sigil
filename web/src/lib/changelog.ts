@@ -4,11 +4,51 @@ export interface Release {
   date: string; // ISO day
   title: string;
   summary: string;
-  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing";
+  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import";
   items: string[];
 }
 
 export const releases: Release[] = [
+  {
+    date: "2026-11-20",
+    title: "Your AI self, version 1",
+    area: "AI self",
+    summary: "An AI that answers as you, from the folders you choose and within rules you write, with your own model key. Share it with a link.",
+    items: [
+      "Rules: the folders it may use, topics it may and may not discuss, things it must never say, its tone, and what it says when it does not know",
+      "Your own Anthropic or OpenAI key, encrypted in the vault and used only from your browser or the connector on your machine",
+      "A test chat in the vault that shows the memories each answer used",
+      "Ask links with their own rules, an expiry, a number of questions and an hourly limit; questions and answers are end to end encrypted between the asker's browser and your open vault or connector",
+      "When neither is running the link says your AI self is offline, and every question and answer goes into your read log, sealed",
+      "ask_self in the connector for apps you allow, and sigil-connector --self to answer links while your vault is closed",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Memory that thinks",
+    area: "Vault",
+    summary: "A weekly brief, memories that disagree, every duplicate group merged at once, and memories that expire.",
+    items: [
+      "A weekly brief of what is new, what changed and what you may have forgotten, saved in a Briefs folder; written by your model when you allow it, as plain lists otherwise",
+      "Pairs of memories that seem to disagree, found by meaning and by words, with an optional check by your model",
+      "Merge every duplicate group after one approval",
+      "An expiry date per memory: expired memories leave the list and apps, wait under Expired, and are deleted for real after a grace period you set",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Your whole digital life, imported on your device",
+    area: "Import",
+    summary: "Obsidian, Apple Notes, Gmail and Google Calendar, Notion and GitHub, parsed and encrypted in the browser. No app approvals.",
+    items: [
+      "Obsidian vaults with their tags, kept in sync by the connector watching the folder and suggesting changes through the inbox",
+      "Apple Notes from the iCloud data copy or exported files",
+      "Google Takeout: one memory per mail thread within size limits, one per calendar event",
+      "Notion Markdown exports, zip inside zip included",
+      "A GitHub repository's history or your recent activity, asked from the browser with a token that is never saved",
+      "A preview, a folder choice and dedupe against what is already in the vault for every source",
+    ],
+  },
   {
     date: "2026-11-20",
     title: "The memory inbox",

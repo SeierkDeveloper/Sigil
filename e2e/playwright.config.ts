@@ -36,6 +36,7 @@ export default defineConfig({
       SIGIL_SEAL_SECONDS: "4",
       SIGIL_SEALS: "on",
       SIGIL_ANCHOR: "off",
+      SIGIL_AGENT_ONLINE_SECONDS: "6",
       ...TEST_MODEL,
     },
   },
