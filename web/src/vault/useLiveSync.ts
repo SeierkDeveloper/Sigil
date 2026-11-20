@@ -5,7 +5,7 @@
 // connector syncs in the background is left to it. Closing the vault stops this.
 
 import { useEffect, useRef, useState } from "react";
-import type { Api } from "./api";
+import { ApiError, type Api } from "./api";
 import type { Unlocked, VaultData } from "./ops";
 import { syncNow } from "./syncOps";
 import { republish } from "./publicOps";
@@ -45,6 +45,8 @@ export function useLiveSync(api: Api, vault: Unlocked, data: VaultData | null, s
           });
           setData((x) => (x ? { ...x, sync: x.sync.map((s) => (s.id === src.id ? r.source : s)) } : x));
         } catch (err) {
+          // Another device or tab saved a newer copy first: nothing went wrong, the next pass starts from it.
+          if (err instanceof ApiError && err.code === "stale") continue;
           if (alive) setState({ running: null, lastError: (err as Error).message });
         }
       }
