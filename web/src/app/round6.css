@@ -1013,267 +1013,462 @@
   }
 }
 
-/* ------------------------------------------------------------------ round six: work, identity, proofs, emergency, agreements, packs
-   Plain first styling, in the tokens above, for the design pass to replace. */
+/* ------------------------------------------------------------------ /p/<id>, a knowledge pack */
 
-.draft-list,
-.lesson-list {
+.pack-card {
   display: grid;
   gap: var(--space-4);
 }
 
-.draft-card {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius);
-  background: var(--plate);
+.pack-card > * {
+  min-width: 0;
+  margin: 0;
 }
 
-.draft-card[data-kind="answer"] {
+.pack-card[data-ok="false"] {
   border-style: dashed;
 }
 
-.draft-head {
-  display: flex;
-  flex-wrap: wrap;
+.pack-card > .small.muted {
+  line-height: 1.6;
+}
+
+.pack-card > .small.faint {
+  max-width: 68ch;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+  line-height: 1.6;
+}
+
+/* What is in it: a numbered list of contents, each line opening on its text. */
+.pack-items {
+  display: block;
+  margin: var(--space-7) 0 0;
+  padding: 0;
+  border-top: 1px solid var(--color-line-strong);
+  list-style: none;
+  counter-reset: pack;
+}
+
+.pack-item {
+  padding: 0;
+  border-bottom: 1px solid var(--color-line);
+  counter-increment: pack;
+}
+
+.pack-item-title {
+  display: grid;
+  grid-template-columns: 2.25rem minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: var(--space-2) var(--space-3);
-}
-
-.draft-title {
-  flex: 1 1 12rem;
-  margin: 0;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-4) var(--space-2) var(--space-4) 0;
+  font-size: 1.0625rem;
   font-weight: 600;
+  line-height: 1.35;
+  list-style: none;
   overflow-wrap: anywhere;
-}
-
-.draft-input summary {
   cursor: pointer;
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  transition: color var(--transition);
 }
 
-.draft-input-text,
-.draft-final,
-.lesson-body,
-.agreement-text,
+.pack-item-title::-webkit-details-marker {
+  display: none;
+}
+
+.pack-item-title::before {
+  content: counter(pack, decimal-leading-zero);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.1em;
+}
+
+.pack-item-title::after {
+  align-self: center;
+  color: var(--color-text-muted);
+}
+
 .pack-item-body {
-  margin: var(--space-2) 0 0;
+  max-width: 68ch;
+  margin: 0;
+  padding: 0 0 var(--space-5) calc(2.25rem + var(--space-3));
+  color: #d2d2d2;
+  line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.draft-final {
-  color: var(--color-text-muted);
-  font-size: var(--text-sm);
+@media (max-width: 640px) {
+  .pack-card {
+    padding: var(--space-5) var(--space-4);
+  }
+
+  .pack-card .row .button {
+    flex: 1 1 100%;
+  }
+
+  .pack-item-title {
+    grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+    gap: var(--space-2);
+    font-size: 1rem;
+  }
+
+  .pack-item-body {
+    padding-left: 0;
+    font-size: 0.9375rem;
+  }
 }
 
-.agreement-text {
-  padding: var(--space-4);
-  border-left: 1px solid var(--color-line-bright);
-  background: var(--color-surface-2);
-}
-
-.identity-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  margin: 0 0 var(--space-4);
-  border-top: 1px solid var(--color-line-strong);
-}
-
-.identity-facts > div {
-  padding: var(--space-3) var(--space-3) var(--space-3) 0;
-  border-bottom: 1px solid var(--color-line);
-  min-width: 0;
-}
-
-.identity-facts dt {
-  color: var(--color-text-faint);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.identity-facts dd {
-  margin: 2px 0 0;
-  overflow-wrap: anywhere;
-}
-
-.identity-address {
-  overflow-wrap: anywhere;
-}
-
-.rules-row {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
-  gap: var(--space-2);
-  align-items: center;
-  margin-bottom: var(--space-2);
-}
-
-.rules-row-wide {
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-}
-
-.emergency-code-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
-  gap: var(--space-5);
-  align-items: start;
-}
-
-.pack-follow-form {
-  flex-wrap: nowrap;
-}
-
-.pack-follow-form .input {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.pack-items {
-  display: grid;
-  gap: var(--space-2);
-  margin: var(--space-5) 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.pack-item {
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--color-line);
-}
-
-.pack-item-title {
-  cursor: pointer;
-  font-weight: 600;
-}
+/* ------------------------------------------------------------------ /verify, signed documents */
 
 .document-checker {
   display: grid;
   gap: var(--space-2);
 }
 
+.document-checker > .button {
+  justify-self: start;
+}
+
+/* The file field is one line with a small plate to press. */
+.document-checker .input[type="file"],
+.certificate-checker .input[type="file"] {
+  padding: 6px;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.document-checker .input[type="file"]::file-selector-button,
+.certificate-checker .input[type="file"]::file-selector-button {
+  min-height: 32px;
+  margin-right: var(--space-3);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* What kind of document it is, in a label, then what it says, set large. */
+.document-checker .verifier-result > .verifier-verdict + .small.muted {
+  margin: 0 0 var(--space-2);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+/* The claim, the title or the name: three fine lines down its left edge, faint when it did not check out. */
 .document-headline {
-  margin: var(--space-2) 0;
-  font-size: var(--text-lg);
+  margin: 0 0 var(--space-4);
+  padding: 2px 0 2px calc(7px + var(--space-4));
+  background: var(--ruled-edge) left top / 7px 100% no-repeat;
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-size: 1.375rem;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
-/* The emergency card: large, plain and readable at arm's length on a phone. */
+[data-ok="false"] > .document-headline {
+  background-image: var(--ruled-edge-faint);
+  color: var(--color-text-muted);
+}
+
+.document-checker .verifier-result > .small.faint {
+  margin: var(--space-4) 0 0;
+  line-height: 1.6;
+}
+
+@media (max-width: 640px) {
+  .document-headline {
+    font-size: 1.25rem;
+  }
+
+  .document-checker > .button {
+    justify-self: stretch;
+  }
+}
+
+/* ------------------------------------------------------------------ /e/<id>, the emergency card */
+
+/* The page belongs to one card and one reader in a hurry: the name stays, the menus, the footer and the moving ground go. */
+body:has(.emergency-page) :is(.site-nav, .site-actions, .site-menu-button, .site-menu, .site-footer) {
+  display: none;
+}
+
+body:has(.emergency-page) .backdrop-canvas {
+  visibility: hidden;
+}
+
+body:has(.emergency-page) .site-header-inner {
+  justify-content: center;
+}
+
+.emergency-page {
+  padding: var(--space-6) 0 var(--space-7);
+}
+
+.emergency-page::before {
+  display: none;
+}
+
+.emergency-page .container-narrow {
+  max-width: 640px;
+}
+
 .emergency-sheet {
-  display: grid;
-  gap: var(--space-5);
-  padding: var(--space-5);
-  border: 1px solid var(--color-line-bright);
+  --pad: var(--space-5);
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid #fff;
   border-radius: var(--radius-lg);
-  background: var(--color-surface);
+  background: #000;
+  color: #fff;
+}
+
+.emergency-sheet[data-state="broken"] {
+  border-style: dashed;
 }
 
 .emergency-head {
   display: flex;
   align-items: center;
   gap: var(--space-4);
+  padding: var(--pad);
 }
 
+.emergency-head > div {
+  min-width: 0;
+}
+
+/* The cross on a white disc: the one sign everyone knows. */
 .emergency-mark {
   display: grid;
   place-items: center;
+  flex: none;
   width: 56px;
   height: 56px;
-  flex: none;
-  border: 1px solid var(--color-line-bright);
+  border: 0;
   border-radius: 50%;
-  font-size: 28px;
+  background: #fff;
+  color: #000;
+  font-size: 34px;
+}
+
+.emergency-sheet[data-state="broken"] .emergency-mark {
+  border: 2px dashed #fff;
+  background: none;
+  color: #fff;
+}
+
+/* Its own label, not the site's: nothing before it and nothing that moves. */
+.emergency-kicker {
+  margin: 0 0 6px;
+  color: #d9d9d9;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  line-height: 1.4;
+  text-transform: uppercase;
 }
 
 .emergency-name {
   margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 8vw, 3rem);
-  line-height: var(--leading-tight);
+  font-family: var(--font-sans);
+  font-size: clamp(1.75rem, 7.6vw, 2.5rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
 }
 
 .emergency-line {
   margin: 0;
-  font-size: var(--text-xl);
-}
-
-.emergency-blood {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-line-bright);
-  border-radius: var(--radius);
-  background: #fff;
-  color: #050506;
-}
-
-.emergency-blood .emergency-label {
-  color: #3a3a3a;
-}
-
-.emergency-blood-value {
-  font-size: clamp(3rem, 16vw, 5rem);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.emergency-facts {
-  display: grid;
-  gap: var(--space-4);
-  margin: 0;
+  padding: var(--pad);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  font-size: clamp(1.25rem, 5.4vw, 1.5rem);
+  line-height: 1.4;
 }
 
 .emergency-label {
   display: block;
-  color: var(--color-text-muted);
+  margin: 0;
+  color: #d9d9d9;
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  letter-spacing: 0.08em;
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
+/* The blood type: black on a white plate, as large as the screen allows. */
+.emergency-blood {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0 var(--pad) var(--pad);
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #000;
+  --cut: 14px;
+  clip-path: var(--chamfer);
+}
+
+.emergency-blood .emergency-label {
+  color: #000;
+  font-size: 1rem;
+}
+
+.emergency-blood-value {
+  font-family: var(--font-sans);
+  font-size: clamp(3.75rem, 19vw, 5.25rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.emergency-facts {
+  display: block;
+  margin: 0;
+}
+
+.emergency-facts:empty {
+  display: none;
+}
+
+.emergency-fact {
+  padding: var(--space-4) var(--pad);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+}
+
 .emergency-value {
-  margin: var(--space-1) 0 0;
-  font-size: clamp(1.25rem, 5vw, 1.625rem);
-  line-height: 1.35;
+  margin: 6px 0 0;
+  color: #fff;
+  font-size: clamp(1.375rem, 5.9vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.3;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Allergies come first and heaviest, behind a solid white bar. */
+.emergency-fact[data-field="allergies"] {
+  padding-left: calc(var(--pad) - 8px);
+  border-left: 8px solid #fff;
+  background: #161616;
+}
+
+.emergency-fact[data-field="allergies"] .emergency-label {
+  color: #fff;
 }
 
 .emergency-fact[data-field="allergies"] .emergency-value {
   font-weight: 700;
 }
 
+.emergency-contacts {
+  padding: var(--pad);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+}
+
 .emergency-contacts ul {
   display: grid;
   gap: var(--space-3);
-  margin: var(--space-2) 0 0;
+  margin: var(--space-3) 0 0;
   padding: 0;
   list-style: none;
 }
 
+.emergency-contacts li > .emergency-value {
+  margin: 0;
+}
+
+/* One press calls: a white plate the width of the card, the name over the number. */
 .emergency-call {
-  min-height: 56px;
-  font-size: var(--text-lg);
-  white-space: normal;
-  text-align: left;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--space-4);
+  min-height: 76px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: #fff;
+  color: #000;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.emergency-call > svg {
+  grid-row: 1 / span 2;
+  width: 30px;
+  height: 30px;
+}
+
+.emergency-call-who {
+  align-self: end;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.emergency-call-number {
+  align-self: start;
+  font-family: var(--font-mono);
+  font-size: 1.375rem;
+  font-weight: 500;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.emergency-call:hover {
+  background: #e6e6e6;
+}
+
+.emergency-call:active {
+  background: #cfcfcf;
+}
+
+.emergency-sheet .emergency-fine {
+  margin: 0;
+  padding: var(--space-4) var(--pad);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  color: #b4b4b4;
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
 @media (max-width: 640px) {
-  .emergency-sheet {
-    padding: var(--space-4);
+  .emergency-page {
+    padding: var(--space-4) 0 var(--space-6);
   }
 
-  .rules-row,
-  .emergency-code-layout {
-    grid-template-columns: minmax(0, 1fr);
+  .emergency-sheet {
+    --pad: var(--space-4);
+  }
+
+  .emergency-mark {
+    width: 52px;
+    height: 52px;
+    font-size: 32px;
+  }
+
+  .emergency-blood {
+    padding: var(--space-3) var(--space-4);
   }
 }

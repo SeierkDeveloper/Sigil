@@ -88,7 +88,7 @@ export function EmergencyApp({ cardId }: { cardId: string }) {
               <EmergencyIcon />
             </span>
             <div>
-              <p className="eyebrow">Emergency information</p>
+              <p className="emergency-kicker">Emergency information</p>
               <h1 className="emergency-name">{phase.kind === "open" ? phase.card.name || "Medical card" : "Medical card"}</h1>
             </div>
           </header>
@@ -136,9 +136,13 @@ function Card({ card, offline }: { card: EmergencyCard; offline: boolean }) {
             {card.contacts.map((c, i) => (
               <li key={i}>
                 {c.phone ? (
-                  <a className="button button-block emergency-call" href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}>
-                    <PhoneIcon /> {c.name || "Call"}
-                    {c.relation ? `, ${c.relation}` : ""}: {c.phone}
+                  <a className="emergency-call" href={`tel:${c.phone.replace(/[^0-9+]/g, "")}`}>
+                    <PhoneIcon />
+                    <span className="emergency-call-who">
+                      {c.name || "Call"}
+                      {c.relation ? `, ${c.relation}` : ""}
+                    </span>
+                    <span className="emergency-call-number">{c.phone}</span>
                   </a>
                 ) : (
                   <p className="emergency-value">
