@@ -1,4 +1,4 @@
-import type { BrowserContext, Page, Request } from "@playwright/test";
+import type { BrowserContext, Page, Request, Route } from "@playwright/test";
 import { privateKeyToAccount, generatePrivateKey } from "viem/accounts";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
@@ -109,4 +109,45 @@ export async function addFolder(page: Page, name: string) {
   await page.getByLabel("New folder").fill(name);
   await page.getByRole("button", { name: "Add folder" }).click();
   await page.locator(".list-row-title", { hasText: name }).first().waitFor();
+}
+
+/** Plays the Anthropic API for one page or context: answers every call, and keeps what was asked. */
+export async function mockModel(target: Page | BrowserContext, answer: (system: string, messages: { role: string; content: string }[]) => string) {
+  const calls: { system: string; messages: { role: string; content: string }[] }[] = [];
+  const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*", "access-control-allow-methods": "POST, OPTIONS" };
+  await target.route("https://api.anthropic.com/**", async (route: Route) => {
+    const req = route.request();
+    if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
+    const body = req.postDataJSON() as { system?: string; messages?: { role: string; content: string }[] };
+    calls.push({ system: body.system ?? "", messages: body.messages ?? [] });
+    return route.fulfill({
+      status: 200,
+      headers: { ...cors, "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "msg_e2e",
+        type: "message",
+        role: "assistant",
+        model: "claude-opus-5-5",
+        content: [{ type: "text", text: answer(body.system ?? "", body.messages ?? []) }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+    });
+  });
+  return calls;
+}
+
+/** Saves a model key and rules under AI self, so the vault's AI self can answer. */
+export async function setUpModel(page: Page, opts: { key?: string; name?: string; folders?: string[] } = {}) {
+  await page.getByRole("tab", { name: "AI self" }).click();
+  const model = page.getByRole("form", { name: "Model key" });
+  await model.getByLabel("API key").fill(opts.key ?? "sk-ant-e2e-key-0001");
+  await model.getByRole("button", { name: "Save key" }).click();
+  await page.getByText("Anthropic, claude-opus-5-5, key").waitFor();
+  const rules = page.getByRole("form", { name: "Rules" });
+  await rules.getByLabel("Name it uses").fill(opts.name ?? "My AI self");
+  for (const f of opts.folders ?? []) await rules.getByLabel(f, { exact: true }).check();
+  await rules.getByRole("button", { name: "Save rules" }).click();
+  await page.getByText("Rules saved.").waitFor();
 }

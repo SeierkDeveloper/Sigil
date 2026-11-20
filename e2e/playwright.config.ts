@@ -39,6 +39,9 @@ export default defineConfig({
       SIGIL_AGENT_ONLINE_SECONDS: "6",
       // A legacy day of 25 ms: a three-month period passes in about two seconds.
       SIGIL_LEGACY_DAY_MS: "25",
+      // Public client ids for live sync. The providers themselves are played by the tests.
+      SIGIL_GOOGLE_CLIENT_ID: "e2e-client.apps.googleusercontent.com",
+      SIGIL_SLACK_CLIENT_ID: "1234.5678",
       ...TEST_MODEL,
     },
   },

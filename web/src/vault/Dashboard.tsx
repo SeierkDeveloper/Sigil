@@ -182,6 +182,9 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
       .catch(() => undefined);
   }, [api, vault, data]);
 
+  // Stable, so effects that update the data now and then are not restarted by every change.
+  const updateData = useCallback((fn: (d: ops.VaultData) => ops.VaultData) => setData((d) => (d ? fn(d) : d)), []);
+
   const ctx = useMemo<VaultCtx | null>(
     () =>
       data
@@ -189,7 +192,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
             api,
             vault,
             data,
-            update: (fn) => setData((d) => (d ? fn(d) : d)),
+            update: updateData,
             reload,
             goTo,
             openMemory,
@@ -201,7 +204,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
             signOut: onSignOut,
           }
         : null,
-    [api, vault, data, reload, goTo, openMemory, focus, semantic, agent, liveSync, onLock, onSignOut],
+    [api, vault, data, updateData, reload, goTo, openMemory, focus, semantic, agent, liveSync, onLock, onSignOut],
   );
 
   if (error && !data) {

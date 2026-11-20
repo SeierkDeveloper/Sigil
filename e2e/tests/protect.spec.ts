@@ -1,0 +1,67 @@
+// A protected folder in a real browser and a real connector: the owner protects
+// Health, an app asks through MCP and is held back, the owner says yes in the
+// inbox, the same call then works once, and the read log marks it.
+
+import { expect, test } from "@playwright/test";
+import { addFolder, connectApp, connectMcp, createWithWallet, installWallet, textOf, writeMemory } from "./helpers";
+
+const HEALTH = "CANARY-blood-e2e-55";
+
+test("an app reads a protected folder only after the owner's yes, once, and the log says so", async ({ page, context, baseURL }) => {
+  await installWallet(context);
+  await createWithWallet(page);
+  await addFolder(page, "Health");
+  await writeMemory(page, { title: "Blood test", body: `${HEALTH} results are fine. Call 0701234567.`, folder: "Health" });
+
+  // Protect it, and mask phone numbers.
+  await page.getByRole("tab", { name: "Folders" }).click();
+  const row = page.locator(".list-row", { hasText: "Health" }).first();
+  await row.getByRole("button", { name: "Protect" }).click();
+  const form = page.getByRole("form", { name: "Protect Health" });
+  await form.getByLabel("Protection").selectOption({ label: "Protected: Health" });
+  await form.getByLabel("Phone numbers").check();
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(row.getByTestId("folder-guard")).toContainText("Protected: Health");
+
+  const appKey = await connectApp(page, { name: "Claude", folders: ["Health"] });
+  const client = await connectMcp(appKey, baseURL!);
+  try {
+    const folders = textOf(await client.callTool({ name: "list_folders", arguments: {} }));
+    expect(folders).toContain("Health (1 memory, protected");
+
+    // Looking through the folder asks the owner first.
+    const held = textOf(await client.callTool({ name: "search_memories", arguments: { query: "blood", folder: "Health" } }));
+    expect(held).toContain("asked in their Sigil inbox");
+    expect(held).not.toContain(HEALTH);
+
+    await page.getByRole("tab", { name: "Inbox" }).click();
+    const request = page.getByTestId("access-row").first();
+    await expect(request).toContainText("Claude asks to read Health");
+    await request.getByRole("button", { name: "Allow this read" }).click();
+    await expect(page.getByTestId("access-requests")).toHaveCount(0);
+
+    const found = textOf(await client.callTool({ name: "search_memories", arguments: { query: "blood", folder: "Health" } }));
+    expect(found).toContain("Blood test");
+    const id = /id: ([A-Za-z0-9_-]+)/.exec(found)![1];
+
+    // Reading it is a read of its own: asked again, allowed again, then it comes, masked.
+    expect(textOf(await client.callTool({ name: "read_memory", arguments: { id } }))).toContain("asked in their Sigil inbox");
+    await page.getByRole("tab", { name: "Memories" }).click();
+    await page.getByRole("tab", { name: "Inbox" }).click();
+    await expect(page.getByTestId("access-row").first()).toContainText('To read "Blood test"');
+    await page.getByTestId("access-row").first().getByRole("button", { name: "Allow this read" }).click();
+    const full = textOf(await client.callTool({ name: "read_memory", arguments: { id } }));
+    expect(full).toContain(HEALTH);
+    expect(full).toContain("[phone number hidden]");
+    expect(full).not.toContain("0701234567");
+
+    // The yes covered that one read.
+    expect(textOf(await client.callTool({ name: "read_memory", arguments: { id } }))).toContain("asked in their Sigil inbox");
+  } finally {
+    await client.close();
+  }
+
+  await page.getByRole("tab", { name: "Read log" }).click();
+  await expect(page.getByText('Read "Blood test" in a protected folder, after your yes')).toBeVisible();
+  await expect(page.getByText("You allowed one read of a protected folder").first()).toBeVisible();
+});

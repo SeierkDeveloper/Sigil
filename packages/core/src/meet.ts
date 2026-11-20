@@ -24,7 +24,7 @@ import { decodeBoxPublicKey, encodeBoxPublicKey, openSealedJson, sealJson, type 
 import { DecryptError, randomBytes } from "./crypto";
 import { compareBytes, concatBytes, fromBase64Url, fromUtf8, toBase64Url, utf8 } from "./encoding";
 import type { ModelCaller, ModelMessage } from "./model";
-import { REFUSAL_TEXT, retrieve, screenAnswer, screenQuestion, type SelfMemory, type SelfRules, type SelfSource } from "./self";
+import { isLive, REFUSAL_TEXT, retrieve, screenAnswer, screenQuestion, type SelfMemory, type SelfRules, type SelfSource } from "./self";
 
 export type MeetPurpose = "find_time" | "collab_fit" | "swap_intros";
 
@@ -222,7 +222,18 @@ export async function meetTurn(input: MeetTurnInput): Promise<MeetTurnOutput> {
     if (!screen.ok) return { text: REFUSAL_TEXT.denied_topic, done: false, citations: [], refused: "denied_topic" };
   }
   const query = [MEET_PURPOSES[input.purpose].label, input.note, last?.text ?? ""].join(" ");
-  const sources = retrieve(input.rules, input.memories, query, { now: input.now });
+  // What matches the purpose and the last message first; then, since a purpose such as finding a time is not
+  // phrased in the words of the memories that answer it, the newest of the rest, up to the rules' limit.
+  const matched = retrieve(input.rules, input.memories, query, { now: input.now });
+  const allowed = new Set(input.rules.folderIds);
+  const rest = input.memories
+    .filter((m) => allowed.has(m.folderId) && isLive(m, input.now) && !matched.some((x) => x.id === m.id))
+    .sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1))
+    .slice(0, Math.max(0, input.rules.maxSources - matched.length));
+  const sources: SelfSource[] = [
+    ...matched,
+    ...rest.map((m, i) => ({ n: matched.length + i + 1, id: m.id, title: m.title, folder: m.folder, text: m.body.length > 2400 ? `${m.body.slice(0, 2400)}...` : m.body, editedAt: m.editedAt })),
+  ];
   const messages: ModelMessage[] = input.transcript.map((t) => ({ role: t.mine ? ("assistant" as const) : ("user" as const), content: t.text }));
   if (messages.length === 0 || messages[messages.length - 1].role === "assistant") {
     messages.push({ role: "user", content: messages.length === 0 ? "Start the conversation." : "Go on." });
