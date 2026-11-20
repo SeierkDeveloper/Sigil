@@ -7,6 +7,9 @@
 //   hash       hex32(SHA-256("sigil-vault-bundle-v1" \n canonical JSON of the body))
 //   signature  Ed25519 by the vault's signing key over the same bytes, when the
 //              owner's device made the bundle; null when a connector made it
+//   mac        when a connector made it: HMAC-SHA256 over the same bytes with a
+//              key from that app's own secret, which only the app and the vault
+//              (where the app's secret is kept under the vault key) can make
 //
 // A bundle is checked in two steps. Anyone can check its form, its hash and
 // its signature (verifyBundle). The owner, holding the vault key, can open it
@@ -19,10 +22,11 @@
 // and the device signs a restore statement for that node with the signing key.
 
 import { ed25519 } from "@noble/curves/ed25519.js";
+import { hmac } from "@noble/hashes/hmac.js";
 import { sha256 } from "@noble/hashes/sha2.js";
-import { gunzipSync, gzipSync } from "fflate";
-import { decryptJson, importKey } from "./crypto";
-import { fromBase64Url, fromUtf8, toBase64Url, utf8 } from "./encoding";
+import { Gunzip, gzipSync } from "fflate";
+import { decryptBytes, decryptJson, hkdf, importKey } from "./crypto";
+import { equalBytes, fromBase64Url, fromUtf8, toBase64Url, utf8 } from "./encoding";
 import { AAD, unwrapVaultKey, type KeyslotKind } from "./keys";
 import { openBoxKey } from "./box";
 import { canonicalJson, isSigningKey, signingFingerprint, vaultSigningKey, type CertificateCheck, type SigningKey } from "./life";
@@ -151,6 +155,8 @@ export interface VaultBundle {
   body: BundleBody;
   hash: string;
   signature: string | null;
+  /** A connector's bundle: the app that made it and its HMAC over the body. */
+  mac?: { appId: string; tag: string } | null;
 }
 
 function bundleMessage(body: BundleBody): Uint8Array {
@@ -173,6 +179,23 @@ export function sealBundle(body: BundleBody, key: SigningKey | null): VaultBundl
   };
 }
 
+/** The key a connector's bundles are authenticated with: from the app's own secret, for this purpose only. */
+export async function bundleMacKey(appSecret: Uint8Array): Promise<Uint8Array> {
+  return hkdf(appSecret, "sigil:bundle-mac:v1");
+}
+
+/**
+ * Seals a body a connector fetched: its hash and an HMAC with a key from the
+ * app's own secret. A connector never holds the vault's signing key; the HMAC
+ * lets the owner's device tell, at restore, that the bundle is the one this
+ * app made and that nobody on the way (the node, the storage) changed it.
+ */
+export async function macBundle(body: BundleBody, appId: string, appSecret: Uint8Array): Promise<VaultBundle> {
+  const sealed = sealBundle(body, null);
+  const tag = hmac(sha256, await bundleMacKey(appSecret), bundleMessage(body));
+  return { ...sealed, mac: { appId, tag: toBase64Url(tag) } };
+}
+
 // ---------------------------------------------------------------- the file
 
 /** A bundle as bytes: gzip of its JSON. */
@@ -185,11 +208,38 @@ export function decodeBundle(bytes: Uint8Array): VaultBundle {
   if (bytes.length > MAX_BUNDLE_BYTES) throw new Error("This file is too large to be a Sigil bundle.");
   let text: string;
   try {
-    text = fromUtf8(bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipSync(bytes) : bytes);
-  } catch {
+    text = fromUtf8(bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b ? gunzipLimited(bytes, MAX_BUNDLE_OPEN_BYTES) : bytes);
+  } catch (err) {
+    if (err instanceof BundleTooLarge) throw new Error("This file opens to more than a Sigil bundle can hold.");
     throw new Error("This file is not a Sigil bundle: it could not be read.");
   }
   return parseBundle(text);
+}
+
+/** The most a bundle file may open to. A small file that unpacks to gigabytes is refused before it fills the memory. */
+export const MAX_BUNDLE_OPEN_BYTES = 1024 * 1024 * 1024;
+
+class BundleTooLarge extends Error {}
+
+/** Gunzip that stops as soon as the output passes the limit. */
+export function gunzipLimited(bytes: Uint8Array, maxBytes: number): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const g = new Gunzip((chunk) => {
+    total += chunk.length;
+    if (total > maxBytes) throw new BundleTooLarge();
+    chunks.push(chunk);
+  });
+  const step = 64 * 1024;
+  for (let i = 0; i < bytes.length; i += step) g.push(bytes.subarray(i, Math.min(bytes.length, i + step)), i + step >= bytes.length);
+  if (bytes.length === 0) g.push(new Uint8Array(0), true);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
+  return out;
 }
 
 export function parseBundle(text: string): VaultBundle {
@@ -326,6 +376,7 @@ export async function openBundle(bundle: VaultBundle, vaultRaw: Uint8Array): Pro
   const signing = await vaultSigningKey(vaultRaw);
   if (signing.publicKey !== body.vault.signKey) throw new Error("This bundle belongs to another vault.");
   const key = await importKey(vaultRaw);
+  await assertMadeByThisVault(bundle, key, signing.publicKey);
   await openBoxKey(key, { publicKey: body.vault.boxPublicKey, wrappedSecret: body.vault.boxWrappedSecret });
   let unreadable = 0;
   const folders = new Map<string, Awaited<ReturnType<typeof openFolder>>>();
@@ -358,6 +409,43 @@ export async function openBundle(bundle: VaultBundle, vaultRaw: Uint8Array): Pro
     }
   }
   return { folders: folders.size, memories, settings, unreadable };
+}
+
+const CHANGED = "This bundle was changed after it was made, or it was not made by your vault or one of its apps. It cannot be restored.";
+
+/**
+ * Whether the whole body is what this vault (or one of its own apps) made:
+ * the hash covers it, and the vault's signature holds over it, or, for a
+ * connector's bundle, the HMAC holds with the key from the secret of the app
+ * named, opened here under the vault key. Anyone who changes a bundle on its
+ * way (an app or capture key slipped in, memories left out, a relabelled
+ * signer) cannot make either.
+ */
+async function assertMadeByThisVault(bundle: VaultBundle, key: CryptoKey, signKey: string): Promise<void> {
+  const message = bundleMessage(bundle.body);
+  if (hex32(sha256(message)) !== bundle.hash) throw new Error(CHANGED);
+  if (bundle.signature != null) {
+    let ok = false;
+    try {
+      ok = ed25519.verify(fromBase64Url(bundle.signature), message, fromBase64Url(signKey));
+    } catch {
+      ok = false;
+    }
+    if (!ok) throw new Error(CHANGED);
+    return;
+  }
+  const mac = bundle.mac;
+  if (bundle.body.madeBy !== "connector" || !mac || typeof mac.appId !== "string" || typeof mac.tag !== "string") throw new Error(CHANGED);
+  const app = (bundle.body.parts.apps as unknown as { table: string; row: Record<string, unknown> }[]).find((p) => p && p.table === "apps" && p.row && p.row.id === mac.appId);
+  if (!app || typeof app.row.secret !== "string") throw new Error(CHANGED);
+  let ok = false;
+  try {
+    const secret = await decryptBytes(key, app.row.secret, AAD.appSecret(mac.appId));
+    ok = equalBytes(hmac(sha256, await bundleMacKey(secret), message), fromBase64Url(mac.tag));
+  } catch {
+    ok = false;
+  }
+  if (!ok) throw new Error(CHANGED);
 }
 
 // ---------------------------------------------------------------- the restore statement
