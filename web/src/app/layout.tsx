@@ -8,6 +8,7 @@ import { site } from "@/lib/site";
 import { InstallWorker } from "@/components/InstallWorker";
 import "./globals.css";
 import "./identity.css";
+import "./round5.css";
 
 // Self-hosted faces (the content security policy allows no third-party font hosts).
 const display = localFont({

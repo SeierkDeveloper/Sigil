@@ -93,8 +93,9 @@ function Sources() {
           {data.sync.map((s) => {
             const kind = s.state?.kind;
             const app = s.appId ? data.apps.find((a) => a.id === s.appId) : undefined;
+            const state = s.paused ? "paused" : liveSync.running === s.id ? "syncing" : app ? "background" : "synced";
             return (
-              <li key={s.id} className="list-row sync-row" data-paused={s.paused ? "true" : "false"} data-testid="sync-row">
+              <li key={s.id} className="list-row sync-row" data-paused={s.paused ? "true" : "false"} data-state={state} data-testid="sync-row">
                 <span className="sync-row-mark" aria-hidden="true">
                   {kind ? <SourceMark kind={SYNC_INFO[kind].source} /> : null}
                 </span>
@@ -102,7 +103,7 @@ function Sources() {
                   <p className="list-row-title">
                     {kind ? SYNC_INFO[kind].label : "A source that could not be opened"}
                     {s.state?.account ? <span className="faint"> {s.state.account}</span> : null}
-                    <span className="badge">{s.paused ? "Paused" : liveSync.running === s.id ? "Syncing" : app ? "In the background" : "In sync"}</span>
+                    <span className="badge sync-state" data-state={state}>{s.paused ? "Paused" : liveSync.running === s.id ? "Syncing" : app ? "In the background" : "In sync"}</span>
                   </p>
                   <p className="list-row-meta">
                     Into {folderName(s.folderId)}. {sourceLine(s)}
@@ -219,7 +220,7 @@ function Connect({ clients }: { clients: sync.SyncClients | null }) {
   };
 
   return (
-    <form className="subpanel plate sync-connect" onSubmit={connect} aria-label="Connect a source">
+    <form className="subpanel plate sync-connect" onSubmit={connect} aria-label="Connect a source" data-ready={clients && !clientId ? "false" : "true"}>
       <PlateHead number="02" title="Connect a source" lead="You sign in with the service in a small window. The sign-in comes back to this page only." />
       <div className="import-sources" role="radiogroup" aria-label="Service">
         {SYNC_KINDS.map((k) => (
@@ -288,7 +289,7 @@ function Background() {
   };
 
   return (
-    <section className="subpanel plate" aria-labelledby="sync-background">
+    <section className="subpanel plate sync-background" aria-labelledby="sync-background">
       <PlateHead
         number="03"
         id="sync-background"

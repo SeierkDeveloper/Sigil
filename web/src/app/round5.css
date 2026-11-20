@@ -1,0 +1,245 @@
+/*
+  Round five in the logo's line language: live sync, selves meet, the public AI
+  self, protected folders, the privacy score, the meeting transcript import,
+  the /@handle page, the open standard and the sign-in return.
+
+  Loaded after globals.css and identity.css. It uses their tokens (--ruled,
+  --lean, --chamfer) and adds one of its own: --ruled-edge, three fine lines
+  standing upright, for the left edge of something sealed or quoted. As
+  everywhere, a component carries one such detail, never several.
+*/
+
+:root {
+  --ruled-edge: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.5) 0 1px, transparent 1px 3px);
+  --ruled-edge-faint: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0 1px, transparent 1px 3px);
+}
+
+/* ------------------------------------------------------------------ waiting for your yes */
+
+/* A request that waits for the owner: a bright plate with a cut of ribbon set on its top edge. */
+.access-requests,
+.protect-gate,
+.meet-invite {
+  border-color: var(--color-line-bright);
+}
+
+.access-requests::before,
+.protect-gate::before,
+.meet-invite::before {
+  top: -5px;
+  left: var(--space-5);
+  right: auto;
+  width: 96px;
+  height: 9px;
+  background: var(--ruled), var(--color-bg);
+  clip-path: var(--lean);
+}
+
+/* ------------------------------------------------------------------ live sync */
+
+.sync > .panel-header > p {
+  max-width: 82ch;
+}
+
+.sync-list {
+  overflow: hidden;
+}
+
+.sync-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3) var(--space-4);
+}
+
+.sync-row-mark {
+  margin: 4px 4px 0;
+}
+
+.sync-row-mark:empty {
+  width: 40px;
+  height: 40px;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: 50%;
+}
+
+.sync-row .list-row-main {
+  min-width: 0;
+}
+
+.sync-row .list-row-title {
+  gap: var(--space-1) var(--space-3);
+}
+
+.sync-row .list-row-title .faint {
+  margin-left: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.sync-row .list-row-meta {
+  max-width: 78ch;
+}
+
+.sync-row .list-row-actions {
+  padding-top: 5px;
+}
+
+/* The state of a source: a filled diamond in sync, a hollow one in the background, dashed when paused. */
+.sync-state::before,
+.wall-state::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.sync-state[data-state="synced"],
+.sync-state[data-state="syncing"] {
+  border-color: var(--color-line-bright);
+  color: var(--color-text);
+}
+
+.sync-state[data-state="synced"]::before,
+.sync-state[data-state="syncing"]::before,
+.wall-state[data-hidden="false"]::before {
+  background: currentColor;
+}
+
+.sync-state[data-state="paused"],
+.wall-state[data-hidden="true"] {
+  border-style: dashed;
+  color: var(--color-text-faint);
+}
+
+.sync-row[data-state="paused"] .mark {
+  border-style: dashed;
+  color: var(--color-text-faint);
+}
+
+/* While a source is being read, a light runs along the top of its row. */
+.sync-row[data-state="syncing"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #fff 50%, transparent 100%) 0 0 / 40% 100% no-repeat;
+  pointer-events: none;
+}
+
+[data-motion] .sync-row[data-state="syncing"]::before {
+  animation: proposal-run 1100ms linear infinite;
+}
+
+[data-motion] .sync-state[data-state="syncing"]::before {
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* Four services, four tiles in a row. */
+.sync-connect .import-sources {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+
+/* The site has no client id for this service yet: a waiting state, so a dashed plate, with the setting to add set as a key. */
+.sync-connect[data-ready="false"] > .notice {
+  border-style: dashed;
+  border-color: var(--color-line-strong);
+  background: #060606;
+}
+
+.sync-connect > .notice .mono {
+  padding: 1px 6px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.sync-connect[data-ready="false"] .import-source[data-selected="true"]::after {
+  background: transparent;
+}
+
+.sync-connect .form-actions {
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.sync-background .list {
+  margin-bottom: var(--space-5);
+}
+
+.sync-background .list-row-actions .select {
+  min-width: 260px;
+}
+
+.sync-background .quiet,
+.sync-background .empty-state {
+  margin-bottom: var(--space-5);
+}
+
+@media (max-width: 1100px) {
+  .sync-connect .import-sources {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .sync-row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .sync-row .list-row-actions {
+    grid-column: 2;
+    padding-top: 0;
+  }
+
+  .sync-background .list-row-actions,
+  .sync-background .list-row-actions .select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  /* On a phone each service is one line: its mark, then its name and what is read. */
+  .sync-connect .import-sources {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sync-connect .import-source {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: var(--space-1) var(--space-4);
+    align-items: start;
+    padding-right: var(--space-7);
+  }
+
+  .sync-connect .import-source-marks {
+    grid-row: 1 / span 2;
+    margin: 0;
+    padding: 4px;
+  }
+
+  .sync-row {
+    padding: var(--space-4);
+  }
+
+  .sync-row .list-row-actions {
+    grid-column: 1 / -1;
+  }
+
+  .sync-row .list-row-actions .button {
+    flex: 1 1 auto;
+  }
+}
+
