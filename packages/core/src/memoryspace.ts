@@ -138,10 +138,68 @@ const paragraphs = (text: string) =>
     .map((p) => `<p>${esc(p).replace(/\n/g, "<br>")}</p>`)
     .join("\n");
 
+// The mark of the printed copy: five fine parallel lines with angled ends, drawn so it prints on any paper.
+const RULE_MARK = `<svg class="mark" viewBox="0 0 72 9" width="72" height="9" aria-hidden="true"><path d="M8 .5H72M6 2.5H70M4 4.5H68M2 6.5H66M0 8.5H64" fill="none" stroke="currentColor" stroke-width="1"/></svg>`;
+
+const HISTORY_STYLE = `
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+html { background: #e8e8e8; }
+body { margin: 0; color: #111; font: 11.5pt/1.6 "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; -webkit-text-size-adjust: 100%; text-rendering: optimizeLegibility; font-kerning: normal; }
+.sheet { max-width: 46rem; margin: 2.5rem auto; padding: 4.5rem 4.75rem 3.5rem; background: #fff; border: 1px solid #cfcfcf; }
+h1, h2, h3 { margin: 0; font-family: Didot, "Bodoni 72", "Bodoni MT", "Iowan Old Style", Georgia, serif; font-weight: 400; }
+.title { margin: 0 0 3.25rem; }
+.kicker, .count, .people > h2, footer { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 7.5pt; letter-spacing: .2em; text-transform: uppercase; color: #555; }
+.kicker { margin: 0 0 1.4rem; }
+h1 { font-size: 34pt; line-height: 1.06; letter-spacing: -.015em; overflow-wrap: anywhere; }
+.about { max-width: 34rem; margin: .9rem 0 0; font-size: 13pt; font-style: italic; line-height: 1.45; color: #333; }
+.mark { display: block; margin: 1.7rem 0 0; color: #111; }
+.count { margin: .9rem 0 0; }
+.people { margin: 0 0 3rem; padding: 1.1rem 0 1.2rem; border-top: 1px solid #111; border-bottom: 1px solid #bbb; }
+.people > h2 { margin: 0 0 .8rem; }
+.people ul { margin: 0; padding: 0; list-style: none; columns: 2; column-gap: 2.5rem; }
+.people li { margin: 0 0 .55rem; break-inside: avoid; font-size: 10.5pt; line-height: 1.45; }
+.people strong { font-weight: 600; }
+.muted { color: #555; }
+.people .muted { font-style: italic; }
+.year { margin: 0 0 2.6rem; }
+.year > h2 { display: flex; align-items: center; gap: 1rem; margin: 0 0 1.3rem; font-size: 30pt; line-height: 1; font-variant-numeric: lining-nums; break-after: avoid; }
+.year > h2::after { content: ""; flex: 1; border-top: 1px solid #111; }
+.story { margin: 0 0 2rem; }
+.story:last-child { margin-bottom: 0; }
+.story + .story { padding-top: 1.6rem; border-top: 1px solid #d5d5d5; }
+h3 { font-size: 17pt; line-height: 1.2; break-after: avoid; overflow-wrap: anywhere; }
+.meta { margin: .3rem 0 0; font-size: 9.5pt; font-style: italic; color: #555; break-after: avoid; }
+figure { width: fit-content; max-width: 100%; margin: 1rem 0 0; padding: 6px; border: 1px solid #bbb; break-inside: avoid; }
+img { display: block; max-width: 100%; max-height: 30rem; height: auto; }
+.story p:not(.meta) { max-width: 36rem; margin: .8rem 0 0; hyphens: auto; orphans: 3; widows: 3; overflow-wrap: anywhere; }
+.none { margin: 0 0 2.6rem; font-style: italic; color: #555; }
+footer { display: flex; align-items: center; gap: 1rem; margin: 3.5rem 0 0; padding: 1rem 0 0; border-top: 1px solid #111; letter-spacing: .12em; line-height: 1.6; }
+footer .mark { flex: none; margin: 0; }
+@media (max-width: 40rem) {
+  html { background: #fff; }
+  .sheet { margin: 0; padding: 2rem 1.25rem 2.5rem; border: 0; }
+  h1 { font-size: 26pt; }
+  .year > h2 { font-size: 24pt; }
+  .people ul { columns: 1; }
+}
+@page { margin: 22mm 21mm 24mm; @bottom-center { content: counter(page); font: 8pt "Helvetica Neue", Helvetica, Arial, sans-serif; color: #555; } }
+@media print {
+  html { background: #fff; }
+  body { font-size: 10.5pt; }
+  .sheet { max-width: none; margin: 0; padding: 0; border: 0; }
+  .title { margin-bottom: 14mm; padding-top: 18mm; }
+  img { max-height: 105mm; }
+  a { color: inherit; text-decoration: none; }
+}
+`;
+
 /**
  * The shared history as one self-contained HTML document, ready to read or
  * print to PDF: the people, then every story by year with its photo, who is in
- * it and who added it. Made on the device from the decrypted space.
+ * it and who added it. Made on the device from the decrypted space. It is set
+ * as a printed book would be, in black on white, in the faces the reader's own
+ * device has, and fetches nothing.
  */
 export function historyHtml(doc: HistoryDocument): string {
   const byId = new Map(doc.people.map((p) => [p.id, p]));
@@ -168,32 +226,26 @@ export function historyHtml(doc: HistoryDocument): string {
     )
     .join("\n");
   const title = esc(doc.name);
+  const count = years.reduce((n, y) => n + y.stories.length, 0);
+  const span = years.length ? (years.length > 1 ? `${years[0].year} to ${years[years.length - 1].year}` : years[0].year) : "";
+  const kicker = doc.kind === "family" ? "A family history" : doc.kind === "history" ? "A team history" : "A shared memory";
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${title}</title>
-<style>
-:root { color-scheme: light; }
-body { font: 16px/1.6 Georgia, "Times New Roman", serif; color: #111; background: #fff; margin: 0 auto; max-width: 42rem; padding: 2.5rem 1rem 4rem; }
-h1 { font-size: 2rem; margin: 0 0 .25rem; }
-h2 { font-size: 1.4rem; border-bottom: 1px solid #999; padding-bottom: .2rem; margin: 2.5rem 0 1rem; break-after: avoid; }
-h3 { font-size: 1.1rem; margin: 0 0 .2rem; }
-.muted, .meta { color: #555; font-size: .9rem; }
-.story { margin: 0 0 1.75rem; break-inside: avoid; }
-figure { margin: .6rem 0; }
-img { max-width: 100%; height: auto; display: block; }
-ul { padding-left: 1.2rem; }
-footer { margin-top: 3rem; color: #555; font-size: .8rem; border-top: 1px solid #ccc; padding-top: .6rem; }
-@media print { body { padding: 0; } a { color: inherit; } }
-</style>
+<style>${HISTORY_STYLE}</style>
 </head>
 <body>
-<header><h1>${title}</h1>${doc.about ? `<p class="muted">${esc(doc.about)}</p>` : ""}</header>
-${people ? `<section><h2>People</h2><ul>${people}</ul></section>` : ""}
-${stories || `<p class="muted">No stories yet.</p>`}
-<footer>A copy of a shared memory, decrypted on the device that made it on ${esc(doc.madeAt.slice(0, 10))}.</footer>
+<main class="sheet">
+<header class="title"><p class="kicker">${kicker}</p><h1>${title}</h1>${doc.about ? `<p class="about">${esc(doc.about)}</p>` : ""}${RULE_MARK}${
+    count ? `<p class="count">${count} ${count === 1 ? "story" : "stories"}, ${esc(span)}</p>` : ""
+  }</header>
+${people ? `<section class="people"><h2>People</h2><ul>${people}</ul></section>` : ""}
+${stories || `<p class="none">No stories yet.</p>`}
+<footer>${RULE_MARK}<span>A copy of a shared memory, decrypted on the device that made it on ${esc(doc.madeAt.slice(0, 10))}.</span></footer>
+</main>
 </body>
 </html>
 `;
