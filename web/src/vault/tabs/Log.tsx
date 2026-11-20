@@ -15,6 +15,7 @@ const LEGACY_STEPS: Record<string, string> = {
   made: "You made a legacy plan",
   changed: "You sealed your legacy plan again, with a new legacy key",
   cancelled: "You cancelled your legacy plan",
+  "invite-answered": "A person you invited answered with their vault",
   "check-in": "You checked in",
   "warning-first": "Your legacy plan reached its first warning",
   "warning-last": "Your legacy plan reached its last warning",

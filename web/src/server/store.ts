@@ -380,6 +380,8 @@ export function revokeApp(db: Db, userId: string, appId: string): void {
     db.prepare("DELETE FROM app_inbox WHERE app_id = ?").run(appId);
     db.prepare("DELETE FROM self_apps WHERE app_id = ?").run(appId);
     db.prepare("UPDATE ask_links SET revoked_at = COALESCE(revoked_at, ?) WHERE app_id = ?").run(now(), appId);
+    // A revoked agent leaves its team spaces: its token no longer works, and no admin seals to it again.
+    db.prepare("DELETE FROM space_members WHERE app_id = ?").run(appId);
   });
 }
 

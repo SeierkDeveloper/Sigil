@@ -973,6 +973,14 @@ export interface VaultExport {
     links: { label: string; createdAt: string; expiresAt: string; uses: number; answered: number; revokedAt: string | null }[];
   };
   thinking: ThinkingSettings;
+  /** The legacy plan as the owner sees it, without the legacy key. */
+  legacy: { owner: string; periodDays: number; threshold: number; people: { label: string; folders: string[]; aiSelf: boolean; added: "vault code" | "invite" }[] } | null;
+  /** Plans of other vaults that name this one. */
+  namedIn: { owner: string; as: string; folders: string[] }[];
+  agents: { name: string; ownFolder: string | null; rules: AgentView["rules"]; revokedAt: string | null }[];
+  spaces: { name: string; role: string; members: { name: string; kind: string; role: string }[]; memories: { title: string; body: string; editedAt: string }[] }[];
+  devices: { addedAt: string; lastUsedAt: string | null }[];
+  certificates: { link: string; from: string; to: string; createdAt: string }[];
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -1015,6 +1023,27 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
       links: data.askLinks.map((l) => ({ label: l.label, createdAt: l.createdAt, expiresAt: l.expiresAt, uses: l.uses, answered: l.answered, revokedAt: l.revokedAt })),
     },
     thinking: data.thinking,
+    legacy: data.legacy.record
+      ? {
+          owner: data.legacy.record.owner,
+          periodDays: data.legacy.record.periodDays,
+          threshold: data.legacy.record.threshold,
+          people: data.legacy.record.people.map((p) => ({ label: p.label, folders: p.folderIds.map((id) => folderName.get(id) ?? id), aiSelf: p.self, added: p.publicKey ? ("vault code" as const) : ("invite" as const) })),
+        }
+      : null,
+    namedIn: data.trusted.flatMap((t) => (t.note ? [{ owner: t.note.owner, as: t.note.label, folders: t.note.folders }] : [])),
+    agents: data.agents.map((a) => {
+      const app = data.apps.find((x) => x.id === a.appId);
+      return { name: app?.name ?? "Removed agent", ownFolder: folderName.get(a.homeFolderId) ?? null, rules: a.rules, revokedAt: app?.revokedAt ?? null };
+    }),
+    spaces: data.spaces.map((sp) => ({
+      name: sp.name,
+      role: sp.me.role,
+      members: sp.members.map((m) => ({ name: m.label, kind: m.kind, role: m.role })),
+      memories: sp.memories.map((m) => ({ title: m.title, body: m.body, editedAt: m.editedAt })),
+    })),
+    devices: data.keyslots.filter((k) => k.kind === "device").map((k) => ({ addedAt: k.createdAt, lastUsedAt: k.lastUsedAt })),
+    certificates: data.certificates.map((c) => ({ link: `/verify?certificate=${c.id}`, from: c.summary.from, to: c.summary.to, createdAt: c.createdAt })),
   };
 }
 

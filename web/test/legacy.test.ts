@@ -76,6 +76,16 @@ describe("making a plan", () => {
     expect(count(h.db, "SELECT COUNT(*) AS n FROM legacy_people WHERE share IS NOT NULL")).toBe(3);
     const log = await ops.loadLog(s.owner.b.api);
     expect(log.entries.map((e) => [e.kind, e.memoryId])).toEqual([["legacy", "made"]]);
+    // The export says who receives what, in plain words, and leaves the legacy key out.
+    const exported = ops.buildExport(await load(s.owner), log.entries);
+    expect(exported.legacy).toMatchObject({ owner: "Sam", periodDays: 90, threshold: 2 });
+    expect(exported.legacy?.people.map((p) => [p.label, p.folders, p.aiSelf])).toEqual([
+      ["Ana", ["Family"], true],
+      ["Ben", ["Work"], false],
+      ["Cy", ["Family", "Work"], false],
+    ]);
+    expect(JSON.stringify(exported)).not.toContain(s.state.record!.key);
+    expect((ops.buildExport(await load(s.ana), [])).namedIn).toEqual([{ owner: "Sam", as: "Ana", folders: ["Family"] }]);
   });
 
   it("tells each trusted person they are named, and hands out no share while the owner is active", async () => {
@@ -222,6 +232,7 @@ describe("invites", () => {
     await expect(legacy.acceptInvite(invited.b.api, { boxPublic: s.ana.data.boxPublic }, invite)).rejects.toMatchObject({ status: 400 });
     await legacy.acceptInvite(invited.b.api, invited.data, invite);
     await expect(legacy.acceptInvite(invited.b.api, invited.data, invite)).rejects.toMatchObject({ code: "answered" });
+    expect((await ops.loadLog(s.owner.b.api)).entries[0]).toMatchObject({ kind: "legacy", appId: dee.id, memoryId: "invite-answered" });
 
     data = await load(s.owner);
     expect(data.legacy.answers[dee.id]).toEqual({ publicKey: invited.data.boxPublic, verified: true });

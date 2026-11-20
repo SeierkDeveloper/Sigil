@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d0e10?style=for-the-badge&labelColor=0b0c0e)](LICENSE)
 [![Encryption](https://img.shields.io/badge/AES--256--GCM-client--side-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-encryption-model)
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
-[![Tests](https://img.shields.io/badge/tests-328%20%2B%2031%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
+[![Tests](https://img.shields.io/badge/tests-332%20%2B%2031%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
@@ -504,7 +504,7 @@ Icons for the installed app are drawn from `web/src/app/icon.svg` with `node web
 ## Tests
 
 ```sh
-npm run test:unit       # 313: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
+npm run test:unit       # 317: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
                         #      the AI self and its rules, briefs, contradictions, expiry, every import
                         #      parser with fixtures, seals, server, connector, extension, SDK, Shamir
                         #      split and combine, sealed shares and bundles, the legacy heartbeat and

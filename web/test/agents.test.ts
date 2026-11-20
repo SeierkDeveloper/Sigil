@@ -197,6 +197,20 @@ describe("team spaces", () => {
     expect((await load(t.owner)).spaces[0].untrusted).toEqual([]);
   });
 
+  it("drops a revoked agent from its spaces, and the export lists agents and spaces in plain words", async () => {
+    const t = await team();
+    await ops.revokeApp(t.owner.b.api, t.second.appId);
+    const data = await load(t.owner);
+    expect(data.spaces[0].members.map((m) => m.label)).toEqual(["Sam", "Robin", "Cursor"]);
+    await expect(new AgentMemory(readerFor(h, t.second.appKey)).recall("x")).rejects.toMatchObject({ code: "app_revoked" });
+    const exported = ops.buildExport(data, []);
+    expect(exported.agents.map((a) => [a.name, a.ownFolder, !!a.revokedAt])).toEqual([
+      ["Cursor", "Cursor memory", false],
+      ["Claude Code", "Claude Code memory", true],
+    ]);
+    expect(exported.spaces).toEqual([{ name: "Launch", role: "admin", members: expect.arrayContaining([{ name: "Robin", kind: "vault", role: "write" }]), memories: [] }]);
+  });
+
   it("keeps roles: only admins add people, and a space keeps one admin", async () => {
     const t = await team();
     await agents.acceptSpace(t.friend.b.api, t.spaceId);

@@ -32,7 +32,7 @@ test("the header menus open and lead to every page", async ({ page }) => {
 test("every page in the menu answers with its own heading and no broken layout", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  expect(pages.length).toBe(21);
+  expect(pages.length).toBe(24);
   for (const item of pages) {
     const res = await page.goto(item.href);
     // A link to another part of the page already open loads nothing new, so the address is asked for directly.

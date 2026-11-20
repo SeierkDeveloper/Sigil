@@ -286,6 +286,7 @@ export function answerInvite(db: Db, userId: string, personId: string, publicKey
     const mine = getBoxKey(db, userId)?.publicKey;
     if (!mine || mine !== publicKey || !isBoxPublicKey(publicKey)) throw new HttpError(400, "Answer with your own vault's key.", "invalid");
     db.prepare("UPDATE legacy_people SET invite_key = ?, invite_tag = ?, invite_user = ? WHERE id = ?").run(publicKey, tag, userId, personId);
+    log(db, String(r.owner_id), personId, "invite-answered");
   });
 }
 
