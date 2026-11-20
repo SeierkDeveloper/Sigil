@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d0e10?style=for-the-badge&labelColor=0b0c0e)](LICENSE)
 [![Encryption](https://img.shields.io/badge/AES--256--GCM-client--side-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-encryption-model)
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
-[![Tests](https://img.shields.io/badge/tests-191%20%2B%2017%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
+[![Tests](https://img.shields.io/badge/tests-259%20%2B%2025%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
@@ -411,14 +411,17 @@ For development: `npm run dev`. Settings are in `web/.env.example`:
 ## Tests
 
 ```sh
-npm run test:unit       # 176: cryptography, sealed boxes, sharing, search by meaning, imports,
-                        #      seals, server, connector, extension, SDK
+npm run test:unit       # 244: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
+                        #      the AI self and its rules, briefs, contradictions, expiry, every import
+                        #      parser with fixtures, seals, server, connector, extension, SDK
 npm run test:contracts  # 15: SigilSeal, with fuzzing and a cross-check against the browser
-npm run test:e2e        # 17: sign up, import, connect, read, revoke, the inbox, the Self card,
-                        #     search by meaning, sharing, Sign in with Sigil, the site
+npm run test:e2e        # 25: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
+                        #     the inbox, the Self card, search by meaning, sharing, Sign in with Sigil,
+                        #     the AI self test chat, an ask link answered across two browsers, the
+                        #     weekly brief, contradictions, expiry, merging every group, the site
 ```
 
-The server tests check that no plaintext ever reaches the database or leaves the browser. Search by meaning is tested with a tiny generated model kept in `packages/core/test/fixtures/tiny-model`, so no test needs the network.
+The server tests check that no plaintext ever reaches the database or leaves the browser, and that the server never holds a model key, a rule, a question or an answer in readable form. Search by meaning is tested with a tiny generated model kept in `packages/core/test/fixtures/tiny-model`, and every model call is answered by the tests themselves, so no test needs the network or a real model.
 
 ---
 

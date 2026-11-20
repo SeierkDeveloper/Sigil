@@ -183,6 +183,9 @@ describe("dedupe against the vault", () => {
     const r = dedupeDrafts([...drafts, { ...drafts[1], source: { kind: "obsidian", ref: "Copy/Boat.md" } }], existing);
     expect(r.fresh.map((d) => d.title)).toEqual(["Boat"]);
     expect(r.duplicates).toBe(2);
+    // Two different items from one source in the same import both stay.
+    const shared = dedupeDrafts([{ title: "A", body: "one", source: { kind: "claude", ref: "p-1" } }, { title: "B", body: "two", source: { kind: "claude", ref: "p-1" } }], []);
+    expect(shared.fresh).toHaveLength(2);
     const byText = dedupeDrafts([{ title: "Boat", body: drafts[1].body }], [{ title: "boat", body: drafts[1].body, source: { kind: "note" } }]);
     expect(byText.fresh).toHaveLength(0);
   });

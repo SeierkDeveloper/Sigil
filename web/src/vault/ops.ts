@@ -173,6 +173,8 @@ export interface VaultData {
   self: SelfRules | null;
   thinking: ThinkingSettings;
   askLinks: AskLinkView[];
+  /** When the vault's first folder was made: the vault's age, for the first weekly brief. */
+  createdAt: string | null;
 }
 
 export interface LogEntryView {
@@ -525,6 +527,7 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
     self,
     thinking,
     askLinks,
+    createdAt: data.folders.reduce<string | null>((min, f) => (!min || f.createdAt < min ? f.createdAt : min), null),
   };
 }
 

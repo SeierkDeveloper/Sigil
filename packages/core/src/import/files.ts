@@ -143,8 +143,8 @@ function fingerprint(title: string, body: string): string {
 
 /**
  * Leaves out what the vault already holds: the same source (a note path, a mail
- * thread, an event id) or the same title and text. Also drops repeats inside the
- * import itself.
+ * thread, an event id) or the same title and text. Also drops items repeated
+ * word for word inside the import itself.
  */
 export function dedupeDrafts(drafts: MemoryDraft[], existing: ExistingMemory[]): { fresh: MemoryDraft[]; duplicates: number } {
   const refs = new Set(existing.filter((m) => m.source.ref).map((m) => `${m.source.kind}:${m.source.ref}`));
@@ -158,7 +158,7 @@ export function dedupeDrafts(drafts: MemoryDraft[], existing: ExistingMemory[]):
       duplicates++;
       continue;
     }
-    if (ref) refs.add(ref);
+    // Inside one import only identical text counts as a repeat: two items may share a source (a project and its memory).
     prints.add(print);
     fresh.push(d);
   }

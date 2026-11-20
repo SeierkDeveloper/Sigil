@@ -31,7 +31,9 @@ describe("the weekly brief", () => {
     const s = await signedUp(h);
     await ops.createMemory(s.b.api, s.data.folders[0], { title: `Garden ${CANARY}`, body: "Planted tomatoes." });
     let data = await ops.loadVault(s.b.api, s.vault);
-    expect(think.shouldMakeBrief(data)).toBe(true);
+    // A vault younger than a week has no week to look back on, so no brief is made on its own yet.
+    expect(think.shouldMakeBrief(data)).toBe(false);
+    expect(think.shouldMakeBrief(data, new Date(Date.now() + 8 * 86_400_000))).toBe(true);
     const made = await think.makeBrief(s.b.api, s.vault, data, null);
     expect(made.createdFolder).toBe(true);
     expect(made.usedModel).toBe(false);
@@ -40,7 +42,8 @@ describe("the weekly brief", () => {
     data = await ops.loadVault(s.b.api, s.vault);
     expect(think.briefFolder(data)?.name).toBe("Briefs");
     expect(think.briefs(data)).toHaveLength(1);
-    expect(think.shouldMakeBrief(data)).toBe(false);
+    expect(think.shouldMakeBrief(data, new Date(Date.now() + 8 * 86_400_000))).toBe(true);
+    expect(think.shouldMakeBrief(data, new Date(Date.now() + 3 * 86_400_000))).toBe(false);
     // A second brief goes into the same folder; one written by the owner's model is kept as written.
     const second = await think.makeBrief(s.b.api, s.vault, data, model("## What is new\nA garden."), new Date(Date.now() + 8 * 86_400_000));
     expect(second.createdFolder).toBe(false);

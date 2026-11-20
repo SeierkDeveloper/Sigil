@@ -34,9 +34,15 @@ export function briefs(data: Pick<VaultData, "memories">): Memory[] {
   return data.memories.filter((m) => m.source.kind === "brief").sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
-export function shouldMakeBrief(data: Pick<VaultData, "memories" | "thinking">, now = new Date()): boolean {
+/**
+ * Whether to write a brief on its own when the vault opens: the owner wants it,
+ * the last brief is a week old, and the vault itself is at least a week old
+ * (a new vault has no week to look back on yet; Make a brief now works at once).
+ */
+export function shouldMakeBrief(data: Pick<VaultData, "memories" | "thinking" | "createdAt">, now = new Date()): boolean {
   const own = data.memories.filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile");
-  return data.thinking.weeklyBrief && own.length > 0 && briefDue(data.memories, now);
+  const weekOld = !!data.createdAt && now.getTime() - new Date(data.createdAt).getTime() >= 7 * 86_400_000;
+  return data.thinking.weeklyBrief && weekOld && own.length > 0 && briefDue(data.memories, now);
 }
 
 /** Writes this week's brief and saves it as a memory in the Briefs folder (made the first time). */
