@@ -1,13 +1,14 @@
 // The MCP server: four tools that read the parts of the vault this app was
-// given, and one that suggests a memory to the owner's inbox.
+// given, one that suggests a memory to the owner's inbox, and one that asks the
+// owner's AI self (when the owner allowed this app to answer as it).
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ProposalDraft } from "@sigil/core";
+import type { ProposalDraft, SelfAnswer } from "@sigil/core";
 import type { FolderInfo, FullMemory, SearchResult } from "./reader";
 import { ReaderError } from "./reader";
 
-export const CONNECTOR_VERSION = "0.2.0";
+export const CONNECTOR_VERSION = "0.3.0";
 
 /** What the server needs from a reader. VaultReader implements it; tests pass a stub. */
 export interface Reader {
@@ -18,11 +19,17 @@ export interface Reader {
   propose(draft: ProposalDraft): Promise<{ id: string }>;
 }
 
+/** The AI self on this machine. SelfAgent implements it; tests pass a stub. */
+export interface SelfAsker {
+  ask(question: string): Promise<SelfAnswer>;
+}
+
 const INSTRUCTIONS = [
   "Sigil is the user's own encrypted memory vault. These tools read the parts of it the user chose to share with this app.",
   "Call get_profile first for who the user is and how they like answers.",
   "Use search_memories when the user's own notes, history, preferences or past conversations could help; it matches by meaning as well as by words. Then read_memory for the full text of what looks relevant.",
   "When the user shares something worth remembering, propose_memory suggests it to their Sigil inbox; it becomes a memory only if they approve it.",
+  "ask_self answers a question the way the user would, from their memories and within rules they wrote, when they allowed this app to.",
   "Every read and every suggestion is shown to the user in their Sigil read log.",
 ].join(" ");
 
@@ -75,7 +82,20 @@ export function formatProfile(m: FullMemory | null): string {
   return `# Self card\nEdited: ${day(m.editedAt)}\n\n${m.body}`;
 }
 
-export function createServer(reader: Reader): McpServer {
+export function formatSelfAnswer(a: SelfAnswer): string {
+  const sources = a.citations.length ? `\n\nFrom: ${a.citations.map((c) => `${c.title} (${c.folder})`).join("; ")}` : "";
+  const why =
+    a.refused === "denied_topic" || a.refused === "off_topic"
+      ? "\n\n(The user's rules for their AI self do not allow this topic.)"
+      : a.refused === "never_say"
+        ? "\n\n(The answer was withheld by the user's rules.)"
+        : a.refused === "unknown"
+          ? "\n\n(Nothing in the memories it may use answers this.)"
+          : "";
+  return `${a.text}${sources}${why}`;
+}
+
+export function createServer(reader: Reader, self?: SelfAsker): McpServer {
   const server = new McpServer({ name: "sigil", title: "Sigil", version: CONNECTOR_VERSION }, { instructions: INSTRUCTIONS });
 
   server.registerTool(
@@ -176,6 +196,27 @@ export function createServer(reader: Reader): McpServer {
       try {
         await reader.propose({ title, body, tags, folder });
         return text(`Suggested "${title}" to the user's Sigil inbox. It becomes a memory only if they approve it.`);
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "ask_self",
+    {
+      title: "Ask the user's AI self",
+      description:
+        "Asks the user's AI self: it answers as the user would, in the first person, only from the memories and within the rules the user set, using the user's own model key on this machine. Use it to find out what the user thinks, prefers or knows. Works only when the user allowed this app to answer as their AI self. The question and answer are recorded, sealed, in the user's read log.",
+      inputSchema: {
+        question: z.string().min(1).max(2000).describe("The question, as you would ask the user."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ question }) => {
+      if (!self) return { ...text("The AI self is not available in this connector."), isError: true };
+      try {
+        return text(formatSelfAnswer(await self.ask(question)));
       } catch (err) {
         return failure(err);
       }

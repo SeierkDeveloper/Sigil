@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
-import { createServer, formatProfile, formatResults, type Reader } from "../src/server";
+import { createServer, formatProfile, formatResults, formatSelfAnswer, type Reader, type SelfAsker } from "../src/server";
 import { ReaderError } from "../src/reader";
 
 const memory = {
@@ -26,9 +26,9 @@ function stub(overrides: Partial<Reader> = {}): Reader {
   };
 }
 
-async function connect(reader: Reader) {
+async function connect(reader: Reader, self?: SelfAsker) {
   const [a, b] = InMemoryTransport.createLinkedPair();
-  await createServer(reader).connect(a);
+  await createServer(reader, self).connect(a);
   const client = new Client({ name: "test", version: "1.0.0" });
   await client.connect(b);
   return client;
@@ -37,11 +37,17 @@ async function connect(reader: Reader) {
 const textOf = (r: unknown) => ((r as { content: { text: string }[] }).content[0]?.text ?? "");
 
 describe("MCP server", () => {
-  it("offers four read-only tools and one that only suggests", async () => {
+  it("offers four read-only tools, one that only suggests, and the AI self", async () => {
     const client = await connect(stub());
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name).sort()).toEqual(["get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
-    expect(tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name).sort()).toEqual(["get_profile", "list_folders", "read_memory", "search_memories"]);
+    expect(tools.map((t) => t.name).sort()).toEqual(["ask_self", "get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
+    expect(tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name).sort()).toEqual([
+      "ask_self",
+      "get_profile",
+      "list_folders",
+      "read_memory",
+      "search_memories",
+    ]);
     const propose = tools.find((t) => t.name === "propose_memory")!;
     expect(propose.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
     expect(propose.description).toContain("only if the user approves");
@@ -69,6 +75,24 @@ describe("MCP server", () => {
     expect(r.isError).toBe(true);
     expect(textOf(r)).toContain("may not suggest");
     expect((await client.callTool({ name: "propose_memory", arguments: { title: "", body: "y" } })).isError).toBe(true);
+  });
+
+  it("asks the AI self, with its sources, and passes refusals and errors through", async () => {
+    const asked: string[] = [];
+    const self: SelfAsker = {
+      ask: async (q) => (asked.push(q), { text: "Risotto [1].", citations: [{ id: "m1", title: "Food", folder: "Life" }], refused: null, usedModel: true }),
+    };
+    const client = await connect(stub(), self);
+    const r = await client.callTool({ name: "ask_self", arguments: { question: "Favourite food?" } });
+    expect(textOf(r)).toBe("Risotto [1].\n\nFrom: Food (Life)");
+    expect(asked).toEqual(["Favourite food?"]);
+    expect(formatSelfAnswer({ text: "No.", citations: [], refused: "denied_topic", usedModel: false })).toContain("do not allow this topic");
+    const off = new ReaderError("This app may not answer as the owner's AI self.", 403, "self_off");
+    const blocked = await connect(stub(), { ask: async () => Promise.reject(off) });
+    const b = await blocked.callTool({ name: "ask_self", arguments: { question: "x" } });
+    expect(b.isError).toBe(true);
+    expect(textOf(b)).toContain("may not answer");
+    expect((await (await connect(stub())).callTool({ name: "ask_self", arguments: { question: "x" } })).isError).toBe(true);
   });
 
   it("marks results found by meaning", () => {

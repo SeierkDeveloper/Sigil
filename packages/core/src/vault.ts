@@ -10,7 +10,20 @@ import { AAD, appKeys, formatAppKey, newAppSecret, tokenHash } from "./keys";
  * suggested by a connected app and approved, saved from a web page with the
  * browser extension, or the Self card.
  */
-export type SourceKind = "note" | "chatgpt" | "claude" | "app" | "web" | "profile";
+export type SourceKind =
+  | "note"
+  | "chatgpt"
+  | "claude"
+  | "app"
+  | "web"
+  | "profile"
+  | "brief"
+  | "obsidian"
+  | "apple-notes"
+  | "gmail"
+  | "calendar"
+  | "github"
+  | "notion";
 
 export interface MemorySource {
   kind: SourceKind;
@@ -25,6 +38,13 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   app: "Suggested by an app",
   web: "Saved from the web",
   profile: "Self card",
+  brief: "Weekly brief",
+  obsidian: "Imported from Obsidian",
+  "apple-notes": "Imported from Apple Notes",
+  gmail: "Imported from Gmail",
+  calendar: "Imported from a calendar",
+  github: "Imported from GitHub",
+  notion: "Imported from Notion",
 };
 
 export function sourceLabel(source: MemorySource): string {
@@ -40,6 +60,8 @@ export interface MemoryHead {
   snippet: string;
   createdAt: string;
   editedAt: string;
+  /** When set, the memory moves to Expired after this time and is deleted for real after the grace period. */
+  expiresAt?: string;
 }
 
 export interface Memory extends MemoryHead {
@@ -55,6 +77,7 @@ export interface MemoryDraft {
   source?: MemorySource;
   createdAt?: string;
   editedAt?: string;
+  expiresAt?: string | null;
 }
 
 /** A folder or memory exactly as the server stores it: ids, envelopes and nothing readable. */
@@ -181,6 +204,7 @@ export async function renameFolder(folder: Pick<OpenFolder, "id" | "key" | "kind
 
 export function buildMemory(draft: MemoryDraft, folderId: string, id = randomId(), now = new Date().toISOString()): Memory {
   const body = draft.body ?? "";
+  const expiresAt = cleanExpiry(draft.expiresAt);
   return {
     id,
     folderId,
@@ -191,7 +215,15 @@ export function buildMemory(draft: MemoryDraft, folderId: string, id = randomId(
     snippet: makeSnippet(body),
     createdAt: draft.createdAt ?? now,
     editedAt: draft.editedAt ?? now,
+    ...(expiresAt ? { expiresAt } : {}),
   };
+}
+
+/** A valid ISO time, or nothing. */
+export function cleanExpiry(value: string | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const t = new Date(value).getTime();
+  return Number.isFinite(t) ? new Date(t).toISOString() : undefined;
 }
 
 export async function encryptMemory(folder: Pick<OpenFolder, "id" | "key">, memory: Memory): Promise<StoredMemory> {
@@ -203,6 +235,7 @@ export async function encryptMemory(folder: Pick<OpenFolder, "id" | "key">, memo
     snippet: makeSnippet(memory.body),
     createdAt: memory.createdAt,
     editedAt: memory.editedAt,
+    ...(memory.expiresAt ? { expiresAt: memory.expiresAt } : {}),
   };
   return {
     id: memory.id,

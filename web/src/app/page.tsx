@@ -128,6 +128,10 @@ const faq = [
     a: "Only the folders you ticked for it, decrypted on your own computer by the connector. Folders you did not grant are never wrapped for that app, so its key cannot open them.",
   },
   {
+    q: "What is my AI self?",
+    a: "An AI that answers as you, from the folders you choose and within rules you write, using your own Anthropic or OpenAI key. It runs in your browser or in the connector on your machine, so Sigil never sees your memories, your rules or your key. You can let someone ask it through a link; every question and answer goes into your read log.",
+  },
+  {
     q: "What is a seal, and why should I care?",
     a: "At the end of every hour, all reads from that hour are folded into one fingerprint, a Merkle root. It lets you prove that an entry in your read log has not been changed or removed since, without showing anyone what was read.",
   },
@@ -533,8 +537,8 @@ export default function Home() {
             <p className="eyebrow">For developers</p>
             <h2 className="section-title">One connector, a few lines of configuration</h2>
             <p className="section-lead">
-              The connector is a small MCP server that runs on your own machine and gives an AI app four tools that read and one that suggests
-              memories to your inbox. Web apps use Sign in with Sigil. Everything is open source, and the API is small enough to read in one sitting.
+              The connector is a small MCP server that runs on your own machine and gives an AI app four tools that read, one that suggests
+              memories to your inbox, and one that asks your AI self. Web apps use Sign in with Sigil. Everything is open source, and the API is small enough to read in one sitting.
             </p>
             <ul className="link-list">
               <li>
@@ -579,8 +583,8 @@ export default function Home() {
             <p className="eyebrow">Where this goes</p>
             <h2 className="section-title">From a vault to an AI self</h2>
             <p className="section-lead">
-              The vault is the first stage. Over time Sigil grows into an AI self that answers in your voice within your rules, can work and earn for
-              you, and can outlive you on terms you set in advance.
+              The vault is the first stage, and the first version of your AI self is here: it answers as you, within your rules, with your own
+              model key. Over time it could work and earn for you, and outlive you on terms you set in advance.
             </p>
             <div className="hero-actions">
               <Link href="/ai-self" className="button">
@@ -608,8 +612,9 @@ export default function Home() {
             <li>
               <CheckIcon />
               <span>
-                <strong>Started:</strong> memory that thinks, with search by meaning on your device, a timeline, duplicates found for you and a Self
-                card apps read first. <strong>Next:</strong> seals published on chain, and the rest of your digital life in one place.
+                <strong>Started:</strong> memory that thinks (search by meaning on your device, a timeline, duplicates, a Self card, a weekly brief,
+                memories that disagree, expiry), your whole digital life (local imports from notes, mail, calendar and code), and your AI self, version
+                1, with ask links. <strong>Next:</strong> seals published on chain, and live sync.
               </span>
             </li>
           </ul>

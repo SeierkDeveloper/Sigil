@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -73,6 +73,9 @@ CREATE TABLE IF NOT EXISTS memories (
   size INTEGER NOT NULL,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
+  -- Set only for a memory the owner gave an expiry: its expiry plus the grace
+  -- period. The row is deleted for real once this time has passed.
+  delete_after TEXT,
   PRIMARY KEY (user_id, id),
   FOREIGN KEY (user_id, folder_id) REFERENCES folders(user_id, id) ON DELETE CASCADE
 );
@@ -150,6 +153,64 @@ CREATE TABLE IF NOT EXISTS shares (
 );
 CREATE INDEX IF NOT EXISTS shares_by_recipient ON shares (recipient_id);
 
+-- Vault settings (the AI self's rules, the model key, how the vault thinks),
+-- each one an envelope under the vault key.
+CREATE TABLE IF NOT EXISTS vault_settings (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  value TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (user_id, name)
+);
+
+-- Apps the owner lets answer as the AI self: rules, model key and the vault
+-- public key, encrypted under a key derived from that app's own secret.
+CREATE TABLE IF NOT EXISTS self_apps (
+  app_id TEXT PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  config TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- "Ask my AI self" links. public_key is the link's X25519 public key (also in
+-- the link's fragment); intro is the greeting under a key only the link holds;
+-- owner_box is the link's private key and rules under the vault key; app_box,
+-- for a link the connector answers, the same under that app's key.
+CREATE TABLE IF NOT EXISTS ask_links (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL,
+  intro TEXT NOT NULL,
+  owner_box TEXT NOT NULL,
+  app_id TEXT REFERENCES apps(id) ON DELETE SET NULL,
+  app_box TEXT,
+  expires_at TEXT NOT NULL,
+  max_uses INTEGER NOT NULL,
+  per_hour INTEGER NOT NULL,
+  uses INTEGER NOT NULL DEFAULT 0,
+  answered INTEGER NOT NULL DEFAULT 0,
+  last_asked_at TEXT,
+  agent_seen_at INTEGER,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ask_links_by_user ON ask_links (user_id);
+
+-- Questions in flight: relay boxes only the asker and the owner's agent open.
+-- Deleted a day after they were asked.
+CREATE TABLE IF NOT EXISTS ask_questions (
+  id TEXT PRIMARY KEY,
+  link_id TEXT NOT NULL REFERENCES ask_links(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_id TEXT NOT NULL,
+  asker_key TEXT NOT NULL,
+  sealed TEXT NOT NULL,
+  answer TEXT,
+  created_at INTEGER NOT NULL,
+  answered_at INTEGER
+);
+CREATE INDEX IF NOT EXISTS ask_questions_by_link ON ask_questions (link_id, answered_at, created_at);
+
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
   hour INTEGER PRIMARY KEY,
@@ -170,44 +231,55 @@ CREATE TABLE IF NOT EXISTS seal_leaves (
 );
 `;
 
-// Every request a connected app makes, every suggestion it sends, and every time
-// another vault opens a folder shared with it. leaf = Merkle leaf of the entry (salted).
+// Every request a connected app makes, every suggestion it sends, every time
+// another vault opens a folder shared with it, and every question the AI self
+// answers. leaf = Merkle leaf of the entry (salted). note, for answers only, is
+// the question and answer sealed to the vault's public key.
 const READ_LOG = `
 CREATE TABLE IF NOT EXISTS read_log (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared')),
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask')),
   memory_id TEXT,
   count INTEGER NOT NULL,
   at TEXT NOT NULL,
   salt TEXT NOT NULL,
   leaf TEXT NOT NULL,
   hour INTEGER NOT NULL,
-  sealed INTEGER NOT NULL DEFAULT 0
+  sealed INTEGER NOT NULL DEFAULT 0,
+  note TEXT
 );
 CREATE INDEX IF NOT EXISTS read_log_by_user ON read_log (user_id, at);
 CREATE INDEX IF NOT EXISTS read_log_unsealed ON read_log (sealed, hour);
 CREATE INDEX IF NOT EXISTS read_log_by_app ON read_log (app_id, kind, at);
 `;
 
-/** Version 1 allowed only reads in the log. Rebuild the table with the new kinds, keeping every row. */
+/** Older versions allowed fewer kinds in the log and had no notes. Rebuild the table, keeping every row. */
 function migrateReadLog(db: Db): void {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes("'propose'")) return;
+  if (!row?.sql || row.sql.includes("'ask'")) return;
   db.exec("BEGIN IMMEDIATE");
   try {
-    db.exec("ALTER TABLE read_log RENAME TO read_log_v1");
+    db.exec("ALTER TABLE read_log RENAME TO read_log_old");
     db.exec("DROP INDEX IF EXISTS read_log_by_user");
     db.exec("DROP INDEX IF EXISTS read_log_unsealed");
+    db.exec("DROP INDEX IF EXISTS read_log_by_app");
     db.exec(READ_LOG);
-    db.exec("INSERT INTO read_log SELECT id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed FROM read_log_v1");
-    db.exec("DROP TABLE read_log_v1");
+    db.exec(
+      "INSERT INTO read_log (id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed) SELECT id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed FROM read_log_old",
+    );
+    db.exec("DROP TABLE read_log_old");
     db.exec("COMMIT");
   } catch (err) {
     db.exec("ROLLBACK");
     throw err;
   }
+}
+
+function addColumn(db: Db, table: string, column: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
 }
 
 export function openDb(file: string): Db {
@@ -222,6 +294,8 @@ export function openDb(file: string): Db {
   }
   migrateReadLog(db);
   db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
+  addColumn(db, "memories", "delete_after", "TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS memories_to_delete ON memories (delete_after) WHERE delete_after IS NOT NULL;");
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return db;
 }

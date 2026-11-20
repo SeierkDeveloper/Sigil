@@ -12,8 +12,8 @@ import { Empty, Notice } from "../ui";
 const NEW_FOLDER = "__new__";
 const VIA: Record<string, string> = { mcp: "through the connector", extension: "from the browser extension", sdk: "from a signed-in web app" };
 
-type Outcome = "approved" | "merged" | "rejected";
-const OUTCOME: Record<Outcome, string> = { approved: "Approved", merged: "Merged", rejected: "Rejected" };
+type Outcome = "approved" | "merged" | "updated" | "rejected";
+const OUTCOME: Record<Outcome, string> = { approved: "Approved", merged: "Merged", updated: "Updated", rejected: "Rejected" };
 /** How long the card shows what happened before it folds away. Nothing waits when motion is off. */
 const LEAVE_MS = 720;
 const motionOn = () => typeof document !== "undefined" && document.documentElement.dataset.motion === "on";
@@ -21,7 +21,7 @@ const motionOn = () => typeof document !== "undefined" && document.documentEleme
 const HOW = [
   { title: "An app suggests", text: "An app you allow, or the browser extension, encrypts a suggestion for your vault and sends it." },
   { title: "It waits here", text: "The suggestion stays sealed in your inbox. The server holds it and cannot read it." },
-  { title: "You decide", text: "Keep it as a new memory, merge it into one you have, or reject it." },
+  { title: "You decide", text: "Keep it as a new memory, merge it into one you have, or reject it. A changed Obsidian note can update the memory it came from." },
 ];
 
 export function InboxTab() {
@@ -94,7 +94,8 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
   const suggested = p?.folder ? data.folders.find((f) => f.name.toLowerCase() === p.folder!.toLowerCase()) : undefined;
   const writable = data.folders.filter((f) => f.kind !== "profile");
   const [folderId, setFolderId] = useState(suggested?.id ?? (p?.folder ? NEW_FOLDER : writable[0]?.id ?? ""));
-  const [mode, setMode] = useState<"new" | "merge">("new");
+  const synced = useMemo(() => ops.syncedTarget(data, proposal), [data, proposal]);
+  const [mode, setMode] = useState<"new" | "merge" | "update">(synced ? "update" : "new");
   const [mergeQuery, setMergeQuery] = useState("");
   const [mergeInto, setMergeInto] = useState<string | null>(null);
   const [nearby, setNearby] = useState<Memory | null>(null);
@@ -177,8 +178,15 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
   const merge = () =>
     act("merge", async () => {
       if (!targetMemory) throw new Error("Choose the memory to merge into.");
-      const merged = await ops.mergeProposal(api, data.folders, proposal, { title, body, tags: tagList }, targetMemory);
+      const merged = await ops.mergeProposal(api, data.folders, proposal, { title, body, tags: tagList }, targetMemory, data.thinking.graceDays);
       leave("merged", () => update((d) => ({ ...removeProposal(d), memories: [merged, ...d.memories.filter((m) => m.id !== merged.id)] })));
+    });
+
+  const applyUpdate = () =>
+    act("update", async () => {
+      if (!synced) throw new Error("The memory this note was imported as is gone. Keep it as a new memory instead.");
+      const next = await ops.updateFromProposal(api, data.folders, proposal, { title, body, tags: tagList }, synced, data.thinking.graceDays);
+      leave("updated", () => update((d) => ({ ...removeProposal(d), memories: [next, ...d.memories.filter((m) => m.id !== next.id)] })));
     });
 
   const reject = () =>
@@ -190,7 +198,7 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
   const from = appName ?? "A removed app";
   const folderHint = !p ? null : suggested ? suggested.name : p.folder ? `${p.folder} (new)` : null;
   return (
-    <li className="proposal" data-testid="proposal" data-state={leaving ?? (busy ? "busy" : "idle")} data-close={close?.how}>
+    <li className="proposal" data-testid="proposal" data-state={leaving ?? (busy ? "busy" : "idle")} data-close={synced ? "synced" : close?.how}>
       <div className="proposal-fold">
         <div className="proposal-card">
           {leaving ? (
@@ -255,22 +263,39 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
                 <ul className="proposal-facts" aria-label="About this suggestion">
                   <li className="proposal-fact">
                     <FolderIcon />
-                    <span className="proposal-fact-label">Suggested folder</span>
-                    <span className="proposal-fact-value">{folderHint ?? "None"}</span>
+                    <span className="proposal-fact-label">{synced ? "Updates" : "Suggested folder"}</span>
+                    <span className="proposal-fact-value">{synced ? synced.title : (folderHint ?? "None")}</span>
                   </li>
-                  <li className="proposal-fact" data-kind={close ? close.how : "new"}>
+                  <li className="proposal-fact" data-kind={synced ? "synced" : close ? close.how : "new"}>
                     <span className="proposal-fact-diamond" aria-hidden="true" />
                     <span className="proposal-fact-label">In your vault</span>
-                    <span className="proposal-fact-value">{close ? (close.how === "same" ? "Already there" : "Something close") : "No copy found"}</span>
+                    <span className="proposal-fact-value">
+                      {synced ? "Synced from Obsidian" : close ? (close.how === "same" ? "Already there" : "Something close") : "No copy found"}
+                    </span>
                   </li>
                 </ul>
-                {close ? (
+                {synced ? (
+                  <Notice>
+                    A change to <span className="mono">{p.source?.ref}</span> in your Obsidian folder. Updating replaces the title, text and tags of{" "}
+                    <strong>&quot;{synced.title}&quot;</strong>.
+                  </Notice>
+                ) : p.source?.ref ? (
+                  <Notice>
+                    A note from your Obsidian folder: <span className="mono">{p.source.ref}</span>.
+                  </Notice>
+                ) : null}
+                {close && !synced ? (
                   <Notice>
                     {close.how === "same" ? "This is already in your vault as " : "This looks close to "}
                     <strong>&quot;{close.memory.title}&quot;</strong>. You can merge it in instead of keeping two.
                   </Notice>
                 ) : null}
-                <div className="segmented proposal-mode" role="group" aria-label="What to do with it">
+                <div className="segmented proposal-mode" role="group" aria-label="What to do with it" data-options={synced ? 3 : 2}>
+                  {synced ? (
+                    <button type="button" aria-pressed={mode === "update"} onClick={() => setMode("update")}>
+                      Update the memory
+                    </button>
+                  ) : null}
                   <button type="button" aria-pressed={mode === "new"} onClick={() => setMode("new")}>
                     Keep as a new memory
                   </button>
@@ -279,7 +304,7 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
                   </button>
                 </div>
 
-                {mode === "new" ? (
+                {mode === "update" ? null : mode === "new" ? (
                   <div className="field">
                     <label className="field-label" htmlFor={`p-folder-${proposal.id}`}>
                       Folder
@@ -314,7 +339,11 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
                 )}
 
                 <div className="form-actions">
-                  {mode === "new" ? (
+                  {mode === "update" ? (
+                    <button type="button" className="button button-primary" onClick={applyUpdate} disabled={!!busy || !title.trim()}>
+                      {busy === "update" ? "Updating" : "Update"}
+                    </button>
+                  ) : mode === "new" ? (
                     <button type="button" className="button button-primary" onClick={approve} disabled={!!busy || !title.trim() || !folderId}>
                       {busy === "approve" ? "Saving" : "Approve"}
                     </button>

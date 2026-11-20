@@ -64,6 +64,21 @@ const covered = [
       "Each hour of reads is sealed into one Merkle root. An entry that was changed no longer matches its fingerprint, and you can check any sealed entry against its seal in your browser.",
   },
   {
+    threat: "The server reads or changes what is said through an ask link",
+    answer:
+      "Questions and answers are sealed between the asker's browser and your vault or connector, with a key derived from the link's key (which stays after the # and never reaches the server) and a fresh key for each conversation. A box that is changed or moved does not open. A server that hands out another link key is caught by the asker's page, which then sends nothing.",
+  },
+  {
+    threat: "The server reads your model key or your AI self's rules",
+    answer:
+      "Both are encrypted with your vault key before they leave your browser, and for an app you allow, with a key from that app's own secret. Model calls go from your browser or connector straight to the provider.",
+  },
+  {
+    threat: "Someone asks your AI self about things it should not discuss",
+    answer:
+      "It uses only the folders a link's rules allow. Denied topics are refused before the model is asked, an answer with a phrase it must never say is replaced on the device, and when nothing matches it says it does not know. Each link has an expiry, a total and an hourly limit, and you can turn it off at once.",
+  },
+  {
     threat: "Another site sends requests in your name",
     answer: "The session cookie cannot be read by scripts, and the vault API checks that every change comes from the Sigil site itself before it acts.",
   },
@@ -103,6 +118,16 @@ const notCovered = [
     answer: "Seals are local today: kept by Sigil. The contract that publishes them on chain, so that not even Sigil could change one, is written and tested but not deployed.",
   },
   {
+    threat: "What your model provider sees",
+    answer:
+      "To answer, the provider you chose receives the question and the memories given to it for that answer, under your key and its own terms. Choose the folders your AI self may use with that in mind.",
+  },
+  {
+    threat: "An AI self that says something you would not",
+    answer:
+      "Models make mistakes, and rules written as topics and phrases can be worked around by careful wording. Give an ask link only the folders you would be happy to see quoted, and read its answers in your log.",
+  },
+  {
     threat: "Bugs",
     answer: "This is early software. It is open source and tested, and it has not had an independent audit yet.",
   },
@@ -112,13 +137,23 @@ const parties = [
   { who: "You", sees: "Everything in your vault, your read log with its salts, and every app's permissions.", not: "Other people's vaults." },
   {
     who: "Sigil's server",
-    sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address.",
-    not: "Titles, bodies, tags, folder names, app names, search words, any key.",
+    sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address, how often an ask link is used, and when an expiring memory is to be deleted.",
+    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers.",
   },
   {
     who: "A connected app",
     sees: "The folders you granted it, decrypted on your computer by the connector.",
     not: "Any other folder, your other apps, your keys, and anything at all once revoked.",
+  },
+  {
+    who: "Someone with your ask link",
+    sees: "The link's name and greeting, and the answers of your AI self to their own questions.",
+    not: "Which memories an answer came from, anything outside the link's folders, other people's questions.",
+  },
+  {
+    who: "Your model provider",
+    sees: "For each answer, brief or check: the question and the memories given to it, under your own key.",
+    not: "Anything else in your vault, or anything at all until you add a key.",
   },
   {
     who: "Anyone on the internet",

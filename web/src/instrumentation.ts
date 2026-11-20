@@ -1,6 +1,6 @@
 // Runs once when the server starts. Seals finished hours of the read log on a
-// timer (requests also seal lazily), and publishes seals on chain only when
-// anchoring is switched on.
+// timer (requests also seal lazily), deletes expired memories whose grace
+// period is over, and publishes seals on chain only when anchoring is on.
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -8,11 +8,16 @@ export async function register() {
   const { sealPending } = await import("./server/seal");
   const { anchorPending, anchorStatus } = await import("./server/anchor");
   const { serverConfig } = await import("./server/config");
+  const { purgeExpired } = await import("./server/store");
+  const { cleanQuestions } = await import("./server/self");
 
   const tick = async () => {
     try {
       const db = getDb();
       sealPending(db);
+      // Memories past their grace period after expiry are deleted for real; old relay boxes go too.
+      purgeExpired(db);
+      cleanQuestions(db);
       if (anchorStatus().mode === "anchored") await anchorPending(db);
     } catch (err) {
       console.error("[sigil] seal job failed", err);

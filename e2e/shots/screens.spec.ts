@@ -233,7 +233,7 @@ test("vault states", async ({ browser, baseURL }) => {
     await page.getByRole("button", { name: /^Import \d/ }).click();
     await page.getByTestId("import-done").waitFor();
     await shot("import-done");
-    await page.getByRole("button", { name: "Import another file" }).click();
+    await page.getByRole("button", { name: "Import something else" }).click();
     await page.getByTestId("import-file").setInputFiles({ name: "claude.zip", mimeType: "application/zip", buffer: Buffer.from(claudeZip()) });
     await page.getByRole("button", { name: /^Import \d/ }).click();
     await page.getByTestId("import-done").waitFor();

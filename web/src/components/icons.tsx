@@ -277,3 +277,31 @@ export const GlobeIcon = (p: IconProps) => (
     <path d="M3.5 12h17M12 3.5c2.5 2.5 3.5 5.5 3.5 8.5s-1 6-3.5 8.5c-2.5-2.5-3.5-5.5-3.5-8.5s1-6 3.5-8.5Z" />
   </Line>
 );
+
+export const MailIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3" y="5.5" width="18" height="13" rx="1.5" />
+    <path d="m3.5 7 8.5 6.5L20.5 7" />
+  </Line>
+);
+
+export const CalendarIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="5" width="17" height="15" rx="1.5" />
+    <path d="M3.5 9.5h17M8 3v4M16 3v4M8 13.5h2M14 13.5h2M8 16.5h2" />
+  </Line>
+);
+
+export const GemIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M12 2.5 18.5 8 16 20.5 12 21.5 8 20.5 5.5 8Z" />
+    <path d="M5.5 8 12 11l6.5-3M12 11v10.5" />
+  </Line>
+);
+
+export const PageIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M6 3.5h8.5L19 8v12.5H6Z" />
+    <path d="M14.5 3.5V8H19M9 12h7M9 15.5h5" />
+  </Line>
+);

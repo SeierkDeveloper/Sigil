@@ -11,3 +11,8 @@ export * from "./client";
 export * from "./merkle";
 export * from "./search";
 export * from "./import/index";
+export * from "./settings";
+export * from "./model";
+export * from "./self";
+export * from "./relay";
+export * from "./thinks";

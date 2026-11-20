@@ -9,7 +9,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Connector",
   description:
-    "The Sigil connector: a small MCP server that runs on your computer, decrypts there, searches by meaning there, and gives AI apps four tools that read and one that suggests memories to your inbox.",
+    "The Sigil connector: a small MCP server that runs on your computer, decrypts there, searches by meaning there, and gives AI apps four tools that read, one that suggests memories to your inbox, and one that asks your AI self.",
 };
 
 const tools = [
@@ -89,6 +89,16 @@ Ship on a Tuesday.`,
     logged: "The app suggested a memory.",
     example: `Suggested "Prefers metric units" to the user's Sigil inbox. It becomes a memory only if they approve it.`,
   },
+  {
+    name: "ask_self",
+    title: "Ask the user's AI self",
+    text: "Asks your AI self: it answers as you, in the first person, only from the folders your rules allow that this app may also read, with your own model key, on your computer. Works only if you let this app answer as your AI self.",
+    args: [["question", "The question, up to 2,000 characters."]] as [string, string][],
+    logged: "The app read the memories it used, and your AI self answered a question (sealed for your vault).",
+    example: `Short answers, plain words and metric units, please [1].
+
+From: How I like answers (Self card)`,
+  },
 ];
 
 const settings: [string, string][] = [
@@ -165,11 +175,11 @@ export default function ConnectorPage() {
         <section className="page-section" aria-labelledby="tools-title">
           <div className="section-header">
             <h2 id="tools-title" className="section-title">
-              Four tools that read, one that suggests
+              Four tools that read, one that suggests, one that answers as you
             </h2>
             <p className="section-lead">
-              The four that read are marked read only for the AI app. The answers below are the plain text an app receives, in the connector&apos;s
-              own format.
+              The tools that read and ask_self are marked read only for the AI app. The answers below are the plain text an app receives, in the
+              connector&apos;s own format.
             </p>
           </div>
           <div className="tools">
@@ -206,7 +216,7 @@ export default function ConnectorPage() {
 
         <section className="page-section" aria-labelledby="modes-title">
           <h2 id="modes-title" className="section-title">
-            Two ways to run it
+            Four ways to run it
           </h2>
           <div className="grid grid-2">
             <article className="card">
@@ -226,6 +236,24 @@ export default function ConnectorPage() {
                 the full address can read what the app key can read, so keep it private.
               </p>
               <CodeBlock code={shellCommand(EXAMPLE_KEY, site.url, true)} label="Terminal" />
+            </article>
+            <article className="card">
+              <span className="card-number">Self</span>
+              <h3 className="card-title">Answering your ask links</h3>
+              <p className="card-text">
+                With <code>--self</code> it answers the ask links you gave this app, while your vault is closed. Questions arrive sealed, are answered
+                on your machine with your own model key, and go back sealed. Your links show as online while it runs.
+              </p>
+              <CodeBlock code={`${shellCommand(EXAMPLE_KEY)} --self`} label="Terminal" />
+            </article>
+            <article className="card">
+              <span className="card-number">Watch</span>
+              <h3 className="card-title">Keeping Obsidian in sync</h3>
+              <p className="card-text">
+                With <code>--watch</code> and a folder it watches an Obsidian vault and suggests new and changed notes to your inbox, sealed on your
+                machine. A small file in your home folder remembers what was sent, as hashes only.
+              </p>
+              <CodeBlock code={`${shellCommand(EXAMPLE_KEY)} --watch ~/Obsidian`} label="Terminal" />
             </article>
           </div>
         </section>
@@ -264,8 +292,8 @@ export default function ConnectorPage() {
             <div className="pillar">
               <h3 className="pillar-title">It does not write your memories</h3>
               <p className="pillar-text">
-                No tool or endpoint lets an app change or delete a memory. A suggestion waits in your inbox, sealed, until you approve, merge or reject
-                it.
+                No tool or endpoint lets an app change or delete a memory. A suggestion, a synced note included, waits in your inbox, sealed, until you
+                approve, merge or reject it.
               </p>
             </div>
             <div className="pillar">

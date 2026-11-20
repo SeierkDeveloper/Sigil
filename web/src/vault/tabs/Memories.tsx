@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { hybridSearch, sourceLabel, tokenize, type MatchKind, type Memory } from "@sigil/core";
+import { hybridSearch, isExpired, sourceLabel, tokenize, type MatchKind, type Memory } from "@sigil/core";
 import { DeviceIcon, PlusIcon, SearchIcon, ImportIcon } from "@/components/icons";
 import { formatDate, formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
@@ -90,7 +90,8 @@ export function MemoriesTab() {
     () => new Map([...data.folders.map((f) => [f.id, f.name] as const), ...data.shares.incoming.filter((s) => s.folder).map((s) => [s.folderId, s.folder!.name] as const)]),
     [data.folders, data.shares.incoming],
   );
-  const all = useMemo<ListedMemory[]>(() => [...data.memories, ...shared], [data.memories, shared]);
+  // Expired memories wait in Review, under Expired, until they are restored or deleted.
+  const all = useMemo<ListedMemory[]>(() => [...data.memories.filter((m) => !isExpired(m)), ...shared], [data.memories, shared]);
   const results = useMemo(() => {
     const pool = folder === "all" ? all : all.filter((m) => m.folderId === folder);
     const vector = queryVector && queryVector.query === query.trim() ? queryVector.vector : null;
@@ -101,7 +102,7 @@ export function MemoriesTab() {
     );
   }, [all, folder, query, queryVector, semantic.vectors]);
 
-  const current = selected && selected !== "new" ? all.find((m) => m.id === selected) ?? null : null;
+  const current: ListedMemory | null = selected && selected !== "new" ? (all.find((m) => m.id === selected) ?? data.memories.find((m) => m.id === selected) ?? null) : null;
   const terms = useMemo(() => [...new Set(tokenize(query))], [query]);
 
   if (all.length === 0 && selected !== "new") {
@@ -276,6 +277,18 @@ export function MemoriesTab() {
   );
 }
 
+/** The date field shows the expiry's day; a chosen day expires at the end of that day, on this device's clock. */
+function toDateInput(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function fromDateInput(value: string): string | null {
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 23, 59, 59).toISOString();
+}
+
 function matchLabel(match: MatchKind): string {
   return match === "meaning" ? "By meaning" : "Words and meaning";
 }
@@ -312,6 +325,7 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
   const [body, setBody] = useState(memory?.body ?? "");
   const [tags, setTags] = useState(memory?.tags.join(", ") ?? "");
   const [folderId, setFolderId] = useState(memory?.folderId ?? defaultFolder ?? data.folders[0]?.id ?? "");
+  const [expires, setExpires] = useState(memory?.expiresAt ? toDateInput(memory.expiresAt) : "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -326,7 +340,15 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
     .split(",")
     .map((t) => t.trim())
     .filter(Boolean);
-  const dirty = !memory || title !== memory.title || body !== memory.body || tags !== memory.tags.join(", ") || folderId !== memory.folderId;
+  const expiresAt = expires ? fromDateInput(expires) : null;
+  const dirty =
+    !memory ||
+    title !== memory.title ||
+    body !== memory.body ||
+    tags !== memory.tags.join(", ") ||
+    folderId !== memory.folderId ||
+    (expiresAt ?? "") !== (memory.expiresAt ?? "");
+  const expired = memory ? isExpired(memory) : false;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -335,9 +357,10 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
     try {
       const folder = data.folders.find((f) => f.id === folderId);
       if (!folder) throw new Error("Choose a folder.");
+      const grace = data.thinking.graceDays;
       const saved = memory
-        ? await ops.updateMemory(api, data.folders, memory, { title, body, tags: tagList, folderId })
-        : await ops.createMemory(api, folder, { title, body, tags: tagList });
+        ? await ops.updateMemory(api, data.folders, memory, { title, body, tags: tagList, folderId, expiresAt }, grace)
+        : await ops.createMemory(api, folder, { title, body, tags: tagList, expiresAt }, grace);
       update((d) => ({ ...d, memories: [saved, ...d.memories.filter((m) => m.id !== saved.id)] }));
       onClose(saved.id);
     } catch (err) {
@@ -396,12 +419,33 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
           <input id="m-tags" className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Separated by commas" />
         </div>
       </div>
+      <div className="field">
+        <label className="field-label" htmlFor="m-expires">
+          Expires
+        </label>
+        <div className="row expiry-row">
+          <input id="m-expires" className="input" type="date" value={expires} onChange={(e) => setExpires(e.target.value)} />
+          {expires ? (
+            <button type="button" className="button button-ghost button-small" onClick={() => setExpires("")}>
+              No expiry
+            </button>
+          ) : null}
+        </div>
+        <span className="field-hint">
+          Optional. After this day the memory moves to Review, under Expired, and apps stop seeing it. It is deleted for real {plural(data.thinking.graceDays, "day")} later.
+        </span>
+      </div>
       {memory ? (
         <p className="editor-meta">
           {sourceLabel(memory.source)}
           {memory.source.kind === "web" && memory.source.ref ? `: ${memory.source.ref}` : ""}. Created {formatDateTime(memory.createdAt)}, edited{" "}
           {formatDateTime(memory.editedAt)}.
         </p>
+      ) : null}
+      {expired ? (
+        <Notice>
+          This memory expired on {formatDate(memory!.expiresAt!)}. Clear the date to keep it, or leave it to be deleted {plural(data.thinking.graceDays, "day")} after it expired.
+        </Notice>
       ) : null}
       {memory?.source.kind === "profile" ? (
         <Notice>

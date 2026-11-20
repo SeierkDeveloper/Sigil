@@ -70,10 +70,15 @@ export const fromHex32 = (hex: string) => {
 
 // ---------------------------------------------------------------- read log leaves
 
-/** What an entry records: an app listing folders, reading the index or a memory, suggesting a memory, or another vault opening a shared folder. */
-export type ReadKind = "folders" | "index" | "read" | "propose" | "shared";
+/**
+ * What an entry records: an app listing folders, reading the index or a memory,
+ * suggesting a memory, another vault opening a shared folder, or the AI self
+ * answering a question (through an ask link or an app). For "ask" entries the
+ * memory id field holds the question's id, which the sealed note is bound to.
+ */
+export type ReadKind = "folders" | "index" | "read" | "propose" | "shared" | "ask";
 
-export const READ_KINDS: readonly ReadKind[] = ["folders", "index", "read", "propose", "shared"];
+export const READ_KINDS: readonly ReadKind[] = ["folders", "index", "read", "propose", "shared", "ask"];
 
 export interface ReadEntryFields {
   id: string;

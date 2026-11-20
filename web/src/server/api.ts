@@ -6,7 +6,7 @@
 //   a connected app  -> "Authorization: Bearer <app token>", reads and suggestions only, every call logged
 
 import { z } from "zod";
-import { isBoxPublicKey, isEnvelope, isSealed, randomId } from "@sigil/core";
+import { isBoxPublicKey, isEnvelope, isRelayBox, isSealed, isSettingName, randomId } from "@sigil/core";
 import { getDb, type Db } from "./db";
 import { serverConfig } from "./config";
 import {
@@ -34,7 +34,9 @@ import {
   listMemories,
   logEntry,
   logRead,
+  purgeExpired,
   putMemories,
+  setDeleteAfter,
   removeKeyslot,
   renameFolder,
   revokeApp,
@@ -46,6 +48,26 @@ import {
 } from "./store";
 import { appInbox, appInboxStates, approveProposal, createProposal, getBoxKey, listProposals, rejectProposal, setAppInbox, setBoxKey } from "./inbox";
 import { acceptShare, createShare, leaveShare, listIncoming, listOutgoing, rotateFolder } from "./shares";
+import {
+  answerQuestion,
+  askQuestion,
+  createLink,
+  deleteLink,
+  deleteSetting,
+  listLinks,
+  listSettings,
+  logSelfAnswer,
+  MAX_LINK_USES,
+  MAX_PER_HOUR,
+  pendingFor,
+  publicLink,
+  putSetting,
+  questionStatus,
+  revokeLink,
+  selfAppIds,
+  selfForApp,
+  setSelfApp,
+} from "./self";
 import { getSeal, listSeals, proofFor, proofForLeaf, publicStats, sealPending, sealQueue, sealStats } from "./seal";
 import { anchorStatus } from "./anchor";
 import {
@@ -74,7 +96,8 @@ const address = z
 const lookupId = z.string().regex(/^[0-9a-f]{32}$/, "Invalid recovery id");
 
 const folderShape = z.object({ id, meta: envelope(4096), wrappedKey: envelope(256) });
-const memoryShape = z.object({ id, folderId: id, head: envelope(64_000), body: envelope(3_000_000) });
+const isoTime = z.string().max(40).refine((v) => Number.isFinite(Date.parse(v)), "Expected a time");
+const memoryShape = z.object({ id, folderId: id, head: envelope(64_000), body: envelope(3_000_000), deleteAfter: isoTime.nullable().optional() });
 const grantShape = z.object({ folderId: id, wrappedKey: envelope(256) });
 const appShape = z.object({
   id,
@@ -89,6 +112,19 @@ const sealed = (max: number) => z.string().max(max).refine(isSealed, "Expected a
 const boxShape = z.object({ publicKey: boxPublicKey, wrappedSecret: envelope(256) });
 const vaultInitShape = z.object({ wrappedKey: envelope(256), recovery: recoveryShape, folder: folderShape, box: boxShape.optional() });
 const tagShape = z.string().regex(/^[0-9a-f]{64}$/, "Invalid tag");
+const relay = (max: number) => z.string().max(max).refine(isRelayBox, "Expected a relay box");
+const linkShape = z.object({
+  id,
+  publicKey: boxPublicKey,
+  intro: envelope(4096),
+  ownerBox: envelope(128 * 1024),
+  appId: id.nullable().optional(),
+  appBox: envelope(128 * 1024).nullable().optional(),
+  expiresAt: isoTime,
+  maxUses: z.number().int().min(1).max(MAX_LINK_USES),
+  perHour: z.number().int().min(1).max(MAX_PER_HOUR),
+});
+const answerShape = z.object({ sealed: relay(64 * 1024), note: sealed(128 * 1024), cited: z.number().int().min(0).max(50) });
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
@@ -159,6 +195,7 @@ route("GET", "status", (ctx) => {
   }
   const queue = sealQueue(ctx.db);
   if (job === "ok" && queue.overdue > 0) job = "failed";
+  purgeExpired(ctx.db);
   return json({
     ok: true,
     time: new Date().toISOString(),
@@ -340,11 +377,15 @@ route("DELETE", "keyslots/:id", (ctx, [slotId]) => {
 
 route("GET", "vault", (ctx) => {
   const userId = userOf(ctx);
+  purgeExpired(ctx.db);
   const inbox = appInboxStates(ctx.db, userId);
+  const selfApps = selfAppIds(ctx.db, userId);
   return json({
     folders: listFolders(ctx.db, userId),
     memories: listMemories(ctx.db, userId),
-    apps: listApps(ctx.db, userId).map((a) => ({ ...a, canPropose: !a.revokedAt && inbox.get(a.id) === true })),
+    apps: listApps(ctx.db, userId).map((a) => ({ ...a, canPropose: !a.revokedAt && inbox.get(a.id) === true, canAskSelf: !a.revokedAt && selfApps.has(a.id) })),
+    settings: listSettings(ctx.db, userId),
+    askLinks: listLinks(ctx.db, userId),
     keyslots: listKeyslots(ctx.db, userId),
     usage: vaultUsage(ctx.db, userId),
     box: getBoxKey(ctx.db, userId),
@@ -389,6 +430,29 @@ route("PUT", "memories", async (ctx) => {
   return json({ saved: putMemories(ctx.db, userId, body.memories) });
 });
 
+route("POST", "memories/delete-after", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ items: z.array(z.object({ id, deleteAfter: isoTime.nullable() })).min(1).max(5000) }), await readJson(ctx.req, 1 * MB));
+  return json({ updated: setDeleteAfter(ctx.db, userId, body.items) });
+});
+
+// ---- vault settings: each one an envelope under the vault key
+
+route("PUT", "settings/:name", async (ctx, [name]) => {
+  const userId = userOf(ctx);
+  if (!isSettingName(name)) throw new HttpError(404, "There is no such setting.", "not_found");
+  const body = parse(z.object({ value: envelope(64 * KB) }), await readJson(ctx.req, 80 * KB));
+  putSetting(ctx.db, userId, name, body.value);
+  return json({ ok: true });
+});
+
+route("DELETE", "settings/:name", (ctx, [name]) => {
+  const userId = userOf(ctx);
+  if (!isSettingName(name)) throw new HttpError(404, "There is no such setting.", "not_found");
+  deleteSetting(ctx.db, userId, name);
+  return json({ ok: true });
+});
+
 route("POST", "memories/delete", async (ctx) => {
   const userId = userOf(ctx);
   const body = parse(z.object({ ids: z.array(id).min(1).max(5000) }), await readJson(ctx.req, 512 * KB));
@@ -412,6 +476,18 @@ route("PUT", "apps/:id/inbox", async (ctx, [appId]) => {
   const userId = userOf(ctx);
   const body = parse(z.object({ enabled: z.boolean(), tag: tagShape.optional() }), await readJson(ctx.req, 8 * KB));
   setAppInbox(ctx.db, userId, appId, body.enabled, body.tag ?? null);
+  return json({ ok: true });
+});
+
+route("PUT", "apps/:id/self", async (ctx, [appId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ config: envelope(128 * KB) }), await readJson(ctx.req, 160 * KB));
+  setSelfApp(ctx.db, userId, appId, body.config);
+  return json({ ok: true });
+});
+
+route("DELETE", "apps/:id/self", (ctx, [appId]) => {
+  setSelfApp(ctx.db, userOf(ctx), appId, null);
   return json({ ok: true });
 });
 
@@ -477,6 +553,53 @@ route("POST", "folders/:id/rotate", async (ctx, [folderId]) => {
   return json({ ok: true });
 });
 
+// ---- your AI self: links, and the owner's open vault answering them
+
+route("POST", "self/links", async (ctx) => {
+  const userId = userOf(ctx);
+  createLink(ctx.db, userId, parse(linkShape, await readJson(ctx.req, 300 * KB)));
+  return json({ ok: true }, 201);
+});
+
+route("POST", "self/links/:id/revoke", (ctx, [linkId]) => {
+  revokeLink(ctx.db, userOf(ctx), linkId);
+  return json({ ok: true });
+});
+
+route("DELETE", "self/links/:id", (ctx, [linkId]) => {
+  deleteLink(ctx.db, userOf(ctx), linkId);
+  return json({ ok: true });
+});
+
+route("GET", "self/links", (ctx) => json({ links: listLinks(ctx.db, userOf(ctx)) }));
+
+route("GET", "self/pending", (ctx) => json({ questions: pendingFor(ctx.db, { kind: "vault", userId: userOf(ctx) }) }));
+
+route("POST", "self/questions/:id/answer", async (ctx, [questionId]) => {
+  const userId = userOf(ctx);
+  answerQuestion(ctx.db, { kind: "vault", userId }, questionId, parse(answerShape, await readJson(ctx.req, 200 * KB)));
+  return json({ ok: true });
+});
+
+// ---- the public side of a link: anyone holding it; the server only relays boxes
+
+route("GET", "ask/:id", (ctx, [linkId]) => {
+  rateLimit(`ask-read:${clientIp(ctx.req)}`, 120, 60_000);
+  return json(publicLink(ctx.db, linkId));
+});
+
+route("POST", "ask/:id/questions", async (ctx, [linkId]) => {
+  rateLimit(`ask:${clientIp(ctx.req)}`, 8, 60_000);
+  rateLimit(`ask-hour:${clientIp(ctx.req)}`, 60, 3600_000);
+  const body = parse(z.object({ id, sessionId: id, askerKey: boxPublicKey, sealed: relay(64 * KB) }), await readJson(ctx.req, 80 * KB));
+  return json(askQuestion(ctx.db, linkId, body), 201);
+});
+
+route("GET", "ask/:id/questions/:qid", (ctx, [linkId, questionId]) => {
+  rateLimit(`ask-poll:${clientIp(ctx.req)}`, 240, 60_000);
+  return json(questionStatus(ctx.db, linkId, questionId));
+});
+
 route("GET", "log", (ctx) => {
   const userId = userOf(ctx);
   sealPending(ctx.db);
@@ -540,6 +663,32 @@ route("POST", "connector/v1/proposals", async (ctx) => {
   const body = parse(z.object({ id, sealed: sealed(600 * KB) }), await readJson(ctx.req, 700 * KB));
   const p = createProposal(ctx.db, auth, body.id, body.sealed);
   return json({ appId: auth.appId, id: p.id, createdAt: p.createdAt }, 201);
+});
+
+// The AI self on the owner's machine: its encrypted config, and the questions for the links it answers.
+route("GET", "connector/v1/self", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, ...selfForApp(ctx.db, auth) });
+});
+
+route("GET", "connector/v1/self/pending", (ctx) => {
+  const auth = appOf(ctx);
+  selfForApp(ctx.db, auth);
+  return json({ appId: auth.appId, questions: pendingFor(ctx.db, { kind: "app", auth }) });
+});
+
+route("POST", "connector/v1/self/questions/:id/answer", async (ctx, [questionId]) => {
+  const auth = appOf(ctx);
+  answerQuestion(ctx.db, { kind: "app", auth }, questionId, parse(answerShape, await readJson(ctx.req, 200 * KB)));
+  return json({ ok: true });
+});
+
+route("POST", "connector/v1/self/asked", async (ctx) => {
+  const auth = appOf(ctx);
+  rateLimit(`self-asked:${auth.appId}`, 30, 60_000);
+  const body = parse(z.object({ id, note: sealed(128 * KB), cited: z.number().int().min(0).max(50) }), await readJson(ctx.req, 160 * KB));
+  logSelfAnswer(ctx.db, auth, body.id, body.note, body.cited);
+  return json({ ok: true }, 201);
 });
 
 // ---------------------------------------------------------------- dispatch

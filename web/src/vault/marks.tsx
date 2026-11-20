@@ -2,7 +2,22 @@
 // and which kind of source a memory has. Icons only; the words stay next to them.
 
 import type { AppKind, SourceKind } from "@sigil/core";
-import { CardIcon, ChatGptIcon, ClaudeIcon, CursorIcon, EditorIcon, ExtensionIcon, GlobeIcon, McpIcon } from "@/components/icons";
+import {
+  BookIcon,
+  CalendarIcon,
+  CardIcon,
+  ChatGptIcon,
+  ClaudeIcon,
+  CursorIcon,
+  EditorIcon,
+  ExtensionIcon,
+  GemIcon,
+  GitHubIcon,
+  GlobeIcon,
+  MailIcon,
+  McpIcon,
+  PageIcon,
+} from "@/components/icons";
 
 const APP_ICONS: Record<AppKind, typeof ClaudeIcon> = {
   "claude-desktop": ClaudeIcon,
@@ -20,6 +35,13 @@ const SOURCE_ICONS: Record<SourceKind, typeof ClaudeIcon> = {
   app: McpIcon,
   web: GlobeIcon,
   profile: CardIcon,
+  brief: BookIcon,
+  obsidian: GemIcon,
+  "apple-notes": EditorIcon,
+  gmail: MailIcon,
+  calendar: CalendarIcon,
+  github: GitHubIcon,
+  notion: PageIcon,
 };
 
 export function AppMark({ kind, className = "" }: { kind?: AppKind; className?: string }) {

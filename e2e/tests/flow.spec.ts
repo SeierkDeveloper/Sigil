@@ -32,14 +32,14 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   await page.getByRole("button", { name: "Import 2 memories" }).click();
   await expect(page.getByTestId("import-done")).toContainText("Imported 2 memories into ChatGPT");
 
-  await page.getByRole("button", { name: "Import another file" }).click();
+  await page.getByRole("button", { name: "Import something else" }).click();
   await page.getByTestId("import-file").setInputFiles({ name: "claude-export.zip", mimeType: "application/zip", buffer: Buffer.from(claudeZip(CANARY)) });
   await expect(page.getByTestId("import-preview")).toContainText("Claude export: 5 items found");
   await page.getByRole("button", { name: "Import 5 memories" }).click();
   await expect(page.getByTestId("import-done")).toContainText("Imported 5 memories into Claude");
 
   // Importing the same file again finds nothing new.
-  await page.getByRole("button", { name: "Import another file" }).click();
+  await page.getByRole("button", { name: "Import something else" }).click();
   await page.getByTestId("import-file").setInputFiles({ name: "chatgpt-export.zip", mimeType: "application/zip", buffer: Buffer.from(chatGptZip(CANARY)) });
   await expect(page.getByTestId("import-preview")).toContainText("Everything in this file is already in your vault.");
 
@@ -66,7 +66,11 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   // ---- the connector, over MCP stdio, exactly as Claude Desktop would start it
   const mcp = await connectMcp(appKey, baseURL!);
   const tools = await mcp.listTools();
-  expect(tools.tools.map((t) => t.name).sort()).toEqual(["get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
+  expect(tools.tools.map((t) => t.name).sort()).toEqual(["ask_self", "get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
+  // The AI self answers only for apps the owner allowed.
+  const notAllowed = await mcp.callTool({ name: "ask_self", arguments: { question: "What do I grow?" } });
+  expect(notAllowed.isError).toBe(true);
+  expect(textOf(notAllowed)).toContain("may not answer as the owner's AI self");
 
   expect(textOf(await mcp.callTool({ name: "list_folders", arguments: {} }))).toContain("- ChatGPT (2 memories)");
 

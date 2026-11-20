@@ -1,6 +1,6 @@
 # sigil-connector
 
-Lets Claude Desktop, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, and suggest memories to your inbox when you allow it. It runs on your own machine: it decrypts, searches and seals there.
+Lets Claude Desktop, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, suggest memories to your inbox, and ask your AI self, when you allow it. It runs on your own machine: it decrypts, searches, seals and calls your model there.
 
 ## Setup
 
@@ -31,8 +31,25 @@ Build `dist/index.js` with `npm run build -w sigil-connector` from the repositor
 - `search_memories`: search by meaning and by the words in titles, tags and first lines, locally. Arguments: `query`, optional `folder` and `limit`.
 - `read_memory`: the full text of one memory by `id`.
 - `propose_memory`: suggest a memory to the vault's inbox (`title`, `body`, optional `tags` and `folder`). Sealed here for the vault; it becomes a memory only when the owner approves it. Needs "May suggest memories" on for this app.
+- `ask_self`: ask the owner's AI self a `question`. It answers as the owner, only from the folders the owner's rules allow that this app may also read, with the owner's own model key, called from this machine. Needs "May answer as your AI self" on for this app, under AI self in the vault.
 
 No tool changes or deletes a memory, and every request shows up in the vault's read log.
+
+## Answering ask links
+
+```sh
+SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --self
+```
+
+Answers the ask links the owner gave this app, while it runs, so they work with the vault closed. Questions arrive as relay boxes only this machine and the asker can open; the answer goes back the same way, and the question and answer go to the owner's read log sealed to the vault's public key. The links show as online while it runs.
+
+## Keeping an Obsidian vault in sync
+
+```sh
+SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --watch "/path/to/Obsidian vault" [--folder Obsidian]
+```
+
+Watches the folder and suggests new and changed notes to the owner's inbox, sealed here, with the note's path, so the vault offers to update the memory imported from the same note. Use an app key that may suggest memories and read the folder the vault was imported into: on the first run, notes the vault already holds unchanged are not suggested again. Up to 8 notes go in one pass and the rest follow a minute later. What was sent is remembered as hashes in `~/.sigil-connector` (or `SIGIL_STATE_DIR`).
 
 ## Search by meaning
 
