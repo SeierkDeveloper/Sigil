@@ -196,14 +196,18 @@ function AskNoteView({ entry }: { entry: ops.LogEntryView }) {
   if (!note) return <p className="small log-unverified">This entry could not be opened with your vault key.</p>;
   return (
     <div className="ask-note" data-testid="ask-note">
-      <p className="small">
-        <strong>Asked:</strong> {note.question}
-      </p>
-      <p className="small">
-        <strong>Answered:</strong> {note.answer}
-      </p>
+      <dl className="ask-note-turns">
+        <div>
+          <dt>Asked</dt>
+          <dd>{note.question}</dd>
+        </div>
+        <div>
+          <dt>Answered</dt>
+          <dd>{note.answer}</dd>
+        </div>
+      </dl>
       {note.citations.length ? (
-        <p className="small faint">
+        <p className="ask-note-from">
           From{" "}
           {note.citations.map((c, i) => (
             <span key={c.id}>

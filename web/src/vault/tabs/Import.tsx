@@ -11,12 +11,14 @@ import {
   parseTakeout,
   type ImportFile,
   type MemoryDraft,
+  type SourceKind,
 } from "@sigil/core";
-import { ImportIcon } from "@/components/icons";
+import { CheckIcon, ImportIcon } from "@/components/icons";
 import { formatBytes, plural } from "@/lib/format";
 import { takePendingImport } from "@/lib/pendingImport";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
+import { SourceMark } from "../marks";
 import { Notice } from "../ui";
 
 type SourceId = "chat" | "obsidian" | "apple-notes" | "takeout" | "notion" | "github";
@@ -30,6 +32,9 @@ interface Source {
   folder: boolean;
   multiple: boolean;
   how: string;
+  /** The marks on its tile, and one short line on what it takes. */
+  marks: SourceKind[];
+  takes: string;
 }
 
 const SOURCES: Source[] = [
@@ -41,6 +46,8 @@ const SOURCES: Source[] = [
     folder: false,
     multiple: false,
     how: "ChatGPT: Settings, Data controls, Export data. Claude: Settings, Privacy, Export data. Choose the zip from the email, or the conversations.json inside it.",
+    marks: ["chatgpt", "claude"],
+    takes: "Zip or conversations.json",
   },
   {
     id: "obsidian",
@@ -50,6 +57,8 @@ const SOURCES: Source[] = [
     folder: true,
     multiple: true,
     how: "Choose the folder of your Obsidian vault. Its settings folder and attachments are left out.",
+    marks: ["obsidian"],
+    takes: "Folder, notes or zip",
   },
   {
     id: "apple-notes",
@@ -59,6 +68,8 @@ const SOURCES: Source[] = [
     folder: true,
     multiple: true,
     how: "Ask for a copy of your iCloud data, choose iCloud Notes, and pick the zip or the unpacked Notes folder. Notes exported as text, Markdown or HTML files work too.",
+    marks: ["apple-notes"],
+    takes: "Zip, folder or note files",
   },
   {
     id: "takeout",
@@ -68,6 +79,8 @@ const SOURCES: Source[] = [
     folder: false,
     multiple: true,
     how: "In Google Takeout choose Mail and Calendar, then pick the zip, or the .mbox and .ics files inside it. Spam and trash are left out; long threads are shortened.",
+    marks: ["gmail", "calendar"],
+    takes: "Zip, .mbox or .ics",
   },
   {
     id: "notion",
@@ -77,6 +90,8 @@ const SOURCES: Source[] = [
     folder: false,
     multiple: true,
     how: "In Notion: Settings, Export all workspace content, Markdown and CSV. Choose the zip. Databases are left out.",
+    marks: ["notion"],
+    takes: "Zip or Markdown pages",
   },
   {
     id: "github",
@@ -86,6 +101,8 @@ const SOURCES: Source[] = [
     folder: false,
     multiple: false,
     how: "Asked from this browser straight from GitHub. A token is needed only for private repositories or more requests; it is used for this import and never saved.",
+    marks: ["github"],
+    takes: "Repository or user name",
   },
 ];
 
@@ -129,6 +146,7 @@ export function ImportTab() {
   const input = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const current = SOURCES.find((s) => s.id === source)!;
+  const at = step.kind === "ready" ? 1 : step.kind === "saving" || step.kind === "done" ? 2 : 0;
 
   const prepare = (kind: SourceId, label: string, title: string, drafts: MemoryDraft[], skipped: number, notes: string[]) => {
     const { fresh, duplicates } = dedupeDrafts(drafts, data.memories);
@@ -209,14 +227,30 @@ export function ImportTab() {
       </div>
       {error ? <Notice kind="error">{error}</Notice> : null}
 
+      <ol className="handshake-steps import-steps" aria-label="Steps">
+        {["Choose where from", "See the preview", "Encrypt and save"].map((name, i) => (
+          <li key={name} data-state={step.kind === "done" || i < at ? "done" : i === at ? "now" : "next"}>
+            <span>{i + 1}</span>
+            {name}
+          </li>
+        ))}
+      </ol>
+
       {step.kind === "idle" || step.kind === "reading" ? (
         <>
           <div className="import-sources" role="radiogroup" aria-label="Where from">
             {SOURCES.map((s) => (
               <label key={s.id} className="import-source" data-selected={s.id === source ? "true" : "false"}>
                 <input type="radio" name="import-source" value={s.id} checked={s.id === source} onChange={() => setSource(s.id)} disabled={step.kind === "reading"} />
+                <span className="import-source-marks">
+                  {s.marks.map((m) => (
+                    <SourceMark key={m} kind={m} />
+                  ))}
+                  {s.id === "obsidian" ? <span className="chip import-source-sync">Stays in sync</span> : null}
+                </span>
                 <span className="import-source-title">{s.title}</span>
                 <span className="import-source-text">{s.text}</span>
+                <span className="import-source-takes">{s.takes}</span>
               </label>
             ))}
           </div>
@@ -240,6 +274,7 @@ export function ImportTab() {
             <label
               className="dropzone"
               data-dragging={dragging ? "true" : "false"}
+              data-reading={step.kind === "reading" ? "true" : "false"}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragging(true);
@@ -297,10 +332,17 @@ export function ImportTab() {
       ) : null}
 
       {step.kind === "ready" ? (
-        <div className="subpanel" data-testid="import-preview">
-          <h3 className="card-title">
-            {step.sourceTitle}: {plural(step.found, "item")} found
-          </h3>
+        <div className="subpanel import-preview" data-testid="import-preview">
+          <header className="import-preview-head">
+            <span className="import-source-marks">
+              {(step.from === "chat" ? [step.label === "ChatGPT" ? "chatgpt" : "claude"] : SOURCES.find((s) => s.id === step.from)!.marks).map((m) => (
+                <SourceMark key={m} kind={m as SourceKind} />
+              ))}
+            </span>
+            <h3 className="import-preview-title">
+              {step.sourceTitle}: {plural(step.found, "item")} found
+            </h3>
+          </header>
           <p className="small muted">
             {step.fresh.length > 0 ? `${plural(step.fresh.length, "new memory", "new memories")} to import.` : "Everything in this file is already in your vault."}
             {step.duplicates > 0 ? ` ${plural(step.duplicates, "item")} already in your vault will be skipped.` : ""}
@@ -317,11 +359,11 @@ export function ImportTab() {
                 {step.fresh.slice(0, 5).map((d, i) => (
                   <li key={i}>
                     <span className="import-sample-title">{d.title}</span>
-                    <span className="faint small"> {d.body.replace(/\s+/g, " ").slice(0, 90)}</span>
+                    <span className="import-sample-text"> {d.body.replace(/\s+/g, " ").slice(0, 90)}</span>
                   </li>
                 ))}
               </ul>
-              {step.fresh.length > 5 ? <p className="small faint">And {plural(step.fresh.length - 5, "more")}.</p> : null}
+              {step.fresh.length > 5 ? <p className="import-sample-more">And {plural(step.fresh.length - 5, "more")}.</p> : null}
               <div className="field">
                 <label className="field-label" htmlFor="import-folder-choice">
                   Save into
@@ -351,9 +393,14 @@ export function ImportTab() {
       ) : null}
 
       {step.kind === "saving" ? (
-        <div className="subpanel" role="status">
-          <p className="small">
-            Encrypting and saving {step.done.toLocaleString("en-US")} of {step.total.toLocaleString("en-US")}
+        <div className="subpanel import-saving" role="status">
+          <p className="import-saving-line">
+            <span>
+              Encrypting and saving {step.done.toLocaleString("en-US")} of {step.total.toLocaleString("en-US")}
+            </span>
+            <span className="import-saving-share" aria-hidden="true">
+              {step.total ? Math.round((step.done / step.total) * 100) : 0}%
+            </span>
           </p>
           <div className="progress" aria-hidden="true">
             <div className="progress-bar" style={{ width: `${step.total ? Math.round((step.done / step.total) * 100) : 0}%` }} />
@@ -362,12 +409,15 @@ export function ImportTab() {
       ) : null}
 
       {step.kind === "done" ? (
-        <div className="subpanel" data-testid="import-done">
-          <p>
+        <div className="subpanel import-done" data-testid="import-done">
+          <span className="consent-stamp" aria-hidden="true">
+            <CheckIcon />
+          </span>
+          <p className="import-done-title">
             Imported {plural(step.count, "memory", "memories")} into {step.folder}.
           </p>
           {step.source === "obsidian" ? (
-            <p className="small muted">
+            <p className="import-watch">
               To keep it in sync, run the connector with <span className="mono">--watch</span> and the path of your Obsidian folder, using an app key that may read{" "}
               {step.folder} and suggest memories. New and changed notes then wait in your inbox for your approval.
             </p>
@@ -393,6 +443,7 @@ function GithubForm({ busy, onRead }: { busy: boolean; onRead(req: { mode: "repo
   return (
     <form
       className="subpanel github-form"
+      data-busy={busy ? "true" : "false"}
       aria-label="GitHub"
       onSubmit={(e) => {
         e.preventDefault();
