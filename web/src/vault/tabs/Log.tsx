@@ -66,14 +66,20 @@ export function LogTab() {
         ...data.apps.map((a) => [a.id, a.name] as const),
         ...data.shares.outgoing.map((s) => [s.id, s.label] as const),
         ...data.askLinks.map((l) => [l.id, `Ask link "${l.label}"`] as const),
+        ...(data.publicSelf ? [[data.publicSelf.id, `Your public AI self @${data.publicSelf.handle}`] as const] : []),
+        ...data.meets.map((m) => [m.id, `Your AI self with ${m.record?.label ?? m.peerName}`] as const),
+        ["self", "Your test chat"] as const,
       ]),
-    [data.apps, data.shares.outgoing, data.askLinks],
+    [data.apps, data.shares.outgoing, data.askLinks, data.publicSelf, data.meets],
   );
   const people = useMemo(() => new Map((data.legacy.record?.people ?? []).map((p) => [p.id, p.label] as const)), [data.legacy.record]);
   const whoDid = (e: ops.LogEntryView) => {
     if (e.kind === "legacy") return e.appId === "legacy" || e.appId === data.legacy.plan?.id ? "Your legacy plan" : (people.get(e.appId) ?? "A trusted person from an earlier plan");
     if (e.kind === "device") return "Your devices";
-    return appName.get(e.appId) ?? (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : "Removed app");
+    return (
+      appName.get(e.appId) ??
+      (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : e.kind === "public" ? "A public AI self you deleted" : e.kind === "meet" ? "A conversation you removed" : "Removed app")
+    );
   };
   const spaceName = (ref: string | null) => {
     const id = ref?.replace(/^[a-z]+-/, "");
@@ -116,6 +122,24 @@ export function LogTab() {
       if (step.startsWith("removed-")) return `Was removed from the space ${name}`;
       return `Used the space ${name}`;
     }
+    if (e.kind === "protected") {
+      const t = e.memoryId ? title.get(e.memoryId) : undefined;
+      if (!e.memoryId) return `Looked through a protected folder (${plural(e.count, "memory", "memories")}), after your yes`;
+      return t ? `Read "${t}" in a protected folder, after your yes` : "Read a memory in a protected folder, after your yes";
+    }
+    if (e.kind === "approval") return step.startsWith("approved-") ? "You allowed one read of a protected folder" : "You said no to reading a protected folder";
+    if (e.kind === "public") return `Your public AI self answered a visitor${e.count ? `, from ${plural(e.count, "public note")}` : ""}`;
+    if (e.kind === "meet") {
+      if (step === "invited") return "An invite for two AI selves to talk";
+      if (step === "accepted") return "The invite was accepted: the AI selves may talk";
+      if (step === "declined") return "The invite was declined";
+      if (step === "stopped") return "The conversation was stopped";
+      if (step === "done") return `The conversation ended after ${plural(e.count, "turn")}`;
+      if (step.startsWith("turn-")) return `Turn ${step.slice(5)} of the conversation, encrypted between the two vaults`;
+      if (step.startsWith("used-")) return `Your AI self used ${plural(e.count, "memory", "memories")} for turn ${step.slice(5)}`;
+      return "A step of a conversation between AI selves";
+    }
+    if (e.kind === "sync") return step.startsWith("wrote-") ? `Wrote ${plural(e.count, "memory", "memories")} from live sync, in the background` : `Removed ${plural(e.count, "memory", "memories")} that are gone at the source`;
     if (e.kind === "propose") return "Suggested a memory to your inbox";
     if (e.kind === "ask") return `Your AI self answered a question${e.count ? `, from ${plural(e.count, "memory", "memories")}` : ""}`;
     if (e.kind === "shared") return `Opened a folder you share with them (${plural(e.count, "memory", "memories")})`;
@@ -172,8 +196,9 @@ export function LogTab() {
       </div>
 
       <Notice>
-        Every request a connected app or agent makes, every memory it suggests, every time another vault opens a folder you share, and every step of your legacy plan and your
-        devices is written here. At the end of each hour all of it is sealed into one fingerprint you can verify in this browser. The hours your vault was open are sealed too
+        Every request a connected app or agent makes, every memory it suggests, every time another vault opens a folder you share, every read of a protected folder and
+        your answer to it, every question your AI selves answer, every turn they take with another self, and every step of your legacy plan and your devices is written
+        here. At the end of each hour all of it is sealed into one fingerprint you can verify in this browser. The hours your vault was open are sealed too
         and counted under Proof.{" "}
         {log.mode === "local" ? "Seals are kept by Sigil for now; publishing them on chain is planned." : "Seals are published on chain."}
       </Notice>
@@ -204,7 +229,7 @@ export function LogTab() {
                     {whoDid(e)}, {formatDateTime(e.at)}.
                     {e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
                   </p>
-                  {(e.kind === "ask" || (e.kind === "legacy" && e.memoryId?.startsWith("ask-"))) && e.note ? (
+                  {(e.kind === "ask" || e.kind === "public" || (e.kind === "legacy" && e.memoryId?.startsWith("ask-"))) && e.note ? (
                     shown === e.id ? (
                       <AskNoteView entry={e} />
                     ) : (

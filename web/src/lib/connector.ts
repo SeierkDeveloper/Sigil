@@ -54,3 +54,9 @@ export function claudeCodeCommand(appKey: string, url = site.url): string {
 }
 
 export const EXAMPLE_KEY = "sigil_app.<app id>.<secret>";
+
+/** The connector keeping live sync sources in sync while the vault is closed. */
+export function watchCommand(appKey: string, url = site.url): string {
+  const { command, args } = launchCommand();
+  return `SIGIL_APP_KEY=${appKey} \\\nSIGIL_URL=${url} \\\n${[command, ...args, "--watch"].join(" ")}`;
+}

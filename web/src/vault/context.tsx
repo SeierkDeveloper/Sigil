@@ -5,6 +5,7 @@ import type { Api } from "./api";
 import type { Unlocked, VaultData } from "./ops";
 import type { SemanticIndex } from "./semantic";
 import type { AgentState } from "./useSelfAgent";
+import type { SyncAgentState } from "./useLiveSync";
 
 export interface VaultCtx {
   api: Api;
@@ -23,6 +24,8 @@ export interface VaultCtx {
   semantic: SemanticIndex;
   /** Whether this open vault is answering ask links right now. */
   agent: AgentState;
+  /** Live sync running in this open vault. */
+  liveSync: SyncAgentState;
   lock(): void;
   signOut(): Promise<void>;
 }
@@ -31,6 +34,7 @@ export type TabId =
   | "memories"
   | "inbox"
   | "self"
+  | "meet"
   | "review"
   | "timeline"
   | "profile"
@@ -42,6 +46,7 @@ export type TabId =
   | "proof"
   | "log"
   | "import"
+  | "sync"
   | "settings";
 
 export const Ctx = createContext<VaultCtx | null>(null);

@@ -11,6 +11,7 @@ import { site } from "@/lib/site";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { CopyButton, Empty, Notice } from "../ui";
+import { PrivacyScoreCard } from "../Score";
 
 const KINDS: { kind: AppKind; label: string; Icon: typeof ClaudeIcon }[] = [
   { kind: "claude-desktop", label: "Claude Desktop", Icon: ClaudeIcon },
@@ -368,6 +369,7 @@ function AppRow({ app }: { app: ops.AppView }) {
             {app.canPropose ? <span className="chip chip-strong">May suggest memories</span> : null}
           </div>
         ) : null}
+        {!app.revokedAt ? <PrivacyScoreCard app={app} /> : null}
         {error ? <Notice kind="error">{error}</Notice> : null}
 
         {editing ? (

@@ -19,6 +19,9 @@ import { errorText, useVault } from "../context";
 import { ChatGptIcon, ClaudeIcon, DeviceIcon } from "@/components/icons";
 import { AppMark } from "../marks";
 import { Band, CopyButton, Empty, Notice, PlateHead, Quiet } from "../ui";
+import { PublicSelfSection } from "./PublicSelf";
+import { approveHere, guardedMemories } from "../protectOps";
+import { retrieve } from "@sigil/core";
 
 const STATE_WORD: Record<ReturnType<typeof useVault>["agent"]["state"], string> = {
   serving: "Answering",
@@ -49,6 +52,7 @@ export function SelfTab() {
       <TestChat />
       <AppsSection />
       <LinksSection />
+      <PublicSelfSection />
     </div>
   );
 }
@@ -403,17 +407,18 @@ const REFUSED: Record<string, string> = {
 };
 
 function TestChat() {
-  const { data, semantic, openMemory } = useVault();
+  const { api, data, semantic, openMemory } = useVault();
   const [turns, setTurns] = useState<Turn[]>([]);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ready = !!data.model && !!data.self && data.self.folderIds.length > 0;
 
-  const ask = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const [gate, setGate] = useState<{ question: string; folders: { id: string; name: string; ids: string[] }[] } | null>(null);
+
+  const run = async (text: string, open: Set<string>) => {
     const model = selfOps.modelCaller(data);
-    if (!model || !data.self || !question.trim()) return;
+    if (!model || !data.self) return;
     setBusy(true);
     setError(null);
     try {
@@ -421,17 +426,54 @@ function TestChat() {
         data,
         data.self,
         model,
-        question,
+        text,
         turns.map((t) => ({ question: t.question, answer: t.answer.text })),
         { embedQuery: semantic.embedQuery, vectors: semantic.vectors },
+        open,
       );
-      setTurns((t) => [...t, { question: question.trim(), answer }]);
+      setTurns((t) => [...t, { question: text.trim(), answer }]);
       setQuestion("");
     } catch (err) {
       setError(errorText(err));
     } finally {
       setBusy(false);
     }
+  };
+
+  const ask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!data.self || !question.trim()) return;
+    // A protected folder in the rules: ask here first, for this one answer.
+    const guarded = data.folders.filter((f) => f.protect && data.self!.folderIds.includes(f.id));
+    if (guarded.length) {
+      const pool = guardedMemories(data, new Set(guarded.map((f) => f.id)));
+      const hits = retrieve({ ...data.self, folderIds: guarded.map((f) => f.id) }, pool, question);
+      const folders = guarded
+        .map((f) => ({ id: f.id, name: f.name, ids: hits.filter((h) => pool.find((m) => m.id === h.id)?.folderId === f.id).map((h) => h.id) }))
+        .filter((f) => f.ids.length);
+      if (folders.length) {
+        setGate({ question, folders });
+        return;
+      }
+    }
+    await run(question, new Set());
+  };
+
+  const decide = async (allow: boolean) => {
+    if (!gate) return;
+    const g = gate;
+    setGate(null);
+    if (!allow) return run(g.question, new Set());
+    try {
+      for (const f of g.folders) {
+        const req = await approveHere(api, f.id, f.ids);
+        await api.post(`access/${req.id}/use`, { memoryIds: f.ids });
+      }
+    } catch (err) {
+      setError(errorText(err));
+      return;
+    }
+    await run(g.question, new Set(g.folders.map((f) => f.id)));
   };
 
   return (
@@ -492,6 +534,28 @@ function TestChat() {
             <Quiet>Nothing asked yet. Try a question someone else would ask.</Quiet>
           )}
           {error ? <Notice kind="error">{error}</Notice> : null}
+          {gate ? (
+            <div className="subpanel protect-gate" data-testid="protect-gate">
+              <p className="small">
+                This answer could use{" "}
+                {gate.folders.map((f, i) => (
+                  <span key={f.id}>
+                    {i ? " and " : ""}
+                    {plural(f.ids.length, "memory", "memories")} from {f.name}
+                  </span>
+                ))}
+                , a protected folder. Allow it for this one answer? The read goes into your read log.
+              </p>
+              <div className="row">
+                <button type="button" className="button button-small button-primary" onClick={() => void decide(true)}>
+                  Allow for this answer
+                </button>
+                <button type="button" className="button button-small button-ghost" onClick={() => void decide(false)}>
+                  Answer without it
+                </button>
+              </div>
+            </div>
+          ) : null}
           <form className="chat-form" onSubmit={ask} aria-label="Ask your AI self">
             <label className="visually-hidden" htmlFor="chat-question">
               Question

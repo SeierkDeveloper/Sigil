@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   dedupeDrafts,
   importGithub,
+  meetingDraft,
   parseAppleNotes,
   parseExport,
   parseNotionExport,
@@ -20,8 +21,9 @@ import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { SourceMark } from "../marks";
 import { Notice } from "../ui";
+import { modelCaller } from "../selfOps";
 
-type SourceId = "chat" | "obsidian" | "apple-notes" | "takeout" | "notion" | "github";
+type SourceId = "chat" | "obsidian" | "apple-notes" | "takeout" | "notion" | "github" | "meeting";
 
 interface Source {
   id: SourceId;
@@ -72,13 +74,24 @@ const SOURCES: Source[] = [
     takes: "Zip, folder or note files",
   },
   {
+    id: "meeting",
+    title: "Meeting transcripts",
+    text: "Zoom, Meet or Teams transcripts, one meeting memory each: who was there, what was decided, what was promised.",
+    accept: ".vtt,.srt,.txt,.docx",
+    folder: false,
+    multiple: true,
+    how: "Save the transcript from Zoom, Google Meet or Microsoft Teams as .vtt, .srt, .txt or .docx and choose it here. The extract is made in this browser, by your own model when you allow it.",
+    marks: ["meeting"],
+    takes: ".vtt, .srt, .txt or .docx",
+  },
+  {
     id: "takeout",
-    title: "Gmail and Google Calendar",
-    text: "One memory per mail thread and per calendar event, from Google Takeout.",
+    title: "Older Gmail and Calendar history",
+    text: "Live sync under Sync keeps Gmail and Calendar up to date. A Takeout file brings in what is older, once.",
     accept: ".zip,.mbox,.ics",
     folder: false,
     multiple: true,
-    how: "In Google Takeout choose Mail and Calendar, then pick the zip, or the .mbox and .ics files inside it. Spam and trash are left out; long threads are shortened.",
+    how: "In Google Takeout choose Mail and Calendar, then pick the zip, or the .mbox and .ics files inside it. Spam and trash are left out; long threads are shortened. Threads and events that live sync brings later land on the same memories.",
     marks: ["gmail", "calendar"],
     takes: "Zip, .mbox or .ics",
   },
@@ -143,6 +156,7 @@ export function ImportTab() {
   const [error, setError] = useState<string | null>(null);
   const [target, setTarget] = useState(NEW);
   const [dragging, setDragging] = useState(false);
+  const [withModel, setWithModel] = useState(true);
   const input = useRef<HTMLInputElement>(null);
   const folderInput = useRef<HTMLInputElement>(null);
   const current = SOURCES.find((s) => s.id === source)!;
@@ -165,6 +179,23 @@ export function ImportTab() {
         const r = parseExport(f.name, new Uint8Array(await f.arrayBuffer()));
         const label = r.source === "chatgpt" ? "ChatGPT" : "Claude";
         prepare("chat", label, `${label} export`, r.drafts, r.skipped, []);
+        return;
+      }
+      if (source === "meeting") {
+        const model = withModel ? modelCaller(data) : null;
+        const drafts: MemoryDraft[] = [];
+        const notes: string[] = [];
+        for (const f of files) {
+          try {
+            const r = await meetingDraft(f.name, new Uint8Array(await f.arrayBuffer()), { model, modified: new Date(f.lastModified).toISOString() });
+            drafts.push(r.draft);
+          } catch (err) {
+            notes.push(`${f.name}: ${errorText(err)}`);
+          }
+        }
+        if (drafts.length === 0) throw new Error(notes[0] ?? "No transcript could be read.");
+        notes.push(model ? "The extracts were written by your own model, called from this browser." : "The extracts were made in this browser without a model: decisions and promises are the sentences that say so.");
+        prepare("meeting", "Meetings", "Meeting transcripts", drafts, 0, notes);
         return;
       }
       const picked = await toImportFiles(files, fromFolder);
@@ -226,6 +257,13 @@ export function ImportTab() {
         <p className="small muted">Files are opened, read and encrypted in this browser. Only the encrypted memories reach the server. Nothing needs an app&apos;s approval.</p>
       </div>
       {error ? <Notice kind="error">{error}</Notice> : null}
+      <Notice>
+        Gmail, Google Calendar, Google Drive and Slack stay in sync on their own under{" "}
+        <button type="button" className="text-button" onClick={() => goTo("sync")}>
+          Sync
+        </button>
+        . Import is for files you bring once.
+      </Notice>
 
       <ol className="handshake-steps import-steps" aria-label="Steps">
         {["Choose where from", "See the preview", "Encrypt and save"].map((name, i) => (
@@ -254,6 +292,16 @@ export function ImportTab() {
               </label>
             ))}
           </div>
+
+          {source === "meeting" && data.model ? (
+            <label className="checkbox" htmlFor="meeting-model">
+              <input id="meeting-model" type="checkbox" checked={withModel} onChange={(e) => setWithModel(e.target.checked)} />
+              <span>
+                Let my model write the extract
+                <span className="field-hint">Your model key is used from this browser. Off: the extract is made here by plain rules.</span>
+              </span>
+            </label>
+          ) : null}
 
           {source === "github" ? (
             <GithubForm

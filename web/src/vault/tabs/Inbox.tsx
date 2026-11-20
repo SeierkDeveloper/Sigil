@@ -8,6 +8,8 @@ import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { AppMark, SourceMark } from "../marks";
 import { Empty, Notice } from "../ui";
+import { approveRequest, denyRequest, loadRequests, type AccessRequestView } from "../protectOps";
+import { PROTECT_LABELS, APPROVAL_MINUTES } from "@sigil/core";
 
 const NEW_FOLDER = "__new__";
 const VIA: Record<string, string> = { mcp: "through the connector", extension: "from the browser extension", sdk: "from a signed-in web app", capture: "with quick capture" };
@@ -35,9 +37,12 @@ export function InboxTab() {
       <div className="panel-header">
         <h2 className="panel-title">Inbox</h2>
         <p className="small muted">
-          Memories your apps suggest. Each was encrypted for this vault before it was sent, and none becomes a memory until you approve it.
+          Memories your apps suggest, and requests to read your protected folders. Suggestions were encrypted for this vault before they were sent, and none
+          becomes a memory until you approve it.
         </p>
       </div>
+
+      <AccessRequests />
 
       {data.proposals.length === 0 ? (
         <div className="inbox-empty">
@@ -370,5 +375,96 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
         </div>
       </div>
     </li>
+  );
+}
+
+// ---------------------------------------------------------------- reads of protected folders
+
+function requesterName(data: ReturnType<typeof useVault>["data"], r: AccessRequestView): string {
+  if (r.requesterKind === "app") return data.apps.find((a) => a.id === r.requester)?.name ?? "A removed app";
+  if (r.requesterKind === "link") return `Your AI self, for the link "${data.askLinks.find((l) => l.id === r.requester)?.label ?? "a deleted link"}"`;
+  if (r.requesterKind === "meet") {
+    const m = data.meets.find((x) => x.id === r.requester);
+    return `Your AI self, talking with ${m?.record?.label ?? m?.peerName ?? "another self"}`;
+  }
+  if (r.requesterKind === "public") return "Your public AI self";
+  return "Your test chat";
+}
+
+/** Requests to read a protected folder: each needs a fresh yes, which lasts a few minutes and covers one read. */
+function AccessRequests() {
+  const { api, data, update } = useVault();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pending = data.access.filter((r) => r.state === "pending");
+
+  // New requests arrive while the vault is open; look again now and then.
+  useEffect(() => {
+    let alive = true;
+    const t = window.setInterval(() => {
+      loadRequests(api)
+        .then((access) => alive && update((d) => ({ ...d, access })))
+        .catch(() => undefined);
+    }, 5000);
+    return () => {
+      alive = false;
+      window.clearInterval(t);
+    };
+  }, [api, update]);
+
+  if (pending.length === 0) return null;
+  const answer = async (r: AccessRequestView, yes: boolean) => {
+    setBusy(r.id);
+    setError(null);
+    try {
+      const next = yes ? await approveRequest(api, r.id) : await denyRequest(api, r.id);
+      update((d) => ({ ...d, access: d.access.map((x) => (x.id === r.id ? next : x)) }));
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="subpanel access-requests" aria-labelledby="access-title" data-testid="access-requests">
+      <h3 id="access-title" className="settings-heading">
+        <LockIcon /> {plural(pending.length, "request")} to read a protected folder
+      </h3>
+      <p className="small muted">A yes covers this one read and lasts {APPROVAL_MINUTES} minutes. Both your answer and the read go into your read log.</p>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <ul className="list">
+        {pending.map((r) => {
+          const folder = data.folders.find((f) => f.id === r.folderId);
+          const titles = r.memoryIds.map((id) => data.memories.find((m) => m.id === id)?.title).filter(Boolean) as string[];
+          return (
+            <li key={r.id} className="list-row access-row" data-testid="access-row">
+              <div className="list-row-main">
+                <p className="list-row-title">
+                  {requesterName(data, r)} asks to read {folder ? folder.name : "a protected folder"}
+                  {folder?.protect ? <span className="badge">{PROTECT_LABELS[folder.protect]}</span> : null}
+                </p>
+                <p className="list-row-meta">
+                  {r.scope === "index"
+                    ? "To look through the titles and first lines of what the folder holds."
+                    : titles.length
+                      ? `To read ${titles.map((t) => `"${t}"`).join(", ")}.`
+                      : `To read ${plural(r.memoryIds.length, "memory", "memories")}.`}{" "}
+                  Asked {formatDateTime(r.createdAt)}.
+                </p>
+              </div>
+              <div className="list-row-actions">
+                <button type="button" className="button button-small button-primary" disabled={busy === r.id} onClick={() => void answer(r, true)}>
+                  Allow this read
+                </button>
+                <button type="button" className="button button-small button-ghost" disabled={busy === r.id} onClick={() => void answer(r, false)}>
+                  Say no
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

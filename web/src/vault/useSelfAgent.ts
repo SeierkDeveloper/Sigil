@@ -10,6 +10,9 @@ import type { Api } from "./api";
 import type { VaultData } from "./ops";
 import type { SemanticIndex } from "./semantic";
 import { modelCaller, serveOnce } from "./selfOps";
+import { servePublicOnce } from "./publicOps";
+import { meetOnce } from "./meetOps";
+import type { Unlocked } from "./ops";
 
 export type AgentState = { state: "off" } | { state: "no-model" } | { state: "serving"; answered: number } | { state: "failed"; reason: string };
 
@@ -19,14 +22,19 @@ export function vaultLinks(data: Pick<VaultData, "askLinks">, now = Date.now()) 
   return data.askLinks.filter((l) => !l.revokedAt && !l.appId && l.secret && new Date(l.expiresAt).getTime() > now && l.uses < l.maxUses);
 }
 
-export function useSelfAgent(api: Api, data: VaultData | null, semantic: SemanticIndex): AgentState {
+/** Something waits for this open vault to answer: a link, the public page, or a conversation with another self. */
+function hasWork(data: VaultData): boolean {
+  return vaultLinks(data).length > 0 || (!!data.publicSelf?.enabled && !data.publicSelf.appId) || data.meets.some((m) => m.state === "running" || m.state === "invited");
+}
+
+export function useSelfAgent(api: Api, vault: Unlocked, data: VaultData | null, semantic: SemanticIndex): AgentState {
   const [progress, setProgress] = useState<{ answered: number; failed: string | null }>({ answered: 0, failed: null });
   const latest = useRef({ data, semantic });
   useEffect(() => {
     latest.current = { data, semantic };
   });
 
-  const active = data ? vaultLinks(data).length > 0 : false;
+  const active = data ? hasWork(data) : false;
   const hasModel = !!data?.model;
   const hasBox = !!data?.box && !!data?.boxPublic;
   const serving = active && hasBox && hasModel;
@@ -41,7 +49,9 @@ export function useSelfAgent(api: Api, data: VaultData | null, semantic: Semanti
       const model = modelCaller(d);
       if (!model) return;
       try {
-        answered += await serveOnce(api, d, { model, box: d.box, boxPublic: d.boxPublic, embedQuery: s.embedQuery, vectors: s.vectors });
+        if (vaultLinks(d).length) answered += await serveOnce(api, d, { model, box: d.box, boxPublic: d.boxPublic, embedQuery: s.embedQuery, vectors: s.vectors });
+        if (d.publicSelf?.enabled && !d.publicSelf.appId) answered += await servePublicOnce(api, d, { model });
+        if (d.meets.some((m) => m.state === "running" || m.state === "invited")) answered += await meetOnce(api, vault, d, { model });
         if (alive) setProgress({ answered, failed: null });
       } catch (err) {
         if (alive) setProgress({ answered, failed: (err as Error).message });
@@ -53,7 +63,7 @@ export function useSelfAgent(api: Api, data: VaultData | null, semantic: Semanti
       alive = false;
       window.clearInterval(timer);
     };
-  }, [api, serving]);
+  }, [api, vault, serving]);
 
   return useMemo<AgentState>(() => {
     if (!active || !hasBox) return { state: "off" };

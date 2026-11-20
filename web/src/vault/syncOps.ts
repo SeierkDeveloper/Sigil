@@ -113,8 +113,10 @@ export interface ConnectMessage {
 
 /**
  * Opens the provider's sign-in in a small window and waits for the code. The
- * window lands on /vault/connect, which posts the code to this page (same
- * origin only) and closes. The verifier never leaves this page.
+ * window lands on /vault/connect, which hands the code to this page (same
+ * origin only, by postMessage to its opener and on a same-origin broadcast
+ * channel, since a provider's page may cut the link to the opener) and closes.
+ * The verifier never leaves this page.
  */
 export function signInWindow(url: string, state: string, opts: { open?: (url: string) => Window | null; timeoutMs?: number } = {}): Promise<ConnectResult> {
   return new Promise((resolve, reject) => {
@@ -124,27 +126,29 @@ export function signInWindow(url: string, state: string, opts: { open?: (url: st
       return;
     }
     let done = false;
+    const channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel(CONNECT_CHANNEL);
     const finish = (fn: () => void) => {
       if (done) return;
       done = true;
       window.removeEventListener("message", onMessage);
-      window.clearInterval(watch);
+      channel?.close();
       window.clearTimeout(timer);
       fn();
     };
-    const onMessage = (e: MessageEvent) => {
-      if (e.origin !== window.location.origin) return;
-      const m = e.data as ConnectMessage;
+    const take = (m: ConnectMessage | null | undefined) => {
       if (!m || m.type !== "sigil-connect" || m.state !== state) return;
-      finish(() => (m.code ? resolve({ code: m.code, state }) : reject(new Error(m.error ? `The provider said: ${m.error}.` : "The sign-in was cancelled."))));
+      finish(() => (m.code ? resolve({ code: m.code, state }) : reject(new Error(m.error ? `The service said: ${m.error}.` : "The sign-in was cancelled."))));
+    };
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin === window.location.origin) take(e.data as ConnectMessage);
     };
     window.addEventListener("message", onMessage);
-    const watch = window.setInterval(() => {
-      if (win.closed) finish(() => reject(new Error("The sign-in window was closed before it finished.")));
-    }, 500);
+    if (channel) channel.onmessage = (e) => take(e.data as ConnectMessage);
     const timer = window.setTimeout(() => finish(() => reject(new Error("The sign-in took too long. Try again."))), opts.timeoutMs ?? 10 * 60_000);
   });
 }
+
+export const CONNECT_CHANNEL = "sigil-connect";
 
 export interface ConnectInput {
   kind: SyncKind;
