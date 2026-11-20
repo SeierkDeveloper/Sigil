@@ -11,11 +11,71 @@ export interface Release {
 export const releases: Release[] = [
   {
     date: "2026-11-20",
+    title: "The AI self gets an identity and a wallet of its own",
+    area: "AI self",
+    summary: "A key for the AI self, made on your device from your vault key, a statement signed by it and your vault, and a wallet it may use only within rules you set.",
+    items: [
+      "The self's key, derived on the device and never stored; its address is the self's identity on any EVM chain",
+      "An identity statement signed by the vault key and the self key, readable by anyone at its address and checked on the verify page",
+      "Wallet rules drafted and kept encrypted in the vault: caps per payment and per day, recipients, contracts and their functions, token caps and an end date, with a check of any payment against the draft",
+      "SigilSelfRegistry and SigilSelfWallet in contracts/, with Foundry tests and fuzzing of caps, freeze and expiry; not deployed. Until a site sets the registry's address, the Identity tab says so and works off chain",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "An AI self that works and learns",
+    area: "AI self",
+    summary: "Your AI self drafts replies, plans your week and answers people, all into an approval queue, and learns from the changes you make.",
+    items: [
+      "Drafts of replies to a pasted message or a synced mail thread, and a plan of the next seven days from your calendar memories",
+      "Answers to ask links, the public page and meetings of selves can be held for approval and sent through their own channel once you approve",
+      "Nothing is sent on its own: approving a reply or a plan copies it",
+      "Your edits become notes in a How I write folder, written by your own model or as a plain summary of the change; later drafts follow them, and you can change or delete each one",
+      "Every draft, approval, discard and lesson in the read log and the hourly seal",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Prove a fact without showing it",
+    area: "Proof",
+    summary: "A signed proof of one claim, sealed with the hour, that shows nothing else: one field of a memory, an age, months of sealed history, or membership of a team space.",
+    items: [
+      "Each field of a memory committed with its own salt, so one can be shown and the rest stay hidden",
+      "Sealed history and team spaces checked in full from the seals; a field or an age marked plainly as the owner's own statement",
+      "Proofs shared by link or file and checked on the verify page in any browser; zero-knowledge proofs are on the roadmap",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "An emergency card for the lock screen",
+    area: "Vault",
+    summary: "A medical card from the health memories you pick, behind a code for your lock screen, that the server stores and cannot read.",
+    items: [
+      "Blood type, allergies, medication, conditions, languages and who to call, drafted from your memories and edited before it goes out",
+      "Encrypted on the device with a key that lives only in the code's link; a lock screen image with the code, made on the device",
+      "Each opening shown to you with the time, a device class and a language, and nothing that tells who it was",
+      "Take it down or issue a new code at any time; the page is large and plain on a phone and opens again without a signal once it was opened",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Sealed agreements and knowledge packs",
+    area: "Sharing",
+    summary: "Agreements two vaults both sign and seal, and folders published as signed packs others follow.",
+    items: [
+      "An agreement drafted in one vault, reviewed and signed in the other, both signatures over one fingerprint, sealed in both logs; amendments as new linked versions; nothing changed after signing",
+      "A verifiable copy either side can show, checked on the verify page",
+      "A folder published as a knowledge pack with a title, a description and a version, signed by your vault; followers take in each new version, checked against the publisher they followed",
+      "Packs are free",
+    ],
+  },
+  {
+    date: "2026-11-20",
     title: "An open standard and a privacy score",
     area: "Trust",
     summary: "The formats, keys, tools and log written down as an open standard with test vectors from the code, and a privacy score per app from your own read log.",
     items: [
-      "docs/spec: memories and folders, keys, envelopes and sealed boxes, the connector's tools and permissions, the access log, seals and presence, certificates, version 1.0.0",
+      "docs/spec: memories and folders, keys, envelopes and sealed boxes, the connector's tools and permissions, the access log, seals and presence, certificates, version 1.0.0; version 1.1.0 adds the self's identity and wallet, proofs of a fact, the emergency card, agreements and knowledge packs",
       "Test vectors generated from the code, and a check on every test run that the code still produces them; the standard on its own page, /spec",
       "A privacy score for every app and agent under Apps and Agents, computed in your browser from your own read log, with every point explained",
     ],

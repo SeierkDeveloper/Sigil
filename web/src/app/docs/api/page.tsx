@@ -149,6 +149,52 @@ const publicEndpoints: Endpoint[] = [
     notes: "404 no_certificate once the owner takes it down. How to check one is on the verify page.",
   },
   {
+    id: "identity-config",
+    method: "GET",
+    path: "/api/identity/config",
+    summary: "Where the registry of AI selves is, once the site has one. Null until a chain id and an address are set.",
+    response: `{ "chain": { "chainId": "8453", "registry": "0x...", "rpcUrl": "https://<public read address>" } }`,
+    notes: "With chain null, the Identity tab works off chain. The read address is public and read-only; the vault reads a self wallet's spends through it.",
+  },
+  {
+    id: "identity",
+    method: "GET",
+    path: "/api/identity/at/:address",
+    summary: "The identity statement of a self key, signed by the owner's vault key and the self key. This is what the registry's metadata address points to.",
+    response: `{
+  "format": "sigil-self-identity",
+  "version": 1,
+  "body": { "selfKey": "0x...", "signingKey": "...", "name": "Sam's AI self", "about": "...", "owner": null, "wallet": null, "chain": null, "origin": "https://...", "issuedAt": "..." },
+  "vaultSignature": "<Ed25519, base64url>",
+  "selfSignature": "0x<EIP-191 signature>"
+}`,
+    notes: "404 no_identity when the owner has not signed one or withdrew it. The site checks both signatures before it keeps a statement.",
+  },
+  {
+    id: "proof-of-fact",
+    method: "GET",
+    path: "/api/proofs/:id",
+    summary: "A proof of a fact its owner shared by link: one claim, its evidence, the signature and the sealed entry of the statement.",
+    response: `{ "format": "sigil-disclosure", "version": 1, "statement": { "claim": { "kind": "field", "opening": { "name": "Nationality", "value": "...", "salt": "...", "index": 2, "proof": ["0x..."] }, "commitment": "0x..." }, "...": "..." }, "signature": "...", "anchor": { "kind": "disclose", "memoryId": "0x...", "hour": 496233, "proof": ["0x..."], "root": "0x..." } }`,
+    notes: "404 no_proof once the owner takes it down. How to check one is on the verify page.",
+  },
+  {
+    id: "emergency-card",
+    method: "GET",
+    path: "/api/e/:id",
+    summary: "An emergency card's ciphertext. The key is only in the link after #, so the server cannot open what it serves. Each call is recorded for the owner with the time, a device class and a language.",
+    response: `{ "card": "v1.<iv>.<ciphertext>", "updatedAt": "2026-11-20T10:00:00.000Z" }`,
+    notes: "404 no_card when the owner took it down or issued a new code. 60 a minute per address.",
+  },
+  {
+    id: "pack",
+    method: "GET",
+    path: "/api/packs/at/:id",
+    summary: "A knowledge pack, as its publisher signed it: the newest version, or one by number with ?version=n.",
+    response: `{ "format": "sigil-knowledge-pack", "version": 1, "body": { "id": "...", "title": "Bread", "version": 2, "previous": "0x...", "publisher": { "name": "Sam", "signingKey": "..." }, "items": [], "...": "..." }, "hash": "0x...", "signature": "..." }`,
+    notes: "GET /api/packs/at/:id/versions lists every version with its hash. 404 no_pack once the publisher takes it down.",
+  },
+  {
     id: "pairing-open",
     method: "POST",
     path: "/api/devices/pairings",
@@ -463,6 +509,11 @@ const errors: [string, string, string][] = [
   ["403", "role", "A space member tried something their role does not allow."],
   ["404", "no_pairing", "No device is waiting with that code, or it expired or was used."],
   ["404", "unknown_device", "A device that was revoked tried to sign in."],
+  ["400", "bad_signature", "A signature (presence, an identity statement, an agreement) does not check out against the key the server holds."],
+  ["409", "decided", "A draft of the AI self was already approved or discarded."],
+  ["409", "drafted", "There is already a draft for this question or turn."],
+  ["409", "closed", "The agreement is no longer open for signing."],
+  ["404", "no_card", "No emergency card at this address. Also no_proof, no_pack and no_identity."],
 ];
 
 function EndpointBlock({ e }: { e: Endpoint }) {
@@ -699,7 +750,9 @@ export default function ApiReference() {
                 model key, how the vault thinks), <code>/api/self</code> (ask links, and the open vault answering them), <code>/api/log</code>,{" "}
                 <code>/api/keyslots</code>, <code>/api/access</code> (requests to read a protected folder, and the owner&apos;s yes or no),{" "}
                 <code>/api/sync</code> (live sync sources), <code>/api/public/self</code> (the public AI self and its public copy), <code>/api/meets</code>{" "}
-                (selves meet) and the sign-in routes under{" "}
+                (selves meet), <code>/api/self/identity</code> (the self key&apos;s address and its signed statement), <code>/api/drafts</code> (the AI self&apos;s approval
+                queue), <code>/api/disclosures</code> (proofs of a fact), <code>/api/emergency</code> (the emergency card and its openings),{" "}
+                <code>/api/agreements</code> (sealed agreements), <code>/api/packs</code> (knowledge packs) and the sign-in routes under{" "}
                 <code>/api/auth</code>. It
                 accepts only encrypted payloads, only with a session cookie, and changes only from the site itself. It is not meant for other
                 programs; the whole router is one readable file, <code>web/src/server/api.ts</code>.

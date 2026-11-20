@@ -92,6 +92,10 @@ const stages: Stage[] = [
       { text: "ask_self for apps you allow, answered on your machine", built: true },
       { text: "A personal model trained only on what you allow" },
       { text: "A public AI self at /@you, answering anyone from the folders you made public, every answer in your log", built: true },
+      { text: "Works for you into an approval queue: replies, a plan for the week and answers to people, nothing sent on its own", built: true },
+      { text: "Learns how you write from the edits you make to its drafts, in notes you can read, change and delete", built: true },
+      { text: "Its own identity: a key made from your vault key, a statement signed by both, and a registry contract", built: true },
+      { text: "Its own wallet, used only within your caps, recipients, functions and end date; you can freeze it at any time (contract written and tested, not deployed)", built: true },
       { text: "Negotiates and replies within limits you set" },
     ],
   },
@@ -108,12 +112,14 @@ const stages: Stage[] = [
   },
   {
     title: "The memory economy",
-    status: "planned",
+    status: "started",
     summary: "What you know has value. You decide who may use it, and on what terms.",
     items: [
-      { text: "Knowledge packs you can license" },
+      { text: "Knowledge packs: a folder published as a signed pack that other vaults and AI selves follow, version by version, free", built: true },
+      { text: "Provable facts, version 1: one field, an age, sealed history or a team space, signed and sealed, showing nothing else", built: true },
+      { text: "Provable facts with zero-knowledge proofs, so a checker computes an age from a date nobody sees" },
+      { text: "Packs you can license, and paid work, once the network has its own means of payment" },
       { text: "Your data, at your price" },
-      { text: "Provable facts: prove something is true without showing the data" },
     ],
   },
   {
@@ -122,7 +128,7 @@ const stages: Stage[] = [
     summary: "Make it easy to see which AI apps treat your memory well.",
     items: [
       { text: "A privacy score for every connected app and agent, from your own read log", built: true },
-      { text: "An open standard for permissioned memory access, version 1, with test vectors from the code", built: true },
+      { text: "An open standard for permissioned memory access, version 1.1, with test vectors from the code", built: true },
       { text: "Scores shared between owners, without sharing their logs" },
     ],
   },
@@ -141,12 +147,12 @@ const stages: Stage[] = [
   },
   {
     title: "Devices",
-    status: "planned",
+    status: "started",
     summary: "Memory that comes with you, in the things around you.",
     items: [
       { text: "Wearables and glasses" },
       { text: "Car and home" },
-      { text: "Emergency medical access you set up in advance" },
+      { text: "Emergency medical access you set up in advance: a card behind a code on your lock screen that only its link opens", built: true },
     ],
   },
   {
@@ -167,7 +173,7 @@ const stages: Stage[] = [
     items: [
       { text: "Version 1: a signed certificate of continuous sealed history, checked in any browser against the seals", built: true },
       { text: "Proof of human from sealed history, with zero-knowledge proofs" },
-      { text: "Sealed agreements" },
+      { text: "Sealed agreements: one text, two vault signatures over one fingerprint, sealed in both logs, amendments as new versions", built: true },
       { text: "A learning record you own" },
     ],
   },

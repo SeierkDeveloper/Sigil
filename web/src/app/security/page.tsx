@@ -48,6 +48,9 @@ export default function Security() {
             <a href="#round-five">Sync, protection, public and meeting selves</a>
           </li>
           <li>
+            <a href="#round-six">Identity, work, proofs, emergency, agreements, packs</a>
+          </li>
+          <li>
             <a href="#limits">Limits</a>
           </li>
           <li>
@@ -250,6 +253,45 @@ export default function Security() {
             </ul>
           </section>
 
+          <section id="round-six">
+            <h2>Identity, work, proofs, emergency, agreements and packs</h2>
+            <ul>
+              <li>
+                <strong>The self key.</strong> A secp256k1 key derived with HKDF from your vault key on your device, never stored and never sent; the server keeps
+                its address only. The identity statement is signed by both your vault&apos;s Ed25519 key and the self key, and the server checks both signatures before
+                it serves one. The wallet rules are an encrypted setting.
+              </li>
+              <li>
+                <strong>The contracts.</strong> <code>SigilSelfRegistry</code> registers a self key only with an EIP-712 signature by that key naming its owner, and
+                refuses high-s signatures; a revoked key stays revoked. <code>SigilSelfWallet</code> checks, for every call by the self key, freeze, expiry, the
+                allowed target, the allowed function, token caps with allowed recipients, and native caps per call and per UTC day; it refuses token moves it cannot
+                cap. The owner can always freeze, change the rules and withdraw. Both are tested with Foundry, with fuzzing of the caps and the freeze, and are not
+                deployed.
+              </li>
+              <li>
+                <strong>Drafts.</strong> Each draft of your AI self is an envelope under your vault key; the server knows its kind and state. Nothing is sent on its
+                own: held answers go out only when you approve them, through their own encrypted channel.
+              </li>
+              <li>
+                <strong>Proofs of a fact.</strong> Each field of a memory is committed with its own 32 random bytes of salt, so the commitment says nothing without
+                them. Only the hash of the signed statement reaches the server before you share a proof; it is sealed with the hour.
+              </li>
+              <li>
+                <strong>The emergency card.</strong> AES-256-GCM under a fresh key that is only in the link after the <code>#</code>, bound to the card&apos;s id. The
+                server stores ciphertext it cannot open and records each opening with a time, a device class and a language only.
+              </li>
+              <li>
+                <strong>Agreements.</strong> The text goes to the other vault as a sealed box; each side keeps its copy under its own vault key. Both sign one SHA-256
+                fingerprint with Ed25519; the server checks each signature against the key that vault registered, and the receiving vault checks that the document
+                names it with its own keys before it signs.
+              </li>
+              <li>
+                <strong>Knowledge packs.</strong> Public by design and signed by the publisher&apos;s vault key. A follower pins that key and checks every version, in
+                order, against it and the hash of the version before.
+              </li>
+            </ul>
+          </section>
+
           <section id="limits">
             <h2>Limits, plainly</h2>
             <ul>
@@ -282,6 +324,14 @@ export default function Security() {
               </li>
               <li>
                 <strong>A revoked device keeps what it showed.</strong> Revoking ends its access from then on; it cannot reach into the device.
+              </li>
+              <li>
+                <strong>A proof of a field or an age is your own word.</strong> It is signed and sealed, not checked by anyone else: Sigil does not read a
+                passport. Only sealed history and team spaces are checked in full.
+              </li>
+              <li>
+                <strong>An emergency card is for anyone who sees the code.</strong> That is its purpose. A phone that opened it may keep its ciphertext, and the key
+                is in that phone&apos;s history; issuing a new code makes both useless.
               </li>
               <li>
                 <strong>Early software.</strong> The code is open source and has not had an independent audit yet.

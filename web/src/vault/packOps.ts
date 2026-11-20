@@ -77,11 +77,17 @@ export async function withdraw(api: Api, id: string): Promise<void> {
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
 
-/** A pack from its link or id, on this site or another one. */
+/**
+ * A pack from its link or its id. The vault page may only talk to its own site
+ * (its content security policy), so it follows packs published on this site.
+ */
 export function packRef(input: string, origin: string): { origin: string; id: string } {
   const t = input.trim();
   const m = /^(https?:\/\/[^/\s]+)\/p\/([A-Za-z0-9_-]{8,64})\/?$/.exec(t);
-  if (m) return { origin: m[1], id: m[2] };
+  if (m) {
+    if (m[1] !== origin.replace(/\/$/, "")) throw new Error("This vault follows packs published on this site. That link is for another one.");
+    return { origin: m[1], id: m[2] };
+  }
   if (/^[A-Za-z0-9_-]{8,64}$/.test(t)) return { origin, id: t };
   throw new Error("Paste a pack's link, like https://.../p/<id>.");
 }

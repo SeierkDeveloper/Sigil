@@ -46,6 +46,8 @@ describe("a knowledge pack", () => {
     expect(data.follows).toEqual([expect.objectContaining({ id: row.id, version: 1, publisherKey: pack.body.publisher.signingKey })]);
     expect(data.memories.filter((m) => m.folderId === followed.folder.id).every((m) => m.source.kind === "pack")).toBe(true);
     await expect(packs.follow(fan.b.api, fan.vault, data, { origin: ORIGIN, id: row.id }, fetcher)).rejects.toThrow(/already follow/);
+    expect(() => packs.packRef("https://elsewhere.example/p/pack-0000001", ORIGIN)).toThrow(/published on this site/);
+    expect(packs.packRef(row.id, ORIGIN)).toEqual({ origin: ORIGIN, id: row.id });
 
     // Two new versions: one memory changed, one added, one removed.
     const starter = pub.data.memories.find((m) => m.title === "Starter")!;

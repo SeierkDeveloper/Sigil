@@ -101,6 +101,38 @@ const covered = [
     answer:
       "Revoke it under Devices: its key slot and every session it opened end at once, and it forgets its device key when it next reaches Sigil. Without the device key, its offline copy is ciphertext.",
   },
+  {
+    threat: "Your AI self sends something you did not approve",
+    answer:
+      "Drafts wait in the approval queue. A reply or a plan is only copied when you approve it; a held answer goes back only through the channel it came from, and only once you approve it. The server cannot read a draft.",
+  },
+  {
+    threat: "Someone else registers your AI self's key, or uses its signature for another owner",
+    answer:
+      "The registry takes a self key only with that key's own signature over the owner's address, the metadata and a deadline. A signature for one owner fails for any other, and a revoked key can never be registered again.",
+  },
+  {
+    threat: "The self key spends more than you allowed",
+    answer:
+      "The self wallet checks every call against your caps per payment and per day, the allowed recipients, contracts and functions, token caps and the end date, and refuses token moves it cannot cap. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing; not deployed.",
+  },
+  {
+    threat: "A proof shows more than its claim",
+    answer: "Every field of a memory is committed with its own random salt, so revealing one field and its path to the commitment says nothing about the others, and an age proof keeps the date back.",
+  },
+  {
+    threat: "The server reads your emergency card",
+    answer: "It is encrypted with a key that is only in the code's link after the #, which browsers never send. The server stores and serves ciphertext, and keeps only a time, a device class and a language for each opening.",
+  },
+  {
+    threat: "An agreement is changed after it was signed",
+    answer:
+      "Both vaults sign one SHA-256 fingerprint of the text and both parties; a changed word no longer matches either signature. The server checks each signature against the vault's own key, and the receiving vault refuses a document that does not name it with its own keys.",
+  },
+  {
+    threat: "A server that swaps a knowledge pack",
+    answer: "A follower pins the publisher's key at the first version and checks every later version against it and the version before. A version signed by any other key is not taken in.",
+  },
 ];
 
 const notCovered = [
@@ -195,6 +227,20 @@ const notCovered = [
     threat: "Bugs",
     answer: "This is early software. It is open source and tested, and it has not had an independent audit yet.",
   },
+  {
+    threat: "Taking a proof of a field or an age as checked fact",
+    answer:
+      "It is your vault's own statement, signed and sealed: nobody checked the passport. Only proofs of sealed history and of team spaces are checked in full. Zero-knowledge proofs of facts that someone else attested are on the roadmap.",
+  },
+  {
+    threat: "Anyone who sees your lock screen",
+    answer:
+      "That is what the emergency card is for: whoever scans it reads it. A phone that opened it may keep its ciphertext, and the key is in that phone's history; issue a new code to make both useless.",
+  },
+  {
+    threat: "A self key on chain before the contracts are reviewed",
+    answer: "The registry and the wallet are tested, not audited, and not deployed. Put on chain only what you could lose until they have been reviewed.",
+  },
 ];
 
 const parties = [
@@ -202,7 +248,7 @@ const parties = [
   {
     who: "Sigil's server",
     sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address, how often an ask link is used, and when an expiring memory is to be deleted.",
-    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other.",
+    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other, drafts of your AI self, your wallet rules, your emergency card, the text of an agreement.",
   },
   {
     who: "A connected app",
@@ -228,6 +274,16 @@ const parties = [
     who: "Your model provider",
     sees: "For each answer, brief or check: the question and the memories given to it, under your own key.",
     not: "Anything else in your vault, or anything at all until you add a key.",
+  },
+  {
+    who: "Someone who scans your emergency code",
+    sees: "The card you published: what you chose to put on it.",
+    not: "Anything else in your vault, or the card once you take it down or issue a new code.",
+  },
+  {
+    who: "Whoever you share a proof, an agreement or a pack with",
+    sees: "The one claim and its evidence; the agreement both of you signed; the pack you published.",
+    not: "Any other field of the memory, the date behind an age, anything else in your vault.",
   },
   {
     who: "Anyone on the internet",
