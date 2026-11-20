@@ -21,6 +21,7 @@ const SCAN = [
   "connector/README.md",
   "packages/sdk/README.md",
   "docs/DESIGN-BRIEF.md",
+  "docs/spec",
 ];
 const EXT = /\.(ts|tsx|css|sol|md|json|svg|html|js|mjs)$/;
 
@@ -68,7 +69,17 @@ describe("copy rules", () => {
   });
 
   it("contains no email addresses", () => {
-    const bad = all.filter((f) => /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(readFileSync(f, "utf8").replace(/@[a-z0-9-]+\/[a-z0-9-]+/g, "")));
+    // The test vectors hold a made-up address on purpose: the redaction rules must mask it.
+    const bad = all.filter((f) => !f.endsWith("vectors.json") && /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(readFileSync(f, "utf8").replace(/@[a-z0-9-]+\/[a-z0-9-]+/g, "")));
     expect(bad).toEqual([]);
+  });
+});
+
+describe("the content security policy", () => {
+  it("allows exactly the live sync addresses the core talks to", async () => {
+    const { SYNC_ORIGINS } = await import("@sigil/core");
+    const config = readFileSync(path.join(ROOT, "web/next.config.ts"), "utf8");
+    const listed = /const SYNC_ORIGINS = \[([^\]]*)\]/.exec(config)![1].match(/"([^"]+)"/g)!.map((x) => x.slice(1, -1));
+    expect(listed).toEqual([...SYNC_ORIGINS]);
   });
 });

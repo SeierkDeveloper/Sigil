@@ -1,0 +1,257 @@
+{
+  "format": "sigil-spec-vectors",
+  "version": "1.0.0",
+  "input": {
+    "vaultKey": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
+    "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
+    "appSecret": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+    "boxSecret": "040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dd",
+    "peerSecret": "050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7de",
+    "linkSecret": "060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8df",
+    "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+    "wallet": {
+      "address": "0x000000000000000000000000000000000000dEaD",
+      "signature": "0x0910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9"
+    },
+    "appId": "app-0000001",
+    "folderId": "folder-00001",
+    "memoryId": "memory-00001",
+    "meetId": "meet-0000001",
+    "linkId": "link-0000001",
+    "sessionId": "session-00001"
+  },
+  "deterministic": {
+    "hkdf": {
+      "secret": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "outputs": {
+        "sigil:auth:app": "9e2751af822f36e82367839d0aae3ee6e7ffa13031f3a6c7fa26df1b511a239e",
+        "sigil:wrap:app": "0f323032360c7ef8946cd2270f2d144184b97738033401c4bfdfda42c8615add",
+        "sigil:wrap:self": "3a21c4621a572446c138d0cfd01a966e97789cb66aa081f7ac082c8eee4b0b97",
+        "sigil:wrap:sync": "4e88005a60f7ca4fb90919fc54ea922801fece747d9537351e9af3f31188ddd4",
+        "sigil:tag:app-box": "b23de13e543446eb5061853170a2e4f898ff5644a104f5cf117064837967dc67",
+        "sigil:kek:passkey": "f1c099d0955f81cb94cd5b842367f23c93e02840bc62a6d17cc36459ae12f27e"
+      }
+    },
+    "appKey": {
+      "secret": "030a11181f262d343b424950575e656c737a81888f969da4abb2b9c0c7ced5dc",
+      "key": "sigil_app.app-0000001.AwoRGB8mLTQ7QklQV15lbHN6gYiPlp2kq7K5wMfO1dw",
+      "authToken": "nidRr4IvNugjZ4OdCq4-5uf_oTAx86bH-ibfG1EaI54",
+      "tokenHash": "0636403d126cb43498e5198acb7825fabf30487c0b2c1ddd3e7297deb6cf049c",
+      "wrapKey": "0f323032360c7ef8946cd2270f2d144184b97738033401c4bfdfda42c8615add",
+      "selfKey": "3a21c4621a572446c138d0cfd01a966e97789cb66aa081f7ac082c8eee4b0b97",
+      "syncKey": "4e88005a60f7ca4fb90919fc54ea922801fece747d9537351e9af3f31188ddd4"
+    },
+    "phrase": {
+      "phrase": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon art",
+      "kek": "844c4fd107683d92eb2d882cdefe471f5784e20f46dd3695563fe0e15bae40f8",
+      "authToken": "MApDSA_nWSHEqOUWSGy1Z-QmyqSNujccUXThpexFeT4",
+      "lookupId": "540f4dfdc71d70ccee1cf18d27e04548"
+    },
+    "wallet": {
+      "address": "0x000000000000000000000000000000000000dEaD",
+      "signature": "0x0910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4dbe2e9f0f7fe050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9",
+      "kek": "24e03b41945fe2c5635736f8c7005339443bd5e3fa3b43f265178bcfddbea35e",
+      "authToken": "uLrluLlcQgA2A8ae_K_-D_Q689n0NYmX0qJMKuDjfT0"
+    },
+    "aad": {
+      "folderKey": "sigil:folder-key:folder-00001",
+      "folderMeta": "sigil:folder-meta:folder-00001",
+      "memoryHead": "sigil:memory-head:memory-00001",
+      "memoryBody": "sigil:memory-body:memory-00001",
+      "appFolderKey": "sigil:app-folder-key:app-0000001:folder-00001",
+      "syncOwner": "sigil:sync:source-0001",
+      "publicOwner": "sigil:public-self:public-0001",
+      "meetOwner": "sigil:meet:meet-0000001"
+    },
+    "vaultCode": {
+      "publicKey": "905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA",
+      "secret": "040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dd",
+      "code": "sigil_vault.905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA.o0c7dA",
+      "fingerprint": "4EC2 8B96 5BDB B310 390D"
+    },
+    "merkle": {
+      "leafData": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "leaves": [
+        "0x022a6979e6dab7aa5ae4c3e5e45f7e977112a7e63593820dbec1ec738a24f93c",
+        "0x57eb35615d47f34ec714cacdf5fd74608a5e8e102724e80b24b287c0c27b6a31",
+        "0x597fcb31282d34654c200d3418fca5705c648ebf326ec73d8ddef11841f876d8",
+        "0xd070dc5b8da9aea7dc0f5ad4c29d89965200059c9a0ceca3abd5da2492dcb71d",
+        "0x2824a7ccda2caa720c85c9fba1e8b5b735eecfdb03878e4f8dfe6c3625030bc4"
+      ],
+      "root": "0x9df74ee350081969147e2273cbfab65f01d280d399333cc125ba0a1192ca58d4",
+      "proofOf3": [
+        "0x597fcb31282d34654c200d3418fca5705c648ebf326ec73d8ddef11841f876d8",
+        "0xb137985ff484fb600db93107c77b0365c80d78f5b429ded0fd97361d077999eb",
+        "0x2824a7ccda2caa720c85c9fba1e8b5b735eecfdb03878e4f8dfe6c3625030bc4"
+      ]
+    },
+    "readEntry": {
+      "entry": {
+        "id": "entry-000001",
+        "appId": "app-0000001",
+        "kind": "protected",
+        "memoryId": "memory-00001",
+        "count": 1,
+        "at": "2026-11-20T10:15:00.000Z",
+        "salt": "abababababababababababababababababababababababababababababababab"
+      },
+      "leafData": "sigil-read-v1\nentry-000001\napp-0000001\nprotected\nmemory-00001\n1\n2026-11-20T10:15:00.000Z\nabababababababababababababababababababababababababababababababab",
+      "leaf": "0x8ec8ef07744bef880bc08f2fadf96ecf95adcf38238fcb18379bc5b6f904bb1e"
+    },
+    "presence": {
+      "vaultKey": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
+      "signingKey": "fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM",
+      "message": "sigil-presence-v1\nhttps://vault.example\n3600\n491000",
+      "signature": "7wCO5FMfH0tFXOERRBsaq1V8Hwh6fcKLpJa9nSg0tNt2TORApcMV_dmOO4njv9-3jdVOsQTnMd6svu7mmkYECA"
+    },
+    "certificate": {
+      "canonicalBody": "{\"hours\":[{\"entry\":{\"at\":\"2026-01-05T08:01:00.000Z\",\"id\":\"entry-000002\",\"salt\":\"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\",\"sig\":\"7wCO5FMfH0tFXOERRBsaq1V8Hwh6fcKLpJa9nSg0tNt2TORApcMV_dmOO4njv9-3jdVOsQTnMd6svu7mmkYECA\"},\"hour\":491000,\"index\":0,\"proof\":[],\"root\":\"0x3c7e9bc930dc93f01fa69985ef242d9f9e861f3c5355aa24ce5ef4b4b8a70ccb\"}],\"issuedAt\":\"2026-11-20T12:00:00.000Z\",\"origin\":\"https://vault.example\",\"periodSeconds\":3600,\"signingKey\":\"fqYvWiaG5mX8Rh-HsKbFwNIxeYogfY92MukNUW7NvBM\",\"summary\":{\"activeDays\":1,\"activeHours\":1,\"continuousDays\":0,\"continuousMonths\":0,\"firstHour\":491000,\"from\":\"2026-01-05T08:00:00.000Z\",\"lastHour\":491000,\"longestGapHours\":0,\"spanDays\":0,\"to\":\"2026-01-05T09:00:00.000Z\"}}",
+      "signature": "19LTjl-dqfL5sOJeK0PgMtLjOLyFRsR3lx3QVRBBH2BVKr2MXD8mO-KdcF3u0fC49xEs_-46BN1BgEg_oqNXDw"
+    },
+    "pkce": {
+      "verifier": "dBjftJeZ4CVP-mB92K27uhbUJU1p1r7wW1gFWFOEjXk",
+      "challenge": "bwWFMyPfdG9qreDhH2lmftFx_dFeLDalzcT1gb_j68g"
+    },
+    "syncId": {
+      "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
+      "kind": "gmail",
+      "ref": "1784231987650000000",
+      "id": "qr33sKC2NtAzh3CxMTN6wX"
+    },
+    "redaction": {
+      "text": "Card 4242 4242 4242 4242, IBAN GB82 WEST 1234 5698 7654 32, call +46 70 123 45 67, mail sam@example.org, ID 123-45-6789, passport no. X1234567, account 1234-5678901.",
+      "rules": [
+        "card",
+        "iban",
+        "account",
+        "national_id",
+        "passport",
+        "phone",
+        "email"
+      ],
+      "output": "Card [card number hidden], IBAN [IBAN hidden], call [phone number hidden], mail [email hidden], ID [ID number hidden], passport no. [passport number hidden], account [account number hidden].",
+      "emailOnly": "Card 4242 4242 4242 4242, IBAN GB82 WEST 1234 5698 7654 32, call +46 70 123 45 67, mail [email hidden], ID 123-45-6789, passport no. X1234567, account 1234-5678901."
+    },
+    "meetKey": {
+      "secretA": "040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dd",
+      "secretB": "050c131a21282f363d444b525960676e757c838a91989fa6adb4bbc2c9d0d7de",
+      "publicA": "905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA",
+      "publicB": "D_gSWgXKc1fGjgs_fubTMK5XqfOYw1mvnEx0qlQYS3c",
+      "meetId": "meet-0000001",
+      "key": "65b2fd8029052ff885305cacaa672ba29cd85da8a726f43bf92b41b8f3d7d38c",
+      "aad": "sigil:meet-msg:v1:meet-0000001:1:905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA"
+    },
+    "askKey": {
+      "linkSecret": "060d141b222930373e454c535a61686f767d848b9299a0a7aeb5bcc3cad1d8df",
+      "linkPublic": "pZbT_mBUiLah9eiPxp64oV_J2edeexUsZrprNT42onk",
+      "askerPublic": "D_gSWgXKc1fGjgs_fubTMK5XqfOYw1mvnEx0qlQYS3c",
+      "linkId": "link-0000001",
+      "sessionId": "session-00001",
+      "key": "8940154839fe650e87f04f1dac6cd840b9a8876f82904a995be5199cbf18c9b5"
+    },
+    "publicCopy": {
+      "items": [
+        {
+          "id": "item-000001",
+          "title": "Talks",
+          "body": "I give talks.",
+          "tags": [
+            "work"
+          ],
+          "editedAt": "2026-11-01T00:00:00.000Z"
+        }
+      ],
+      "hash": "ecbded3984c2dff4b84523106e878f7c3a993e3d0272b3414471f3bd0f8a9d95"
+    },
+    "privacyScore": {
+      "score": 72,
+      "level": "regular",
+      "parts": [
+        [
+          "reads",
+          6
+        ],
+        [
+          "folders",
+          10
+        ],
+        [
+          "protected",
+          10
+        ],
+        [
+          "often",
+          1
+        ],
+        [
+          "writes",
+          1
+        ]
+      ]
+    }
+  },
+  "sealed": {
+    "envelope": {
+      "key": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
+      "aad": "sigil:folder-key:folder-00001",
+      "plaintextHex": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
+      "envelope": "v1.3WcRc5valYWaDxdv.8SmelYl9CYIMHTX41OPef5X3NEQDmr0MfgvSe-FYY_Qe1ZNltqVI29wQOGvFs3rV"
+    },
+    "folder": {
+      "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
+      "id": "folder-00001",
+      "meta": "v1.4UWnmHtXm4hsWRqr.zbcpIZs_yDaly4H5MYpT8Zto0PjJSZdM1vih_fzpoIx-FAoMjtcOikB98jLkDacKTsq5pOYQxz6JmcgOmH4n3dh7bhqqGw",
+      "opened": {
+        "name": "Notes",
+        "protect": "health",
+        "redact": [
+          "email"
+        ]
+      }
+    },
+    "memory": {
+      "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
+      "stored": {
+        "id": "memory-00001",
+        "folderId": "folder-00001",
+        "head": "v1.vGvMZaXWQ7D0NMCV.CMtEFl2h88k2iLDvoST5lIgLODSmwX-mIPTryOn8wRyRrJX9OeSWIYTBCH9p4WMLYAo4ABz_7DOmz5NDHa-BMLmzYTCFvDLFs5hqVAn_BhwG6eTk_41kcxsn2xdHxj3z2_yt59R29uNFphduHvkPEZp8z23x-tiuoLr4K0GNDYOXuy4FOoQa9HtEc4h1MwSkexGiNkwrbxgXZkcj51kKs1fWoQVFa92Wv8XXEp8KIYrUCI9NuA",
+        "body": "v1.0sGifcO6gcKh1Iyy.2GVDrl1ThMaAp70BOkxgRwUfq5D5WGzDmR9W8B83f8fDQtzZSoqhx_KPwsg"
+      },
+      "opened": {
+        "title": "Hello",
+        "body": "The first memory.",
+        "tags": [
+          "spec"
+        ]
+      }
+    },
+    "sealedBox": {
+      "recipientSecret": "040b121920272e353c434a51585f666d747b828990979ea5acb3bac1c8cfd6dd",
+      "context": "proposal:prop-0001:app-0000001",
+      "plaintext": {
+        "v": 1,
+        "title": "A suggestion"
+      },
+      "sealed": "s1.4oqpi8sjotrJcd0R966kpJuwh4mYwb_pqjUHUYdfcT4.awaZr4LYIfcdaMgY2mqkGlO1w8LsOG29.Ooa791BXCY2KsR6Gnw-K0gL9-HUuqsVs23WgU9nMrdm5F1yVI1McBT-BoC5DOQ"
+    },
+    "meetMessage": {
+      "ids": {
+        "meetId": "meet-0000001",
+        "turn": 1,
+        "from": "905bt1FdVlJ0lnr3XYhJfcb8f81gfandkaYX24atARA"
+      },
+      "message": {
+        "v": 1,
+        "text": "Tuesday at 14:00?",
+        "done": false
+      },
+      "box": "m1.xgaps95gqFmN3z49W-M9sLLBT-Pb9x69.YuOdS48M-dYz4Ld_Q4hFir1dsfnC1a-w4GhSp-0ls1KX4ttu2PHKEkB66tjnydEu3dZeOPVqazUT0pz3Mcp7"
+    }
+  }
+}
