@@ -8,7 +8,7 @@ export function Footer() {
     <footer className="site-footer">
       <div className="site-footer-inner">
         <div className="site-footer-brand">
-          <Logo />
+          <Logo withName />
           <p className="site-footer-tagline">{site.tagline}</p>
           <div className="site-footer-social">
             <a className="icon-link" href={site.githubUrl} target="_blank" rel="noopener noreferrer" aria-label="Sigil on GitHub">

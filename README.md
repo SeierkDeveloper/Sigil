@@ -499,7 +499,7 @@ For development: `npm run dev`. Settings are in `web/.env.example`:
 | `SIGIL_CHAIN_READ_RPC` | | A public, read-only RPC address of the anchoring chain. With anchoring on, the verify page reads roots from SigilSeal in the visitor's browser |
 | `SIGIL_LEGACY_DAY_MS` | `86400000` | The length of a day for legacy plans. Only tests shorten it |
 
-Icons for the installed app are drawn from `web/src/app/icon.svg` with `node web/scripts/icons.mjs`.
+The logo, favicon and app icons are made from `web/brand/sigil-logo.png` with `node web/scripts/icons.mjs`.
 
 ## Tests
 

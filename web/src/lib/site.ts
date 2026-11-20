@@ -11,7 +11,7 @@ export const site = {
   /** The X account. Fill in the handle when it exists. */
   xUrl: "https://x.com/",
   /** Path to the logo file (for example "/logo.svg"). While null, the header shows the text wordmark. */
-  logoSrc: null as string | null,
+  logoSrc: "/logo.png" as string | null,
   /** Set to true once the connector is published to npm; the docs then show the npx command. */
   connectorPublished: false,
   connectorPackage: "sigil-connector",
