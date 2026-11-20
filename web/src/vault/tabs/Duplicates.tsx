@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { findDuplicates, hkdf, toHex, type DuplicateKind, type Memory } from "@sigil/core";
+import { findDuplicates, groupDuplicates, hkdf, toHex, type DuplicateKind, type Memory } from "@sigil/core";
 import { formatDate, plural } from "@/lib/format";
 import * as ops from "../ops";
+import * as think from "../thinkOps";
 import { errorText, useVault } from "../context";
 import { Notice } from "../ui";
 
@@ -60,9 +61,21 @@ export function Duplicates({ onOpen }: { onOpen(id: string): void }) {
   const [error, setError] = useState<string | null>(null);
 
   const pairs = useMemo(() => {
-    const items = data.memories.filter((m) => m.source.kind !== "profile").map((m) => ({ ...m, text: m.body }));
+    const items = data.memories.filter((m) => m.source.kind !== "profile" && m.source.kind !== "brief").map((m) => ({ ...m, text: m.body }));
     return findDuplicates(items, { vectors: semantic.vectors }).filter((p) => !dismissed.has(pairKey(p.a.id, p.b.id)));
   }, [data.memories, semantic.vectors, dismissed]);
+  const groups = useMemo(() => groupDuplicates(pairs), [pairs]);
+  const [confirmAll, setConfirmAll] = useState(false);
+
+  /** Every group into its newest memory, after this one approval. */
+  const mergeAll = () =>
+    act("all", async () => {
+      const r = await think.mergeAllGroups(api, data, groups);
+      const drop = new Set(r.deleted);
+      const saved = new Map(r.saved.map((m) => [m.id, m]));
+      update((d) => ({ ...d, memories: [...r.saved, ...d.memories.filter((m) => !drop.has(m.id) && !saved.has(m.id))] }));
+      setConfirmAll(false);
+    });
 
   const act = async (key: string, fn: () => Promise<void>) => {
     setBusy(key);
@@ -80,7 +93,7 @@ export function Duplicates({ onOpen }: { onOpen(id: string): void }) {
   const merge = (keep: Memory, drop: Memory) =>
     act(pairKey(keep.id, drop.id), async () => {
       const body = keep.body.includes(drop.body.trim()) ? keep.body : `${keep.body.trimEnd()}\n\n---\n${drop.title}\n\n${drop.body.trim()}`;
-      const saved = await ops.updateMemory(api, data.folders, keep, { body, tags: [...keep.tags, ...drop.tags] });
+      const saved = await ops.updateMemory(api, data.folders, keep, { body, tags: [...keep.tags, ...drop.tags] }, data.thinking.graceDays);
       await ops.deleteMemories(api, [drop.id]);
       update((d) => ({ ...d, memories: [saved, ...d.memories.filter((m) => m.id !== saved.id && m.id !== drop.id)] }));
     });
@@ -105,7 +118,26 @@ export function Duplicates({ onOpen }: { onOpen(id: string): void }) {
         <p className="small">No duplicates found.</p>
       ) : (
         <>
-          <p className="small faint">{plural(pairs.length, "pair")} to look at.</p>
+          <div className="merge-all" data-testid="merge-all">
+            <p className="small">
+              {plural(pairs.length, "pair")} in {plural(groups.length, "group")}. Merging keeps the newest memory of each group, adds what the others say beyond it, joins the
+              tags, and deletes the others.
+            </p>
+            {confirmAll ? (
+              <div className="row">
+                <button type="button" className="button button-primary button-small" disabled={busy === "all"} onClick={() => void mergeAll()}>
+                  {busy === "all" ? "Merging" : `Merge into ${plural(groups.length, "memory", "memories")}`}
+                </button>
+                <button type="button" className="button button-ghost button-small" onClick={() => setConfirmAll(false)} disabled={busy === "all"}>
+                  Not now
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="button button-small" onClick={() => setConfirmAll(true)}>
+                Merge every group
+              </button>
+            )}
+          </div>
           <ul className="list duplicate-list">
             {pairs.slice(0, 50).map((p) => {
               const [newer, older] = p.a.editedAt >= p.b.editedAt ? [p.a, p.b] : [p.b, p.a];

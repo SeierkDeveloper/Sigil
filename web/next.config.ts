@@ -2,8 +2,11 @@ import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
 
-// The page may only talk to its own server. No third-party scripts, styles,
-// fonts or frames. Next.js needs inline scripts for hydration; dev mode also needs eval.
+// The page may only talk to its own server, plus three addresses the owner's own
+// browser calls directly with the owner's own keys: the two model providers the
+// AI self can use, and GitHub for the import. Nothing is sent there unless the
+// owner sets a model key or starts a GitHub import. No third-party scripts,
+// styles, fonts or frames. Next.js needs inline scripts for hydration; dev mode also needs eval.
 // 'wasm-unsafe-eval' lets the vault run the search model (WebAssembly) it loads
 // from this same site; it does not allow eval of JavaScript.
 const csp = [
@@ -13,7 +16,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self'${isProd ? "" : " ws: wss:"}`,
+  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com${isProd ? "" : " ws: wss:"}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",

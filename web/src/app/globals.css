@@ -7256,3 +7256,263 @@ button.site-nav-link {
 .consent .checkbox-list {
   margin-bottom: var(--space-5);
 }
+
+/* ------------------------------------------------------------------ round 3: AI self, Review, local imports, the ask page */
+/* Plain styles on the existing tokens; the design pass refines them. */
+
+.self-status,
+.ask-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.self-status::before,
+.ask-status::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-line-bright);
+  border-radius: var(--radius-pill);
+}
+
+.self-status[data-state="serving"]::before,
+.ask-status[data-online="true"]::before {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+}
+
+.self-model {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.chat {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chat-turn {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.chat-question {
+  justify-self: end;
+  max-width: 85%;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+  white-space: pre-wrap;
+}
+
+.chat-answer {
+  max-width: 90%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+
+.chat-answer > p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.chat-answer > * + * {
+  margin-top: var(--space-2);
+}
+
+.chat-sources .text-button {
+  font-size: inherit;
+}
+
+.chat-form .form-actions {
+  margin-top: var(--space-3);
+}
+
+.self-links-head {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.link-row .list-row-title .badge,
+.link-row .list-row-title .chip {
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.link-made .app-key {
+  word-break: break-all;
+}
+
+.expiry-row {
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.expiry-row .input {
+  max-width: 14rem;
+}
+
+.merge-all {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.merge-all > p {
+  margin: 0;
+  flex: 1 1 20rem;
+}
+
+.brief-latest {
+  margin: var(--space-3) 0;
+}
+
+.brief-body {
+  max-height: 24rem;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+.contradiction-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.contradiction-side p {
+  margin: var(--space-1) 0 0;
+}
+
+.grace-form {
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-3) 0;
+}
+
+.grace-form .input {
+  width: 6rem;
+}
+
+.ask-note {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border-left: 1px solid var(--color-line-strong);
+}
+
+.ask-note p {
+  margin: 0 0 var(--space-1);
+}
+
+.import-sources {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.import-source {
+  position: relative;
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.import-source input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.import-source[data-selected="true"] {
+  border-color: var(--color-line-bright);
+  background: var(--color-surface-2);
+}
+
+.import-source:focus-within {
+  outline: 1px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.import-source-title {
+  font-weight: 600;
+}
+
+.import-source-text {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.import-sample {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.import-sample li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.import-sample-title {
+  font-weight: 600;
+}
+
+.ask-page {
+  padding-block: var(--space-7);
+}
+
+.ask-card {
+  max-width: var(--container-narrow);
+  margin: 0 auto;
+}
+
+.ask-card .page-title {
+  margin-bottom: var(--space-3);
+}
+
+.ask-card .chat-form {
+  margin-top: var(--space-5);
+}
+
+.ask-fine {
+  margin-top: var(--space-6);
+}
+
+@media (max-width: 820px) {
+  .import-sources {
+    grid-template-columns: 1fr;
+  }
+
+  .contradiction-pair {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-question,
+  .chat-answer {
+    max-width: 100%;
+  }
+}

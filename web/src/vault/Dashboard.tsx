@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Api } from "./api";
 import * as ops from "./ops";
 import { Ctx, errorText, type TabId, type VaultCtx } from "./context";
@@ -15,11 +15,18 @@ import { SettingsTab } from "./tabs/Settings";
 import { InboxTab } from "./tabs/Inbox";
 import { TimelineTab } from "./tabs/Timeline";
 import { ProfileTab } from "./tabs/Profile";
+import { SelfTab } from "./tabs/Self";
+import { ReviewTab } from "./tabs/Review";
 import { useSemanticIndex } from "./semantic";
+import { useSelfAgent } from "./useSelfAgent";
+import { modelCaller } from "./selfOps";
+import { makeBrief, shouldMakeBrief } from "./thinkOps";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "memories", label: "Memories" },
   { id: "inbox", label: "Inbox" },
+  { id: "self", label: "AI self" },
+  { id: "review", label: "Review" },
   { id: "timeline", label: "Timeline" },
   { id: "profile", label: "Self card" },
   { id: "folders", label: "Folders" },
@@ -106,6 +113,19 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
     [memories, incoming],
   );
   const semantic = useSemanticIndex(api, vault, indexed);
+  const agent = useSelfAgent(api, data, semantic);
+
+  // The weekly brief, once per opening, when it is due and the owner wants it.
+  const briefTried = useRef(false);
+  useEffect(() => {
+    if (!data || briefTried.current) return;
+    briefTried.current = true;
+    if (!shouldMakeBrief(data)) return;
+    const model = data.thinking.briefWithModel ? modelCaller(data) : null;
+    makeBrief(api, vault, data, model)
+      .then((r) => setData((d) => (d ? { ...d, folders: r.createdFolder ? [...d.folders, r.folder] : d.folders, memories: [r.memory, ...d.memories] } : d)))
+      .catch(() => undefined);
+  }, [api, vault, data]);
 
   const ctx = useMemo<VaultCtx | null>(
     () =>
@@ -120,11 +140,12 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
             openMemory,
             focus,
             semantic,
+            agent,
             lock: onLock,
             signOut: onSignOut,
           }
         : null,
-    [api, vault, data, reload, goTo, openMemory, focus, semantic, onLock, onSignOut],
+    [api, vault, data, reload, goTo, openMemory, focus, semantic, agent, onLock, onSignOut],
   );
 
   if (error && !data) {
@@ -196,6 +217,8 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
         <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
           {tab === "memories" ? <MemoriesTab /> : null}
           {tab === "inbox" ? <InboxTab /> : null}
+          {tab === "self" ? <SelfTab /> : null}
+          {tab === "review" ? <ReviewTab /> : null}
           {tab === "timeline" ? <TimelineTab /> : null}
           {tab === "profile" ? <ProfileTab /> : null}
           {tab === "folders" ? <FoldersTab /> : null}

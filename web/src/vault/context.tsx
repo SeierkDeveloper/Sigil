@@ -4,6 +4,7 @@ import { createContext, useContext } from "react";
 import type { Api } from "./api";
 import type { Unlocked, VaultData } from "./ops";
 import type { SemanticIndex } from "./semantic";
+import type { AgentState } from "./useSelfAgent";
 
 export interface VaultCtx {
   api: Api;
@@ -20,11 +21,13 @@ export interface VaultCtx {
   focus: string | null;
   /** Search by meaning, computed on this device. */
   semantic: SemanticIndex;
+  /** Whether this open vault is answering ask links right now. */
+  agent: AgentState;
   lock(): void;
   signOut(): Promise<void>;
 }
 
-export type TabId = "memories" | "inbox" | "timeline" | "profile" | "folders" | "apps" | "log" | "import" | "settings";
+export type TabId = "memories" | "inbox" | "self" | "review" | "timeline" | "profile" | "folders" | "apps" | "log" | "import" | "settings";
 
 export const Ctx = createContext<VaultCtx | null>(null);
 

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { SealIcon } from "@/components/icons";
 import { formatDateTime, formatSealPeriod, formatTime, plural, shortHash } from "@/lib/format";
 import * as ops from "../ops";
+import { openAskNote } from "../selfOps";
 import { errorText, useVault } from "../context";
 import { Empty, Notice, Spinner } from "../ui";
 
@@ -17,6 +18,7 @@ export function LogTab() {
   const [checks, setChecks] = useState<Record<string, Verify>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [shown, setShown] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
@@ -42,10 +44,16 @@ export function LogTab() {
   }, [api]);
 
   const appName = useMemo(
-    () => new Map([...data.apps.map((a) => [a.id, a.name] as const), ...data.shares.outgoing.map((s) => [s.id, s.label] as const)]),
-    [data.apps, data.shares.outgoing],
+    () =>
+      new Map([
+        ...data.apps.map((a) => [a.id, a.name] as const),
+        ...data.shares.outgoing.map((s) => [s.id, s.label] as const),
+        ...data.askLinks.map((l) => [l.id, `Ask link "${l.label}"`] as const),
+      ]),
+    [data.apps, data.shares.outgoing, data.askLinks],
   );
-  const whoDid = (e: ops.LogEntryView) => appName.get(e.appId) ?? (e.kind === "shared" ? "A vault you no longer share with" : "Removed app");
+  const whoDid = (e: ops.LogEntryView) =>
+    appName.get(e.appId) ?? (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : "Removed app");
   const title = useMemo(() => new Map(data.memories.map((m) => [m.id, m.title])), [data.memories]);
 
   if (!log && error) return <Notice kind="error">The read log could not be loaded: {error}</Notice>;
@@ -56,6 +64,7 @@ export function LogTab() {
 
   const describe = (e: ops.LogEntryView) => {
     if (e.kind === "propose") return "Suggested a memory to your inbox";
+    if (e.kind === "ask") return `Your AI self answered a question${e.count ? `, from ${plural(e.count, "memory", "memories")}` : ""}`;
     if (e.kind === "shared") return `Opened a folder you share with them (${plural(e.count, "memory", "memories")})`;
     if (e.kind === "folders") return `Listed the ${plural(e.count, "folder")} it may read`;
     if (e.kind === "index") return `Searched the titles, tags and first lines of ${plural(e.count, "memory", "memories")}`;
@@ -141,6 +150,15 @@ export function LogTab() {
                     {whoDid(e)}, {formatDateTime(e.at)}.
                     {e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
                   </p>
+                  {e.kind === "ask" && e.note ? (
+                    shown === e.id ? (
+                      <AskNoteView entry={e} />
+                    ) : (
+                      <button type="button" className="text-button small" onClick={() => setShown(e.id)}>
+                        Show the question and answer
+                      </button>
+                    )
+                  ) : null}
                   {check && "ok" in check ? (
                     check.ok ? (
                       <p className="small log-verified" data-testid="verified">
@@ -167,6 +185,37 @@ export function LogTab() {
           })}
         </ul>
       )}
+    </div>
+  );
+}
+
+/** The question and answer of one entry, opened with this vault's own key. The server holds them sealed. */
+function AskNoteView({ entry }: { entry: ops.LogEntryView }) {
+  const { data, openMemory } = useVault();
+  const note = data.box ? openAskNote(data.box, entry) : null;
+  if (!note) return <p className="small log-unverified">This entry could not be opened with your vault key.</p>;
+  return (
+    <div className="ask-note" data-testid="ask-note">
+      <p className="small">
+        <strong>Asked:</strong> {note.question}
+      </p>
+      <p className="small">
+        <strong>Answered:</strong> {note.answer}
+      </p>
+      {note.citations.length ? (
+        <p className="small faint">
+          From{" "}
+          {note.citations.map((c, i) => (
+            <span key={c.id}>
+              {i ? ", " : ""}
+              <button type="button" className="text-button" onClick={() => openMemory(c.id)}>
+                {c.title}
+              </button>
+            </span>
+          ))}
+          .
+        </p>
+      ) : null}
     </div>
   );
 }
