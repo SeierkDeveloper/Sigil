@@ -61,11 +61,11 @@ async function call<T extends { ok: boolean; error?: string }>(fetcher: SyncFetc
 /** Slack's markup as plain text: mentions by name, links by their label and address. */
 export function slackText(text: string, users: Map<string, string>, channels: Map<string, string>): string {
   return text
-    .replace(/<@([A-Z0-9]+)(?:\|[^>]*)?>/g, (_m, id: string) => `@${users.get(id) ?? "someone"}`)
-    .replace(/<#([A-Z0-9]+)(?:\|([^>]*))?>/g, (_m, id: string, label?: string) => `#${label || channels.get(id) || "a channel"}`)
+    .replace(/<@([A-Z0-9]+)(?:\|[^<>]*)?>/g, (_m, id: string) => `@${users.get(id) ?? "someone"}`)
+    .replace(/<#([A-Z0-9]+)(?:\|([^<>]*))?>/g, (_m, id: string, label?: string) => `#${label || channels.get(id) || "a channel"}`)
     .replace(/<!(here|channel|everyone)>/g, "@$1")
-    .replace(/<(https?:[^|>]+)\|([^>]+)>/g, "$2 ($1)")
-    .replace(/<(https?:[^>]+)>/g, "$1")
+    .replace(/<(https?:[^|<>]+)\|([^<>]+)>/g, "$2 ($1)")
+    .replace(/<(https?:[^<>]+)>/g, "$1")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&amp;/g, "&");

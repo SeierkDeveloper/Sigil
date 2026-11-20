@@ -166,7 +166,7 @@ export async function refresh(api: Api, data: Pick<VaultData, "follows" | "folde
       let pack = latest;
       for (let v = f.version + 1; v <= latest.body.version; v++) {
         pack = v === latest.body.version ? latest : await fetchPack(f.origin, f.id, v, fetcher);
-        const check = verifyPack(pack, { pinnedKey: f.publisherKey, after: held });
+        const check = verifyPack(pack, { pinnedKey: f.publisherKey, after: held, packId: f.id });
         if (!check.ok || pack.body.previous !== held.hash) throw new Error(check.checks.find((c) => !c.ok)?.detail ?? "A version does not follow the one before it.");
         held = { version: pack.body.version, hash: pack.hash };
         if (v - f.version > 50) throw new Error("Too many versions behind. Unfollow and follow again.");

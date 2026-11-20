@@ -126,7 +126,7 @@ export function styleHints(notes: { body: string; editedAt?: string }[]): StyleH
 }
 
 function firstName(from: string): string {
-  const name = from.replace(/<[^>]*>/g, "").replace(/["']/g, "").trim();
+  const name = from.replace(/<[^<>]*>/g, "").replace(/["']/g, "").trim();
   if (!name || name.includes("@")) return "";
   return name.split(/\s+/)[0];
 }

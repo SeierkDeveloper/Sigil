@@ -31,6 +31,8 @@ export class ClientError extends Error {
     message: string,
     public status = 0,
     public code = "error",
+    /** True when the message is the server's own words. A connector does not pass those on to an AI model as they are. */
+    public fromServer = false,
   ) {
     super(message);
     this.name = "ClientError";
@@ -163,7 +165,7 @@ export class VaultClient {
       // fall through with an empty object
     }
     if (!res.ok) {
-      throw new ClientError(typeof data.error === "string" ? data.error : `Sigil answered ${res.status}.`, res.status, typeof data.code === "string" ? data.code : "error");
+      throw new ClientError(typeof data.error === "string" ? data.error.slice(0, 500) : `Sigil answered ${res.status}.`, res.status, typeof data.code === "string" && /^[a-z_]{1,40}$/.test(data.code) ? data.code : "error", true);
     }
     return data as T;
   }

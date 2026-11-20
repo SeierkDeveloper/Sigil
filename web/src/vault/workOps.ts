@@ -160,7 +160,7 @@ export async function draftReply(api: Api, vault: Unlocked, data: VaultData, inp
   } else {
     draft = plainReply({ message, from: input.from, subject }, hints);
   }
-  const who = input.from.replace(/<[^>]*>/g, "").trim();
+  const who = input.from.replace(/<[^<>]*>/g, "").trim();
   return saveDraft(
     api,
     vault,

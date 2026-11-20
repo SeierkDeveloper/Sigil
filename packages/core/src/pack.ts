@@ -126,7 +126,7 @@ export interface PackResult {
  * follower, that the publisher is the one it pinned and that the version
  * follows the one it holds.
  */
-export function verifyPack(p: KnowledgePack, opts: { pinnedKey?: string; after?: { version: number; hash: string } } = {}): PackResult {
+export function verifyPack(p: KnowledgePack, opts: { pinnedKey?: string; after?: { version: number; hash: string }; packId?: string } = {}): PackResult {
   const checks: CertificateCheck[] = [];
   const add = (name: string, ok: boolean, detail: string) => checks.push({ name, ok, detail });
   let clean: PackBody | null = null;
@@ -135,7 +135,7 @@ export function verifyPack(p: KnowledgePack, opts: { pinnedKey?: string; after?:
   } catch (err) {
     add("body", false, (err as Error).message);
   }
-  const same = !!clean && canonicalJson(clean) === canonicalJson(p.body) && packHash(clean) === p.hash;
+  const same = !!clean && p.format === PACK_FORMAT && p.version === 1 && canonicalJson(clean) === canonicalJson(p.body) && packHash(clean) === p.hash;
   if (clean) add("body", same, same ? `Version ${clean.version}, ${clean.items.length} ${clean.items.length === 1 ? "memory" : "memories"}.` : "The pack was changed after it was signed.");
   let sigOk = false;
   try {
@@ -147,6 +147,10 @@ export function verifyPack(p: KnowledgePack, opts: { pinnedKey?: string; after?:
   if (opts.pinnedKey) {
     const ok = p.body?.publisher?.signingKey === opts.pinnedKey;
     add("publisher", ok, ok ? "From the same publisher you followed." : "This version was signed by another key than the publisher you followed.");
+  }
+  if (opts.packId !== undefined) {
+    const ok = p.body?.id === opts.packId;
+    add("id", ok, ok ? "The pack you followed." : "This is another pack than the one you followed.");
   }
   if (opts.after) {
     const ok = !!clean && clean.version === opts.after.version + 1 && clean.previous === opts.after.hash;

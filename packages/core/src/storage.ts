@@ -81,11 +81,13 @@ export interface StorageBackend {
 }
 
 const clean = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+/** A storage address: https, or plain http only on this machine (a local test bucket). Keys and signatures never travel in the clear. */
 const httpUrl = (v: unknown): string => {
   const s = clean(v, 500).replace(/\/+$/, "");
   try {
     const u = new URL(s);
-    return u.protocol === "https:" || u.protocol === "http:" ? s : "";
+    const local = u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]";
+    return u.protocol === "https:" || (u.protocol === "http:" && local) ? s : "";
   } catch {
     return "";
   }
