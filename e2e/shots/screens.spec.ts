@@ -15,12 +15,23 @@ type Vp = keyof typeof VIEWPORTS;
 
 const PAGES = [
   ["home", "/"],
+  ["import", "/import"],
+  ["apps", "/apps"],
+  ["seals", "/seals"],
   ["how-it-works", "/how-it-works"],
   ["security", "/security"],
-  ["docs", "/docs"],
-  ["roadmap", "/roadmap"],
-  ["terms", "/terms"],
+  ["threat-model", "/threat-model"],
   ["privacy", "/privacy"],
+  ["status", "/status"],
+  ["docs", "/docs"],
+  ["api-reference", "/docs/api"],
+  ["connector", "/connector"],
+  ["verify", "/verify"],
+  ["open-source", "/open-source"],
+  ["ai-self", "/ai-self"],
+  ["roadmap", "/roadmap"],
+  ["changelog", "/changelog"],
+  ["terms", "/terms"],
   ["not-found", "/does-not-exist"],
 ] as const;
 
@@ -40,7 +51,8 @@ async function shoot(page: Page, name: string) {
   if (total > h * 1.15) stops.push(["bottom", total - h]);
   for (const [label, y] of stops) {
     await page.evaluate((top) => window.scrollTo({ top, behavior: "instant" as ScrollBehavior }), y);
-    await page.waitForTimeout(150);
+    // Things rise in as they enter the screen; let them settle.
+    await page.waitForTimeout(1500);
     await page.screenshot({ path: path.join(OUT, `${name}-${label}.png`) });
   }
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior }));
@@ -59,11 +71,52 @@ for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
     if (vp === "phone") {
       await page.goto("/");
       await page.getByRole("button", { name: "Open menu" }).click();
+      await page.waitForTimeout(400);
       await page.screenshot({ path: path.join(OUT, `menu-phone-open.png`) });
+    } else {
+      // Each header menu, open. With reduced motion, so the hero piece behind it rests on one frame.
+      const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+      const menuPage = await still.newPage();
+      await menuPage.goto("/");
+      await menuPage.evaluate(() => document.fonts.ready);
+      await menuPage.waitForTimeout(1500);
+      for (const group of ["Product", "Trust", "Developers", "Vision"]) {
+        await menuPage.getByRole("navigation", { name: "Main" }).getByRole("button", { name: group }).click();
+        await menuPage.waitForTimeout(400);
+        await menuPage.screenshot({ path: path.join(OUT, `menu-desktop-${group.toLowerCase()}.png`) });
+      }
+      await still.close();
     }
     await context.close();
   });
 }
+
+// The page ground in motion: the drifting light, the engraving it shows, and the light under the pointer.
+test("backdrop in motion", async ({ browser }) => {
+  const { context, page } = await newPage(browser, "desktop");
+  await page.goto("/security");
+  await page.evaluate(() => document.fonts.ready);
+  let n = 0;
+  for (const wait of [2500, 9000, 9000]) {
+    await page.waitForTimeout(wait);
+    await page.screenshot({ path: path.join(OUT, `backdrop-frame-${++n}.png`) });
+  }
+  for (const [x, y] of [[1100, 520], [380, 700]]) {
+    await page.mouse.move(x, y, { steps: 20 });
+    await page.waitForTimeout(2200);
+    await page.screenshot({ path: path.join(OUT, `backdrop-frame-${++n}.png`) });
+  }
+  await context.close();
+
+  // With reduced motion: one finished frame, nothing moves.
+  const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
+  const stillPage = await still.newPage();
+  await stillPage.goto("/security");
+  await stillPage.evaluate(() => document.fonts.ready);
+  await stillPage.waitForTimeout(2500);
+  await stillPage.screenshot({ path: path.join(OUT, `backdrop-reduced-motion.png`) });
+  await still.close();
+});
 
 // The three hero directions (?hero=a|b|c): desktop and phone views, a few moments
 // of the motion, and the still frame shown with reduced motion.
@@ -144,6 +197,7 @@ test("share image", async ({ browser }) => {
 });
 
 test("vault states", async ({ browser, baseURL }) => {
+  test.setTimeout(900_000);
   for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
     const { context, page } = await newPage(browser, vp);
     await installWallet(context);

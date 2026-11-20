@@ -168,3 +168,65 @@ export const PhraseIcon = (p: IconProps) => (
     <path d="M7 9h4M13 9h4M7 12h4M13 12h4M7 15h4M13 15h4" />
   </Line>
 );
+
+export const ChevronIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="m6 9 6 6 6-6" />
+  </Line>
+);
+
+export const ServerIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="4.5" width="17" height="6.5" rx="1.5" />
+    <rect x="3.5" y="13" width="17" height="6.5" rx="1.5" />
+    <path d="M7 7.75h.2M7 16.25h.2M11 7.75h6M11 16.25h6" />
+  </Line>
+);
+
+export const CodeIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="m8.5 7-5 5 5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15" />
+  </Line>
+);
+
+export const ShieldIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M12 3.5 5 6v5.5c0 4.3 2.9 7.4 7 9 4.1-1.6 7-4.7 7-9V6Z" />
+    <path d="m9 12 2.2 2.2L15 10.4" />
+  </Line>
+);
+
+export const TerminalIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2" />
+    <path d="m7 9.5 3 2.5-3 2.5M12.5 15H17" />
+  </Line>
+);
+
+export const EditorIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3" y="4.5" width="18" height="15" rx="2" />
+    <path d="M3 8.5h18M8 8.5v11M11 12.5h6M11 15.5h4" />
+  </Line>
+);
+
+export const ClockIcon = (p: IconProps) => (
+  <Line {...p}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
+  </Line>
+);
+
+export const DeviceIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="5" width="17" height="11" rx="1.5" />
+    <path d="M2 19.5h20M10 16v3.5M14 16v3.5" />
+  </Line>
+);
+
+export const BookIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M5 4.5h10.5a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3Z" />
+    <path d="M5 16.5a3 3 0 0 1 3-3h10.5M9 8.5h5.5" />
+  </Line>
+);

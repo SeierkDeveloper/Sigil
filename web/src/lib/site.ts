@@ -17,19 +17,67 @@ export const site = {
   connectorPackage: "sigil-connector",
 } as const;
 
-export const nav = [
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/security", label: "Security" },
-  { href: "/docs", label: "Docs" },
-  { href: "/roadmap", label: "Roadmap" },
-] as const;
+export interface NavItem {
+  href: string;
+  label: string;
+  /** One line under the label in the header menu. */
+  text: string;
+}
 
-export const footerNav = [
-  { href: "/how-it-works", label: "How it works" },
-  { href: "/security", label: "Security" },
-  { href: "/docs", label: "Docs" },
-  { href: "/roadmap", label: "Roadmap" },
-  { href: "/vault", label: "Vault" },
-  { href: "/privacy", label: "Privacy" },
+export interface NavGroup {
+  label: string;
+  /** A line that introduces the group in the header menu. */
+  lead: string;
+  items: NavItem[];
+}
+
+/** The header menus, the phone menu and the footer columns all come from this list. */
+export const navGroups: NavGroup[] = [
+  {
+    label: "Product",
+    lead: "One encrypted memory, read by every AI app you use, only where you allow it.",
+    items: [
+      { href: "/vault", label: "Vault", text: "Memories, folders, apps and the read log" },
+      { href: "/import", label: "Import", text: "Bring your ChatGPT and Claude history" },
+      { href: "/apps", label: "Apps", text: "Step-by-step setup for every AI app" },
+      { href: "/seals", label: "Seals", text: "The hourly seals, with a proof checker" },
+    ],
+  },
+  {
+    label: "Trust",
+    lead: "What Sigil can see, what it cannot, and how you can check.",
+    items: [
+      { href: "/how-it-works", label: "How it works", text: "From sign-up to a sealed read, in plain words" },
+      { href: "/security", label: "Security", text: "Keys, encryption and what the server holds" },
+      { href: "/threat-model", label: "Threat model", text: "What Sigil protects against, and what it does not" },
+      { href: "/privacy", label: "Privacy", text: "What is stored, and for how long" },
+      { href: "/status", label: "Status", text: "Live health of the service and the seal job" },
+    ],
+  },
+  {
+    label: "Developers",
+    lead: "Open source, a small read-only API and one connector for every MCP client.",
+    items: [
+      { href: "/docs", label: "Docs", text: "Quick start and the encryption model" },
+      { href: "/docs/api", label: "API reference", text: "Every public and connector endpoint" },
+      { href: "/connector", label: "Connector", text: "The MCP server, its tools and settings" },
+      { href: "/verify", label: "Verify", text: "Check a seal or a log entry by hand" },
+      { href: "/open-source", label: "Open source", text: "The repository, the licence, run it yourself" },
+    ],
+  },
+  {
+    label: "Vision",
+    lead: "Where this goes: from a vault to an AI self that is yours.",
+    items: [
+      { href: "/ai-self", label: "The AI self", text: "The long-term idea, told as a story" },
+      { href: "/roadmap", label: "Roadmap", text: "Thirteen stages, built and planned" },
+      { href: "/changelog", label: "Changelog", text: "What has been built so far" },
+    ],
+  },
+];
+
+export const legalNav = [
   { href: "/terms", label: "Terms" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/status", label: "Status" },
 ] as const;

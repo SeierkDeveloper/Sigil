@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseExport, type ImportResult } from "@sigil/core";
 import { ImportIcon } from "@/components/icons";
 import { plural } from "@/lib/format";
+import { takePendingImport } from "@/lib/pendingImport";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { Notice } from "../ui";
@@ -45,6 +46,16 @@ export function ImportTab() {
       if (input.current) input.current.value = "";
     }
   };
+
+  // A file dropped on the Import page comes in here once the vault is open.
+  const readRef = useRef(read);
+  useEffect(() => {
+    readRef.current = read;
+  });
+  useEffect(() => {
+    const waiting = takePendingImport();
+    if (waiting) void readRef.current(waiting);
+  }, []);
 
   const save = async () => {
     if (step.kind !== "ready") return;

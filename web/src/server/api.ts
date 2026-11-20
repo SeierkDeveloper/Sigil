@@ -44,7 +44,7 @@ import {
   vaultUsage,
   type AppAuth,
 } from "./store";
-import { listSeals, proofFor, sealPending, sealStats } from "./seal";
+import { getSeal, listSeals, proofFor, proofForLeaf, publicStats, sealPending, sealQueue, sealStats } from "./seal";
 import { anchorStatus } from "./anchor";
 import {
   assertSameOrigin,
@@ -140,12 +140,31 @@ const route = (method: string, pattern: string, handler: Handler) => routes.push
 
 // ---- public
 
+const STARTED_AT = Date.now();
+
 route("GET", "status", (ctx) => {
   const anchor = anchorStatus();
+  // The seal job runs here too, so the page that shows this always shows a finished job or a real fault.
+  let job: "ok" | "off" | "failed" = serverConfig.sealsEnabled ? "ok" : "off";
+  try {
+    sealPending(ctx.db);
+  } catch {
+    job = "failed";
+  }
+  const queue = sealQueue(ctx.db);
+  if (job === "ok" && queue.overdue > 0) job = "failed";
   return json({
     ok: true,
-    seals: { enabled: serverConfig.sealsEnabled, periodSeconds: serverConfig.sealSeconds, mode: anchor.mode, ...sealStats(ctx.db) },
+    time: new Date().toISOString(),
+    upSeconds: Math.floor((Date.now() - STARTED_AT) / 1000),
+    database: "ok",
+    seals: { enabled: serverConfig.sealsEnabled, periodSeconds: serverConfig.sealSeconds, mode: anchor.mode, job, ...queue, ...sealStats(ctx.db) },
   });
+});
+
+route("GET", "stats", (ctx) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  return json(publicStats(ctx.db));
 });
 
 route("GET", "seals", (ctx) => {
@@ -153,6 +172,33 @@ route("GET", "seals", (ctx) => {
   const limit = Math.min(Math.max(Number(ctx.url.searchParams.get("limit")) || 24, 1), 200);
   const anchor = anchorStatus();
   return json({ mode: anchor.mode, periodSeconds: serverConfig.sealSeconds, seals: listSeals(ctx.db, limit) });
+});
+
+const sealHour = (value: string) => {
+  if (!/^\d{1,12}$/.test(value)) throw new HttpError(400, "Invalid seal number.", "invalid");
+  return Number(value);
+};
+
+route("GET", "seals/:hour", (ctx, [hour]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  sealPending(ctx.db);
+  const seal = getSeal(ctx.db, sealHour(hour));
+  if (!seal) throw new HttpError(404, "There is no seal with that number.", "no_seal");
+  return json({ mode: anchorStatus().mode, periodSeconds: serverConfig.sealSeconds, seal });
+});
+
+// Anyone holding a fingerprint can ask for its proof. The fingerprint is a salted
+// hash, so neither the question nor the answer shows what was read, or by whom.
+route("GET", "seals/:hour/proof", (ctx, [hour]) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  sealPending(ctx.db);
+  const leaf = (ctx.url.searchParams.get("leaf") ?? "").toLowerCase();
+  if (!/^0x[0-9a-f]{64}$/.test(leaf)) throw new HttpError(400, "A fingerprint is 0x followed by 64 hex characters.", "invalid");
+  const n = sealHour(hour);
+  if (!getSeal(ctx.db, n)) throw new HttpError(404, "There is no seal with that number.", "no_seal");
+  const proof = proofForLeaf(ctx.db, n, leaf);
+  if (!proof) throw new HttpError(404, "That fingerprint is not part of this seal.", "not_in_seal");
+  return json(proof);
 });
 
 // ---- session

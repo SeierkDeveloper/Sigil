@@ -1,0 +1,361 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { PageHeader } from "@/components/PageHeader";
+import { PageLinks } from "@/components/PageLinks";
+import { CodeBlock } from "@/components/CodeBlock";
+import { site } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "API reference",
+  description: "Every public and connector endpoint of the Sigil server: requests, responses, errors and limits.",
+};
+
+interface Endpoint {
+  id: string;
+  method: "GET" | "POST";
+  path: string;
+  summary: string;
+  params?: [string, string][];
+  response: string;
+  notes?: string;
+}
+
+const publicEndpoints: Endpoint[] = [
+  {
+    id: "status",
+    method: "GET",
+    path: "/api/status",
+    summary: "Health of the server and the seal job. Running it also seals any finished hour that is still open.",
+    response: `{
+  "ok": true,
+  "time": "2026-11-20T10:00:04.512Z",
+  "upSeconds": 86400,
+  "database": "ok",
+  "seals": {
+    "enabled": true,
+    "periodSeconds": 3600,
+    "mode": "local",
+    "job": "ok",
+    "currentHour": 496234,
+    "open": 2,
+    "overdue": 0,
+    "lastSealedAt": "2026-11-20T10:00:01.220Z",
+    "seals": 41,
+    "leaves": 318,
+    "latestHour": 496233
+  }
+}`,
+    notes: "job is ok, off or failed. open counts reads waiting for the running hour to end; overdue counts reads from finished hours that are not sealed.",
+  },
+  {
+    id: "stats",
+    method: "GET",
+    path: "/api/stats",
+    summary: "The public counters. Counts only.",
+    response: `{ "vaults": 12, "memories": 4310, "apps": 19, "reads": 320, "seals": 41 }`,
+    notes: "reads is every read ever sealed plus those waiting for a seal, so it does not drop when a vault is deleted.",
+  },
+  {
+    id: "seals",
+    method: "GET",
+    path: "/api/seals",
+    summary: "The newest seals, newest first.",
+    params: [["limit", "1 to 200. Default 24."]],
+    response: `{
+  "mode": "local",
+  "periodSeconds": 3600,
+  "seals": [
+    {
+      "hour": 496233,
+      "root": "0x...",
+      "leaves": 7,
+      "sealedAt": "2026-11-20T10:00:01.220Z",
+      "anchorTx": null,
+      "anchoredAt": null
+    }
+  ]
+}`,
+    notes: "hour is the seal number: the Unix time divided by the period. mode is local, or anchored when roots are also published on chain.",
+  },
+  {
+    id: "seal",
+    method: "GET",
+    path: "/api/seals/:hour",
+    summary: "One seal by its number.",
+    response: `{
+  "mode": "local",
+  "periodSeconds": 3600,
+  "seal": { "hour": 496233, "root": "0x...", "leaves": 7, "sealedAt": "...", "anchorTx": null, "anchoredAt": null }
+}`,
+    notes: "404 with code no_seal when that hour has no seal.",
+  },
+  {
+    id: "proof",
+    method: "GET",
+    path: "/api/seals/:hour/proof",
+    summary: "The Merkle proof for one fingerprint in one seal.",
+    params: [["leaf", "The fingerprint: 0x and 64 hex characters."]],
+    response: `{
+  "hour": 496233,
+  "root": "0x...",
+  "leaf": "0x...",
+  "index": 3,
+  "proof": ["0x...", "0x...", "0x..."]
+}`,
+    notes: "404 with code not_in_seal when the fingerprint is not part of that seal. A fingerprint is a salted hash and reveals nothing about the read behind it.",
+  },
+];
+
+const connectorEndpoints: Endpoint[] = [
+  {
+    id: "folders",
+    method: "GET",
+    path: "/api/connector/v1/folders",
+    summary: "The folders this app may read, with the folder keys wrapped for this app.",
+    response: `{
+  "appId": "...",
+  "folders": [
+    { "id": "...", "meta": "v1...", "wrappedKey": "v1...", "count": 12 }
+  ]
+}`,
+    notes: "Logged as: the app listed its folders.",
+  },
+  {
+    id: "index",
+    method: "GET",
+    path: "/api/connector/v1/index",
+    summary: "The encrypted heads (title, tags, source, first lines, dates) of every memory in the granted folders. Search happens on the caller's side.",
+    response: `{
+  "appId": "...",
+  "folders": [...],
+  "memories": [
+    { "id": "...", "folderId": "...", "head": "v1..." }
+  ]
+}`,
+    notes: "Logged as: the app read the index of N memories. Search words are never sent.",
+  },
+  {
+    id: "read",
+    method: "POST",
+    path: "/api/connector/v1/read",
+    summary: "The full encrypted memories for 1 to 20 ids.",
+    params: [["ids", "JSON body: { \"ids\": [\"...\"] }"]],
+    response: `{
+  "appId": "...",
+  "folders": [...],
+  "memories": [
+    { "id": "...", "folderId": "...", "head": "v1...", "body": "v1..." }
+  ],
+  "missing": ["..."]
+}`,
+    notes: "Each memory found is logged as one read. Ids outside the granted folders come back under missing, without saying whether they exist.",
+  },
+];
+
+const errors: [string, string, string][] = [
+  ["400", "invalid", "The request is malformed. The message names the field."],
+  ["401", "signed_out", "A vault request without a session."],
+  ["401", "app_revoked", "The app key was revoked or never existed."],
+  ["403", "origin", "A change to a vault that did not come from the site itself."],
+  ["404", "not_found", "No such endpoint. Also no_seal and not_in_seal on the seal endpoints."],
+  ["405", "method", "The endpoint exists, the method does not."],
+  ["409", "not_sealed", "A proof was asked for an entry whose hour has not been sealed yet."],
+  ["429", "rate_limited", "Too many requests. Wait a little and try again."],
+];
+
+function EndpointBlock({ e }: { e: Endpoint }) {
+  return (
+    <section id={e.id} className="endpoint">
+      <h3 className="endpoint-head">
+        <span className="endpoint-method" data-method={e.method}>
+          {e.method}
+        </span>
+        <code className="endpoint-path">{e.path}</code>
+      </h3>
+      <p className="endpoint-summary">{e.summary}</p>
+      {e.params ? (
+        <dl className="endpoint-params">
+          {e.params.map(([name, text]) => (
+            <div key={name}>
+              <dt>
+                <code>{name}</code>
+              </dt>
+              <dd>{text}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+      <CodeBlock code={e.response} label="Response" language="json" />
+      {e.notes ? <p className="endpoint-notes">{e.notes}</p> : null}
+    </section>
+  );
+}
+
+export default function ApiReference() {
+  return (
+    <div className="page">
+      <div className="container">
+        <PageHeader
+          eyebrow="API reference"
+          title="A small API, read only where it matters"
+          lead="Five public endpoints anyone can call, and three connector endpoints an app key can call. Connected apps cannot write. Everything a connector endpoint returns is encrypted."
+        />
+
+        <div className="doc-layout">
+          <aside className="doc-aside" aria-label="On this page">
+            <p className="doc-aside-label">Public</p>
+            <ul>
+              {publicEndpoints.map((e) => (
+                <li key={e.id}>
+                  <a href={`#${e.id}`}>{e.path.replace("/api", "")}</a>
+                </li>
+              ))}
+            </ul>
+            <p className="doc-aside-label">Connector</p>
+            <ul>
+              {connectorEndpoints.map((e) => (
+                <li key={e.id}>
+                  <a href={`#${e.id}`}>{e.path.replace("/api/connector/v1", "")}</a>
+                </li>
+              ))}
+            </ul>
+            <p className="doc-aside-label">More</p>
+            <ul>
+              <li>
+                <a href="#auth">Authentication</a>
+              </li>
+              <li>
+                <a href="#errors">Errors and limits</a>
+              </li>
+              <li>
+                <a href="#session">Vault session API</a>
+              </li>
+            </ul>
+          </aside>
+
+          <div className="doc-main">
+            <section className="doc-block" aria-labelledby="base-title">
+              <h2 id="base-title" className="section-title">
+                Base address
+              </h2>
+              <p className="section-lead">
+                Every path below is relative to the Sigil site your vault lives on. Responses are JSON. Errors are JSON too, as{" "}
+                <code>{'{ "error": "...", "code": "..." }'}</code>.
+              </p>
+              <CodeBlock code={`curl ${site.url}/api/seals?limit=3`} label="Terminal" />
+            </section>
+
+            <section className="doc-block" aria-labelledby="public-title">
+              <h2 id="public-title" className="section-title">
+                Public endpoints
+              </h2>
+              <p className="section-lead">No key, no session. These power the Status, Seals and Verify pages.</p>
+              {publicEndpoints.map((e) => (
+                <EndpointBlock key={e.id} e={e} />
+              ))}
+            </section>
+
+            <section className="doc-block" aria-labelledby="auth">
+              <h2 id="auth" className="section-title">
+                Authentication for connected apps
+              </h2>
+              <p className="section-lead">
+                An app key looks like <code>sigil_app.&lt;app id&gt;.&lt;secret&gt;</code>. The secret is 32 random bytes. It is never sent to the
+                server. Two things are derived from it with HKDF-SHA256 (salt <code>sigil/hkdf/v1</code>):
+              </p>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Label</th>
+                      <th>Result</th>
+                      <th>Used for</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>
+                        <code>sigil:auth:app</code>
+                      </td>
+                      <td>The bearer token, base64url</td>
+                      <td>
+                        <code>Authorization: Bearer &lt;token&gt;</code>. The server stores only its SHA-256.
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <code>sigil:wrap:app</code>
+                      </td>
+                      <td>The app wrap key</td>
+                      <td>Opens the folder keys that were wrapped for this app. Stays on the caller&apos;s machine.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="endpoint-notes">
+                The connector does all of this for you. Use the endpoints directly only when you build your own reader; the envelope format and
+                every label are in the <Link href="/docs#encryption">encryption model</Link>.
+              </p>
+            </section>
+
+            <section className="doc-block" aria-labelledby="connector-title">
+              <h2 id="connector-title" className="section-title">
+                Connector endpoints
+              </h2>
+              <p className="section-lead">Read only, one bearer token per app, every call written to the vault owner&apos;s read log.</p>
+              {connectorEndpoints.map((e) => (
+                <EndpointBlock key={e.id} e={e} />
+              ))}
+            </section>
+
+            <section className="doc-block" aria-labelledby="errors">
+              <h2 id="errors" className="section-title">
+                Errors and limits
+              </h2>
+              <div className="table-wrap">
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Code</th>
+                      <th>Meaning</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {errors.map(([status, code, text]) => (
+                      <tr key={code}>
+                        <td>{status}</td>
+                        <td>
+                          <code>{code}</code>
+                        </td>
+                        <td>{text}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="endpoint-notes">
+                Limits per minute: 240 requests per app key, 600 connector requests per address, 240 public requests per address, 40 sign-in
+                attempts per address.
+              </p>
+            </section>
+
+            <section className="doc-block" aria-labelledby="session">
+              <h2 id="session" className="section-title">
+                The vault session API
+              </h2>
+              <p className="section-lead">
+                The vault page itself talks to a session API: <code>/api/vault</code>, <code>/api/memories</code>, <code>/api/folders</code>,{" "}
+                <code>/api/apps</code>, <code>/api/log</code>, <code>/api/keyslots</code> and the sign-in routes under <code>/api/auth</code>. It
+                accepts only encrypted payloads, only with a session cookie, and changes only from the site itself. It is not meant for other
+                programs; the whole router is one readable file, <code>web/src/server/api.ts</code>.
+              </p>
+            </section>
+          </div>
+        </div>
+
+        <PageLinks hrefs={["/connector", "/verify", "/open-source"]} />
+      </div>
+    </div>
+  );
+}

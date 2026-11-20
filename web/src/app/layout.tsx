@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { Backdrop } from "@/components/backdrop/Backdrop";
+import { Motion, MOTION_BOOT } from "@/components/backdrop/Motion";
 import { site } from "@/lib/site";
 import "./globals.css";
 
@@ -53,8 +55,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT }} />
+      </head>
       <body>
+        <Backdrop />
         <a className="skip-link" href="#main">
           Skip to content
         </a>
@@ -63,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <Footer />
+        <Motion />
       </body>
     </html>
   );

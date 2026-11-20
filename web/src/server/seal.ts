@@ -84,17 +84,54 @@ export interface ProofResult {
 /** Proof that a sealed log entry is part of its hour's seal. */
 export function proofFor(db: Db, entry: LogEntry): ProofResult | null {
   if (!entry.sealed) return null;
-  const seal = getSeal(db, entry.hour);
+  return proofForLeaf(db, entry.hour, entry.leaf);
+}
+
+/** Proof for a leaf by its fingerprint alone. Public: a leaf is a salted hash and says nothing about the read behind it. */
+export function proofForLeaf(db: Db, hour: number, leaf: string): ProofResult | null {
+  const seal = getSeal(db, hour);
   if (!seal) return null;
-  const leaves = (db.prepare("SELECT leaf FROM seal_leaves WHERE hour = ? ORDER BY idx").all(entry.hour) as Row[]).map((r) => String(r.leaf));
-  const index = leaves.indexOf(entry.leaf);
+  const leaves = (db.prepare("SELECT leaf FROM seal_leaves WHERE hour = ? ORDER BY idx").all(hour) as Row[]).map((r) => String(r.leaf));
+  const index = leaves.indexOf(leaf);
   if (index < 0) return null;
   return {
-    hour: entry.hour,
+    hour,
     root: seal.root,
-    leaf: entry.leaf,
+    leaf,
     index,
     proof: merkleProof(leaves.map(fromHex32), index).map(hex32),
+  };
+}
+
+/** How the seal job stands: reads waiting for the current period to end, and reads from finished periods not sealed yet. */
+export function sealQueue(db: Db, nowMs = Date.now()) {
+  const current = hourOf(nowMs);
+  const r = db
+    .prepare("SELECT COALESCE(SUM(hour >= ?), 0) AS open, COALESCE(SUM(hour < ?), 0) AS overdue FROM read_log WHERE sealed = 0")
+    .get(current, current) as Row;
+  const last = db.prepare("SELECT hour, sealed_at FROM seals ORDER BY hour DESC LIMIT 1").get() as Row | undefined;
+  return {
+    currentHour: current,
+    open: Number(r.open),
+    overdue: Number(r.overdue),
+    lastSealedAt: last ? String(last.sealed_at) : null,
+  };
+}
+
+/**
+ * The public counters. Counts only: nothing here names a person, a vault or a memory.
+ * Reads are counted from the seals plus the entries not sealed yet, so the number
+ * does not drop when someone deletes their vault.
+ */
+export function publicStats(db: Db) {
+  const one = (sql: string) => Number((db.prepare(sql).get() as Row).n);
+  const sealed = db.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(leaves), 0) AS leaves FROM seals").get() as Row;
+  return {
+    vaults: one("SELECT COUNT(*) AS n FROM users"),
+    memories: one("SELECT COUNT(*) AS n FROM memories"),
+    apps: one("SELECT COUNT(*) AS n FROM apps WHERE revoked_at IS NULL"),
+    reads: Number(sealed.leaves) + one("SELECT COUNT(*) AS n FROM read_log WHERE sealed = 0"),
+    seals: Number(sealed.n),
   };
 }
 

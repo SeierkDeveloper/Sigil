@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { AppMakers } from "@/components/AppMakers";
+import { CodeBlock } from "@/components/CodeBlock";
 import { HeroVisual } from "@/components/hero/HeroVisual";
-import { ArrowIcon, CheckIcon, ClaudeIcon, EyeIcon, ImportIcon, LockIcon, SealIcon } from "@/components/icons";
+import { LatestSeal } from "@/components/live/LatestSeal";
+import { LiveStats } from "@/components/live/LiveStats";
+import { ArrowIcon, BookIcon, CheckIcon, ClaudeIcon, CodeIcon, EyeIcon, GitHubIcon, LockIcon, SealIcon } from "@/components/icons";
+import { cipherText } from "@/lib/cipher";
+import { EXAMPLE_KEY, mcpConfig } from "@/lib/connector";
 
 const promises = [
   {
@@ -26,6 +31,70 @@ const steps = [
   { title: "Fill it", text: "Write memories, sort them into folders, or import your ChatGPT and Claude history in one step." },
   { title: "Connect your AI apps", text: "Make an app key, pick the folders that app may read, and add the connector to Claude, Cursor or ChatGPT." },
   { title: "Stay in charge", text: "Watch the read log, change permissions, revoke an app or delete everything, at any time." },
+];
+
+const importSteps = [
+  { label: "Opened", text: "The export is unpacked in this browser. The file itself is never uploaded." },
+  { label: "Sorted", text: "Every conversation becomes one memory, dated, in a folder of its own." },
+  { label: "Encrypted", text: "Each memory is locked with its folder's key before anything is stored." },
+  { label: "Yours", text: "Search it, edit it, and decide which app may read which folder." },
+];
+
+// One record, as its owner sees it and as the server holds it.
+const record: { field: string; you: string; seed: number; length: number }[] = [
+  { field: "Title", you: "How I like answers", seed: 11, length: 28 },
+  { field: "Body", you: "Short first, details after. Metric units.", seed: 12, length: 56 },
+  { field: "Tags", you: "preferences, writing", seed: 13, length: 24 },
+  { field: "Folder", you: "Writing", seed: 14, length: 16 },
+  { field: "Shared with", you: "Claude Desktop", seed: 15, length: 20 },
+];
+
+const guarantees = [
+  { title: "Apps can only read", text: "There is no way for a connected app to add, change or delete a memory. An AI cannot plant false memories in your vault." },
+  { title: "Revoke takes one click", text: "A revoked app key fails on its very next request, and the server deletes the folder keys that were wrapped for it." },
+  { title: "Delete means deleted", text: "Deleting removes the rows, and the database overwrites deleted content on disk instead of just unlinking it." },
+  { title: "No reset, no back door", text: "Lose every passkey, every wallet and the recovery phrase and nobody can open the vault, including Sigil." },
+  { title: "Nothing from third parties", text: "The site loads no outside scripts, fonts or trackers. Its content security policy allows the site itself and nothing else." },
+  { title: "Open source", text: "The encryption, the server, the connector and the contract are public under the MIT licence. You can run all of it yourself." },
+];
+
+const faq = [
+  {
+    q: "Can Sigil read my memories?",
+    a: "No. They are encrypted in your browser with a key that is only ever stored wrapped by your passkey, your wallet or your recovery phrase. The server holds ciphertext, ids, sizes and times.",
+  },
+  {
+    q: "What happens if I lose my passkey?",
+    a: "Sign in with your wallet or your 24-word recovery phrase, then add a new passkey under Settings. If you lose every way in, the vault cannot be opened by anyone. There is no reset.",
+  },
+  {
+    q: "Which AI apps work with it?",
+    a: "Any app that speaks MCP, the Model Context Protocol: Claude Desktop, Claude Code, Cursor, Windsurf, VS Code and others start the connector themselves. ChatGPT reaches it over a private address that you run.",
+  },
+  {
+    q: "Can an AI app change or delete what is in my vault?",
+    a: "No. Connected apps are read only. They can list the folders you gave them, search them and read memories. Nothing else exists for them to call.",
+  },
+  {
+    q: "What does an app see when I connect it?",
+    a: "Only the folders you ticked for it, decrypted on your own computer by the connector. Folders you did not grant are never wrapped for that app, so its key cannot open them.",
+  },
+  {
+    q: "What is a seal, and why should I care?",
+    a: "At the end of every hour, all reads from that hour are folded into one fingerprint, a Merkle root. It lets you prove that an entry in your read log has not been changed or removed since, without showing anyone what was read.",
+  },
+  {
+    q: "Is anything stored on a blockchain?",
+    a: "Not today. Seals are kept by the Sigil server and marked Local. A contract that publishes seal roots on chain is written and tested but not deployed. Your memories are never put on a chain, encrypted or not.",
+  },
+  {
+    q: "What does it cost?",
+    a: "The code is open source and free to run yourself. Creating a vault on this site costs nothing today.",
+  },
+  {
+    q: "Can I leave?",
+    a: "Yes. Export everything from Settings, decrypted on your device, and delete your account in one step. Or run your own copy of Sigil and keep the vault on your own machine.",
+  },
 ];
 
 export default function Home() {
@@ -59,6 +128,24 @@ export default function Home() {
         <div className="container">
           <p className="works-with-label">Reads into</p>
           <AppMakers />
+        </div>
+      </section>
+
+      <section className="section section-stats">
+        <div className="container">
+          <div className="section-header">
+            <p className="eyebrow">Live from the server</p>
+            <h2 className="section-title">What Sigil is holding right now</h2>
+            <p className="section-lead">
+              Counted by the server as you load this page. It can count what it holds. It cannot read it.
+            </p>
+          </div>
+          <LiveStats />
+          <p className="stats-foot">
+            <Link href="/status" className="arrow-link">
+              Service status <ArrowIcon />
+            </Link>
+          </p>
         </div>
       </section>
 
@@ -130,6 +217,9 @@ export default function Home() {
                 <span>Decryption happens on your own computer, inside the connector you run.</span>
               </li>
             </ul>
+            <Link href="/apps" className="arrow-link split-link">
+              Set up your app <ArrowIcon />
+            </Link>
           </div>
           <div className="permission-card" aria-label="Example of an app's permissions">
             <div className="permission-app">
@@ -158,37 +248,187 @@ export default function Home() {
       </section>
 
       <section className="section">
-        <div className="container grid grid-2">
-          <article className="card">
-            <span className="card-icon">
-              <ImportIcon />
-            </span>
-            <h3 className="card-title">Bring your history with you</h3>
-            <p className="card-text">
-              Download your data export from ChatGPT or Claude and drop it into Sigil. It is opened, sorted and encrypted in your browser; every
-              conversation becomes a memory you can search, edit or share with another app.
+        <div className="container split">
+          <ol className="import-flow" aria-label="What happens to an export">
+            {importSteps.map((s, i) => (
+              <li key={s.label} className="import-flow-step">
+                <span className="import-flow-number">{String(i + 1).padStart(2, "0")}</span>
+                <div>
+                  <p className="import-flow-label">{s.label}</p>
+                  <p className="import-flow-text">{s.text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <div>
+            <p className="eyebrow">Import</p>
+            <h2 className="section-title">Years of history, in your vault in a minute</h2>
+            <p className="section-lead">
+              Download your data export from ChatGPT or Claude and drop it into Sigil. Every conversation becomes a memory you can search, edit
+              and share with another app. Claude projects, their documents and what Claude remembered come along too.
             </p>
-            <p className="card-link">
-              <Link href="/docs#import" className="arrow-link">
-                How to import <ArrowIcon />
+            <div className="hero-actions">
+              <Link href="/import" className="button button-primary">
+                Import your history <ArrowIcon />
               </Link>
-            </p>
-          </article>
-          <article className="card">
-            <span className="card-icon">
-              <SealIcon />
-            </span>
-            <h3 className="card-title">A seal every hour</h3>
-            <p className="card-text">
+              <Link href="/docs#import" className="button">
+                Where to find the export
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container split">
+          <div>
+            <p className="eyebrow">Seals</p>
+            <h2 className="section-title">A seal every hour, and you can check it</h2>
+            <p className="section-lead">
               At the end of each hour, every read from that hour is folded into a single fingerprint, a Merkle root. Your vault can prove that any
               entry in your log is part of its seal, without showing anyone else what was read.
             </p>
-            <p className="card-link">
-              <Link href="/security#seals" className="arrow-link">
-                How seals work <ArrowIcon />
-              </Link>
+            <ul className="checklist">
+              <li>
+                <CheckIcon />
+                <span>A changed or removed log entry no longer matches its seal.</span>
+              </li>
+              <li>
+                <CheckIcon />
+                <span>Every fingerprint is salted, so a seal shows nothing about who read what.</span>
+              </li>
+              <li>
+                <CheckIcon />
+                <span>The check runs in your browser, with code you can read.</span>
+              </li>
+            </ul>
+            <Link href="/verify" className="arrow-link split-link">
+              Verify by hand <ArrowIcon />
+            </Link>
+          </div>
+          <LatestSeal />
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-header">
+            <p className="eyebrow">Two views of one memory</p>
+            <h2 className="section-title">What you see, and what the server holds</h2>
+            <p className="section-lead">
+              The same record, on your screen and in Sigil&apos;s database. The left side exists only on your device, after you unlock the vault.
             </p>
-          </article>
+          </div>
+          <div className="compare" role="table" aria-label="One memory as you see it and as the server stores it">
+            <div className="compare-head" role="row">
+              <span role="columnheader" className="compare-field" />
+              <span role="columnheader">On your device</span>
+              <span role="columnheader">On Sigil&apos;s server</span>
+            </div>
+            {record.map((r) => (
+              <div key={r.field} className="compare-row" role="row">
+                <span role="rowheader" className="compare-field">
+                  {r.field}
+                </span>
+                <span role="cell" className="compare-plain">
+                  {r.you}
+                </span>
+                <span role="cell" className="compare-cipher" aria-label="Ciphertext">
+                  v1.{cipherText(r.seed, r.length, 0)}
+                </span>
+              </div>
+            ))}
+            <div className="compare-row" role="row" data-shared="true">
+              <span role="rowheader" className="compare-field">
+                Size, dates, ids
+              </span>
+              <span role="cell" className="compare-plain">
+                Visible
+              </span>
+              <span role="cell" className="compare-plain">
+                Visible. The server needs them to store, sort and count.
+              </span>
+            </div>
+          </div>
+          <p className="stats-foot">
+            <Link href="/threat-model" className="arrow-link">
+              The full list of who can see what <ArrowIcon />
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-header">
+            <p className="eyebrow">Security</p>
+            <h2 className="section-title">Promises the code keeps</h2>
+            <p className="section-lead">
+              Each of these is something the software does today. The limits are written down just as plainly in the threat model.
+            </p>
+          </div>
+          <div className="fact-grid">
+            {guarantees.map((g) => (
+              <div key={g.title} className="pillar">
+                <h3 className="pillar-title">{g.title}</h3>
+                <p className="pillar-text">{g.text}</p>
+              </div>
+            ))}
+          </div>
+          <div className="hero-actions section-actions">
+            <Link href="/security" className="button">
+              How the encryption works
+            </Link>
+            <Link href="/threat-model" className="button">
+              The threat model
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container split split-top">
+          <div>
+            <p className="eyebrow">For developers</p>
+            <h2 className="section-title">One connector, a few lines of configuration</h2>
+            <p className="section-lead">
+              The connector is a small MCP server that runs on your own machine and gives an AI app three read-only tools. Everything is open
+              source, and the API is small enough to read in one sitting.
+            </p>
+            <ul className="link-list">
+              <li>
+                <Link href="/connector">
+                  <CodeIcon />
+                  <span>
+                    <strong>Connector</strong>
+                    <span>The tools, the two modes and every setting</span>
+                  </span>
+                  <ArrowIcon />
+                </Link>
+              </li>
+              <li>
+                <Link href="/docs/api">
+                  <BookIcon />
+                  <span>
+                    <strong>API reference</strong>
+                    <span>Five public endpoints, three for connected apps</span>
+                  </span>
+                  <ArrowIcon />
+                </Link>
+              </li>
+              <li>
+                <Link href="/open-source">
+                  <GitHubIcon />
+                  <span>
+                    <strong>Open source</strong>
+                    <span>MIT licence. Run the whole thing yourself</span>
+                  </span>
+                  <ArrowIcon />
+                </Link>
+              </li>
+            </ul>
+          </div>
+          <CodeBlock code={mcpConfig(EXAMPLE_KEY)} label="MCP configuration" language="json" />
         </div>
       </section>
 
@@ -201,9 +441,14 @@ export default function Home() {
               The vault is the first stage. Over time Sigil grows into an AI self that answers in your voice within your rules, can work and earn for
               you, and can outlive you on terms you set in advance.
             </p>
-            <Link href="/roadmap" className="button">
-              See the roadmap
-            </Link>
+            <div className="hero-actions">
+              <Link href="/ai-self" className="button">
+                Read the vision
+              </Link>
+              <Link href="/roadmap" className="button">
+                See the roadmap
+              </Link>
+            </div>
           </div>
           <ul className="checklist">
             <li>
@@ -225,6 +470,26 @@ export default function Home() {
               </span>
             </li>
           </ul>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container faq-layout">
+          <div>
+            <p className="eyebrow">Questions</p>
+            <h2 className="section-title">Asked before trusting a vault</h2>
+            <p className="section-lead">Short answers. The long ones are under Trust in the menu.</p>
+          </div>
+          <div className="faq">
+            {faq.map((f) => (
+              <details key={f.q} className="faq-item">
+                <summary>
+                  <span>{f.q}</span>
+                </summary>
+                <p>{f.a}</p>
+              </details>
+            ))}
+          </div>
         </div>
       </section>
 

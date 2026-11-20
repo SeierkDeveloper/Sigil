@@ -40,3 +40,17 @@ export const configLocations: Record<Exclude<ClientKind, "chatgpt" | "other">, {
     where: ["Global, for every project: ~/.cursor/mcp.json", "One project only: .cursor/mcp.json in the project folder"],
   },
 };
+
+/** VS Code keeps MCP servers under "servers", with a type, in .vscode/mcp.json. */
+export function vscodeConfig(appKey: string, url = site.url): string {
+  const { command, args } = launchCommand();
+  return JSON.stringify({ servers: { sigil: { type: "stdio", command, args, env: { SIGIL_APP_KEY: appKey, SIGIL_URL: url } } } }, null, 2);
+}
+
+/** One command that adds the connector to Claude Code for every project of this user. */
+export function claudeCodeCommand(appKey: string, url = site.url): string {
+  const { command, args } = launchCommand();
+  return `claude mcp add sigil --scope user \\\n  --env SIGIL_APP_KEY=${appKey} \\\n  --env SIGIL_URL=${url} \\\n  -- ${[command, ...args].join(" ")}`;
+}
+
+export const EXAMPLE_KEY = "sigil_app.<app id>.<secret>";

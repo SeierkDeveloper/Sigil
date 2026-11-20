@@ -6,7 +6,7 @@ Everything the visual design pass has to style. The product works and every page
 
 - **Look:** black, with silver and white details. Near-black backgrounds, white type, silver as the only accent (fine lines, subtle metallic gradients on the few surfaces that matter). No colour accents beyond black, silver, white and greys, including for errors and success.
 - **Hero piece:** calm, specific to what Sigil does, never a badge. No coins, medallions, stars, rim lettering, woven bands, glowing orbs or node webs. It lives in `web/src/components/hero/`. Respect `prefers-reduced-motion` with a still frame, cap frame work and stop off screen.
-- **Chrome stays:** full-width header with the logo top left, section nav, GitHub and X icons top right and the Open vault button; a footer. No left sidebar.
+- **Chrome stays:** full-width header with the logo top left, four grouped menus (Product, Trust, Developers, Vision), GitHub and X icons top right and the Open vault button; a footer with the same four groups. No left sidebar. The menus, the phone menu and the footer all read `navGroups` in `web/src/lib/site.ts`: add a page there and it appears in all three.
 - **Copy stays:** do not add em dashes, emoji, or labels such as "demo" or "sample". `web/test/content.test.ts` checks this.
 - **Logo:** `web/src/components/Logo.tsx` renders the text wordmark. When the logo file exists, set `logoSrc` in `web/src/lib/site.ts`; nothing else changes.
 - **Phone first-class:** 390 px wide with a 16 px gutter, no horizontal scroll, 44 px touch targets, inputs at 16 px or more (no iOS zoom).
@@ -17,16 +17,17 @@ Everything the visual design pass has to style. The product works and every page
 - Fonts are self-hosted and exposed as `--font-sans`, `--font-display`, `--font-mono`. Self-host any new font (the content security policy blocks third-party font hosts) via `next/font/local` or files in `web/public`.
 - The CSP in `web/next.config.ts` allows only same-origin scripts, styles, images and fonts. Inline styles are allowed.
 - Icons are inline SVG in `web/src/components/icons.tsx` and use `currentColor`. Brand marks (Claude, ChatGPT, Cursor, MCP, GitHub, X) are their official monochrome shapes.
-- Screenshots of the current state: `docs/screenshots/` (`<page>-<desktop|phone>-<top|middle|bottom>.png`, `vault-<state>-<desktop|phone>-*.png`, `hero-<a|b|c>-*.png`). Regenerate with `npx playwright test -c playwright.shots.config.ts` in `e2e/` after `npm run build`.
+- Screenshots of the current state: `docs/screenshots/` (`<page>-<desktop|phone>-<top|middle|bottom>.png`, `vault-<state>-<desktop|phone>-*.png`, `hero-<a|b|c>-*.png`). The screenshots in the folder are from before the full site was built; the spec now also covers the new pages, the open menus (`menu-desktop-<group>.png`) and the page ground in motion (`backdrop-frame-<n>.png`). Regenerate with `npx playwright test -c playwright.shots.config.ts` in `e2e/` after `npm run build`.
 
 ## Site chrome
 
 | Component | File | Classes | States |
 | --- | --- | --- | --- |
-| Header | `components/Header.tsx` | `.site-header`, `.site-header-inner`, `.site-brand`, `.site-nav`, `.site-nav-link`, `.site-actions`, `.icon-link`, `.site-cta`, `.site-menu-button` | sticky; active link `[aria-current="page"]`; phone (at 820 px and below) hides nav and CTA, shows menu button |
-| Phone menu | same | `.site-menu`, `.site-menu-link`, `.site-menu-cta`; `.site-header[data-open="true"]` | open and closed |
+| Header | `components/Header.tsx` | `.site-header`, `.site-header-inner`, `.site-brand`, `.site-nav`, `.site-nav-group[data-open]`, `.site-nav-link` (a button, `[data-current]` when one of its pages is open), `.site-nav-chevron`, `.nav-panel` (`.nav-panel-head`, `.nav-panel-label`, `.nav-panel-lead`, `.nav-panel-list`, `.nav-panel-link`, `.nav-panel-title`, `.nav-panel-text`), `.site-actions`, `.icon-link`, `.site-cta`, `.site-menu-button` | sticky; a menu opens on hover, click or keyboard and closes on Escape, outside click or navigation; phone (at 820 px and below) hides the menus, shows the menu button |
+| Phone menu | same | `.site-menu`, `.site-menu-group`, `.site-menu-label`, `.site-menu-list`, `.site-menu-link`, `.site-menu-cta`; `.site-header[data-open="true"]` | open and closed; scrolls inside itself |
 | Logo | `components/Logo.tsx` | `.logo`, `.logo-word`, `.logo-image` | wordmark now, image later |
-| Footer | `components/Footer.tsx` | `.site-footer`, `.site-footer-inner`, `.site-footer-brand`, `.site-footer-tagline`, `.site-footer-nav`, `.site-footer-social`, `.site-footer-legal` | desktop three columns, phone stacked |
+| Footer | `components/Footer.tsx` | `.site-footer`, `.site-footer-inner`, `.site-footer-brand`, `.site-footer-tagline`, `.site-footer-social`, `.site-footer-nav`, `.site-footer-group`, `.site-footer-label`, `.site-footer-legal`, `.site-footer-legal-links` | desktop brand plus four columns, phone two by two |
+| Page ground | `components/backdrop/Backdrop.tsx` | `.backdrop`, `.backdrop-canvas`, `.backdrop-rules`, `.backdrop-grain` | moving, and one still frame with reduced motion |
 | Skip link | `app/layout.tsx` | `.skip-link` | hidden until focused |
 
 ## Shared components
@@ -47,18 +48,31 @@ Everything the visual design pass has to style. The product works and every page
 | Forms | vault | `.field`, `.field-label`, `.field-hint`, `.input`, `.textarea`, `.select`, `.checkbox`, `.checkbox-list`, `.form-actions` | focus, disabled, required |
 | AI apps row | `components/AppMakers.tsx` | `.app-makers`, `.app-maker`, `.app-maker-icon`, `.app-maker-name` | wraps on phone |
 | Public seal list | `components/SealList.tsx` | `.seal-list`, `.seal-row`, `.seal-hour`, `.seal-root` | loading, error, empty ("No seals yet"), list |
+| Page blocks | new pages | `.page-section`, `.page-section-narrow`, `.split-top`, `.panel`, `.fact-grid`, `.card-number`, `.mini-steps`, `.plain-list` | |
+| Read next | `components/PageLinks.tsx` | `.page-links`, `.page-link`, `.page-link-group`, `.page-link-title`, `.page-link-text` | three links at the foot of every new page |
 
 ## Pages
 
 | Route | File | Sections and notes |
 | --- | --- | --- |
-| `/` | `app/page.tsx` | `.hero` (`.hero-inner`, `.hero-title`, `.hero-lead`, `.hero-actions`, `.hero-visual[data-hero]` for the hero piece); `.works-with` row of AI apps; three promises (`.grid-3` of `.card`); four steps (`.steps`, `.step`); permissions split with the app permission illustration (`.split`, `.permission-card`, `.permission-item[data-allowed]`, `.checklist`); import and seal cards (`.grid-2`); roadmap teaser; final `.cta-band` |
+| `/` | `app/page.tsx` | `.hero` with the hero piece; `.works-with` row of AI apps; live counters (`.section-stats`, `.stats`, `.stat`, `.stat-number`); three promises (`.grid-3` of `.card`); four steps (`.steps`, `.step`); permissions split (`.split`, `.permission-card`, `.checklist`); import (`.import-flow`, `.import-flow-step`); seals with the live latest seal (`.seal-card`); two views of one memory (`.compare`, `.compare-row`, `.compare-plain`, `.compare-cipher`); six promises (`.fact-grid` of `.pillar`); developers (`.link-list` and a code block); roadmap teaser; questions (`.faq-layout`, `.faq`, `.faq-item`, built on `details`); final `.cta-band` |
+| `/import` | `app/import/page.tsx` | drop zone that hands the file to the vault (`components/ImportDrop.tsx`, `.import-drop`, `.dropzone`); two guide cards (`.guide-card`, `.guide-steps`, `.plain-list`); six facts |
+| `/apps` | `app/apps/page.tsx` | index of seven apps (`.app-index`, `.app-index-link`); two things to do first; one guide per app (`.guides`, `.guide`, `.guide-head`, `.guide-icon`, `.guide-tags`, `.guide-body`, `.guide-steps`, `.guide-code`, `.guide-after`) |
+| `/seals` | `app/seals/page.tsx` | live latest seal (`.seal-card`, with and without a seal); proof checker in a `.panel`; the public list (`SealList`, all four states) |
 | `/how-it-works` | `app/how-it-works/page.tsx` | seven numbered prose sections; "Who can see what" two cards |
-| `/security` | `app/security/page.tsx` | table of contents chips; prose sections; live "Latest seals" list (all four states of `SealList`) |
-| `/docs` | `app/docs/page.tsx` | table of contents; eleven doc sections with code blocks and tables; the connector section switches between "build from source" and `npx` with `site.connectorPublished` |
-| `/roadmap` | `app/roadmap/page.tsx` | six pillars (`.pillars`, `.pillar`); thirteen stages (`.stages`, `.stage[data-status]`, `.stage-number`, `.stage-head`, `.stage-items`, `.stage-item[data-built]`); closing disclaimer |
-| `/terms` | `app/terms/page.tsx` | prose |
+| `/security` | `app/security/page.tsx` | table of contents chips; prose sections; live "Latest seals" list |
+| `/threat-model` | `app/threat-model/page.tsx` | who can see what (`.table-wide`); protected against and not protected against (`.threats[data-kind]`, `.threat`); what you can do |
 | `/privacy` | `app/privacy/page.tsx` | prose with the "What is stored" table |
+| `/status` | `app/status/page.tsx` | `components/live/StatusBoard.tsx`: `.status-banner[data-level]`, `.status-list`, `.status-row[data-level="ok|off|fault"]`, `.status-mark`, `.status-numbers`; loading, working, fault and "server did not answer" |
+| `/docs` | `app/docs/page.tsx` | table of contents; eleven doc sections with code blocks and tables |
+| `/docs/api` | `app/docs/api/page.tsx` | sticky index (`.doc-layout`, `.doc-aside`); `.doc-block` sections; one `.endpoint` per endpoint (`.endpoint-head`, `.endpoint-method[data-method]`, `.endpoint-path`, `.endpoint-params`, `.endpoint-notes`) |
+| `/connector` | `app/connector/page.tsx` | the path of one read (`.flow`, `.flow-step`, `.flow-where`); install split; three tools (`.tools`, `.tool`, `.tool-name`, `.tool-logged`); two modes; settings table; three facts |
+| `/verify` | `app/verify/page.tsx` | the checker with three modes (`components/live/Verifier.tsx`: `.verifier`, `.segmented`, `.verifier-form`, `.verifier-result[data-ok]`, `.proof-steps`); the rules; a script; what a check proves |
+| `/open-source` | `app/open-source/page.tsx` | `.repo-card`; six parts (`.pillar[data-plain]`, `.pillar-path`); run it; settings; licence |
+| `/ai-self` | `app/ai-self/page.tsx` | vision notice (`.vision-note`); five chapters (`.chapters`, `.chapter[data-built]`, `.chapter-number`); six principles; `.closing` |
+| `/roadmap` | `app/roadmap/page.tsx` | six pillars; thirteen stages (`.stages`, `.stage[data-status]`); closing disclaimer |
+| `/changelog` | `app/changelog/page.tsx` | entries from `lib/changelog.ts` (`.releases`, `.release`, `.release-date`, `.release-title`) |
+| `/terms` | `app/terms/page.tsx` | prose |
 | `/vault` | `app/vault/page.tsx` | the app below |
 | 404 | `app/not-found.tsx` | |
 | favicon | `app/icon.svg` | replace with the logo mark later |
@@ -103,7 +117,9 @@ All files in `web/src/vault/`. The wrapper is `.vault[data-phase]` with phases `
   - **B, one vault, five readers** (`HeroViews.tsx`, `.views-*`): six lines of a vault set large in the display face, shown as you, Sigil's server, Claude, ChatGPT and Cursor get them. Lines lock into ciphertext and open again only where that reader was given the folder. It cycles on its own and the five names are buttons.
   - **C, the block** (`HeroSlab.tsx`, `.slab-*`): one block of polished black marble with a single silver inlay on a dark mirror, lit by soft studio lights that drift and follow the pointer (the page scroll on touch screens). One small WebGL fragment shader, 30 frames a second at most, with a still drawing when WebGL is missing.
   - All three stop while off screen or in a hidden tab (`hero/clock.ts`) and hold one finished frame with reduced motion. On a phone A and B sit below the headline and buttons; C sits above the headline.
-- **Other motion:** sections rise as they scroll in (only where scroll-driven animations exist), seal rows come in one after another, the Sealed badge stamps in, the primary button has a sheen on hover. All of it is off with reduced motion.
+- **The page ground** (`components/backdrop/Backdrop.tsx`, behind every page): layered dark tones from charcoal to near-black, film grain, a vignette and two etched vertical rules at the edges of the content on wide screens. On top of that one 2D canvas draws rows of ciphertext engraved in the mono face. A soft light drifts slowly across the page and a second one follows the pointer; the engraving shows only where the light falls, and now and then a few characters resolve into a plain word and lock again. The engraving moves a little slower than the page when scrolling. 30 frames a second at most, stopped in a hidden tab, one finished frame with reduced motion.
+- **Other motion** (`components/backdrop/Motion.tsx` and the last blocks of `globals.css`): sections, cards and rows rise in as they enter the screen, neighbours one after another; section hairlines draw in from the middle and carry a travelling highlight; small mono labels decode from ciphertext into their words; panels carry a soft light under the pointer; the rings of the seal turn slowly as brushed metal; the apps in "Reads into" light up in turn; the footer's outlined name carries a slow sheen; counters count up; the latest seal shows the time left in the running hour. All of it hangs on `html[data-motion="on"]`, set before first paint by a small inline script only when the visitor has not asked for less motion. Without it nothing is hidden and nothing moves.
+- **Live data:** `components/live/` reads the public endpoints (`/api/stats`, `/api/status`, `/api/seals`). Numbers are real; zero is shown as zero.
 - **Share image:** `app/opengraph-image.png` and `app/twitter-image.png` (1200 by 630), the default hero at rest. Regenerate with the `share image` test in `e2e/shots/screens.spec.ts`.
 - **States without colour:** errors and confirmations are white on a lighter plate with an icon and a plain label ("Error", "Done"); waiting and revoked states use dashed outlines; allowed and sealed states use a filled mark.
 

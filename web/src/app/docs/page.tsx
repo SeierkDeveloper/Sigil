@@ -277,9 +277,10 @@ export default function Docs() {
               </table>
             </div>
             <p>
-              A revoked or unknown key gets <code>401</code> with code <code>app_revoked</code>. Too many requests get <code>429</code>.
+              A revoked or unknown key gets <code>401</code> with code <code>app_revoked</code>. Too many requests get <code>429</code>. Every
+              endpoint, with its full response and limits, is in the <Link href="/docs/api">API reference</Link>.
             </p>
-            <p>Two public endpoints need no key:</p>
+            <p>Public endpoints need no key. The two used most:</p>
             <div className="table-wrap">
               <table className="table">
                 <thead>

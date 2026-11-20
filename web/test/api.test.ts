@@ -354,6 +354,78 @@ describe("seals", () => {
   });
 });
 
+describe("public numbers, status and proofs", () => {
+  async function withReads() {
+    const s = await signedUp(h);
+    await ops.createMemory(s.b.api, s.data.folders[0], { title: "Launch plan", body: `Ship on a Tuesday. ${CANARY}` });
+    const { appId } = await ops.connectApp(s.b.api, s.vault, { name: "Cursor", kind: "cursor" }, [s.data.folders[0]]);
+    const userId = String((h.db.prepare("SELECT user_id FROM apps WHERE id = ?").get(appId) as { user_id: string }).user_id);
+    const auth = { appId, userId };
+    const past = Date.now() - 2 * 3600_000;
+    const old = [0, 1, 2].map((i) => logRead(h.db, auth, "index", null, i, new Date(past + i * 1000)));
+    const fresh = logRead(h.db, auth, "read", "abcdefgh", 1);
+    return { ...s, old, fresh, past };
+  }
+
+  it("counts are zero on an empty server", async () => {
+    const res = await h.raw("GET", "stats");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ vaults: 0, memories: 0, apps: 0, reads: 0, seals: 0 });
+  });
+
+  it("counts vaults, memories, apps, reads and seals, and nothing else", async () => {
+    const s = await withReads();
+    sealPending(h.db);
+    const stats = await (await h.raw("GET", "stats")).json();
+    expect(stats).toEqual({ vaults: 1, memories: 1, apps: 1, reads: 4, seals: 1 });
+    expect(JSON.stringify(stats)).not.toContain(CANARY);
+
+    // Deleting the vault keeps the sealed reads in the count; the open one goes with the account.
+    await ops.deleteAccount(s.b.api);
+    expect(await (await h.raw("GET", "stats")).json()).toEqual({ vaults: 0, memories: 0, apps: 0, reads: 3, seals: 1 });
+  });
+
+  it("status runs the seal job and reports the queue", async () => {
+    const empty = await (await h.raw("GET", "status")).json();
+    expect(empty).toMatchObject({ ok: true, database: "ok", seals: { enabled: true, job: "ok", mode: "local", open: 0, overdue: 0, seals: 0, lastSealedAt: null } });
+    expect(Number.isNaN(Date.parse(empty.time))).toBe(false);
+
+    const s = await withReads();
+    const status = await (await h.raw("GET", "status")).json();
+    expect(status.seals).toMatchObject({ job: "ok", open: 1, overdue: 0, seals: 1, leaves: 3, latestHour: hourOf(s.past), currentHour: hourOf(Date.now()) });
+    expect(typeof status.seals.lastSealedAt).toBe("string");
+  });
+
+  it("gives one seal by its number", async () => {
+    const s = await withReads();
+    const res = await h.raw("GET", `seals/${hourOf(s.past)}`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ mode: "local", periodSeconds: 3600, seal: { hour: hourOf(s.past), leaves: 3 } });
+    expect((await h.raw("GET", "seals/1")).status).toBe(404);
+    expect((await h.raw("GET", "seals/abc")).status).toBe(400);
+  });
+
+  it("proves a fingerprint against its seal without a session", async () => {
+    const s = await withReads();
+    const hour = hourOf(s.past);
+    for (const entry of s.old) {
+      const res = await h.raw("GET", `seals/${hour}/proof?leaf=${entry.leaf}`);
+      expect(res.status).toBe(200);
+      const proof = await res.json();
+      expect(proof).toMatchObject({ hour, leaf: entry.leaf });
+      expect(hex32(readEntryLeaf(entry))).toBe(proof.leaf);
+      expect(verifyProof(fromHex32(proof.root), fromHex32(proof.leaf), proof.proof.map(fromHex32))).toBe(true);
+    }
+    // Not sealed yet, a made-up fingerprint, a malformed one, and a seal that does not exist.
+    expect((await h.raw("GET", `seals/${hour}/proof?leaf=${s.fresh.leaf}`)).status).toBe(404);
+    expect((await h.raw("GET", `seals/${hour}/proof?leaf=0x${"ab".repeat(32)}`)).status).toBe(404);
+    expect((await h.raw("GET", `seals/${hour}/proof?leaf=nope`)).status).toBe(400);
+    expect((await h.raw("GET", `seals/${hour}/proof`)).status).toBe(400);
+    expect((await h.raw("GET", `seals/1/proof?leaf=${s.old[0].leaf}`)).status).toBe(404);
+    expect((await h.raw("POST", `seals/${hour}/proof?leaf=${s.old[0].leaf}`)).status).toBe(405);
+  });
+});
+
 describe("export and delete", () => {
   it("exports everything decrypted, on the device", async () => {
     const s = await setup2();

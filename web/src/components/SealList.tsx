@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatSealPeriod, plural, shortHash } from "@/lib/format";
+import { SealIcon } from "./icons";
 
 interface Seal {
   hour: number;
@@ -47,6 +48,9 @@ export function SealList({ limit = 12 }: { limit?: number }) {
   if (state.seals.length === 0) {
     return (
       <div className="empty-state">
+        <span className="empty-state-icon">
+          <SealIcon />
+        </span>
         <p className="empty-state-title">No seals yet</p>
         <p className="empty-state-text">A seal is made at the end of every hour in which a connected app read a vault. The first one will appear here.</p>
       </div>

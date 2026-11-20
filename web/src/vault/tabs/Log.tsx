@@ -15,6 +15,7 @@ export function LogTab() {
   const [error, setError] = useState<string | null>(null);
   const [app, setApp] = useState("all");
   const [checks, setChecks] = useState<Record<string, Verify>>({});
+  const [copied, setCopied] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -57,6 +58,18 @@ export function LogTab() {
   };
 
   const sealsAt = (e: ops.LogEntryView) => new Date((e.hour + 1) * log.periodSeconds * 1000).toISOString();
+
+  // The entry with its salt, as the public checker on the Verify page takes it.
+  const copyEntry = async (e: ops.LogEntryView) => {
+    const { id, appId, kind, memoryId, count, at, salt, hour } = e;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify({ id, appId, kind, memoryId, count, at, salt, hour }, null, 2));
+      setCopied(e.id);
+      window.setTimeout(() => setCopied(null), 1600);
+    } catch {
+      // Clipboard access was refused; nothing to copy to.
+    }
+  };
 
   const verify = async (e: ops.LogEntryView) => {
     setChecks((c) => ({ ...c, [e.id]: { state: "checking" } }));
@@ -124,7 +137,10 @@ export function LogTab() {
                   {check && "ok" in check ? (
                     check.ok ? (
                       <p className="small log-verified" data-testid="verified">
-                        Verified: part of the seal for {formatSealPeriod(check.hour, log.periodSeconds)}, root {shortHash(check.root, 8)}.
+                        Verified: part of the seal for {formatSealPeriod(check.hour, log.periodSeconds)}, root {shortHash(check.root, 8)}.{" "}
+                        <button type="button" className="text-button" onClick={() => void copyEntry(e)}>
+                          {copied === e.id ? "Copied" : "Copy entry"}
+                        </button>
                       </p>
                     ) : (
                       <p className="small log-unverified">Not verified: {check.reason}</p>
