@@ -12,6 +12,9 @@
 //   sigil-connector --http          a local HTTP endpoint, for clients that need a URL
 //       --port 8787 --host 127.0.0.1
 //       SIGIL_HTTP_TOKEN            secret path segment (a random one is made if unset)
+//   sigil-connector --self          answer the ask links the owner gave this app,
+//                                   on this machine, while it runs
+//   sigil-connector --watch <dir>   keep an Obsidian vault in sync through the inbox
 
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
 import { randomBytes } from "node:crypto";
@@ -20,6 +23,8 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { VaultReader } from "./reader";
 import { embedSettings, loadEmbedder } from "./embed";
 import { CONNECTOR_VERSION, createServer } from "./server";
+import { SelfAgent } from "./self";
+import { ObsidianWatcher } from "./watch";
 
 function fail(message: string): never {
   process.stderr.write(`sigil-connector: ${message}\n`);
@@ -47,6 +52,8 @@ function help(): never {
       "Usage:",
       "  sigil-connector                      run over stdio (Claude Desktop, Cursor)",
       "  sigil-connector --http [--port N]    serve http://127.0.0.1:N/mcp/<token>",
+      "  sigil-connector --self               answer your ask links on this machine",
+      "  sigil-connector --watch <folder>     suggest new and changed Obsidian notes to the inbox",
       "",
     ].join("\n"),
   );
@@ -91,8 +98,43 @@ async function main() {
     fail((err as Error).message);
   }
 
+  const self = new SelfAgent(reader);
+
+  if (process.argv.includes("--self")) {
+    process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} answering ask links (stop with Ctrl+C)\n`);
+    const stop = new AbortController();
+    process.on("SIGINT", () => stop.abort());
+    process.on("SIGTERM", () => stop.abort());
+    let last = "";
+    await self.run({
+      signal: stop.signal,
+      onError: (err) => {
+        if (err.message !== last) process.stderr.write(`sigil-connector: ${err.message}\n`);
+        last = err.message;
+      },
+    });
+    return;
+  }
+
+  const watchDir = arg("--watch");
+  if (watchDir) {
+    let watcher: ObsidianWatcher;
+    try {
+      watcher = new ObsidianWatcher(reader, watchDir, { folder: arg("--folder") ?? "Obsidian", log: (l) => process.stderr.write(`sigil-connector: ${l}\n`) });
+    } catch (err) {
+      fail((err as Error).message);
+    }
+    watcher.start();
+    process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} watching ${watchDir} (stop with Ctrl+C)\n`);
+    process.on("SIGINT", () => {
+      watcher.stop();
+      process.exit(0);
+    });
+    return;
+  }
+
   if (!process.argv.includes("--http")) {
-    const server = createServer(reader);
+    const server = createServer(reader, self);
     await server.connect(new StdioServerTransport());
     process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} ready (stdio)\n`);
     return;
@@ -112,7 +154,7 @@ async function main() {
     }
     try {
       // Stateless: a fresh server and transport per request, nothing kept in memory.
-      const server = createServer(reader);
+      const server = createServer(reader, self);
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
       res.on("close", () => {
         void transport.close();

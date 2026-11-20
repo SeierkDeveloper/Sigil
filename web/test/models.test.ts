@@ -89,9 +89,9 @@ describe("upgrading the database", () => {
     old.close();
     const db = openDb(file);
     expect(db.prepare("SELECT id, kind, sealed FROM read_log").all()).toEqual([{ id: "e1", kind: "read", sealed: 1 }]);
-    db.prepare("INSERT INTO read_log VALUES ('e2', 'u1', 'a1', 'propose', 'p1', 1, '2026-01-01T00:00:01.000Z', 'cd', '0x02', 5, 0)").run();
-    expect(() => db.prepare("INSERT INTO read_log VALUES ('e3', 'u1', 'a1', 'write', null, 1, 'x', 'ef', '0x03', 5, 0)").run()).toThrow();
-    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(2);
+    db.prepare("INSERT INTO read_log VALUES ('e2', 'u1', 'a1', 'propose', 'p1', 1, '2026-01-01T00:00:01.000Z', 'cd', '0x02', 5, 0, NULL)").run();
+    expect(() => db.prepare("INSERT INTO read_log VALUES ('e3', 'u1', 'a1', 'write', null, 1, 'x', 'ef', '0x03', 5, 0, NULL)").run()).toThrow();
+    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(3);
     db.close();
     // Opening again changes nothing.
     const again = openDb(file);

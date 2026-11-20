@@ -56,6 +56,18 @@ import {
   type ReadKind,
   type StoredFolder,
   type StoredMemory,
+  AAD,
+  cleanModelSettings,
+  cleanRules,
+  cleanThinking,
+  decryptJson,
+  deleteAfter,
+  DEFAULT_THINKING,
+  openSetting,
+  type AskLinkSecret,
+  type ModelSettings,
+  type SelfRules,
+  type ThinkingSettings,
 } from "@sigil/core";
 import type { Api } from "./api";
 
@@ -86,6 +98,27 @@ export interface AppView {
   secret: string;
   /** May suggest memories to the inbox. Off unless the owner turns it on. */
   canPropose: boolean;
+  /** May answer as the AI self (the ask_self tool, and links it serves). */
+  canAskSelf: boolean;
+}
+
+export interface AskLinkView {
+  id: string;
+  publicKey: string;
+  /** The link's private key, rules and label, opened on this device. Null if it would not open. */
+  secret: AskLinkSecret | null;
+  label: string;
+  /** The app that answers it, or null when this vault answers it while open. */
+  appId: string | null;
+  expiresAt: string;
+  maxUses: number;
+  perHour: number;
+  uses: number;
+  answered: number;
+  lastAskedAt: string | null;
+  online: boolean;
+  createdAt: string;
+  revokedAt: string | null;
 }
 
 export interface ProposalView {
@@ -134,6 +167,12 @@ export interface VaultData {
   boxPublic: string | null;
   proposals: ProposalView[];
   shares: { outgoing: OutgoingShareView[]; incoming: IncomingShareView[] };
+  /** The owner's own model and key, opened on this device. Never readable on the server. */
+  model: ModelSettings | null;
+  /** The AI self's rules. Null until the owner saves them. */
+  self: SelfRules | null;
+  thinking: ThinkingSettings;
+  askLinks: AskLinkView[];
 }
 
 export interface LogEntryView {
@@ -147,6 +186,8 @@ export interface LogEntryView {
   leaf: string;
   hour: number;
   sealed: boolean;
+  /** For an answer of the AI self: the question and answer, sealed to this vault's key. */
+  note?: string;
 }
 
 export interface LogData {
@@ -167,6 +208,23 @@ interface ServerVault {
     lastUsedAt: string | null;
     grants: { folderId: string }[];
     canPropose?: boolean;
+    canAskSelf?: boolean;
+  }[];
+  settings?: Record<string, string>;
+  askLinks?: {
+    id: string;
+    publicKey: string;
+    ownerBox: string;
+    appId: string | null;
+    expiresAt: string;
+    maxUses: number;
+    perHour: number;
+    uses: number;
+    answered: number;
+    lastAskedAt: string | null;
+    online: boolean;
+    createdAt: string;
+    revokedAt: string | null;
   }[];
   keyslots: KeyslotView[];
   usage: { memories: number; bytes: number };
@@ -353,7 +411,36 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
       meta: a.meta,
       secret: a.secret,
       canPropose: a.canPropose === true,
+      canAskSelf: a.canAskSelf === true,
     });
+  }
+
+  // Settings: each one opened with the vault key on this device.
+  const settings = data.settings ?? {};
+  const open = async <T,>(name: "model" | "self" | "thinking"): Promise<T | null> => {
+    if (!settings[name]) return null;
+    try {
+      return await openSetting<T>(vault.key, name, settings[name]);
+    } catch {
+      unreadable++;
+      return null;
+    }
+  };
+  const model = cleanModelSettings(await open("model"));
+  const selfRaw = await open<unknown>("self");
+  const self = selfRaw ? cleanRules(selfRaw) : null;
+  const thinking = cleanThinking(await open("thinking"));
+
+  const askLinks: AskLinkView[] = [];
+  for (const l of data.askLinks ?? []) {
+    let secret: AskLinkSecret | null = null;
+    try {
+      secret = await decryptJson<AskLinkSecret>(vault.key, l.ownerBox, AAD.askLinkOwner(l.id));
+    } catch {
+      unreadable++;
+    }
+    const { ownerBox: _box, ...rest } = l;
+    askLinks.push({ ...rest, secret, label: secret?.label ?? "Unreadable link" });
   }
 
   // The vault's box key: made now for a vault from before box keys existed.
@@ -423,7 +510,22 @@ export async function loadVault(api: Api, vault: Unlocked): Promise<VaultData> {
     incoming.push({ id: s.id, folderId: s.folderId, folder, from, createdAt: s.createdAt, acceptedAt: s.acceptedAt, memories: shared });
   }
 
-  return { folders, memories, apps, keyslots: data.keyslots, usage: data.usage, unreadable, box, boxPublic, proposals, shares: { outgoing, incoming } };
+  return {
+    folders,
+    memories,
+    apps,
+    keyslots: data.keyslots,
+    usage: data.usage,
+    unreadable,
+    box,
+    boxPublic,
+    proposals,
+    shares: { outgoing, incoming },
+    model,
+    self,
+    thinking,
+    askLinks,
+  };
 }
 
 // ---------------------------------------------------------------- folders
@@ -452,17 +554,31 @@ export async function findOrCreateFolder(api: Api, vault: Unlocked, folders: Ope
 
 // ---------------------------------------------------------------- memories
 
-export async function saveMemory(api: Api, folder: OpenFolder, memory: Memory): Promise<Memory> {
-  const stored = await encryptMemory(folder, memory);
-  await api.put("memories", { memories: [stored] });
+/**
+ * Encrypts a memory for saving. A memory with an expiry also carries, in the
+ * clear, the time the server deletes it for real: the expiry plus the grace
+ * period. That time is all the server learns; the expiry itself stays encrypted.
+ */
+export async function storedForSave(folder: OpenFolder, memory: Memory, graceDays = DEFAULT_THINKING.graceDays): Promise<StoredMemory & { deleteAfter: string | null }> {
+  return { ...(await encryptMemory(folder, memory)), deleteAfter: deleteAfter(memory.expiresAt, graceDays) };
+}
+
+export async function saveMemory(api: Api, folder: OpenFolder, memory: Memory, graceDays?: number): Promise<Memory> {
+  await api.put("memories", { memories: [await storedForSave(folder, memory, graceDays)] });
   return memory;
 }
 
-export async function createMemory(api: Api, folder: OpenFolder, draft: MemoryDraft): Promise<Memory> {
-  return saveMemory(api, folder, buildMemory(draft, folder.id));
+export async function createMemory(api: Api, folder: OpenFolder, draft: MemoryDraft, graceDays?: number): Promise<Memory> {
+  return saveMemory(api, folder, buildMemory(draft, folder.id), graceDays);
 }
 
-export async function updateMemory(api: Api, folders: OpenFolder[], memory: Memory, changes: Partial<Pick<Memory, "title" | "body" | "tags" | "folderId">>): Promise<Memory> {
+export async function updateMemory(
+  api: Api,
+  folders: OpenFolder[],
+  memory: Memory,
+  changes: Partial<Pick<Memory, "title" | "body" | "tags" | "folderId">> & { expiresAt?: string | null },
+  graceDays?: number,
+): Promise<Memory> {
   const next = buildMemory(
     {
       title: changes.title ?? memory.title,
@@ -471,6 +587,7 @@ export async function updateMemory(api: Api, folders: OpenFolder[], memory: Memo
       source: memory.source,
       createdAt: memory.createdAt,
       editedAt: new Date().toISOString(),
+      expiresAt: changes.expiresAt === undefined ? memory.expiresAt : changes.expiresAt,
     },
     changes.folderId ?? memory.folderId,
     memory.id,
@@ -478,7 +595,7 @@ export async function updateMemory(api: Api, folders: OpenFolder[], memory: Memo
   const folder = folders.find((f) => f.id === next.folderId);
   if (!folder) throw new Error("That folder no longer exists.");
   // Moving to another folder re-encrypts the memory under that folder's key.
-  return saveMemory(api, folder, next);
+  return saveMemory(api, folder, next, graceDays);
 }
 
 export async function deleteMemories(api: Api, ids: string[]): Promise<number> {
@@ -580,6 +697,7 @@ export interface ProposalEdits {
 }
 
 function proposalSource(app: Pick<AppView, "name"> | undefined, payload: ProposalPayload): Memory["source"] {
+  if (payload.source?.ref) return payload.source;
   if (payload.via === "extension" && payload.url) return { kind: "web", ref: payload.url };
   return { kind: "app", ref: app?.name ?? "an app" };
 }
@@ -593,7 +711,7 @@ export async function approveProposal(api: Api, folder: OpenFolder, proposal: Pr
 }
 
 /** Merges a suggestion into an existing memory: its text is added under a dated line, its tags joined. */
-export async function mergeProposal(api: Api, folders: OpenFolder[], proposal: ProposalView, edits: ProposalEdits, into: Memory): Promise<Memory> {
+export async function mergeProposal(api: Api, folders: OpenFolder[], proposal: ProposalView, edits: ProposalEdits, into: Memory, graceDays?: number): Promise<Memory> {
   const folder = folders.find((f) => f.id === into.folderId);
   if (!folder) throw new Error("That memory's folder no longer exists.");
   const merged = buildMemory(
@@ -604,12 +722,33 @@ export async function mergeProposal(api: Api, folders: OpenFolder[], proposal: P
       source: into.source,
       createdAt: into.createdAt,
       editedAt: new Date().toISOString(),
+      expiresAt: into.expiresAt,
     },
     into.folderId,
     into.id,
   );
-  await api.post(`proposals/${proposal.id}/approve`, { memory: await encryptMemory(folder, merged) });
+  await api.post(`proposals/${proposal.id}/approve`, { memory: await storedForSave(folder, merged, graceDays) });
   return merged;
+}
+
+/** The memory a synced suggestion changes: the one imported from the same note. */
+export function syncedTarget(data: Pick<VaultData, "memories">, proposal: ProposalView): Memory | null {
+  const src = proposal.payload?.source;
+  if (!src?.ref) return null;
+  return data.memories.find((m) => m.source.kind === src.kind && m.source.ref === src.ref) ?? null;
+}
+
+/** Applies a change from a synced note: the memory's title, text and tags become the suggested ones; its source and dates stay. */
+export async function updateFromProposal(api: Api, folders: OpenFolder[], proposal: ProposalView, edits: ProposalEdits, into: Memory, graceDays?: number): Promise<Memory> {
+  const folder = folders.find((f) => f.id === into.folderId);
+  if (!folder) throw new Error("That memory's folder no longer exists.");
+  const next = buildMemory(
+    { title: edits.title, body: edits.body, tags: edits.tags, source: into.source, createdAt: into.createdAt, editedAt: new Date().toISOString(), expiresAt: into.expiresAt },
+    into.folderId,
+    into.id,
+  );
+  await api.post(`proposals/${proposal.id}/approve`, { memory: await storedForSave(folder, next, graceDays) });
+  return next;
 }
 
 export async function rejectProposal(api: Api, proposalId: string): Promise<void> {

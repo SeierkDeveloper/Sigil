@@ -8,6 +8,8 @@ import {
   ClientError,
   embeddingText,
   hybridSearch,
+  looseSearch,
+  type HeadInfo,
   sha256Hex,
   toResult,
   VaultClient,
@@ -73,6 +75,36 @@ export class VaultReader extends VaultClient {
     }
     if (this.vectors.size > CACHE_LIMIT) this.vectors.clear();
     return keys.map((k) => this.vectors.get(k)!);
+  }
+
+  /** Lets the AI self agent talk to the connector routes with this app key. */
+  request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+    return this.call<T>(method, path, body);
+  }
+
+  /** The app secret, for keys derived from it on this machine (the AI self's config and links). */
+  get appSecret(): Uint8Array {
+    return this.secret;
+  }
+
+  /**
+   * Ranks memories for a question: by meaning (when the model runs here) and
+   * words, then by any meaningful word, since a question rarely repeats the
+   * exact words of the memory that answers it.
+   */
+  async rank(heads: HeadInfo[], question: string, limit: number): Promise<HeadInfo[]> {
+    const items = heads.map((h) => ({ ...h, text: h.snippet }));
+    const embedder = question.trim() ? await this.model() : null;
+    let strict: HeadInfo[];
+    if (embedder) {
+      const [queryVector, ...vecs] = await this.embed(embedder, [question, ...items.map(embeddingText)]);
+      const vectors = new Map(items.map((item, i) => [item.id, vecs[i]]));
+      strict = hybridSearch(items, question, { queryVector, vectors, limit }).map((h) => h.item);
+    } else {
+      strict = hybridSearch(items, question, { limit }).map((h) => h.item);
+    }
+    const seen = new Set(strict.map((h) => h.id));
+    return [...strict, ...looseSearch(items, question).filter((h) => !seen.has(h.id))].slice(0, limit);
   }
 
   /**

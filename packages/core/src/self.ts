@@ -198,6 +198,14 @@ export function looseSearch<T extends { title: string; tags: string[]; text: str
   return scored.sort((a, b) => b.score - a.score || (a.item.editedAt < b.item.editedAt ? 1 : -1)).map((s) => s.item);
 }
 
+function rankedSources(rules: SelfRules, memories: SelfMemory[], now?: number): SelfSource[] {
+  const allowed = new Set(rules.folderIds);
+  return memories
+    .filter((m) => allowed.has(m.folderId) && isLive(m, now))
+    .slice(0, rules.maxSources)
+    .map((m, i) => ({ n: i + 1, id: m.id, title: m.title, folder: m.folder, text: m.body.length > SOURCE_TEXT ? `${m.body.slice(0, SOURCE_TEXT)}...` : m.body, editedAt: m.editedAt }));
+}
+
 // ---------------------------------------------------------------- the prompt
 
 export type Asker = "owner" | "guest";
@@ -281,6 +289,8 @@ export interface AnswerOptions {
   queryVector?: Float32Array | null;
   vectors?: Map<string, Float32Array>;
   now?: number;
+  /** The memories are already ranked for this question (the connector ranks them by meaning itself): use them in order. */
+  ranked?: boolean;
 }
 
 export const MAX_QUESTION = 2000;
@@ -291,7 +301,9 @@ export async function answerAsSelf(opts: AnswerOptions): Promise<SelfAnswer> {
   const screen = screenQuestion(opts.rules, question);
   if (!screen.ok) return { text: screen.reply, citations: [], refused: screen.reason, usedModel: false };
 
-  const sources = retrieve(opts.rules, opts.memories, question, { queryVector: opts.queryVector, vectors: opts.vectors, now: opts.now });
+  const sources = opts.ranked
+    ? rankedSources(opts.rules, opts.memories, opts.now)
+    : retrieve(opts.rules, opts.memories, question, { queryVector: opts.queryVector, vectors: opts.vectors, now: opts.now });
   if (sources.length === 0 && !opts.profile?.trim()) {
     return { text: opts.rules.unknownText, citations: [], refused: "unknown", usedModel: false };
   }

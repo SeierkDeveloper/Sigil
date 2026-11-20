@@ -252,25 +252,43 @@ export function listFolders(db: Db, userId: string): (StoredFolder & { createdAt
 
 // ---------------------------------------------------------------- memories
 
-export function putMemories(db: Db, userId: string, items: StoredMemory[]): number {
+/** A memory as it is saved. deleteAfter is set only for a memory with an expiry: the time the server deletes it for real. */
+export type MemoryInput = StoredMemory & { deleteAfter?: string | null };
+
+export function putMemories(db: Db, userId: string, items: MemoryInput[]): number {
   return tx(db, () => putMemoriesIn(db, userId, items));
 }
 
 /** The body of putMemories, for callers that are already inside a transaction. */
-export function putMemoriesIn(db: Db, userId: string, items: StoredMemory[]): number {
+export function putMemoriesIn(db: Db, userId: string, items: MemoryInput[]): number {
   const folderOk = db.prepare("SELECT 1 FROM folders WHERE user_id = ? AND id = ?");
   const upsert = db.prepare(`
-    INSERT INTO memories (user_id, id, folder_id, head, body, size, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO memories (user_id, id, folder_id, head, body, size, created_at, updated_at, delete_after)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT (user_id, id) DO UPDATE SET folder_id = excluded.folder_id, head = excluded.head,
-      body = excluded.body, size = excluded.size, updated_at = excluded.updated_at`);
+      body = excluded.body, size = excluded.size, updated_at = excluded.updated_at, delete_after = excluded.delete_after`);
   const at = now();
   for (const m of items) {
     if (!folderOk.get(userId, m.folderId)) throw new HttpError(400, "A memory points at a folder that does not exist.");
     if (!m.body) throw new HttpError(400, "A memory was sent without its body.");
-    upsert.run(userId, m.id, m.folderId, m.head, m.body, m.head.length + m.body.length, at, at);
+    upsert.run(userId, m.id, m.folderId, m.head, m.body, m.head.length + m.body.length, at, at, m.deleteAfter ?? null);
   }
   return items.length;
+}
+
+/** Sets or clears when expiring memories are deleted for real, after the owner changes the grace period. */
+export function setDeleteAfter(db: Db, userId: string, items: { id: string; deleteAfter: string | null }[]): number {
+  return tx(db, () => {
+    const q = db.prepare("UPDATE memories SET delete_after = ? WHERE user_id = ? AND id = ?");
+    let n = 0;
+    for (const i of items) n += Number(q.run(i.deleteAfter, userId, i.id).changes);
+    return n;
+  });
+}
+
+/** Deletes, for real, every memory whose grace period after expiry is over. Runs on a timer and when a vault loads. */
+export function purgeExpired(db: Db, at = new Date()): number {
+  return Number(db.prepare("DELETE FROM memories WHERE delete_after IS NOT NULL AND delete_after <= ?").run(at.toISOString()).changes);
 }
 
 /** Real delete: the rows are removed and, with secure_delete on, overwritten on disk. */
@@ -283,13 +301,14 @@ export function deleteMemories(db: Db, userId: string, ids: string[]): number {
   });
 }
 
-export function listMemories(db: Db, userId: string): (StoredMemory & { updatedAt: string })[] {
-  return (db.prepare("SELECT id, folder_id, head, body, updated_at FROM memories WHERE user_id = ? ORDER BY updated_at DESC, id").all(userId) as Row[]).map((r) => ({
+export function listMemories(db: Db, userId: string): (StoredMemory & { updatedAt: string; deleteAfter: string | null })[] {
+  return (db.prepare("SELECT id, folder_id, head, body, updated_at, delete_after FROM memories WHERE user_id = ? ORDER BY updated_at DESC, id").all(userId) as Row[]).map((r) => ({
     id: String(r.id),
     folderId: String(r.folder_id),
     head: String(r.head),
     body: String(r.body),
     updatedAt: String(r.updated_at),
+    deleteAfter: str(r.delete_after),
   }));
 }
 
@@ -337,6 +356,8 @@ export function revokeApp(db: Db, userId: string, appId: string): void {
     if (r.changes === 0) throw new HttpError(404, "That app was not found.");
     db.prepare("DELETE FROM grants WHERE app_id = ?").run(appId);
     db.prepare("DELETE FROM app_inbox WHERE app_id = ?").run(appId);
+    db.prepare("DELETE FROM self_apps WHERE app_id = ?").run(appId);
+    db.prepare("UPDATE ask_links SET revoked_at = COALESCE(revoked_at, ?) WHERE app_id = ?").run(now(), appId);
   });
 }
 
@@ -432,9 +453,11 @@ export interface LogEntry {
   leaf: string;
   hour: number;
   sealed: boolean;
+  /** For an answer of the AI self: the question and answer, sealed to the vault's public key. */
+  note?: string | null;
 }
 
-export function logRead(db: Db, auth: AppAuth, kind: ReadKind, memoryId: string | null, count: number, at = new Date()): LogEntry {
+export function logRead(db: Db, auth: AppAuth, kind: ReadKind, memoryId: string | null, count: number, at = new Date(), note: string | null = null): LogEntry {
   const entry = {
     id: randomId(),
     appId: auth.appId,
@@ -446,7 +469,7 @@ export function logRead(db: Db, auth: AppAuth, kind: ReadKind, memoryId: string 
   };
   const leaf = hex32(readEntryLeaf(entry));
   const hour = hourOf(at.getTime());
-  db.prepare("INSERT INTO read_log (id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+  db.prepare("INSERT INTO read_log (id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     entry.id,
     auth.userId,
     entry.appId,
@@ -457,8 +480,9 @@ export function logRead(db: Db, auth: AppAuth, kind: ReadKind, memoryId: string 
     entry.salt,
     leaf,
     hour,
+    note,
   );
-  return { ...entry, leaf, hour, sealed: false };
+  return { ...entry, leaf, hour, sealed: false, ...(note ? { note } : {}) };
 }
 
 function toEntry(r: Row): LogEntry {
@@ -473,6 +497,7 @@ function toEntry(r: Row): LogEntry {
     leaf: String(r.leaf),
     hour: Number(r.hour),
     sealed: Number(r.sealed) === 1,
+    ...(r.note ? { note: String(r.note) } : {}),
   };
 }
 

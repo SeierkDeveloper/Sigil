@@ -67,6 +67,7 @@ export interface HeadInfo {
   source: MemorySource;
   createdAt: string;
   editedAt: string;
+  expiresAt?: string;
 }
 
 export interface SearchResult {
@@ -176,6 +177,8 @@ export class VaultClient {
       if (!folder) continue;
       if (wanted && folder.name.toLowerCase() !== wanted && folder.id !== opts.folder) continue;
       const head: MemoryHead = await decryptHead(folder, m);
+      // An expired memory waits in the owner's Expired view and is not offered to apps.
+      if (head.expiresAt && new Date(head.expiresAt).getTime() <= Date.now()) continue;
       out.push({ ...head, id: m.id, folderId: folder.id, folder: folder.name });
     }
     return out;
