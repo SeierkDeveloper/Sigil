@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { cleanHandle, cleanRules, DEFAULT_RULES, isHandle, PUBLIC_MAX_PER_VISITOR, splitList } from "@sigil/core";
-import { formatDateTime, plural } from "@/lib/format";
+import { formatDateTime } from "@/lib/format";
 import * as pub from "../publicOps";
 import { errorText, useVault } from "../context";
 import { Band, CopyButton, Notice, PlateHead, Quiet } from "../ui";
@@ -72,7 +72,7 @@ export function PublicSelfSection() {
           <p className="app-key mono" data-testid="public-url">
             {pub.publicUrl(origin, self.handle)}
           </p>
-          <div className="row">
+          <div className="row public-address-actions">
             <CopyButton text={pub.publicUrl(origin, self.handle)} label="Copy address" />
             <a className="button button-small button-ghost" href={`/@${self.handle}`} target="_blank" rel="noreferrer">
               Open the page
@@ -81,9 +81,22 @@ export function PublicSelfSection() {
               Change
             </button>
           </div>
-          <p className="small muted">
-            {plural(self.items, "public note")} published{self.publishedAt ? ` ${formatDateTime(self.publishedAt)}` : ""}, kept up to date while this vault is open.{" "}
-            {plural(self.asked, "question")} asked, {self.answered} answered.{" "}
+          <dl className="public-facts">
+            <div>
+              <dt>{self.items === 1 ? "Public note" : "Public notes"}</dt>
+              <dd>{self.items}</dd>
+            </div>
+            <div>
+              <dt>Asked</dt>
+              <dd>{self.asked}</dd>
+            </div>
+            <div>
+              <dt>Answered</dt>
+              <dd>{self.answered}</dd>
+            </div>
+          </dl>
+          <p className="small muted public-facts-note">
+            {self.publishedAt ? `Published ${formatDateTime(self.publishedAt)}, kept` : "Kept"} up to date while this vault is open.{" "}
             {self.appId ? "Answered by your connector while it runs with --self." : "Answered by this vault while it is open."} Each question and answer is in your read log.
           </p>
           <Wall />
@@ -112,9 +125,11 @@ export function PublicSelfSection() {
               </div>
             </div>
           ) : (
-            <button type="button" className="text-button small" onClick={() => setConfirmOff(true)}>
-              Delete it for good
-            </button>
+            <p className="public-end">
+              <button type="button" className="text-button small" onClick={() => setConfirmOff(true)}>
+                Delete it for good
+              </button>
+            </p>
           )}
         </>
       ) : (
@@ -146,7 +161,9 @@ function Wall() {
             <p className="list-row-meta">{w.answer}</p>
           </div>
           <div className="list-row-actions">
-            <span className="badge">{w.hidden ? "Hidden" : "Shown"}</span>
+            <span className="badge wall-state" data-hidden={w.hidden ? "true" : "false"}>
+              {w.hidden ? "Hidden" : "Shown"}
+            </span>
             <button
               type="button"
               className="button button-small button-ghost"

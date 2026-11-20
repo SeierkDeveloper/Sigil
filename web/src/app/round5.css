@@ -440,3 +440,291 @@
   }
 }
 
+/* ------------------------------------------------------------------ the public AI self, in the vault */
+
+.self-public > .app-key {
+  margin-bottom: var(--space-3);
+  font-size: var(--text-base);
+}
+
+.public-address-actions {
+  margin-bottom: var(--space-5);
+}
+
+/* Three numbers on one plate. */
+.public-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 0 var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+}
+
+.public-facts > div {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border-left: 1px solid var(--color-line);
+}
+
+.public-facts > div:first-child {
+  border-left: 0;
+}
+
+.public-facts dt {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.public-facts dd {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-size: 2rem;
+  line-height: 1.05;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.public-facts-note {
+  max-width: 78ch;
+  margin: 0 0 var(--space-5);
+}
+
+.public-wall-list {
+  margin-bottom: var(--space-5);
+}
+
+.public-wall-list .list-row {
+  align-items: flex-start;
+}
+
+.public-wall-list .list-row-title {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.public-wall-list .list-row-meta {
+  display: -webkit-box;
+  max-width: 78ch;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+/* An answer hidden from the page is ruled over with fine lines. */
+.public-wall-list .list-row[data-hidden="true"] {
+  background: var(--ruled-faint);
+}
+
+.public-wall-list .list-row[data-hidden="true"] .list-row-meta {
+  color: var(--color-text-faint);
+}
+
+.self-public > .quiet {
+  margin-bottom: var(--space-5);
+}
+
+.public-end {
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .public-facts > div {
+    padding: var(--space-3);
+  }
+
+  .public-facts dd {
+    font-size: 1.625rem;
+  }
+
+  .public-facts dt {
+    letter-spacing: 0.08em;
+  }
+
+  .public-address-actions .button {
+    flex: 1 1 auto;
+  }
+
+  .public-wall-list .list-row-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* ------------------------------------------------------------------ /@handle: the public AI self */
+
+.public-card {
+  max-width: 720px;
+}
+
+/* Every answer says what wrote it: a small cut white plate. */
+.public-card .chat-by-kind {
+  --cut: 4px;
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 0;
+  background: var(--metal);
+  color: var(--color-accent-ink);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  clip-path: var(--chamfer);
+}
+
+/* The public notes an answer came from, each one a key to open. */
+.public-card .chat-answer > .chat-sources {
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.public-card .chat-sources-label {
+  margin-right: var(--space-1);
+}
+
+.public-card .chat-source .text-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+  color: var(--color-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.public-card .chat-source .text-button:hover {
+  border-color: var(--color-line-bright);
+  background: var(--ruled-faint), #060606;
+}
+
+/* A public note, opened: a sheet with three fine lines down its left edge. */
+.public-source {
+  margin: 0 0 var(--space-5);
+  padding-left: calc(var(--space-5) + 7px);
+  border-color: var(--color-line-bright);
+  background: var(--ruled-edge) left top / 7px 100% no-repeat, var(--plate), var(--color-surface);
+}
+
+.public-source::before {
+  display: none;
+}
+
+.public-source .eyebrow {
+  margin-bottom: var(--space-3);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+}
+
+.public-source-title {
+  margin: 0 0 var(--space-3);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-weight: 400;
+  font-size: 1.625rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.public-source-body {
+  max-height: 22rem;
+  margin: 0 0 var(--space-4);
+  overflow-y: auto;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+/* Offline: nothing is answering, so the seal, the status line and the field are all drawn dashed. */
+.public-card[data-online="false"] .ask-seal {
+  border-style: dashed;
+  outline-style: dashed;
+  outline-color: var(--color-line-strong);
+  color: var(--color-text-faint);
+}
+
+.public-card .ask-status[data-online="false"] {
+  border-style: dashed;
+  border-color: var(--color-line-strong);
+}
+
+.public-card[data-online="false"] .chat-form .textarea {
+  border-style: dashed;
+}
+
+/* Asked before: a plain record, one hairline between entries. */
+.public-wall {
+  margin-top: var(--space-7);
+}
+
+.public-wall .settings-heading {
+  margin-top: 0;
+}
+
+.public-wall .chat {
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+.public-wall .chat-turn {
+  padding: var(--space-5) 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.public-wall .chat-turn:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.public-wall .chat-by .faint {
+  margin-left: auto;
+  letter-spacing: 0.1em;
+}
+
+@media (max-width: 640px) {
+  .public-card .chat {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .public-card .ask-head .eyebrow {
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-align: center;
+    text-wrap: balance;
+  }
+
+  .public-card .chat-question,
+  .public-card .chat-answer {
+    max-width: 96%;
+  }
+
+  .public-card .chat-keys {
+    display: none;
+  }
+
+  .public-card .chat-form .button {
+    flex: 1 1 auto;
+  }
+
+  .public-source {
+    padding: var(--space-4) var(--space-4) var(--space-4) calc(var(--space-4) + 7px);
+  }
+}
+
