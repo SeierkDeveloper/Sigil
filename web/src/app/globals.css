@@ -489,6 +489,9 @@ svg {
   align-items: stretch;
   gap: var(--space-5);
   height: var(--header-height);
+  width: 100%;
+  max-width: calc(var(--container) + 2 * var(--gutter));
+  margin: 0 auto;
   padding: 0 var(--gutter);
 }
 
