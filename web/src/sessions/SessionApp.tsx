@@ -156,6 +156,12 @@ export function SessionApp({ bookingId }: { bookingId: string }) {
           <span>
             {status.problem ?? (status.online ? `Open. ${plural(left, "question")} left in this session.` : "The host's AI self is not answering right now. Try again in a moment.")}
           </span>
+          {/* The questions of the session, drawn: one cut for each, bright while it is still to ask. */}
+          <span className="session-meter" aria-hidden="true">
+            {Array.from({ length: status.turns }, (_, i) => (
+              <i key={i} data-left={i < left ? "true" : "false"} />
+            ))}
+          </span>
         </p>
         {status.houseRules ? (
           <div className="session-rules" data-testid="session-rules">

@@ -135,13 +135,17 @@ export class Recording {
 }
 
 /** Reads an answer aloud with a voice that runs on this device. False when the device has none, so nothing is sent anywhere. */
-export function speak(text: string): boolean {
+export function speak(text: string, onDone?: () => void): boolean {
   if (typeof speechSynthesis === "undefined") return false;
   const voice = pickLocalVoice(speechSynthesis.getVoices(), (navigator.language || "en").slice(0, 2));
   if (!voice) return false;
   const u = new SpeechSynthesisUtterance(speakable(text));
   u.voice = voice;
   u.lang = voice.lang;
+  if (onDone) {
+    u.onend = onDone;
+    u.onerror = onDone;
+  }
   speechSynthesis.cancel();
   speechSynthesis.speak(u);
   return true;

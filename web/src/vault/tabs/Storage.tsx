@@ -510,7 +510,7 @@ function MoveSection() {
         </div>
       ) : null}
       {open && !started ? (
-        <div className="subpanel" data-testid="move-open-row">
+        <div className="subpanel move-open" data-testid="move-open-row">
           <p className="small">
             A move to {open.to} is under way ({open.state === "sent" ? "the new node fetched the bundle" : "waiting for the new node"}).
           </p>

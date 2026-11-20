@@ -466,9 +466,9 @@ function MembersSection({ space }: { space: SpaceView }) {
     <section className="subpanel plate shared-members" aria-labelledby={`members-${space.id}`}>
       <PlateHead number="04" id={`members-${space.id}`} title="Members and heirs" lead="Roles as in a team space: read, write (and change or delete their own entries), admin." />
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <ul className="list">
+      <ul className="list shared-member-list">
         {vaults.map((m) => (
-          <li key={m.id} className="list-row" data-testid="shared-member">
+          <li key={m.id} className="list-row" data-testid="shared-member" data-accepted={m.acceptedAt ? "true" : "false"}>
             <div className="list-row-main">
               <p className="list-row-title">
                 {m.label} <span className="badge">{m.role}</span>
@@ -525,7 +525,7 @@ function MembersSection({ space }: { space: SpaceView }) {
       {space.heirs.length === 0 ? (
         <Quiet>No heirs named. An heir becomes a member when the legacy plan of the member they are named for releases.</Quiet>
       ) : (
-        <ul className="list" data-testid="heir-list">
+        <ul className="list shared-heir-list" data-testid="heir-list">
           {space.heirs.map((h) => (
             <li key={h.id} className="list-row" data-testid="heir">
               <div className="list-row-main">

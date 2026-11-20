@@ -27,6 +27,7 @@ export function VoiceControls({ onText, answer, startOn = false, onSwitch, label
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [speakAnswers, setSpeakAnswers] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
   const [localVoice, setLocalVoice] = useState(() => typeof speechSynthesis !== "undefined" && hasLocalVoice());
   const engine = useRef<SpeechEngine | null>(null);
   const recording = useRef<Recording | null>(null);
@@ -70,7 +71,8 @@ export function VoiceControls({ onText, answer, startOn = false, onSwitch, label
   useEffect(() => {
     if (!answer || !speakAnswers || spoken.current === answer.id) return;
     spoken.current = answer.id;
-    speak(answer.text);
+    // Shown while the device reads, so the strip says what the sound is.
+    setSpeaking(speak(answer.text, () => setSpeaking(false)));
   }, [answer, speakAnswers]);
 
   const toggle = async () => {
@@ -114,7 +116,7 @@ export function VoiceControls({ onText, answer, startOn = false, onSwitch, label
   }
 
   return (
-    <div className="voice" data-state={state} data-testid="voice" aria-label={label}>
+    <div className="voice" data-state={state} data-speaking={speaking && speakAnswers ? "true" : undefined} data-testid="voice" aria-label={label}>
       {state === "loading" ? (
         <p className="small voice-line" role="status">
           <span className="spinner" aria-hidden="true" /> Loading the speech model{progress ? ` (${progress}%)` : ""}
@@ -156,6 +158,11 @@ export function VoiceControls({ onText, answer, startOn = false, onSwitch, label
       {state === "listening" ? (
         <p className="small voice-line" role="status">
           Listening. What you say is written down here, on this device.
+        </p>
+      ) : null}
+      {speaking && speakAnswers && state !== "listening" ? (
+        <p className="small voice-line voice-reading" role="status">
+          <SpeakerIcon /> Reading the answer aloud, with a voice on this device.
         </p>
       ) : null}
       {!localVoice && state !== "loading" ? <p className="small faint voice-line">No voice on this device speaks without a network, so answers are not read aloud.</p> : null}

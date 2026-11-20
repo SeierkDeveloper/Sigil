@@ -283,7 +283,7 @@ function Bookings() {
       {list.length === 0 ? (
         <Quiet>No sessions booked yet.</Quiet>
       ) : (
-        <ul className="list">
+        <ul className="list session-booking-list">
           {list.map((b) => (
             <li key={b.id} className="list-row" data-testid="booking" data-state={b.state}>
               <div className="list-row-main">
