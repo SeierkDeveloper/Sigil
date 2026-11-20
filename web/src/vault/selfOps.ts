@@ -249,21 +249,24 @@ export interface ServeDeps extends MeaningDeps {
   boxPublic: string;
 }
 
+export interface ComposedLink {
+  reply: AskReply;
+  question: string;
+  citations: AskNote["citations"];
+}
+
 /**
- * Answers one waiting question for a link this vault answers: opens it with the
- * link's key, answers within the link's rules from the allowed folders, seals the
- * answer for the asker, and seals the question and answer to this vault's own
- * public key for the read log.
+ * Writes the answer to one waiting question of a link this vault answers,
+ * without sending it: opens the question with the link's key and answers within
+ * the link's rules from the allowed folders. Null for a link this vault does not hold.
  */
-export async function answerPending(api: Api, data: VaultData, q: PendingQuestion, deps: ServeDeps): Promise<{ answered: boolean; reply: AskReply }> {
+export async function composeLinkAnswer(api: Api, data: VaultData, q: PendingQuestion, deps: MeaningDeps & { model: ModelCaller }): Promise<ComposedLink | null> {
   const link = data.askLinks.find((l) => l.id === q.linkId);
-  if (!link?.secret) return { answered: false, reply: { v: 1, text: "", refused: "unknown_link" } };
+  if (!link?.secret) return null;
   const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
   const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey);
   const rules = cleanRules(link.secret.rules);
-  let reply: AskReply;
   let question = "";
-  let citations: AskNote["citations"] = [];
   try {
     const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
     question = opened.text;
@@ -283,20 +286,43 @@ export async function answerPending(api: Api, data: VaultData, q: PendingQuestio
     });
     if (gate.extra.length) await gate.use(gate.extra.map((m) => m.id));
     const text = withoutCitations(a.text);
-    reply = { v: 1, text: gate.asked.length ? `${text}\n\n${ASKED_TEXT}` : text, refused: a.refused };
-    citations = a.citations.map((c) => ({ id: c.id, title: c.title }));
-  } catch (err) {
-    reply = { v: 1, text: AGENT_ERROR_TEXT, refused: "error" };
-    if (!question) question = "(the question could not be opened)";
-    void err;
+    return { reply: { v: 1, text: gate.asked.length ? `${text}\n\n${ASKED_TEXT}` : text, refused: a.refused }, question, citations: a.citations.map((c) => ({ id: c.id, title: c.title })) };
+  } catch {
+    return { reply: { v: 1, text: AGENT_ERROR_TEXT, refused: "error" }, question: question || "(the question could not be opened)", citations: [] };
   }
-  const note: AskNote = { v: 1, via: "link", label: link.label, question, answer: reply.text, citations, refused: reply.refused };
+}
+
+/** Seals an answer for the asker and the question and answer for this vault's log, and sends both. */
+export async function sendLinkAnswer(
+  api: Api,
+  data: Pick<VaultData, "askLinks">,
+  q: Pick<PendingQuestion, "id" | "linkId" | "sessionId" | "askerKey">,
+  composed: ComposedLink,
+  boxPublic: string,
+): Promise<void> {
+  const link = data.askLinks.find((l) => l.id === q.linkId);
+  if (!link?.secret) throw new Error("That ask link is gone.");
+  const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
+  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey);
+  const note: AskNote = { v: 1, via: "link", label: link.label, question: composed.question, answer: composed.reply.text, citations: composed.citations, refused: composed.reply.refused };
   await api.post(`self/questions/${q.id}/answer`, {
-    sealed: sealAskMessage(key, ids, "a", reply),
-    note: sealJson(decodeBoxPublicKey(deps.boxPublic), note, askNoteContext(q.id, q.linkId)),
-    cited: citations.length,
+    sealed: sealAskMessage(key, ids, "a", composed.reply),
+    note: sealJson(decodeBoxPublicKey(boxPublic), note, askNoteContext(q.id, q.linkId)),
+    cited: composed.citations.length,
   });
-  return { answered: true, reply };
+}
+
+/**
+ * Answers one waiting question for a link this vault answers: opens it with the
+ * link's key, answers within the link's rules from the allowed folders, seals the
+ * answer for the asker, and seals the question and answer to this vault's own
+ * public key for the read log.
+ */
+export async function answerPending(api: Api, data: VaultData, q: PendingQuestion, deps: ServeDeps): Promise<{ answered: boolean; reply: AskReply }> {
+  const composed = await composeLinkAnswer(api, data, q, deps);
+  if (!composed) return { answered: false, reply: { v: 1, text: "", refused: "unknown_link" } };
+  await sendLinkAnswer(api, data, q, composed, deps.boxPublic);
+  return { answered: true, reply: composed.reply };
 }
 
 /** One round of the agent: says it is online, and answers whatever is waiting. */

@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -529,6 +529,121 @@ CREATE TABLE IF NOT EXISTS meet_messages (
   PRIMARY KEY (meet_id, turn)
 );
 
+-- The AI self's identity: the address of its self key (derived on the owner's
+-- device; public by nature) and the latest identity statement signed by the
+-- vault key and the self key, which anyone may read at /api/identity/<address>.
+CREATE TABLE IF NOT EXISTS self_identities (
+  user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  address TEXT NOT NULL UNIQUE,
+  statement TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Drafts of the AI self waiting for the owner: replies, plans and answers.
+-- box is the draft under the vault key. ref names what an answer answers (a
+-- question, a turn) so the open vault never drafts it twice; it is an id the
+-- server already knows.
+CREATE TABLE IF NOT EXISTS drafts (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('reply', 'plan', 'answer')),
+  ref TEXT,
+  box TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('waiting', 'approved', 'discarded')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (user_id, ref)
+);
+CREATE INDEX IF NOT EXISTS drafts_by_user ON drafts (user_id, state, created_at);
+
+-- Proofs of a fact. entry_id is the "disclose" log entry that carries the
+-- signed statement's hash; box is the proof under the vault key; published is
+-- the complete proof, only when the owner shares it by link.
+CREATE TABLE IF NOT EXISTS disclosures (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  entry_id TEXT NOT NULL,
+  box TEXT NOT NULL,
+  published TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS disclosures_by_user ON disclosures (user_id, created_at);
+
+-- The emergency card: ciphertext under a key that lives only in the link's
+-- fragment, which the server never receives. owner_box is that key and the
+-- card under the vault key. One card per vault; re-issuing replaces it.
+CREATE TABLE IF NOT EXISTS emergency_cards (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+  card TEXT NOT NULL,
+  owner_box TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+-- Each opening of the card, for its owner: the time, a device class and a
+-- language. No address, no cookie, no identifier. Kept after a card is revoked.
+CREATE TABLE IF NOT EXISTS emergency_opens (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  card_id TEXT NOT NULL,
+  at TEXT NOT NULL,
+  device TEXT NOT NULL,
+  lang TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS emergency_opens_by_user ON emergency_opens (user_id, at);
+
+-- Sealed agreements between two vaults. offer is the document and the first
+-- signature, sealed to the second vault; each side's own copy is under its own
+-- vault key. The server sees the hash, the keys and the signatures, which it
+-- checks against the vaults' signing keys; never the text. A signed agreement
+-- is never changed: an amendment is a new row whose previous is the old hash.
+CREATE TABLE IF NOT EXISTS agreements (
+  id TEXT PRIMARY KEY,
+  from_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  from_key TEXT NOT NULL,
+  to_key TEXT NOT NULL,
+  hash TEXT NOT NULL UNIQUE,
+  version INTEGER NOT NULL,
+  previous TEXT,
+  offer TEXT NOT NULL,
+  from_box TEXT NOT NULL,
+  to_box TEXT,
+  from_sig TEXT NOT NULL,
+  to_sig TEXT,
+  state TEXT NOT NULL CHECK (state IN ('proposed', 'signed', 'declined', 'withdrawn')),
+  from_removed INTEGER NOT NULL DEFAULT 0,
+  to_removed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  signed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS agreements_by_from ON agreements (from_id);
+CREATE INDEX IF NOT EXISTS agreements_by_to ON agreements (to_id);
+
+-- Knowledge packs: public, signed by the publisher's vault key. body is the
+-- whole signed pack of the latest version; every version is kept.
+CREATE TABLE IF NOT EXISTS packs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  folder_id TEXT NOT NULL,
+  sign_key TEXT NOT NULL,
+  title TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  hash TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS packs_by_user ON packs (user_id);
+CREATE TABLE IF NOT EXISTS pack_versions (
+  pack_id TEXT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+  version INTEGER NOT NULL,
+  hash TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (pack_id, version)
+);
+
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
   hour INTEGER PRIMARY KEY,
@@ -552,14 +667,16 @@ CREATE TABLE IF NOT EXISTS seal_leaves (
 // Every request a connected app makes, every suggestion it sends, every time
 // another vault opens a folder shared with it, every question the AI self
 // answers, every read of a protected folder and the owner's answer to it, and
-// every step of a conversation between two AI selves. leaf = Merkle leaf of the entry (salted). note, for answers only, is
+// every step of a conversation between two AI selves, and the steps of the AI
+// self's identity, its work, proofs of facts, the emergency card, agreements and
+// knowledge packs. leaf = Merkle leaf of the entry (salted). note, for answers only, is
 // the question and answer sealed to the vault's public key.
 const READ_LOG = `
 CREATE TABLE IF NOT EXISTS read_log (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync')),
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync', 'identity', 'work', 'disclose', 'emergency', 'agreement', 'pack')),
   memory_id TEXT,
   count INTEGER NOT NULL,
   at TEXT NOT NULL,
@@ -578,7 +695,7 @@ CREATE INDEX IF NOT EXISTS read_log_by_kind ON read_log (user_id, kind, hour);
 /** Older versions allowed fewer kinds in the log and had no notes. Rebuild the table, keeping every row. */
 function migrateReadLog(db: Db): void {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes("'sync'")) return;
+  if (!row?.sql || row.sql.includes("'pack'")) return;
   const hasNote = row.sql.includes("note TEXT");
   db.exec("BEGIN IMMEDIATE");
   try {

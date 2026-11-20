@@ -78,6 +78,14 @@ import type { AccessRequestView } from "./protectOps";
 import { openSources, type ServerSource, type SyncSourceView } from "./syncOps";
 import { openPublicSelf, type PublicSelfView, type ServerPublicSelf } from "./publicOps";
 import { openMeets, type MeetView, type ServerMeet } from "./meetOps";
+import { openChoices, openIdentity, openRules, type IdentityChoices, type IdentityView, type ServerIdentity } from "./identityOps";
+import { openDrafts, openWork, type DraftView, type ServerDraft } from "./workOps";
+import { openDisclosures, type DisclosureView, type ServerDisclosure } from "./discloseOps";
+import { openEmergency, type EmergencyView, type ServerEmergency } from "./emergencyOps";
+import { openAgreements, type AgreementView, type ServerAgreement } from "./agreementOps";
+import { openFollows, type PackRow } from "./packOps";
+import { EMPTY_CHOICES } from "./identityOps";
+import { DEFAULT_WORK, type FollowedPack, type WalletRules, type WorkSettings } from "@sigil/core";
 
 // ---------------------------------------------------------------- types
 
@@ -205,6 +213,26 @@ export interface VaultData {
   publicSelf: PublicSelfView | null;
   /** Conversations between this vault's AI self and others. */
   meets: MeetView[];
+  /** The AI self's identity: its self key's address and its signed statement. */
+  identity: IdentityView | null;
+  /** What the owner chose to say about the self, kept encrypted. */
+  identityChoices: IdentityChoices;
+  /** The draft rules of the self wallet, kept encrypted. */
+  walletRules: WalletRules | null;
+  /** What the AI self holds for approval, and how it learns. */
+  work: WorkSettings;
+  /** The approval queue. */
+  drafts: DraftView[];
+  /** Proofs of a fact, opened on this device. */
+  disclosures: DisclosureView[];
+  /** The emergency card and who opened it. */
+  emergency: EmergencyView;
+  /** Agreements with other vaults, opened on this device. */
+  agreements: AgreementView[];
+  /** Knowledge packs this vault publishes. */
+  packs: PackRow[];
+  /** Knowledge packs this vault follows. */
+  follows: FollowedPack[];
 }
 
 export interface LogEntryView {
@@ -271,6 +299,12 @@ export interface ServerVault {
   sync?: ServerSource[];
   publicSelf?: ServerPublicSelf | null;
   meets?: ServerMeet[];
+  identity?: ServerIdentity | null;
+  drafts?: ServerDraft[];
+  disclosures?: ServerDisclosure[];
+  emergency?: ServerEmergency;
+  agreements?: ServerAgreement[];
+  packs?: PackRow[];
   box?: StoredBoxKey | null;
   proposals?: { id: string; appId: string; sealed: string; createdAt: string }[];
   shares?: {
@@ -583,12 +617,42 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   unreadable += pub.unreadable;
   const met = await openMeets(vault, box, data.meets ?? []);
   unreadable += met.unreadable;
+  const later = async <T,>(fn: () => Promise<T>, fallback: T): Promise<T> => {
+    try {
+      return await fn();
+    } catch {
+      unreadable++;
+      return fallback;
+    }
+  };
+  const identityChoices = await later(() => openChoices(vault, settings.identity), EMPTY_CHOICES);
+  const walletRules = await later(() => openRules(vault, settings.wallet), null);
+  const work = await later(() => openWork(vault, settings.work), DEFAULT_WORK);
+  const follows = await later(() => openFollows(vault, settings.packs), []);
+  const drafted = await openDrafts(vault, data.drafts ?? []);
+  unreadable += drafted.unreadable;
+  const disclosed = await openDisclosures(vault, data.disclosures ?? []);
+  unreadable += disclosed.unreadable;
+  const em = await openEmergency(vault, data.emergency);
+  unreadable += em.unreadable;
+  const agreed = await openAgreements(vault, box, data.agreements ?? []);
+  unreadable += agreed.unreadable;
 
   return {
     access: data.access ?? [],
     sync: synced.sources,
     publicSelf: pub.self,
     meets: met.meets,
+    identity: openIdentity(data.identity),
+    identityChoices,
+    walletRules,
+    work,
+    drafts: drafted.drafts,
+    disclosures: disclosed.disclosures,
+    emergency: em.emergency,
+    agreements: agreed.agreements,
+    packs: data.packs ?? [],
+    follows,
     legacy,
     trusted,
     agents: (data.agents ?? []).map((a) => ({ appId: a.appId, homeFolderId: a.homeFolderId, rules: a.rules, publicKey: a.publicKey, createdAt: a.createdAt })),

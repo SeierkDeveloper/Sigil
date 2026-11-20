@@ -9,8 +9,9 @@
 //   signature  Ed25519 by the publisher's signing key over the same bytes
 //
 // A pack is public: its text is stored and served in the clear, like the public
-// AI self's copy. Which vaults follow a pack is kept only in each follower's
-// own encrypted settings; the server never learns it. Packs are free.
+// AI self's copy. The list of packs a vault follows is kept in its encrypted
+// settings; the server sees a pack being fetched and the follower's own log
+// line when it takes a version in. Packs are free.
 
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { hmac } from "@noble/hashes/hmac.js";

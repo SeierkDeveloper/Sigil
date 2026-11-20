@@ -100,6 +100,8 @@ export function createSpace(db: Db, userId: string, s: { id: string; meta: strin
     const at = now();
     db.prepare("INSERT INTO spaces (id, created_by, meta, epoch, created_at, updated_at) VALUES (?, ?, ?, 1, ?, ?)").run(s.id, userId, s.meta, at, at);
     insertMember(db, s.id, userId, null, s.member, null, at, at);
+    // The vault's own sealed record of joining: a proof of membership can rest on it.
+    logRead(db, { appId: "vault", userId }, "space", `joined-${s.id}`, 1);
   });
 }
 
@@ -140,8 +142,14 @@ export function addMember(db: Db, userId: string, spaceId: string, m: NewMember)
 }
 
 export function acceptSpace(db: Db, userId: string, spaceId: string): void {
-  const r = db.prepare("UPDATE space_members SET accepted_at = COALESCE(accepted_at, ?) WHERE space_id = ? AND kind = 'vault' AND user_id = ?").run(now(), spaceId, userId);
-  if (r.changes === 0) throw new HttpError(404, "That space was not found. You may have been removed from it.", "no_space");
+  tx(db, () => {
+    const was = db.prepare("SELECT accepted_at FROM space_members WHERE space_id = ? AND kind = 'vault' AND user_id = ?").get(spaceId, userId) as Row | undefined;
+    if (!was) throw new HttpError(404, "That space was not found. You may have been removed from it.", "no_space");
+    if (was.accepted_at) return;
+    db.prepare("UPDATE space_members SET accepted_at = ? WHERE space_id = ? AND kind = 'vault' AND user_id = ?").run(now(), spaceId, userId);
+    // The vault's own sealed record of joining: a proof of membership can rest on it.
+    logRead(db, { appId: "vault", userId }, "space", `joined-${spaceId}`, 1);
+  });
 }
 
 export function setRole(db: Db, userId: string, spaceId: string, memberId: string, role: SpaceRole, tag: string): void {

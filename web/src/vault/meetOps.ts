@@ -223,9 +223,16 @@ export function meetRules(data: Pick<VaultData, "self">, record: MeetRecord): Se
   return cleanRules({ ...(data.self ?? {}), folderIds: [...record.folderIds, ...(record.calendar ? [CALENDAR] : [])] });
 }
 
-/** Takes this side's turn: written by the owner's own model on this device, sealed under the meet key. */
-export async function takeTurn(api: Api, data: VaultData, meet: MeetView, deps: { model: ModelCaller; box: BoxKeyPair }): Promise<void> {
-  if (meet.state !== "running" || meet.next !== "me" || !meet.record) return;
+export interface ComposedTurn {
+  turn: number;
+  text: string;
+  done: boolean;
+  cited: number;
+}
+
+/** Writes this side's turn with the owner's own model, without sending it. Null when it is not this side's turn. */
+export async function composeTurn(api: Api, data: VaultData, meet: MeetView, deps: { model: ModelCaller }): Promise<ComposedTurn | null> {
+  if (meet.state !== "running" || meet.next !== "me" || !meet.record) return null;
   const rules = meetRules(data, meet.record);
   const last = [...meet.lines].reverse().find((l) => !l.mine)?.text ?? meet.note;
   const gate = await protectedGate(api, data, { ...rules, folderIds: meet.record.folderIds }, last, { id: meet.id, kind: "meet" });
@@ -244,14 +251,31 @@ export async function takeTurn(api: Api, data: VaultData, meet: MeetView, deps: 
     turnLimit: meet.turnLimit,
   });
   if (gate.extra.length) await gate.use(gate.extra.map((m) => m.id));
-  const text = gate.asked.length ? `${out.text}\n\n${ASKED_TEXT}` : out.text;
-  const key = meetKey(deps.box, meet.peerKey, meet.id);
+  return { turn, text: gate.asked.length ? `${out.text}\n\n${ASKED_TEXT}` : out.text, done: out.done, cited: out.citations.length };
+}
+
+/** Seals a turn under the meet key, which only the two vaults can derive, and sends it. */
+export async function sendTurn(api: Api, meet: Pick<MeetView, "id" | "peerKey" | "myKey">, box: BoxKeyPair, t: ComposedTurn): Promise<void> {
+  const key = meetKey(box, meet.peerKey, meet.id);
   await api.post(`meets/${meet.id}/turns`, {
-    turn,
-    box: sealMeetMessage(key, { meetId: meet.id, turn, from: meet.myKey }, { v: 1, text, done: out.done }),
-    done: out.done,
-    cited: out.citations.length,
+    turn: t.turn,
+    box: sealMeetMessage(key, { meetId: meet.id, turn: t.turn, from: meet.myKey }, { v: 1, text: t.text, done: t.done }),
+    done: t.done,
+    cited: t.cited,
   });
+}
+
+/** Takes this side's turn: written by the owner's own model on this device, sealed under the meet key. */
+export async function takeTurn(api: Api, data: VaultData, meet: MeetView, deps: { model: ModelCaller; box: BoxKeyPair }): Promise<void> {
+  const t = await composeTurn(api, data, meet, deps);
+  if (t) await sendTurn(api, meet, deps.box, t);
+}
+
+/** The conversations waiting for this vault's turn, opened here. Also tells the server this vault is here. */
+export async function waitingMeets(api: Api, vault: Unlocked, box: BoxKeyPair): Promise<MeetView[]> {
+  const { meets } = await api.get<{ meets: ServerMeet[] }>("meets/waiting");
+  if (!meets.length) return [];
+  return (await openMeets(vault, box, meets)).meets;
 }
 
 /** One round: says this vault is here, and takes every turn that waits for it. */
