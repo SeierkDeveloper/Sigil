@@ -52,7 +52,7 @@ export function MeetTab() {
           </button>
         ) : null}
       </div>
-      <p className="small muted">
+      <p className="small muted meet-lead">
         Your AI self talks with someone else&apos;s, only after both of you said yes, for one purpose and a fixed number of turns. Each answers within its own rules, from
         the folders its owner chose. Every message is encrypted between the two vaults; Sigil passes it on and cannot read it. You both get the whole transcript, and
         either of you can stop it. Your AI self takes its turns while this vault is open, with your own model key.
@@ -202,7 +202,7 @@ function InviteForm({ onDone }: { onDone(): void }) {
         <label className="field-label" htmlFor="meet-turns">
           Turns, both sides together
         </label>
-        <input id="meet-turns" className="input" type="number" min={2} max={12} value={turns} onChange={(e) => setTurns(Math.min(12, Math.max(2, Number(e.target.value) || 2)))} />
+        <input id="meet-turns" className="input meet-turns" type="number" min={2} max={12} value={turns} onChange={(e) => setTurns(Math.min(12, Math.max(2, Number(e.target.value) || 2)))} />
       </div>
       <div className="form-actions">
         <button type="submit" className="button button-primary" disabled={busy || !fingerprint || !label.trim() || !me.trim()}>
@@ -246,7 +246,7 @@ function InviteCard({ meeting }: { meeting: meet.MeetView }) {
         </span>
       </PlateHead>
       {meeting.note ? <p className="meet-note">&ldquo;{meeting.note}&rdquo;</p> : null}
-      <p className="small muted">
+      <p className="small muted meet-their-vault">
         Their vault: <Fingerprint value={vaultFingerprint(meeting.peerKey)} />. Compare it with what they read to you if you are not sure who this is.
       </p>
       {error ? <Notice kind="error">{error}</Notice> : null}
@@ -327,14 +327,19 @@ function MeetCard({ meeting }: { meeting: meet.MeetView }) {
             : `Done after ${plural(meeting.turns, "turn")}.`;
 
   return (
-    <section className="subpanel plate meet-card" data-state={meeting.state} data-testid="meet-card" aria-label={`Conversation with ${meeting.record?.label ?? meeting.peerName}`}>
+    <section className="subpanel plate meet-card" data-state={meeting.state} data-next={meeting.state === "running" ? meeting.next : undefined} data-testid="meet-card" aria-label={`Conversation with ${meeting.record?.label ?? meeting.peerName}`}>
       <PlateHead number={meeting.role === "inviter" ? "Out" : "In"} title={`${meeting.record?.label ?? meeting.peerName}: ${MEET_PURPOSES[meeting.purpose].label}`} lead={waitingLine}>
         <span className="plate-state" data-on={open ? "true" : "false"}>
           {STATE_WORD[meeting.state]}
         </span>
       </PlateHead>
       {meeting.note ? <p className="meet-note">&ldquo;{meeting.note}&rdquo;</p> : null}
-      <p className="small faint">
+      <span className="meet-meter" aria-hidden="true">
+        {Array.from({ length: meeting.turnLimit }, (_, i) => (
+          <i key={i} data-said={i < meeting.turns ? "true" : "false"} />
+        ))}
+      </span>
+      <p className="small faint meet-facts">
         Started {formatDateTime(meeting.createdAt)}. {meeting.turns} of {meeting.turnLimit} turns.{" "}
         {folderNames.length ? `Your self may use ${folderNames.join(", ")}` : "Your self uses no folder"}
         {meeting.record?.calendar ? " and your calendar." : "."}
@@ -358,7 +363,7 @@ function MeetCard({ meeting }: { meeting: meet.MeetView }) {
       ) : (
         <Quiet>{meeting.state === "invited" ? "Nothing is said until they say yes." : "No turns yet."}</Quiet>
       )}
-      <div className="form-actions">
+      <div className="form-actions meet-actions">
         {open ? (
           <button type="button" className="button button-small button-danger" disabled={busy} onClick={() => void act(() => meet.stopMeet(api, meeting.id))}>
             Stop

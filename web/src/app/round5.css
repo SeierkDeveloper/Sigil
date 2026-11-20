@@ -243,3 +243,200 @@
   }
 }
 
+/* ------------------------------------------------------------------ selves meet */
+
+.meet-lead {
+  max-width: 82ch;
+  margin-bottom: var(--space-5);
+}
+
+.meet-form .segmented {
+  margin-bottom: var(--space-2);
+}
+
+.meet-form .segmented button {
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.3;
+}
+
+.meet-form .fingerprint {
+  display: block;
+  margin-top: var(--space-2);
+}
+
+.meet-turns {
+  max-width: 7.5rem;
+}
+
+.meet-form .checkbox-list + .checkbox,
+.meet-invite .checkbox-list + .checkbox {
+  margin-top: var(--space-3);
+}
+
+/* The line both owners wrote for their selves: a quotation, marked by three fine lines down its left side. */
+.meet-note {
+  position: relative;
+  max-width: 60ch;
+  margin: 0 0 var(--space-4);
+  padding: 2px 0 2px calc(7px + var(--space-4));
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-size: 1.25rem;
+  font-style: italic;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.meet-note::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 7px;
+  background: var(--ruled-edge);
+}
+
+/* The turn limit, drawn: one cut of ribbon for each turn, on two rails because two selves take them in turn. */
+.meet-meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 2px;
+  margin: 0 0 var(--space-2);
+  padding-bottom: 5px;
+}
+
+.meet-meter i {
+  --cut: 4px;
+  flex: none;
+  width: 20px;
+  height: 7px;
+  background: var(--ruled-faint), rgba(255, 255, 255, 0.04);
+  clip-path: var(--lean);
+}
+
+.meet-meter i:nth-child(even) {
+  transform: translateY(5px);
+}
+
+.meet-meter i[data-said="true"] {
+  background: var(--ruled);
+}
+
+.meet-facts {
+  max-width: 78ch;
+  margin: 0 0 var(--space-5);
+}
+
+.meet-card[data-state="invited"] {
+  border-style: dashed;
+}
+
+.meet-card[data-state="stopped"],
+.meet-card[data-state="declined"] {
+  border-style: dashed;
+  opacity: 1;
+}
+
+.meet-card:is([data-state="stopped"], [data-state="declined"]) :is(.plate-title, .meet-note) {
+  color: var(--color-text-muted);
+}
+
+.meet-card:is([data-state="stopped"], [data-state="declined"]) .plate-number {
+  border-style: dashed;
+  color: var(--color-text-faint);
+}
+
+.meet-card:is([data-state="stopped"], [data-state="declined"]) .meet-meter i[data-said="true"] {
+  opacity: 0.5;
+}
+
+/* Two selves, two sides: yours on the right, theirs on the left. */
+.meet-transcript {
+  gap: var(--space-4);
+}
+
+.meet-transcript .chat-answer {
+  max-width: min(84%, 64ch);
+}
+
+.meet-transcript .chat-turn[data-mine="true"] .chat-answer {
+  justify-self: end;
+  margin-left: 0;
+  border-color: var(--color-line-strong);
+  border-left-color: var(--color-line-strong);
+  border-right-color: var(--color-line-bright);
+  border-radius: var(--radius-lg) var(--radius-sm) var(--radius-lg) var(--radius-lg);
+  background: var(--color-surface-3);
+}
+
+.meet-transcript .chat-turn[data-mine="false"] .chat-answer {
+  margin-right: 0;
+}
+
+.meet-transcript .chat-by .faint {
+  margin-left: auto;
+  padding-left: var(--space-3);
+  letter-spacing: 0.1em;
+}
+
+/* Whose turn it is: a short cut of ribbon waits on that side. */
+.meet-card[data-next] .meet-transcript::after {
+  content: "";
+  --cut: 4px;
+  width: 44px;
+  height: 9px;
+  background: var(--ruled);
+  clip-path: var(--lean);
+  opacity: 0.6;
+}
+
+.meet-card[data-next="me"] .meet-transcript::after {
+  justify-self: end;
+}
+
+[data-motion] .meet-card[data-next] .meet-transcript::after {
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+.meet-actions {
+  justify-content: flex-end;
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.meet .empty-state {
+  margin-top: var(--space-5);
+}
+
+@media (max-width: 760px) {
+  .meet-form .segmented {
+    grid-auto-flow: row;
+  }
+
+  .meet-form .segmented button {
+    text-align: left;
+  }
+}
+
+@media (max-width: 640px) {
+  .meet-note {
+    font-size: 1.125rem;
+  }
+
+  .meet-transcript {
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .meet-transcript .chat-answer {
+    max-width: 94%;
+  }
+
+  .meet-actions .button {
+    flex: 1 1 auto;
+  }
+}
+
