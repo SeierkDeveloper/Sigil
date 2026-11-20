@@ -6,7 +6,8 @@ import { formatDate, plural } from "@/lib/format";
 import * as selfOps from "../selfOps";
 import * as think from "../thinkOps";
 import { errorText, useVault } from "../context";
-import { Notice } from "../ui";
+import { SourceMark } from "../marks";
+import { Notice, PlateHead, Quiet } from "../ui";
 
 /** Memory that thinks: the weekly brief, memories that disagree, and what has expired. All of it worked out on this device. */
 export function ReviewTab() {
@@ -63,47 +64,100 @@ function BriefSection() {
   };
 
   return (
-    <section className="subpanel brief" aria-labelledby="brief-title">
-      <h3 id="brief-title" className="settings-heading">
-        Weekly brief
-      </h3>
-      <p className="small muted">What is new, what changed, and what you may have forgotten, saved as a memory in the Briefs folder.</p>
+    <section className="subpanel plate brief" aria-labelledby="brief-title">
+      <PlateHead number="01" id="brief-title" title="Weekly brief" lead="What is new, what changed, and what you may have forgotten, saved as a memory in the Briefs folder.">
+        <span className="plate-state" data-on={data.thinking.weeklyBrief ? "true" : "false"}>
+          {data.thinking.weeklyBrief ? "Every week" : "By hand"}
+        </span>
+      </PlateHead>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {note ? <Notice kind="success">{note}</Notice> : null}
-      {latest ? (
-        <article className="brief-latest" data-testid="brief-latest">
-          <p className="list-row-title">
-            <button type="button" className="text-button" onClick={() => openMemory(latest.id)}>
-              {latest.title}
-            </button>
-          </p>
-          <div className="editor-body brief-body">{latest.body}</div>
-        </article>
-      ) : (
-        <p className="small">No brief yet.</p>
-      )}
-      <div className="checkbox-list">
-        <label className="checkbox" htmlFor="brief-auto">
-          <input id="brief-auto" type="checkbox" checked={data.thinking.weeklyBrief} disabled={busy === "settings"} onChange={(e) => void setThinking({ weeklyBrief: e.target.checked })} />
-          <span>Make one when I open my vault and the last is a week old</span>
-        </label>
-        <label className="checkbox" htmlFor="brief-model">
-          <input
-            id="brief-model"
-            type="checkbox"
-            checked={data.thinking.briefWithModel}
-            disabled={busy === "settings" || !data.model}
-            onChange={(e) => void setThinking({ briefWithModel: e.target.checked })}
-          />
-          <span>Let my model write it{data.model ? "" : " (add a model key under AI self)"}. Without it, the brief is three plain lists.</span>
-        </label>
-      </div>
-      <div className="form-actions">
-        <button type="button" className="button" onClick={() => void make()} disabled={!!busy}>
-          {busy === "make" ? "Writing" : "Make a brief now"}
-        </button>
+      <div className="brief-layout">
+        {latest ? (
+          <article className="brief-latest" data-testid="brief-latest">
+            <header className="brief-head">
+              <SourceMark kind="brief" />
+              <p className="brief-title">
+                <button type="button" className="text-button" onClick={() => openMemory(latest.id)}>
+                  {latest.title}
+                </button>
+              </p>
+            </header>
+            <BriefBody text={latest.body} />
+          </article>
+        ) : (
+          <div className="brief-latest brief-none">
+            <Quiet>No brief yet.</Quiet>
+            <p className="small faint">With the weekly switch on, the first one is written once your vault is a week old. The button writes one now.</p>
+          </div>
+        )}
+        <div className="brief-side">
+          <label className="checkbox suggest-toggle" htmlFor="brief-auto">
+            <input id="brief-auto" type="checkbox" checked={data.thinking.weeklyBrief} disabled={busy === "settings"} onChange={(e) => void setThinking({ weeklyBrief: e.target.checked })} />
+            <span>Make one when I open my vault and the last is a week old</span>
+          </label>
+          <label className="checkbox suggest-toggle" htmlFor="brief-model">
+            <input
+              id="brief-model"
+              type="checkbox"
+              checked={data.thinking.briefWithModel}
+              disabled={busy === "settings" || !data.model}
+              onChange={(e) => void setThinking({ briefWithModel: e.target.checked })}
+            />
+            <span>Let my model write it{data.model ? "" : " (add a model key under AI self)"}. Without it, the brief is three plain lists.</span>
+          </label>
+          <button type="button" className="button button-block" onClick={() => void make()} disabled={!!busy}>
+            {busy === "make" ? "Writing" : "Make a brief now"}
+          </button>
+        </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * A brief is plain text with a few marks: "## " opens a part and "- " a line of a list.
+ * They are set as headings and lists; the marks stay in the text for a reader that copies it.
+ */
+function BriefBody({ text }: { text: string }) {
+  const blocks: { kind: "h" | "ul" | "p"; mark?: string; lines: string[] }[] = [];
+  for (const raw of text.split("\n")) {
+    const line = raw.trimEnd();
+    if (!line.trim()) {
+      blocks.push({ kind: "p", lines: [] });
+      continue;
+    }
+    const h = /^(#{1,3} )(.*)$/.exec(line);
+    const li = /^([-*] )(.*)$/.exec(line);
+    const last = blocks[blocks.length - 1];
+    if (h) blocks.push({ kind: "h", mark: h[1], lines: [h[2]] });
+    else if (li && last?.kind === "ul") last.lines.push(li[2]);
+    else if (li) blocks.push({ kind: "ul", mark: li[1], lines: [li[2]] });
+    else if (last?.kind === "p" && last.lines.length) last.lines.push(line);
+    else blocks.push({ kind: "p", lines: [line] });
+  }
+  return (
+    <div className="brief-body">
+      {blocks.map((b, i) =>
+        b.kind === "h" ? (
+          <h4 key={i}>
+            <span className="visually-hidden">{b.mark}</span>
+            {b.lines[0]}
+          </h4>
+        ) : b.kind === "ul" ? (
+          <ul key={i}>
+            {b.lines.map((l, j) => (
+              <li key={j}>
+                <span className="visually-hidden">{b.mark}</span>
+                {l}
+              </li>
+            ))}
+          </ul>
+        ) : b.lines.length ? (
+          <p key={i}>{b.lines.join("\n")}</p>
+        ) : null,
+      )}
+    </div>
   );
 }
 
@@ -189,49 +243,57 @@ function ContradictionsSection() {
     });
 
   return (
-    <section className="subpanel contradictions" aria-labelledby="contradictions-title">
-      <h3 id="contradictions-title" className="settings-heading">
-        Memories that disagree
-      </h3>
-      <p className="small muted">
-        Pairs about the same thing that seem to say different things: one says no where the other says yes, opposite words, or other numbers and dates.{" "}
-        {semantic.status.state === "ready" ? "Found by meaning and words." : "Found by words; by meaning once search by meaning is ready."} You decide which is true.
-      </p>
-      <label className="checkbox" htmlFor="contradictions-model">
+    <section className="subpanel plate contradictions" aria-labelledby="contradictions-title">
+      <PlateHead
+        number="02"
+        id="contradictions-title"
+        title="Memories that disagree"
+        lead={
+          <>
+            Pairs about the same thing that seem to say different things: one says no where the other says yes, opposite words, or other numbers and dates.{" "}
+            {semantic.status.state === "ready" ? "Found by meaning and words." : "Found by words; by meaning once search by meaning is ready."} You decide which is true.
+          </>
+        }
+      >
+        <span className="plate-state" data-on={found.length ? "true" : "false"}>
+          {found.length ? plural(found.length, "pair") : "None"}
+        </span>
+      </PlateHead>
+      <label className="checkbox suggest-toggle" htmlFor="contradictions-model">
         <input id="contradictions-model" type="checkbox" checked={data.thinking.contradictionsWithModel} disabled={!data.model || busy === "settings"} onChange={(e) => void setUseModel(e.target.checked)} />
         <span>Let me ask my model about a pair{data.model ? "" : " (add a model key under AI self)"}</span>
       </label>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {found.length === 0 ? (
-        <p className="small">No memories that disagree.</p>
+        <Quiet>No memories that disagree.</Quiet>
       ) : (
-        <ul className="list contradiction-list">
+        <ul className="contradiction-list">
           {found.slice(0, 30).map((c) => {
             const key = pairKey(c.a.id, c.b.id);
             return (
-              <li key={key} className="list-row contradiction" data-testid="contradiction">
-                <div className="list-row-main">
-                  <p className="list-row-title">{c.signals.join(". ")}</p>
-                  <div className="contradiction-pair">
-                    {[c.a, c.b].map((m) => (
+              <li key={key} className="contradiction" data-testid="contradiction">
+                <p className="contradiction-why">{c.signals.join(". ")}</p>
+                <div className="contradiction-pair">
+                  {[c.a, c.b].map((m, i) => {
+                    const other = i === 0 ? c.b : c.a;
+                    return (
                       <div key={m.id} className="contradiction-side">
-                        <button type="button" className="text-button" onClick={() => openMemory(m.id)}>
-                          {m.title}
+                        <p className="contradiction-title">
+                          <button type="button" className="text-button" onClick={() => openMemory(m.id)}>
+                            {m.title}
+                          </button>
+                          <span className="contradiction-date"> {formatDate(m.editedAt)}</span>
+                        </p>
+                        <p className="contradiction-text">{m.snippet}</p>
+                        <button type="button" className="button button-small" disabled={busy === key} onClick={() => void keep(m, other)}>
+                          Keep &quot;{short(m.title)}&quot;
                         </button>
-                        <span className="faint small"> {formatDate(m.editedAt)}</span>
-                        <p className="small">{m.snippet}</p>
                       </div>
-                    ))}
-                  </div>
-                  {verdicts[key] ? <p className="small">{verdicts[key]}</p> : null}
+                    );
+                  })}
                 </div>
-                <div className="list-row-actions">
-                  <button type="button" className="button button-small" disabled={busy === key} onClick={() => void keep(c.a, c.b)}>
-                    Keep &quot;{short(c.a.title)}&quot;
-                  </button>
-                  <button type="button" className="button button-small" disabled={busy === key} onClick={() => void keep(c.b, c.a)}>
-                    Keep &quot;{short(c.b.title)}&quot;
-                  </button>
+                {verdicts[key] ? <p className="contradiction-verdict">{verdicts[key]}</p> : null}
+                <div className="contradiction-actions">
                   {model ? (
                     <button type="button" className="button button-small button-ghost" disabled={busy === `check:${key}`} onClick={() => void check(c.a, c.b)}>
                       {busy === `check:${key}` ? "Asking" : "Ask my model"}
@@ -305,17 +367,20 @@ function ExpiredSection() {
   const graceEnd = (m: Memory) => new Date(new Date(m.expiresAt!).getTime() + data.thinking.graceDays * 86_400_000).toISOString();
 
   return (
-    <section className="subpanel expired" aria-labelledby="expired-title">
-      <h3 id="expired-title" className="settings-heading">
-        Expired
-      </h3>
-      <p className="small muted">
-        Memories past the expiry date you gave them. Apps no longer see them. Each is deleted for real when the grace period after its expiry is over, by the server,
-        even while your vault is closed. The server knows that time, and nothing else about the memory.
-      </p>
+    <section className="subpanel plate expired" aria-labelledby="expired-title">
+      <PlateHead
+        number="03"
+        id="expired-title"
+        title="Expired"
+        lead="Memories past the expiry date you gave them. Apps no longer see them. Each is deleted for real when the grace period after its expiry is over, by the server, even while your vault is closed. The server knows that time, and nothing else about the memory."
+      >
+        <span className="plate-state" data-on={list.length ? "true" : "false"}>
+          {list.length ? plural(list.length, "memory", "memories") : "None"}
+        </span>
+      </PlateHead>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {saved ? <Notice kind="success">{saved}</Notice> : null}
-      <form className="row grace-form" onSubmit={saveGrace} aria-label="Grace period">
+      <form className="grace-form" onSubmit={saveGrace} aria-label="Grace period">
         <label className="field-label" htmlFor="grace-days">
           Grace period in days
         </label>
@@ -325,9 +390,9 @@ function ExpiredSection() {
         </button>
       </form>
       {list.length === 0 ? (
-        <p className="small">Nothing has expired. Give a memory an expiry date in its editor.</p>
+        <Quiet>Nothing has expired. Give a memory an expiry date in its editor.</Quiet>
       ) : (
-        <ul className="list">
+        <ul className="list expired-list">
           {list.map((m) => (
             <li key={m.id} className="list-row" data-testid="expired-row">
               <div className="list-row-main">
