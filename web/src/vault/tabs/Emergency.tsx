@@ -167,9 +167,15 @@ function CardSection({ card, setCard }: { card: EmergencyCard; setCard(c: Emerge
       <Band label="Who to call" hint="Up to four people.">
         {card.contacts.map((c, i) => (
           <div key={i} className="rules-row rules-row-wide">
-            <input aria-label={`Contact ${i + 1} name`} className="input" value={c.name} placeholder="Name" onChange={(e) => setContact(i, { name: e.target.value })} />
-            <input aria-label={`Contact ${i + 1} relation`} className="input" value={c.relation} placeholder="Relation" onChange={(e) => setContact(i, { relation: e.target.value })} />
-            <input aria-label={`Contact ${i + 1} phone`} className="input" type="tel" value={c.phone} placeholder="Phone" onChange={(e) => setContact(i, { phone: e.target.value })} />
+            <span className="rules-cell" data-label="Name">
+              <input aria-label={`Contact ${i + 1} name`} className="input" value={c.name} placeholder="Name" onChange={(e) => setContact(i, { name: e.target.value })} />
+            </span>
+            <span className="rules-cell" data-label="Relation">
+              <input aria-label={`Contact ${i + 1} relation`} className="input" value={c.relation} placeholder="Relation" onChange={(e) => setContact(i, { relation: e.target.value })} />
+            </span>
+            <span className="rules-cell" data-label="Phone">
+              <input aria-label={`Contact ${i + 1} phone`} className="input" type="tel" value={c.phone} placeholder="Phone" onChange={(e) => setContact(i, { phone: e.target.value })} />
+            </span>
             <button type="button" className="button button-small button-ghost" onClick={() => set({ contacts: card.contacts.filter((_, j) => j !== i) })}>
               Remove
             </button>

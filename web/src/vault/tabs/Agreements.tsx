@@ -181,7 +181,7 @@ function AgreementCard({ view, onAmend }: { view: ag.AgreementView; onAmend(): v
   };
 
   return (
-    <section className="subpanel plate agreement-card" data-state={view.state} data-testid="agreement-card" aria-label={doc?.title ?? "Agreement"}>
+    <section className="subpanel plate agreement-card" data-state={view.state} data-role={view.role} data-testid="agreement-card" aria-label={doc?.title ?? "Agreement"}>
       <PlateHead number={`v${view.version}`} title={doc?.title ?? "An agreement that could not be opened"} lead={`With ${peer}. ${view.role === "from" ? "You sent it" : "Sent to you"} ${formatDateTime(view.createdAt)}.`}>
         <span className="plate-state" data-on={view.state === "signed" ? "true" : "false"}>
           {STATE_WORD[view.state]}

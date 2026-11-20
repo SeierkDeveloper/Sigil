@@ -274,8 +274,10 @@ function RulesSection() {
     problem = errorText(err);
   }
   let trialResult: string | null = null;
+  let trialOk = false;
   if (trial.target.trim() && !problem) {
     const r = checkCall(draft(), { target: trial.target.trim(), value: trial.value || "0", fn: "" });
+    trialOk = r.ok;
     trialResult = r.ok ? "The wallet would let the self send this." : r.reason;
   }
 
@@ -343,8 +345,12 @@ function RulesSection() {
       <Band label="Recipients" hint="Who the self may pay.">
         {rules.recipients.map((r, i) => (
           <div key={i} className="rules-row">
-            <input aria-label={`Recipient ${i + 1} address`} className="input mono" value={r.address} placeholder="0x..." onChange={(e) => setAt("recipients", i, { ...r, address: e.target.value })} spellCheck={false} />
-            <input aria-label={`Recipient ${i + 1} label`} className="input" value={r.label} placeholder="Who" onChange={(e) => setAt("recipients", i, { ...r, label: e.target.value })} />
+            <span className="rules-cell" data-label="Address">
+              <input aria-label={`Recipient ${i + 1} address`} className="input mono" value={r.address} placeholder="0x..." onChange={(e) => setAt("recipients", i, { ...r, address: e.target.value })} spellCheck={false} />
+            </span>
+            <span className="rules-cell" data-label="Who">
+              <input aria-label={`Recipient ${i + 1} label`} className="input" value={r.label} placeholder="Who" onChange={(e) => setAt("recipients", i, { ...r, label: e.target.value })} />
+            </span>
             <button type="button" className="button button-small button-ghost" onClick={() => drop("recipients", i)}>
               Remove
             </button>
@@ -357,9 +363,15 @@ function RulesSection() {
       <Band label="Contracts" hint="Contracts the self may call, and which of their functions, like order(uint256).">
         {rules.contracts.map((c, i) => (
           <div key={i} className="rules-row rules-row-wide">
-            <input aria-label={`Contract ${i + 1} address`} className="input mono" value={c.address} placeholder="0x..." onChange={(e) => setAt("contracts", i, { ...c, address: e.target.value })} spellCheck={false} />
-            <input aria-label={`Contract ${i + 1} label`} className="input" value={c.label} placeholder="What it is" onChange={(e) => setAt("contracts", i, { ...c, label: e.target.value })} />
-            <input aria-label={`Contract ${i + 1} functions`} className="input mono" value={fns[i] ?? ""} placeholder="order(uint256), cancel()" onChange={(e) => setFns(fns.map((f, j) => (j === i ? e.target.value : f)))} spellCheck={false} />
+            <span className="rules-cell" data-label="Address">
+              <input aria-label={`Contract ${i + 1} address`} className="input mono" value={c.address} placeholder="0x..." onChange={(e) => setAt("contracts", i, { ...c, address: e.target.value })} spellCheck={false} />
+            </span>
+            <span className="rules-cell" data-label="What it is">
+              <input aria-label={`Contract ${i + 1} label`} className="input" value={c.label} placeholder="What it is" onChange={(e) => setAt("contracts", i, { ...c, label: e.target.value })} />
+            </span>
+            <span className="rules-cell" data-label="Functions">
+              <input aria-label={`Contract ${i + 1} functions`} className="input mono" value={fns[i] ?? ""} placeholder="order(uint256), cancel()" onChange={(e) => setFns(fns.map((f, j) => (j === i ? e.target.value : f)))} spellCheck={false} />
+            </span>
             <button type="button" className="button button-small button-ghost" onClick={() => drop("contracts", i)}>
               Remove
             </button>
@@ -379,11 +391,21 @@ function RulesSection() {
       <Band label="Tokens" hint="Tokens the self may send or approve, each with its own caps, only to recipients above. Moves the wallet cannot cap are always refused.">
         {rules.tokens.map((t, i) => (
           <div key={i} className="rules-row rules-row-wide">
-            <input aria-label={`Token ${i + 1} address`} className="input mono" value={t.address} placeholder="0x..." onChange={(e) => setAt("tokens", i, { ...t, address: e.target.value })} spellCheck={false} />
-            <input aria-label={`Token ${i + 1} label`} className="input" value={t.label} placeholder="Name" onChange={(e) => setAt("tokens", i, { ...t, label: e.target.value })} />
-            <input aria-label={`Token ${i + 1} decimals`} className="input" inputMode="numeric" value={String(t.decimals)} onChange={(e) => setAt("tokens", i, { ...t, decimals: Number(e.target.value) || 0 })} />
-            <input aria-label={`Token ${i + 1} per payment`} className="input" inputMode="decimal" value={t.perTx} onChange={(e) => setAt("tokens", i, { ...t, perTx: e.target.value })} />
-            <input aria-label={`Token ${i + 1} per day`} className="input" inputMode="decimal" value={t.perDay} onChange={(e) => setAt("tokens", i, { ...t, perDay: e.target.value })} />
+            <span className="rules-cell" data-label="Address">
+              <input aria-label={`Token ${i + 1} address`} className="input mono" value={t.address} placeholder="0x..." onChange={(e) => setAt("tokens", i, { ...t, address: e.target.value })} spellCheck={false} />
+            </span>
+            <span className="rules-cell" data-label="Name">
+              <input aria-label={`Token ${i + 1} label`} className="input" value={t.label} placeholder="Name" onChange={(e) => setAt("tokens", i, { ...t, label: e.target.value })} />
+            </span>
+            <span className="rules-cell" data-label="Decimals">
+              <input aria-label={`Token ${i + 1} decimals`} className="input" inputMode="numeric" value={String(t.decimals)} onChange={(e) => setAt("tokens", i, { ...t, decimals: Number(e.target.value) || 0 })} />
+            </span>
+            <span className="rules-cell" data-label="Per payment">
+              <input aria-label={`Token ${i + 1} per payment`} className="input" inputMode="decimal" value={t.perTx} onChange={(e) => setAt("tokens", i, { ...t, perTx: e.target.value })} />
+            </span>
+            <span className="rules-cell" data-label="Per day">
+              <input aria-label={`Token ${i + 1} per day`} className="input" inputMode="decimal" value={t.perDay} onChange={(e) => setAt("tokens", i, { ...t, perDay: e.target.value })} />
+            </span>
             <button type="button" className="button button-small button-ghost" onClick={() => drop("tokens", i)}>
               Remove
             </button>
@@ -409,7 +431,7 @@ function RulesSection() {
           </div>
         </div>
         {trialResult ? (
-          <p className="small" data-testid="rules-trial">
+          <p className="small rules-trial" data-ok={trialOk ? "true" : "false"} data-testid="rules-trial">
             {trialResult}
           </p>
         ) : null}
