@@ -23,7 +23,9 @@ export type SourceKind =
   | "gmail"
   | "calendar"
   | "github"
-  | "notion";
+  | "notion"
+  | "capture"
+  | "agent";
 
 export interface MemorySource {
   kind: SourceKind;
@@ -45,10 +47,13 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   calendar: "Imported from a calendar",
   github: "Imported from GitHub",
   notion: "Imported from Notion",
+  capture: "Captured on a device",
+  agent: "Remembered by an agent",
 };
 
 export function sourceLabel(source: MemorySource): string {
   if (source.kind === "app" && source.ref) return `Suggested by ${source.ref}`;
+  if (source.kind === "agent" && source.ref) return `Remembered by ${source.ref}`;
   return SOURCE_LABELS[source.kind] ?? "Saved";
 }
 
@@ -64,10 +69,29 @@ export interface MemoryHead {
   expiresAt?: string;
 }
 
+/** A photo kept with a memory, inside its encrypted body. */
+export interface MemoryImage {
+  type: "image/jpeg" | "image/png" | "image/webp";
+  /** The image bytes, base64. */
+  data: string;
+}
+
+/** About 1.5 MB of image; the vault shrinks photos on the device before they are sealed. */
+export const MAX_IMAGE_CHARS = 2_000_000;
+
+export function cleanImage(value: unknown): MemoryImage | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const type = v.type === "image/jpeg" || v.type === "image/png" || v.type === "image/webp" ? v.type : null;
+  const data = typeof v.data === "string" && /^[A-Za-z0-9+/]+=*$/.test(v.data) && v.data.length <= MAX_IMAGE_CHARS ? v.data : null;
+  return type && data ? { type, data } : undefined;
+}
+
 export interface Memory extends MemoryHead {
   id: string;
   folderId: string;
   body: string;
+  image?: MemoryImage;
 }
 
 export interface MemoryDraft {
@@ -78,6 +102,7 @@ export interface MemoryDraft {
   createdAt?: string;
   editedAt?: string;
   expiresAt?: string | null;
+  image?: MemoryImage | null;
 }
 
 /** A folder or memory exactly as the server stores it: ids, envelopes and nothing readable. */
@@ -205,6 +230,7 @@ export async function renameFolder(folder: Pick<OpenFolder, "id" | "key" | "kind
 export function buildMemory(draft: MemoryDraft, folderId: string, id = randomId(), now = new Date().toISOString()): Memory {
   const body = draft.body ?? "";
   const expiresAt = cleanExpiry(draft.expiresAt);
+  const image = cleanImage(draft.image);
   return {
     id,
     folderId,
@@ -216,6 +242,7 @@ export function buildMemory(draft: MemoryDraft, folderId: string, id = randomId(
     createdAt: draft.createdAt ?? now,
     editedAt: draft.editedAt ?? now,
     ...(expiresAt ? { expiresAt } : {}),
+    ...(image ? { image } : {}),
   };
 }
 
@@ -241,7 +268,7 @@ export async function encryptMemory(folder: Pick<OpenFolder, "id" | "key">, memo
     id: memory.id,
     folderId: memory.folderId,
     head: await encryptJson(folder.key, head, AAD.memoryHead(memory.id)),
-    body: await encryptJson(folder.key, { body: memory.body }, AAD.memoryBody(memory.id)),
+    body: await encryptJson(folder.key, memory.image ? { body: memory.body, image: memory.image } : { body: memory.body }, AAD.memoryBody(memory.id)),
   };
 }
 
@@ -252,8 +279,9 @@ export async function decryptHead(folder: Pick<OpenFolder, "key">, stored: Pick<
 export async function decryptMemory(folder: Pick<OpenFolder, "key">, stored: StoredMemory): Promise<Memory> {
   const head = await decryptHead(folder, stored);
   if (!stored.body) throw new Error("This memory was sent without its body.");
-  const { body } = await decryptJson<{ body: string }>(folder.key, stored.body, AAD.memoryBody(stored.id));
-  return { ...head, id: stored.id, folderId: stored.folderId, body };
+  const { body, image } = await decryptJson<{ body: string; image?: unknown }>(folder.key, stored.body, AAD.memoryBody(stored.id));
+  const img = cleanImage(image);
+  return { ...head, id: stored.id, folderId: stored.folderId, body, ...(img ? { image: img } : {}) };
 }
 
 // ---------------------------------------------------------------- apps

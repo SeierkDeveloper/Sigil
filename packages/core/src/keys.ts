@@ -21,7 +21,7 @@ import { wordlist } from "@scure/bip39/wordlists/english.js";
 import { decryptBytes, encryptBytes, hkdf, importKey, randomBytes } from "./crypto";
 import { fromBase64Url, fromHex, toBase64Url, toHex, utf8 } from "./encoding";
 
-export type KeyslotKind = "passkey" | "wallet" | "phrase";
+export type KeyslotKind = "passkey" | "wallet" | "phrase" | "device";
 
 export const AAD = {
   keyslot: (kind: KeyslotKind) => `sigil:keyslot:${kind}`,
@@ -39,6 +39,15 @@ export const AAD = {
   askLinkOwner: (linkId: string) => `sigil:ask-link:${linkId}`,
   askLinkApp: (appId: string, linkId: string) => `sigil:ask-link-app:${appId}:${linkId}`,
   askIntro: (linkId: string) => `sigil:ask-intro:${linkId}`,
+  legacyOwner: (planId: string) => `sigil:legacy-owner:${planId}`,
+  legacyBundle: (planId: string, epoch: number, trusteeId: string) => `sigil:legacy-bundle:${planId}:${epoch}:${trusteeId}`,
+  legacyIntro: (trusteeId: string) => `sigil:legacy-intro:${trusteeId}`,
+  legacyKept: (planId: string) => `sigil:legacy-kept:${planId}`,
+  keyslotNote: (keyslotId: string) => `sigil:keyslot-note:${keyslotId}`,
+  agentRules: (appId: string) => `sigil:agent-rules:${appId}`,
+  handoff: (handoffId: string) => `sigil:handoff:${handoffId}`,
+  spaceMeta: (spaceId: string) => `sigil:space-meta:${spaceId}`,
+  spaceNote: (spaceId: string) => `sigil:space-note:${spaceId}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */
