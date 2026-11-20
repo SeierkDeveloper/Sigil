@@ -74,6 +74,10 @@ import { openLegacyState, openTrusted, type LegacyState, type ServerLegacy, type
 import { openSpaces, type AgentView, type ServerAgent, type ServerSpace, type SpaceView } from "./agentOps";
 import { ensureSignKey, type CertificateView, type PresenceCounts } from "./lifeOps";
 import { rememberKeyslot } from "./offline";
+import type { AccessRequestView } from "./protectOps";
+import { openSources, type ServerSource, type SyncSourceView } from "./syncOps";
+import { openPublicSelf, type PublicSelfView, type ServerPublicSelf } from "./publicOps";
+import { openMeets, type MeetView, type ServerMeet } from "./meetOps";
 
 // ---------------------------------------------------------------- types
 
@@ -193,6 +197,14 @@ export interface VaultData {
   signKey: string | null;
   presence: PresenceCounts;
   certificates: CertificateView[];
+  /** Requests to read a protected folder, waiting for the owner or answered. */
+  access: AccessRequestView[];
+  /** Live sync sources, opened on this device. */
+  sync: SyncSourceView[];
+  /** The public AI self, with its key and rules opened on this device. */
+  publicSelf: PublicSelfView | null;
+  /** Conversations between this vault's AI self and others. */
+  meets: MeetView[];
 }
 
 export interface LogEntryView {
@@ -217,7 +229,7 @@ export interface LogData {
 }
 
 export interface ServerVault {
-  folders: (StoredFolder & { createdAt: string })[];
+  folders: (StoredFolder & { createdAt: string; protected?: boolean })[];
   memories: (StoredMemory & { updatedAt: string })[];
   apps: {
     id: string;
@@ -255,6 +267,10 @@ export interface ServerVault {
   signKey?: string | null;
   presence?: PresenceCounts;
   certificates?: CertificateView[];
+  access?: AccessRequestView[];
+  sync?: ServerSource[];
+  publicSelf?: ServerPublicSelf | null;
+  meets?: ServerMeet[];
   box?: StoredBoxKey | null;
   proposals?: { id: string; appId: string; sealed: string; createdAt: string }[];
   shares?: {
@@ -417,7 +433,9 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   const folders: OpenFolder[] = [];
   for (const f of data.folders) {
     try {
-      folders.push(await openFolder(vault.key, f));
+      const open = await openFolder(vault.key, f);
+      // The server's flag and the encrypted meta should agree; if either says protected, it is treated as protected.
+      folders.push(f.protected && !open.protect ? { ...open, protect: "other" } : open);
     } catch {
       unreadable++;
     }
@@ -559,8 +577,18 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   const { spaces, unreadable: badSpaces } = await openSpaces(box, data.spaces ?? []);
   unreadable += badSpaces;
   const signKey = api ? await ensureSignKey(api, vault, data.signKey ?? null) : (data.signKey ?? null);
+  const synced = await openSources(vault, apps, data.sync ?? []);
+  unreadable += synced.unreadable;
+  const pub = await openPublicSelf(vault, data.publicSelf);
+  unreadable += pub.unreadable;
+  const met = await openMeets(vault, box, data.meets ?? []);
+  unreadable += met.unreadable;
 
   return {
+    access: data.access ?? [],
+    sync: synced.sources,
+    publicSelf: pub.self,
+    meets: met.meets,
     legacy,
     trusted,
     agents: (data.agents ?? []).map((a) => ({ appId: a.appId, homeFolderId: a.homeFolderId, rules: a.rules, publicKey: a.publicKey, createdAt: a.createdAt })),

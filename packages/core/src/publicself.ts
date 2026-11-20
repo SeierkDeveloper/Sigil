@@ -16,10 +16,12 @@
 // Nothing private is at stake there, since everything it can answer from is
 // published.
 
-import { sha256Hex } from "./keys";
+import { decryptJson, encryptJson, importKey } from "./crypto";
+import { AAD, appSelfKey, sha256Hex } from "./keys";
+import type { ModelSettings } from "./model";
 import { redactMemory } from "./protect";
 import type { Memory, OpenFolder } from "./vault";
-import { isLive, type SelfMemory } from "./self";
+import { cleanRules, isLive, type SelfMemory, type SelfRules } from "./self";
 
 export const HANDLE_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{1,28}[a-z0-9])?$/;
 export const RESERVED_HANDLES = new Set(["admin", "api", "sigil", "vault", "ask", "docs", "spec", "help", "support", "root", "public", "status", "about"]);
@@ -90,3 +92,47 @@ export interface PublicSettings {
 }
 
 export const PUBLIC_MAX_PER_VISITOR = 60;
+
+/** What only the owner's device (and a connector the owner picks) holds: the public self's private key, its rules and which folders are public. */
+export interface PublicSecret {
+  v: 1;
+  /** The X25519 private key, base64url. */
+  secret: string;
+  rules: SelfRules;
+  /** The folders whose public copy it answers from. */
+  folderIds: string[];
+  /** For a connector only: the owner's model key and the vault public key, so it can answer and seal the log note. */
+  model?: ModelSettings;
+  boxPublic?: string;
+}
+
+export function cleanPublicSecret(v: unknown): PublicSecret | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.secret !== "string") return null;
+  return {
+    v: 1,
+    secret: o.secret,
+    // It answers from the public copy only, which the model sees as one folder.
+    rules: { ...cleanRules(o.rules), folderIds: ["public"] },
+    folderIds: Array.isArray(o.folderIds) ? o.folderIds.map(String).slice(0, 200) : [],
+    ...(o.model && typeof o.model === "object" ? { model: o.model as ModelSettings } : {}),
+    ...(typeof o.boxPublic === "string" ? { boxPublic: o.boxPublic } : {}),
+  };
+}
+
+export async function sealPublicSecret(vaultKey: CryptoKey, selfId: string, s: PublicSecret): Promise<string> {
+  return encryptJson(vaultKey, s, AAD.publicOwner(selfId));
+}
+
+export async function openPublicSecret(vaultKey: CryptoKey, selfId: string, envelope: string): Promise<PublicSecret | null> {
+  return cleanPublicSecret(await decryptJson(vaultKey, envelope, AAD.publicOwner(selfId)));
+}
+
+export async function sealPublicForApp(appSecret: Uint8Array, appId: string, selfId: string, s: PublicSecret): Promise<string> {
+  return encryptJson(await importKey(await appSelfKey(appSecret)), s, AAD.publicApp(appId, selfId));
+}
+
+export async function openPublicForApp(appSecret: Uint8Array, appId: string, selfId: string, envelope: string): Promise<PublicSecret | null> {
+  return cleanPublicSecret(await decryptJson(await importKey(await appSelfKey(appSecret)), envelope, AAD.publicApp(appId, selfId)));
+}

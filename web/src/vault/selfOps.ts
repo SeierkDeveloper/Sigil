@@ -17,7 +17,6 @@ import {
   encryptJson,
   fromBase64Url,
   importKey,
-  isLive,
   linkPair,
   newAskLink,
   openAppSecret,
@@ -44,6 +43,7 @@ import {
 } from "@sigil/core";
 import type { Api } from "./api";
 import { profileMemory, type AppView, type AskLinkView, type Unlocked, type VaultData } from "./ops";
+import { ASKED_TEXT, guardedMemories, protectedGate } from "./protectOps";
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -70,12 +70,14 @@ export function modelCaller(data: Pick<VaultData, "model">, fetcher?: Fetch): Mo
 
 // ---------------------------------------------------------------- what the AI self may read
 
-/** The vault's own memories, with folder names, as the AI self sees them. Expired memories and briefs are left out. */
-export function selfMemories(data: Pick<VaultData, "memories" | "folders">, now = Date.now()): SelfMemory[] {
-  const names = new Map(data.folders.map((f) => [f.id, f.name]));
-  return data.memories
-    .filter((m) => isLive(m, now) && m.source.kind !== "profile" && m.source.kind !== "brief")
-    .map((m) => ({ id: m.id, folderId: m.folderId, folder: names.get(m.folderId) ?? "", title: m.title, tags: m.tags, body: m.body, editedAt: m.editedAt, expiresAt: m.expiresAt }));
+/**
+ * The vault's own memories, with folder names, as the AI self sees them:
+ * expired memories, briefs and the Self card left out, protected folders left
+ * out unless the owner said yes (`open`), and each masked with its folder's
+ * redaction rules.
+ */
+export function selfMemories(data: Pick<VaultData, "memories" | "folders">, now = Date.now(), open: Set<string> = new Set()): SelfMemory[] {
+  return guardedMemories(data, open, now);
 }
 
 /** The Self card's text, when the rules allow its folder. */
@@ -91,14 +93,22 @@ export interface MeaningDeps {
   vectors?: Map<string, Float32Array>;
 }
 
-/** The owner's own test chat: the same answer a guest would get, with the memories it used. */
-export async function askInVault(data: VaultData, rules: SelfRules, model: ModelCaller, question: string, history: SelfTurn[] = [], deps: MeaningDeps = {}): Promise<SelfAnswer> {
+/** The owner's own test chat: the same answer a guest would get, with the memories it used. `open` holds protected folders the owner said yes to for this answer. */
+export async function askInVault(
+  data: VaultData,
+  rules: SelfRules,
+  model: ModelCaller,
+  question: string,
+  history: SelfTurn[] = [],
+  deps: MeaningDeps = {},
+  open: Set<string> = new Set(),
+): Promise<SelfAnswer> {
   const queryVector = deps.embedQuery ? await deps.embedQuery(question) : null;
   return answerAsSelf({
     question,
     history,
     rules,
-    memories: selfMemories(data),
+    memories: selfMemories(data, Date.now(), open),
     profile: selfProfile(data, rules),
     model,
     asker: "owner",
@@ -258,18 +268,22 @@ export async function answerPending(api: Api, data: VaultData, q: PendingQuestio
     const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
     question = opened.text;
     const queryVector = deps.embedQuery ? await deps.embedQuery(question) : null;
+    // Protected folders the link's rules name come in only with the owner's yes for this read.
+    const gate = await protectedGate(api, data, rules, question, { id: q.linkId, kind: "link" });
     const a = await answerAsSelf({
       question,
       history: opened.history,
       rules,
-      memories: selfMemories(data),
+      memories: [...selfMemories(data), ...gate.extra],
       profile: selfProfile(data, rules),
       model: deps.model,
       asker: "guest",
       queryVector,
       vectors: deps.vectors,
     });
-    reply = { v: 1, text: withoutCitations(a.text), refused: a.refused };
+    if (gate.extra.length) await gate.use(gate.extra.map((m) => m.id));
+    const text = withoutCitations(a.text);
+    reply = { v: 1, text: gate.asked.length ? `${text}\n\n${ASKED_TEXT}` : text, refused: a.refused };
     citations = a.citations.map((c) => ({ id: c.id, title: c.title }));
   } catch (err) {
     reply = { v: 1, text: AGENT_ERROR_TEXT, refused: "error" };

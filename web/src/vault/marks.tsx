@@ -19,6 +19,9 @@ import {
   PageIcon,
   PhoneIcon,
   AgentIcon,
+  ChatIcon,
+  DriveIcon,
+  MeetingIcon,
 } from "@/components/icons";
 
 const APP_ICONS: Record<AppKind, typeof ClaudeIcon> = {
@@ -47,6 +50,9 @@ const SOURCE_ICONS: Record<SourceKind, typeof ClaudeIcon> = {
   notion: PageIcon,
   capture: PhoneIcon,
   agent: AgentIcon,
+  slack: ChatIcon,
+  drive: DriveIcon,
+  meeting: MeetingIcon,
 };
 
 export function AppMark({ kind, className = "" }: { kind?: AppKind; className?: string }) {

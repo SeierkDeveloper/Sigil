@@ -66,5 +66,17 @@ export const serverConfig = {
     const v = process.env.SIGIL_CHAIN_READ_RPC?.trim() || "";
     return /^https:\/\/[^\s]+$/.test(v) ? v : "";
   },
+  /**
+   * Public OAuth client ids for live sync, from the environment. They are not
+   * secrets: the flow runs on the owner's device with PKCE, and no client
+   * secret is ever set on the server. Unset, a source shows how to add one.
+   */
+  get syncClients(): { google: string | null; slack: string | null } {
+    const clean = (v: string | undefined) => {
+      const t = v?.trim() ?? "";
+      return /^[A-Za-z0-9._-]{6,200}$/.test(t) ? t : null;
+    };
+    return { google: clean(process.env.SIGIL_GOOGLE_CLIENT_ID), slack: clean(process.env.SIGIL_SLACK_CLIENT_ID) };
+  },
   sessionDays: 30,
 };

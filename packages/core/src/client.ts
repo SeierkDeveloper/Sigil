@@ -10,6 +10,7 @@ import { randomId, importKey } from "./crypto";
 import { cleanProposal, sealProposal, type ProposalDraft, type ProposalVia } from "./inbox";
 import { appKeys, parseAppKey } from "./keys";
 import { search } from "./search";
+import { redactMemory } from "./protect";
 import {
   decryptHead,
   decryptMemory,
@@ -41,6 +42,25 @@ interface WireFolder {
   meta: string;
   wrappedKey: string;
   count: number;
+  /** The owner protected it: its memories come only with the owner's yes for the read. */
+  protected?: boolean;
+}
+
+interface WireHeld {
+  folderId: string;
+  memoryIds?: string[];
+  requestId: string;
+  state: string;
+}
+
+/** A read the server held back: the memories are in a protected folder and the owner has not said yes yet. */
+export interface HeldRead {
+  folderId: string;
+  folder: string;
+  memoryIds: string[];
+  requestId: string;
+  /** "pending" while the request waits in the owner's inbox; "denied" when the owner said no. */
+  state: string;
 }
 
 interface WireMemory {
@@ -55,6 +75,7 @@ export interface FolderInfo {
   name: string;
   memories: number;
   kind?: FolderKind;
+  protected?: boolean;
 }
 
 export interface HeadInfo {
@@ -119,7 +140,7 @@ export class VaultClient {
     this.via = opts.via ?? "mcp";
   }
 
-  protected async call<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
+  protected async call<T>(method: "GET" | "POST" | "PUT", path: string, body?: unknown): Promise<T> {
     const { authToken } = await appKeys(this.secret);
     const headers: Record<string, string> = { authorization: `Bearer ${authToken}` };
     if (this.userAgent) headers["user-agent"] = this.userAgent;
@@ -162,15 +183,34 @@ export class VaultClient {
     const open = await this.openFolders(r.folders);
     return r.folders.map((f) => {
       const o = open.get(f.id)!;
-      return { id: f.id, name: o.name, memories: f.count, ...(o.kind ? { kind: o.kind } : {}) };
+      return { id: f.id, name: o.name, memories: f.count, ...(o.kind ? { kind: o.kind } : {}), ...(f.protected ? { protected: true } : {}) };
     });
   }
 
-  /** Titles, tags and first lines of every memory this app may see, decrypted here. One read-log entry. */
+  /** Protected folders the last index left out, by name, and the reads the server held back last. */
+  lastSkipped: string[] = [];
+  lastHeld: HeldRead[] = [];
+
+  /**
+   * Titles, tags and first lines of every memory this app may see, decrypted
+   * here and masked with each folder's redaction rules. One read-log entry.
+   * Protected folders are left out; naming one in `folder` asks the owner for
+   * a look at it (the server answers with the request until they say yes).
+   */
   async heads(opts: { folder?: string } = {}): Promise<HeadInfo[]> {
-    const r = await this.call<{ folders: WireFolder[]; memories: WireMemory[] }>("GET", "index");
-    const folders = await this.openFolders(r.folders);
+    let r = await this.call<{ folders: WireFolder[]; memories: WireMemory[]; held?: WireHeld[] }>("GET", "index");
+    let folders = await this.openFolders(r.folders);
     const wanted = opts.folder?.trim().toLowerCase();
+    const guarded = r.folders.filter((f) => f.protected).map((f) => folders.get(f.id)!);
+    const asked = wanted ? guarded.find((f) => f.name.toLowerCase() === wanted || f.id === opts.folder) : undefined;
+    this.lastHeld = [];
+    if (asked) {
+      r = await this.call("GET", `index?protected=${encodeURIComponent(asked.id)}`);
+      folders = await this.openFolders(r.folders);
+      this.lastHeld = (r.held ?? []).map((h) => ({ folderId: h.folderId, folder: asked.name, memoryIds: h.memoryIds ?? [], requestId: h.requestId, state: h.state }));
+    }
+    const shown = new Set(r.memories.map((m) => m.folderId));
+    this.lastSkipped = guarded.filter((f) => !shown.has(f.id)).map((f) => f.name);
     const out: HeadInfo[] = [];
     for (const m of r.memories) {
       const folder = folders.get(m.folderId);
@@ -179,7 +219,8 @@ export class VaultClient {
       const head: MemoryHead = await decryptHead(folder, m);
       // An expired memory waits in the owner's Expired view and is not offered to apps.
       if (head.expiresAt && new Date(head.expiresAt).getTime() <= Date.now()) continue;
-      out.push({ ...head, id: m.id, folderId: folder.id, folder: folder.name });
+      const { body: _body, ...masked } = redactMemory({ ...head, body: "" }, folder.redact);
+      out.push({ ...masked, id: m.id, folderId: folder.id, folder: folder.name });
     }
     return out;
   }
@@ -195,15 +236,19 @@ export class VaultClient {
     ).map(({ item }) => toResult(item, "words"));
   }
 
-  /** Reads whole memories. Each one read is written to the owner's read log. */
-  async read(ids: string[]): Promise<{ memories: FullMemory[]; missing: string[] }> {
-    const r = await this.call<{ folders: WireFolder[]; memories: WireMemory[]; missing: string[] }>("POST", "read", { ids });
+  /**
+   * Reads whole memories, masked with each folder's redaction rules. Each one
+   * read is written to the owner's read log. Memories in a protected folder
+   * come back in `held` until the owner says yes for this read.
+   */
+  async read(ids: string[]): Promise<{ memories: FullMemory[]; missing: string[]; held: HeldRead[] }> {
+    const r = await this.call<{ folders: WireFolder[]; memories: WireMemory[]; missing: string[]; held?: WireHeld[] }>("POST", "read", { ids });
     const folders = await this.openFolders(r.folders);
     const memories: FullMemory[] = [];
     for (const m of r.memories) {
       const folder = folders.get(m.folderId);
       if (!folder) continue;
-      const full = await decryptMemory(folder, m);
+      const full = redactMemory(await decryptMemory(folder, m), folder.redact);
       memories.push({
         id: full.id,
         title: full.title,
@@ -215,7 +260,9 @@ export class VaultClient {
         body: full.body,
       });
     }
-    return { memories, missing: r.missing };
+    const held = (r.held ?? []).map((h) => ({ folderId: h.folderId, folder: "a protected folder", memoryIds: h.memoryIds ?? [], requestId: h.requestId, state: h.state }));
+    this.lastHeld = held;
+    return { memories, missing: r.missing, held };
   }
 
   /** The Self card, when this app may read its folder. Null when it may not, or none exists. */

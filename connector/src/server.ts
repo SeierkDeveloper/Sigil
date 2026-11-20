@@ -4,7 +4,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { ProposalDraft, SelfAnswer } from "@sigil/core";
+import { APPROVAL_MINUTES, type HeldRead, type ProposalDraft, type SelfAnswer } from "@sigil/core";
 import type { FolderInfo, FullMemory, SearchResult } from "./reader";
 import { ReaderError } from "./reader";
 import type { AgentTools, PickedNote, RecallHit } from "./agent";
@@ -15,9 +15,12 @@ export const CONNECTOR_VERSION = "0.4.0";
 export interface Reader {
   listFolders(): Promise<FolderInfo[]>;
   search(query: string, opts?: { folder?: string; limit?: number }): Promise<SearchResult[]>;
-  read(ids: string[]): Promise<{ memories: FullMemory[]; missing: string[] }>;
+  read(ids: string[]): Promise<{ memories: FullMemory[]; missing: string[]; held?: HeldRead[] }>;
   profile(): Promise<FullMemory | null>;
   propose(draft: ProposalDraft): Promise<{ id: string }>;
+  /** Protected folders the last search left out, and reads it held back. */
+  lastSkipped?: string[];
+  lastHeld?: HeldRead[];
 }
 
 /** The AI self on this machine. SelfAgent implements it; tests pass a stub. */
@@ -32,6 +35,7 @@ const INSTRUCTIONS = [
   "When the user shares something worth remembering, propose_memory suggests it to their Sigil inbox; it becomes a memory only if they approve it.",
   "ask_self answers a question the way the user would, from their memories and within rules they wrote, when they allowed this app to.",
   "Every read and every suggestion is shown to the user in their Sigil read log.",
+  "Folders the user protected (health, money, legal) are never searched or read without the user's yes for that read: naming one asks the user in their Sigil inbox, and the same call works once they say yes.",
 ].join(" ");
 
 const AGENT_INSTRUCTIONS = [
@@ -59,8 +63,22 @@ const day = (iso: string) => iso.slice(0, 10);
 
 export function formatFolders(folders: FolderInfo[]): string {
   if (folders.length === 0) return "This app has not been given any folders yet. The user can share folders in their Sigil vault under Apps.";
-  const lines = folders.map((f) => `- ${f.name} (${f.memories} ${f.memories === 1 ? "memory" : "memories"})`);
+  const lines = folders.map((f) => `- ${f.name} (${f.memories} ${f.memories === 1 ? "memory" : "memories"}${f.protected ? ", protected: each read needs the user's yes" : ""})`);
   return `Folders this app can read:\n${lines.join("\n")}`;
+}
+
+/** What to tell the app about protected folders after a search or a read. */
+export function formatProtected(skipped: string[] | undefined, held: HeldRead[] | undefined): string {
+  const parts: string[] = [];
+  for (const h of held ?? []) {
+    parts.push(
+      h.state === "denied"
+        ? `The user said no to reading ${h.folder}.`
+        : `${h.folder === "a protected folder" ? "A memory asked for is in a protected folder" : `${h.folder} is a protected folder`}. The user has been asked in their Sigil inbox to allow this read. Once they say yes, make the same call again within ${APPROVAL_MINUTES} minutes; the yes covers that one read.`,
+    );
+  }
+  if (skipped?.length) parts.push(`Protected folders not searched: ${skipped.join(", ")}. To look in one, search again with folder set to its name; the user is asked first.`);
+  return parts.join("\n");
 }
 
 export function formatResults(query: string, results: SearchResult[]): string {
@@ -159,7 +177,10 @@ export function createServer(reader: Reader, self?: SelfAsker, agent?: AgentTool
     },
     async ({ query, folder, limit }) => {
       try {
-        return text(formatResults(query, await reader.search(query, { folder, limit })));
+        const results = await reader.search(query, { folder, limit });
+        const note = formatProtected(reader.lastSkipped, reader.lastHeld);
+        if (results.length === 0 && reader.lastHeld?.length) return text(note);
+        return text(note ? `${formatResults(query, results)}\n\n${note}` : formatResults(query, results));
       } catch (err) {
         return failure(err);
       }
@@ -178,7 +199,8 @@ export function createServer(reader: Reader, self?: SelfAsker, agent?: AgentTool
     },
     async ({ id }) => {
       try {
-        const { memories } = await reader.read([id]);
+        const { memories, held } = await reader.read([id]);
+        if (memories.length === 0 && held?.length) return text(formatProtected([], held));
         if (memories.length === 0) {
           return { ...text("That memory does not exist or this app is not allowed to read it."), isError: true };
         }
