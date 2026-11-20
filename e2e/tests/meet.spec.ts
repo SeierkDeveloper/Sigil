@@ -4,7 +4,7 @@
 // both owners read the same transcript. The server relays only boxes.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, createWithWallet, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
 
 test("two AI selves talk after both said yes, end to end encrypted, and both owners get the transcript", async ({ browser, baseURL }) => {
   const samCtx = await browser.newContext();
@@ -35,6 +35,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
   await form.getByLabel("What you call them").fill("Robin");
   await form.getByLabel("Your name, as they see it").fill("Sam");
   await form.getByLabel("Calendar", { exact: true }).check();
+  await fitsPhone(sam, "Meet, the invite form");
   await form.getByRole("button", { name: "Send invite" }).click();
   await expect(sam.getByTestId("meet-card")).toContainText("Waiting for a yes");
 
@@ -43,6 +44,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
   await expect(invite).toContainText("Sam invites your AI self", { timeout: 20_000 });
   await expect(invite).toContainText("30 minutes next week");
   await invite.getByLabel("Your name, as they see it").fill("Robin");
+  await fitsPhone(robin, "Meet, an invite waiting");
   await invite.getByRole("button", { name: "Say yes" }).click();
 
   // Both vaults are open: Sam's self writes turn 1, Robin's turn 2 and ends it.
@@ -53,6 +55,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
     await expect(lines.nth(1)).toContainText("Tuesday at 14:00 works for Robin.");
     await expect(p.getByTestId("meet-card")).toContainText("Done");
   }
+  await fitsPhone(sam, "Meet, the transcript");
   expect(samModel[0].system).toContain("CANARY-dentist");
   expect(robinModel[0].system).not.toContain("CANARY-dentist");
 

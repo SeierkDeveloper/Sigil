@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 import { chatGptZip } from "../../packages/core/test/fixtures/exports";
 import { navGroups } from "../../web/src/lib/site";
-import { connectMcp, createWithWallet, installWallet, textOf } from "./helpers";
+import { connectMcp, createWithWallet, fitsPhone, installWallet, textOf } from "./helpers";
 
 const pages = navGroups.flatMap((g) => g.items);
 
@@ -163,4 +163,21 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
   await page.getByLabel("Fingerprint", { exact: true }).fill(`0x${"ab".repeat(32)}`);
   await page.getByRole("button", { name: "Check", exact: true }).click();
   await expect(page.getByTestId("verifier-result")).toContainText("That fingerprint is not part of this seal");
+});
+
+test("the open standard reads as one document: its facts, numbered contents and every part, on a phone too", async ({ page }) => {
+  await page.goto("/spec");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("The Sigil open standard");
+  await expect(page.locator(".spec-sheet")).toContainText("Version1.0.0");
+  const contents = page.getByRole("navigation", { name: "Parts of the standard" });
+  await expect(contents.locator(".spec-index > li")).toHaveCount(8);
+  await expect(page.locator(".spec-part")).toHaveCount(7);
+  // A link in the contents and a link between parts both land on a heading of this page.
+  await contents.getByRole("link", { name: "2. Keys, envelopes and sealed boxes" }).click();
+  await expect(page).toHaveURL(/\/spec#keys$/);
+  await expect(page.locator("#keys h2")).toBeInViewport();
+  for (const href of await page.locator('.spec-doc a[href^="#"]').evaluateAll((as) => as.map((a) => a.getAttribute("href")!))) {
+    expect(await page.locator(`[id="${href.slice(1)}"]`).count(), href).toBe(1);
+  }
+  await fitsPhone(page, "The open standard");
 });

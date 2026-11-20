@@ -3,7 +3,7 @@
 // inbox, the same call then works once, and the read log marks it.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, connectApp, connectMcp, createWithWallet, installWallet, textOf, writeMemory } from "./helpers";
+import { addFolder, connectApp, connectMcp, createWithWallet, fitsPhone, installWallet, mockModel, setUpModel, textOf, writeMemory } from "./helpers";
 
 const HEALTH = "CANARY-blood-e2e-55";
 
@@ -20,8 +20,10 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
   const form = page.getByRole("form", { name: "Protect Health" });
   await form.getByLabel("Protection").selectOption({ label: "Protected: Health" });
   await form.getByLabel("Phone numbers").check();
+  await fitsPhone(page, "Folders, protecting one");
   await form.getByRole("button", { name: "Save" }).click();
   await expect(row.getByTestId("folder-guard")).toContainText("Protected: Health");
+  await fitsPhone(page, "Folders, one protected");
 
   const appKey = await connectApp(page, { name: "Claude", folders: ["Health"] });
   const client = await connectMcp(appKey, baseURL!);
@@ -37,6 +39,7 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
     await page.getByRole("tab", { name: "Inbox" }).click();
     const request = page.getByTestId("access-row").first();
     await expect(request).toContainText("Claude asks to read Health");
+    await fitsPhone(page, "Inbox, a request to read a protected folder");
     await request.getByRole("button", { name: "Allow this read" }).click();
     await expect(page.getByTestId("access-requests")).toHaveCount(0);
 
@@ -64,4 +67,29 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
   await page.getByRole("tab", { name: "Read log" }).click();
   await expect(page.getByText('Read "Blood test" in a protected folder, after your yes')).toBeVisible();
   await expect(page.getByText("You allowed one read of a protected folder").first()).toBeVisible();
+});
+
+test("the test chat asks before it uses a protected folder, for that one answer", async ({ page, context }) => {
+  await installWallet(context);
+  const calls = await mockModel(page, (system) => (system.includes(HEALTH) ? "The results are fine [1]." : "I don't know that."));
+  await createWithWallet(page);
+  await addFolder(page, "Health");
+  await writeMemory(page, { title: "Blood test", body: `${HEALTH} blood test results are fine.`, folder: "Health" });
+  await page.getByRole("tab", { name: "Folders" }).click();
+  await page.locator(".list-row", { hasText: "Health" }).first().getByRole("button", { name: "Protect" }).click();
+  const form = page.getByRole("form", { name: "Protect Health" });
+  await form.getByLabel("Protection").selectOption({ label: "Protected: Health" });
+  await form.getByRole("button", { name: "Save" }).click();
+  await setUpModel(page, { name: "Sam's AI self", folders: ["Health"] });
+
+  const chat = page.getByRole("form", { name: "Ask your AI self" });
+  await chat.getByLabel("Question").fill("How was the blood test?");
+  await chat.getByRole("button", { name: "Ask" }).click();
+  const gate = page.getByTestId("protect-gate");
+  await expect(gate).toContainText("1 memory from Health, a protected folder");
+  expect(calls).toHaveLength(0);
+  await fitsPhone(page, "Test chat, asking before a protected read");
+  await gate.getByRole("button", { name: "Allow for this answer" }).click();
+  await expect(page.getByTestId("chat-turn").first()).toContainText("The results are fine");
+  expect(calls.at(-1)!.system).toContain(HEALTH);
 });

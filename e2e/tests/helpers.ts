@@ -151,3 +151,23 @@ export async function setUpModel(page: Page, opts: { key?: string; name?: string
   await rules.getByRole("button", { name: "Save rules" }).click();
   await page.getByText("Rules saved.").waitFor();
 }
+
+/** The page as it is now, at 375 pixels wide: nothing past the right edge and no sideways scrolling. The window is set back afterwards. */
+export async function fitsPhone(page: Page, where: string) {
+  const before = page.viewportSize();
+  await page.setViewportSize({ width: 375, height: 812 });
+  const over = await page.evaluate(async () => {
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const wide = [...document.querySelectorAll<HTMLElement>("#main *")]
+      .filter((el) => {
+        const r = el.getBoundingClientRect();
+        // Elements inside a horizontal scroller (the tab strip, code blocks, tables) may run wider.
+        return r.width > 0 && r.right > window.innerWidth + 1 && !el.closest(".tabs, pre, .table-wrap, .code-block");
+      })
+      .slice(0, 3)
+      .map((el) => `${el.tagName.toLowerCase()}.${[...el.classList].join(".")}`);
+    return { scroll: document.documentElement.scrollWidth, wide };
+  });
+  if (before) await page.setViewportSize(before);
+  if (over.wide.length || over.scroll > 375) throw new Error(`${where} at 375 pixels: ${over.wide.length ? `past the right edge: ${over.wide.join(", ")}` : `the page is ${over.scroll} pixels wide`}`);
+}

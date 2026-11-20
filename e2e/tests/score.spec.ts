@@ -2,7 +2,7 @@
 // read log after a real connector read through MCP.
 
 import { expect, test } from "@playwright/test";
-import { connectApp, connectMcp, createWithWallet, installWallet, textOf, writeMemory } from "./helpers";
+import { connectApp, connectMcp, createWithWallet, fitsPhone, installWallet, textOf, writeMemory } from "./helpers";
 
 test("each app shows a privacy score made from its reads, with where every point went", async ({ page, context, baseURL }) => {
   await installWallet(context);
@@ -33,5 +33,6 @@ test("each app shows a privacy score made from its reads, with where every point
   await score.getByRole("button").click();
   await expect(score).toContainText("1 memory read in full, of 2 memories it may read.");
   await expect(score).toContainText("Folders read: Notes (1)");
+  await fitsPhone(page, "Apps, a privacy score opened");
   await expect(score.getByRole("link", { name: "How the score is made" })).toHaveAttribute("href", "/docs#privacy-score");
 });

@@ -4,7 +4,7 @@
 // marked as AI with its source, and the owner's log has the question.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, createWithWallet, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
 
 const TALK = "CANARY-talks-e2e I speak about memory and privacy.";
 const PRIVATE = "CANARY-private-e2e";
@@ -25,6 +25,7 @@ test("anyone can ask the public AI self, answered only from what was made public
   await form.getByLabel("Greeting").fill("Ask me about my talks.");
   await form.getByLabel("Public work").check();
   await form.getByLabel("Show answered questions on the page").check();
+  await fitsPhone(page, "AI self, the public AI self form");
   await form.getByRole("button", { name: "Save and publish" }).click();
   await expect(page.getByTestId("public-url")).toHaveText(`${baseURL}/@sam-e2e`);
 
@@ -41,6 +42,7 @@ test("anyone can ask the public AI self, answered only from what was made public
   await expect(turn.locator(".chat-by-kind")).toHaveText("AI");
   await turn.getByRole("button", { name: "Talks" }).click();
   await expect(visitor.getByTestId("public-source")).toContainText("CANARY-talks-e2e");
+  await fitsPhone(visitor, "The public page, an answer with its source open");
 
   // The owner's model saw the public copy and nothing private; the server relayed only boxes.
   expect(calls.at(-1)!.system).toContain("CANARY-talks-e2e");
@@ -61,11 +63,17 @@ test("anyone can ask the public AI self, answered only from what was made public
   await expect(wall).toContainText("What do you talk about?", { timeout: 20_000 });
   await wall.getByRole("button", { name: "Hide" }).click();
   await expect(wall).toContainText("Hidden");
+  await expect(page.getByTestId("public-self").locator(".public-facts")).toContainText("Answered1");
+  await fitsPhone(page, "AI self, the public AI self set up");
 
   // The vault closes: the page says plainly that it is offline.
   await page.close();
   await visitor.reload();
   await expect(visitor.getByTestId("public-status")).toContainText("Offline right now", { timeout: 20_000 });
   await expect(visitor.getByRole("button", { name: "Ask" })).toBeDisabled();
+  await fitsPhone(visitor, "The public page, offline");
+  await visitor.goto("/@nobody-here");
+  await expect(visitor.getByRole("heading", { name: "No public AI self here" })).toBeVisible();
+  await fitsPhone(visitor, "The public page, no such handle");
   await guest.close();
 });
