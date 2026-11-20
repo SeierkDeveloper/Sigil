@@ -1,0 +1,264 @@
+/* ------------------------------------------------------------------ round six: work, identity, proofs, emergency, agreements, packs
+   Plain first styling, in the tokens above, for the design pass to replace. */
+
+.draft-list,
+.lesson-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.draft-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius);
+  background: var(--plate);
+}
+
+.draft-card[data-kind="answer"] {
+  border-style: dashed;
+}
+
+.draft-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+}
+
+.draft-title {
+  flex: 1 1 12rem;
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.draft-input summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.draft-input-text,
+.draft-final,
+.lesson-body,
+.agreement-text,
+.pack-item-body {
+  margin: var(--space-2) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.draft-final {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.agreement-text {
+  padding: var(--space-4);
+  border-left: 1px solid var(--color-line-bright);
+  background: var(--color-surface-2);
+}
+
+.identity-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  margin: 0 0 var(--space-4);
+  border-top: 1px solid var(--color-line-strong);
+}
+
+.identity-facts > div {
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  border-bottom: 1px solid var(--color-line);
+  min-width: 0;
+}
+
+.identity-facts dt {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.identity-facts dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.identity-address {
+  overflow-wrap: anywhere;
+}
+
+.rules-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-2);
+}
+
+.rules-row-wide {
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+}
+
+.emergency-code-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.pack-follow-form {
+  flex-wrap: nowrap;
+}
+
+.pack-follow-form .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pack-items {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pack-item {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.pack-item-title {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.document-checker {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.document-headline {
+  margin: var(--space-2) 0;
+  font-size: var(--text-lg);
+  overflow-wrap: anywhere;
+}
+
+/* The emergency card: large, plain and readable at arm's length on a phone. */
+.emergency-sheet {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line-bright);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.emergency-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.emergency-mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border: 1px solid var(--color-line-bright);
+  border-radius: 50%;
+  font-size: 28px;
+}
+
+.emergency-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 8vw, 3rem);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.emergency-line {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.emergency-blood {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--color-line-bright);
+  border-radius: var(--radius);
+  background: #fff;
+  color: #050506;
+}
+
+.emergency-blood .emergency-label {
+  color: #3a3a3a;
+}
+
+.emergency-blood-value {
+  font-size: clamp(3rem, 16vw, 5rem);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.emergency-facts {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.emergency-label {
+  display: block;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.emergency-value {
+  margin: var(--space-1) 0 0;
+  font-size: clamp(1.25rem, 5vw, 1.625rem);
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.emergency-fact[data-field="allergies"] .emergency-value {
+  font-weight: 700;
+}
+
+.emergency-contacts ul {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.emergency-call {
+  min-height: 56px;
+  font-size: var(--text-lg);
+  white-space: normal;
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .emergency-sheet {
+    padding: var(--space-4);
+  }
+
+  .rules-row,
+  .emergency-code-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
