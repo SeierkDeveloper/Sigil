@@ -1,0 +1,33 @@
+{
+  "name": "Sigil",
+  "short_name": "Sigil",
+  "description": "Your AI self, owned by you, forever. One encrypted memory for every AI you use.",
+  "id": "/vault",
+  "start_url": "/vault",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#050506",
+  "theme_color": "#060607",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Quick capture", "short_name": "Capture", "url": "/capture", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Inbox", "url": "/vault#inbox", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ],
+  "share_target": {
+    "action": "/capture",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [{ "name": "photo", "accept": ["image/jpeg", "image/png", "image/webp", "image/heic", "image/*"] }]
+    }
+  }
+}

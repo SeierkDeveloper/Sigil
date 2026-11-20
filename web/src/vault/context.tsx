@@ -27,7 +27,22 @@ export interface VaultCtx {
   signOut(): Promise<void>;
 }
 
-export type TabId = "memories" | "inbox" | "self" | "review" | "timeline" | "profile" | "folders" | "apps" | "log" | "import" | "settings";
+export type TabId =
+  | "memories"
+  | "inbox"
+  | "self"
+  | "review"
+  | "timeline"
+  | "profile"
+  | "folders"
+  | "apps"
+  | "agents"
+  | "devices"
+  | "legacy"
+  | "proof"
+  | "log"
+  | "import"
+  | "settings";
 
 export const Ctx = createContext<VaultCtx | null>(null);
 

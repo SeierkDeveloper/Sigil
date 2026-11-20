@@ -17,6 +17,13 @@ import { TimelineTab } from "./tabs/Timeline";
 import { ProfileTab } from "./tabs/Profile";
 import { SelfTab } from "./tabs/Self";
 import { ReviewTab } from "./tabs/Review";
+import { LegacyTab } from "./tabs/Legacy";
+import { DevicesTab } from "./tabs/Devices";
+import { AgentsTab } from "./tabs/Agents";
+import { ProofTab } from "./tabs/Proof";
+import { sendPresence } from "./lifeOps";
+import { saveOfflineCopy } from "./offline";
+import { flushCaptures, pinVaultKey } from "./deviceOps";
 import { useSemanticIndex } from "./semantic";
 import { useSelfAgent } from "./useSelfAgent";
 import { modelCaller } from "./selfOps";
@@ -31,6 +38,10 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "profile", label: "Self card" },
   { id: "folders", label: "Folders" },
   { id: "apps", label: "Apps" },
+  { id: "agents", label: "Agents" },
+  { id: "devices", label: "Devices" },
+  { id: "legacy", label: "Legacy" },
+  { id: "proof", label: "Proof" },
   { id: "log", label: "Read log" },
   { id: "import", label: "Import" },
   { id: "settings", label: "Settings" },
@@ -40,9 +51,15 @@ const NO_MEMORIES: ops.VaultData["memories"] = [];
 
 function tabFromHash(): TabId {
   if (typeof window === "undefined") return "memories";
+  // A pairing code opened with the camera, and a legacy invite, land on their own tab.
+  if (window.location.pathname.endsWith("/vault/pair")) return "devices";
+  if (window.location.pathname.endsWith("/vault/legacy")) return "legacy";
   const h = window.location.hash.replace("#", "");
   return (TABS.find((t) => t.id === h)?.id ?? "memories") as TabId;
 }
+
+/** Every load keeps the ciphertext for offline reading, when the owner turned that on for this device. */
+const keepCopy = { onRaw: (raw: ops.ServerVault) => void saveOfflineCopy(raw) };
 
 interface Props {
   api: Api;
@@ -59,7 +76,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
 
   const reload = useCallback(async () => {
     try {
-      setData(await ops.loadVault(api, vault));
+      setData(await ops.loadVault(api, vault, keepCopy));
       setError(null);
     } catch (err) {
       setError(errorText(err));
@@ -69,8 +86,16 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   useEffect(() => {
     let alive = true;
     ops
-      .loadVault(api, vault)
-      .then((d) => alive && setData(d))
+      .loadVault(api, vault, keepCopy)
+      .then((d) => {
+        if (!alive) return;
+        setData(d);
+        pinVaultKey(d.boxPublic);
+        // Captures sealed on this device while it was offline go to the inbox now.
+        void flushCaptures(api)
+          .then((n) => (n > 0 ? ops.loadVault(api, vault).then((x) => alive && setData(x)) : undefined))
+          .catch(() => undefined);
+      })
       .catch((err) => alive && setError(errorText(err)));
     const sync = () => setTab(tabFromHash());
     window.addEventListener("hashchange", sync);
@@ -93,6 +118,30 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
       alive = false;
     };
   }, [api, memories]);
+
+  // While the vault is open, sign this period's presence once: the proof of a real life is built from these.
+  const hasSignKey = !!data?.signKey;
+  useEffect(() => {
+    if (!hasSignKey) return;
+    let timer = 0;
+    let alive = true;
+    const beat = async () => {
+      let wait = 60_000;
+      try {
+        const r = await sendPresence(api, vault);
+        wait = Math.min(Math.max((r.periodSeconds * 1000) / 2, 2000), 60_000);
+        if (r.recorded && alive) setData((d) => (d ? { ...d, presence: { ...d.presence, total: d.presence.total + 1 } } : d));
+      } catch {
+        // Offline or signed out: the next beat tries again.
+      }
+      if (alive) timer = window.setTimeout(beat, wait);
+    };
+    void beat();
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [api, vault, hasSignKey]);
 
   const [focus, setFocus] = useState<string | null>(null);
   const goTo = useCallback((t: TabId) => {
@@ -191,6 +240,14 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           </Notice>
         ) : null}
         {error ? <Notice kind="error">{error}</Notice> : null}
+        {data.legacy.plan?.missed && tab !== "legacy" ? (
+          <Notice>
+            While you were away your legacy plan reached {data.legacy.plan.missed.stage >= 3 ? "the end of its period" : "a warning stage"}. Coming back counted as a check-in.{" "}
+            <button type="button" className="text-button" onClick={() => goTo("legacy")}>
+              See Legacy
+            </button>
+          </Notice>
+        ) : null}
 
         <div className="tabs" role="tablist" aria-label="Vault sections">
           {TABS.map((t) => (
@@ -205,6 +262,11 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
               onClick={() => goTo(t.id)}
             >
               {t.label}
+              {t.id === "legacy" && data.trusted.some((x) => x.state === "open" && !x.kept) ? (
+                <span className="tab-count" aria-label="A plan that names you is open for release">
+                  {data.trusted.filter((x) => x.state === "open" && !x.kept).length}
+                </span>
+              ) : null}
               {t.id === "inbox" && data.proposals.length > 0 ? (
                 <span className="tab-count" aria-label={`${data.proposals.length} waiting`}>
                   {data.proposals.length}
@@ -223,6 +285,10 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "profile" ? <ProfileTab /> : null}
           {tab === "folders" ? <FoldersTab /> : null}
           {tab === "apps" ? <AppsTab /> : null}
+          {tab === "agents" ? <AgentsTab /> : null}
+          {tab === "devices" ? <DevicesTab /> : null}
+          {tab === "legacy" ? <LegacyTab /> : null}
+          {tab === "proof" ? <ProofTab /> : null}
           {tab === "log" ? <LogTab /> : null}
           {tab === "import" ? <ImportTab /> : null}
           {tab === "settings" ? <SettingsTab onDeleted={onDeleted} /> : null}

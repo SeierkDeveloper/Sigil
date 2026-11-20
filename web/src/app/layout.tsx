@@ -5,6 +5,7 @@ import { Footer } from "@/components/Footer";
 import { Backdrop } from "@/components/backdrop/Backdrop";
 import { Motion, MOTION_BOOT } from "@/components/backdrop/Motion";
 import { site } from "@/lib/site";
+import { InstallWorker } from "@/components/InstallWorker";
 import "./globals.css";
 
 // Self-hosted faces (the content security policy allows no third-party font hosts).
@@ -44,6 +45,9 @@ export const metadata: Metadata = {
   openGraph: { title: site.name, description: site.description, siteName: site.name, type: "website" },
   twitter: { card: "summary_large_image", title: site.name, description: site.description },
   robots: { index: true, follow: true },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: site.name, statusBarStyle: "black-translucent" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {
@@ -70,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
         <Footer />
         <Motion />
+        <InstallWorker />
       </body>
     </html>
   );

@@ -160,3 +160,21 @@ export async function deriveFromDevice(key: CryptoKey, info: string): Promise<Ui
   const bits = await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt: enc.encode("sigil/hkdf/v1"), info: enc.encode(info) }, key, 256);
   return new Uint8Array(bits);
 }
+
+// ---------------------------------------------------------------- captures made offline
+
+/** Captures sealed to the vault public key while there was no network. Ciphertext only. */
+export async function queueCapture(c: { id: string; sealed: string }): Promise<void> {
+  const list = (await get<{ id: string; sealed: string }[]>("captures")) ?? [];
+  await put("captures", [...list, c].slice(-50));
+}
+
+export async function queuedCaptures(): Promise<{ id: string; sealed: string }[]> {
+  return (await get<{ id: string; sealed: string }[]>("captures")) ?? [];
+}
+
+export async function dropCaptures(n: number): Promise<void> {
+  if (n <= 0) return;
+  const list = (await get<{ id: string; sealed: string }[]>("captures")) ?? [];
+  await put("captures", list.slice(n));
+}

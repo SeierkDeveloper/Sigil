@@ -4,10 +4,11 @@ import { PageHeader } from "@/components/PageHeader";
 import { PageLinks } from "@/components/PageLinks";
 import { CodeBlock } from "@/components/CodeBlock";
 import { Verifier } from "@/components/live/Verifier";
+import { CertificateChecker } from "@/components/live/CertificateChecker";
 
 export const metadata: Metadata = {
   title: "Verify",
-  description: "Check a Sigil seal or a read-log entry by hand: in your browser, or with a few lines of your own code.",
+  description: "Check a Sigil seal, a read-log entry or a life certificate by hand: in your browser, or with a few lines of your own code.",
 };
 
 const rules = `leaf  = SHA-256( 0x00 || data )
@@ -49,7 +50,7 @@ export default function VerifyPage() {
         <PageHeader
           eyebrow="Verify"
           title="Check it yourself, by hand"
-          lead="Your vault checks a log entry against its seal with one button. This page is the long way round: the same check, with every step in the open, and with code you can run without trusting ours."
+          lead="Your vault checks a log entry against its seal with one button. This page is the long way round: the same check, with every step in the open, with code you can run without trusting ours, and a checker for life certificates."
         />
 
         <section className="page-section" aria-labelledby="tool-title">
@@ -79,6 +80,44 @@ export default function VerifyPage() {
             </div>
             <div className="panel">
               <Verifier />
+            </div>
+          </div>
+        </section>
+
+        <section className="page-section" id="certificate" aria-labelledby="cert-title">
+          <div className="split split-top">
+            <div>
+              <p className="eyebrow">Proof of a real life</p>
+              <h2 id="cert-title" className="section-title">
+                A life certificate
+              </h2>
+              <p className="section-lead">
+                A vault can show that it has a long, continuous sealed history without showing anything in it. Open a certificate from its link, or drop the file here.
+              </p>
+              <ol className="mini-steps">
+                <li>
+                  <strong>The signature.</strong> The whole certificate is signed by the vault&apos;s own signing key, which is made from its vault key.
+                </li>
+                <li>
+                  <strong>Each hour.</strong> Every listed hour carries a statement, signed by the same key, that the vault was open in that hour.
+                </li>
+                <li>
+                  <strong>Each proof.</strong> Each statement hashes to a leaf, and its proof leads to the root listed for that hour.
+                </li>
+                <li>
+                  <strong>The summary.</strong> First and last seal, hours and days with activity and the longest gap are counted again here.
+                </li>
+                <li>
+                  <strong>The roots.</strong> Each root is compared with the seal this site publishes, and with SigilSeal on chain when the seals are anchored.
+                </li>
+              </ol>
+              <p className="muted">
+                What it proves: whoever could open that vault signed in each of those hours, and the site sealed it then. It does not prove who that is, that they are one person,
+                or anything about what is in the vault. While seals are not anchored, the site holds the list of roots.
+              </p>
+            </div>
+            <div className="panel">
+              <CertificateChecker />
             </div>
           </div>
         </section>

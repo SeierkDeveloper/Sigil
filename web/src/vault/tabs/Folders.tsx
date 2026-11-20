@@ -7,6 +7,7 @@ import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
 import { errorText, useVault } from "../context";
 import { CopyButton, Fingerprint, Notice } from "../ui";
+import { legacyCovers, resealLegacy } from "../legacyOps";
 
 export function FoldersTab() {
   const { api, vault, data, update, reload } = useVault();
@@ -289,7 +290,9 @@ function FolderShares({ folder }: { folder: OpenFolder }) {
     setBusy(true);
     setError(null);
     try {
-      await ops.revokeShare(api, vault, data, folder, shareId);
+      const next = await ops.revokeShare(api, vault, data, folder, shareId);
+      // The folder has a new key: a legacy plan that leaves it to someone is sealed again with it.
+      if (legacyCovers(data, folder.id)) await resealLegacy(api, vault, { ...data, folders: data.folders.map((f) => (f.id === folder.id ? next : f)) });
       setConfirm(null);
       await reload();
     } catch (err) {

@@ -185,12 +185,12 @@ export function createSession(db: Db, userId: string, keyslotId: string | null =
 
 // ---------------------------------------------------------------- the heartbeat
 
-/** Any sign-in or vault action counts as alive. Written at most once a minute. */
+/** Any sign-in or vault action counts as alive. Written at most once a minute (once a legacy day where tests shorten days). */
 export function touchActive(db: Db, userId: string, at = new Date()): boolean {
   const r = db.prepare("SELECT last_active_at FROM users WHERE id = ?").get(userId) as Row | undefined;
   if (!r) return false;
   const last = r.last_active_at ? Date.parse(String(r.last_active_at)) : 0;
-  if (at.getTime() - last < 60_000) return false;
+  if (at.getTime() - last < Math.min(60_000, serverConfig.legacyDayMs)) return false;
   db.prepare("UPDATE users SET last_active_at = ? WHERE id = ?").run(at.toISOString(), userId);
   return true;
 }

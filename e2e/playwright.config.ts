@@ -37,6 +37,8 @@ export default defineConfig({
       SIGIL_SEALS: "on",
       SIGIL_ANCHOR: "off",
       SIGIL_AGENT_ONLINE_SECONDS: "6",
+      // A legacy day of 25 ms: a three-month period passes in about two seconds.
+      SIGIL_LEGACY_DAY_MS: "25",
       ...TEST_MODEL,
     },
   },

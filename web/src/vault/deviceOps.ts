@@ -31,7 +31,7 @@ import {
 } from "@sigil/core";
 import type { Api } from "./api";
 import type { KeyslotView, Unlocked } from "./ops";
-import { deriveFromDevice, rememberKeyslot, saveDevice, thisDevice } from "./offline";
+import { deriveFromDevice, dropCaptures, queueCapture, queuedCaptures, rememberKeyslot, saveDevice, thisDevice } from "./offline";
 
 // ---------------------------------------------------------------- the new device
 
@@ -193,13 +193,46 @@ export function pinnedVaultKey(): string | null {
  * inbox. The vault does not need to be open: the key is public, and it is
  * checked against the one this device pinned when the vault was last open.
  */
-export async function capture(api: Api, draft: ProposalDraft, pinned: string | null = pinnedVaultKey()): Promise<{ id: string }> {
-  const { publicKey } = await api.get<{ publicKey: string }>("capture/key");
+export async function capture(api: Api, draft: ProposalDraft, pinned: string | null = pinnedVaultKey()): Promise<{ id: string; queued: boolean }> {
+  let publicKey: string;
+  try {
+    publicKey = (await api.get<{ publicKey: string }>("capture/key")).publicKey;
+  } catch (err) {
+    // Offline: seal with the key this device pinned and send it once the network is back.
+    if ((err as { status?: number }).status === 0 && pinned) {
+      const sealed = sealCapture(draft, pinned);
+      await queueCapture(sealed);
+      return { id: sealed.id, queued: true };
+    }
+    throw err;
+  }
   if (pinned && pinned !== publicKey) throw new Error("The server sent a different vault key than this device knows, so nothing was sent. Open your vault on this device and try again.");
-  const payload = cleanProposal(draft, "capture");
+  const sealed = sealCapture(draft, publicKey);
+  await api.post("capture", sealed);
+  return { id: sealed.id, queued: false };
+}
+
+export function sealCapture(draft: ProposalDraft, publicKey: string): { id: string; sealed: string } {
   const id = randomId();
-  await api.post("capture", { id, sealed: sealProposal(decodeBoxPublicKey(publicKey), id, "capture", payload) });
-  return { id };
+  return { id, sealed: sealProposal(decodeBoxPublicKey(publicKey), id, "capture", cleanProposal(draft, "capture")) };
+}
+
+/** Sends captures that were sealed while offline. Returns how many went. */
+export async function flushCaptures(api: Api): Promise<number> {
+  const waiting = await queuedCaptures();
+  let sent = 0;
+  for (const c of waiting) {
+    try {
+      await api.post("capture", c);
+      sent++;
+    } catch (err) {
+      // Still offline: keep the rest for next time. Anything the server refused is dropped.
+      if ((err as { status?: number }).status === 0) break;
+      sent++;
+    }
+  }
+  await dropCaptures(sent);
+  return sent;
 }
 
 /** Shrinks a photo on this device before it is sealed: longest side 1600 pixels, JPEG. */

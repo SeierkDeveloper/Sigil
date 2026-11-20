@@ -399,6 +399,12 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
         </label>
         <textarea id="m-body" className="textarea" value={body} onChange={(e) => setBody(e.target.value)} rows={12} />
       </div>
+      {memory?.image ? (
+        <figure className="memory-photo">
+          <img src={`data:${memory.image.type};base64,${memory.image.data}`} alt={`Photo kept with ${memory.title}`} />
+          <figcaption className="small faint">Encrypted with this memory, like its text.</figcaption>
+        </figure>
+      ) : null}
       <div className="grid grid-2">
         <div className="field">
           <label className="field-label" htmlFor="m-folder">

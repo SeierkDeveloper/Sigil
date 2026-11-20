@@ -8,10 +8,13 @@ import { PhraseScreen } from "./PhraseScreen";
 import { Dashboard } from "./Dashboard";
 import { Consent, type ConsentRequest } from "./Consent";
 import { Notice, Spinner } from "./ui";
+import { offlineCopy, thisDevice } from "./offline";
+import { OfflineVault } from "./OfflineVault";
 
 type Phase =
   | { kind: "checking" }
-  | { kind: "offline" }
+  | { kind: "offline"; copy: boolean }
+  | { kind: "offline-copy" }
   | { kind: "gate"; mode: GateMode }
   | { kind: "phrase"; vault: ops.Unlocked; phrase: string }
   | { kind: "open"; vault: ops.Unlocked };
@@ -26,25 +29,26 @@ export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) 
   const api = useMemo(() => createApi(), []);
   const [phase, setPhase] = useState<Phase>({ kind: "checking" });
 
-  const check = useCallback(async () => {
+  // Signed out on a device that keeps a device key: start on sign-in, where that key is offered.
+  const firstPhase = useCallback(async (): Promise<Phase> => {
     try {
       const s = await api.get<{ signedIn: boolean }>("session");
-      setPhase({ kind: "gate", mode: s.signedIn ? "unlock" : "create" });
+      if (s.signedIn) return { kind: "gate", mode: "unlock" };
+      return { kind: "gate", mode: (await thisDevice().catch(() => null)) ? "signin" : "create" };
     } catch {
-      setPhase({ kind: "offline" });
+      return { kind: "offline", copy: !!(await offlineCopy().catch(() => null)) };
     }
   }, [api]);
 
+  const check = useCallback(async () => setPhase(await firstPhase()), [firstPhase]);
+
   useEffect(() => {
     let alive = true;
-    api
-      .get<{ signedIn: boolean }>("session")
-      .then((s) => alive && setPhase({ kind: "gate", mode: s.signedIn ? "unlock" : "create" }))
-      .catch(() => alive && setPhase({ kind: "offline" }));
+    void firstPhase().then((p) => alive && setPhase(p));
     return () => {
       alive = false;
     };
-  }, [api]);
+  }, [firstPhase]);
 
   const signOut = useCallback(async () => {
     try {
@@ -61,11 +65,19 @@ export function VaultApp({ consent }: { consent?: ConsentRequest | null } = {}) 
         {phase.kind === "offline" ? (
           <div className="vault-gate">
             <Notice kind="error">Sigil could not be reached. Check your connection and try again.</Notice>
-            <button type="button" className="button" onClick={() => void check()}>
-              Try again
-            </button>
+            <div className="row">
+              <button type="button" className="button" onClick={() => void check()}>
+                Try again
+              </button>
+              {phase.copy ? (
+                <button type="button" className="button button-primary" onClick={() => setPhase({ kind: "offline-copy" })}>
+                  Read the copy on this device
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
+        {phase.kind === "offline-copy" ? <OfflineVault onBack={() => void check()} /> : null}
         {phase.kind === "gate" ? (
           <Gate
             api={api}

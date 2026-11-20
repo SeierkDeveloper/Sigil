@@ -5,10 +5,26 @@ import { SealIcon } from "@/components/icons";
 import { formatDateTime, formatSealPeriod, formatTime, plural, shortHash } from "@/lib/format";
 import * as ops from "../ops";
 import { openAskNote } from "../selfOps";
+import { openLegacyAskNote } from "../legacyOps";
 import { errorText, useVault } from "../context";
 import { Empty, Notice, Spinner } from "../ui";
 
 type Verify = { state: "checking" } | ops.VerifyResult;
+
+const LEGACY_STEPS: Record<string, string> = {
+  made: "You made a legacy plan",
+  changed: "You sealed your legacy plan again, with a new legacy key",
+  cancelled: "You cancelled your legacy plan",
+  "check-in": "You checked in",
+  "warning-first": "Your legacy plan reached its first warning",
+  "warning-last": "Your legacy plan reached its last warning",
+  "release-open": "Your legacy plan's period ended: trusted people may ask for a release",
+  request: "A trusted person asked for a release",
+  "share-passed": "A trusted person passed their share to another",
+  released: "Your legacy plan was released",
+  opened: "A trusted person combined the shares and opened their bundle",
+  read: "A trusted person read the folders you left them",
+};
 
 export function LogTab() {
   const { api, data, goTo } = useVault();
@@ -52,17 +68,53 @@ export function LogTab() {
       ]),
     [data.apps, data.shares.outgoing, data.askLinks],
   );
-  const whoDid = (e: ops.LogEntryView) =>
-    appName.get(e.appId) ?? (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : "Removed app");
+  const people = useMemo(() => new Map((data.legacy.record?.people ?? []).map((p) => [p.id, p.label] as const)), [data.legacy.record]);
+  const whoDid = (e: ops.LogEntryView) => {
+    if (e.kind === "legacy") return e.appId === "legacy" || e.appId === data.legacy.plan?.id ? "Your legacy plan" : (people.get(e.appId) ?? "A trusted person from an earlier plan");
+    if (e.kind === "device") return "Your devices";
+    return appName.get(e.appId) ?? (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : "Removed app");
+  };
+  const spaceName = (ref: string | null) => {
+    const id = ref?.replace(/^[a-z]+-/, "");
+    return data.spaces.find((x) => x.id === id)?.name ?? "a team space";
+  };
   const title = useMemo(() => new Map(data.memories.map((m) => [m.id, m.title])), [data.memories]);
 
   if (!log && error) return <Notice kind="error">The read log could not be loaded: {error}</Notice>;
   if (!log) return <Spinner label="Loading the read log" />;
 
-  const entries = app === "all" ? log.entries : log.entries.filter((e) => e.appId === app);
-  const appsInLog = [...new Set(log.entries.map((e) => e.appId))];
+  // Presence is counted under Proof; listing one line per hour here would bury everything else.
+  const shownEntries = log.entries.filter((e) => e.kind !== "presence");
+  const entries = app === "all" ? shownEntries : shownEntries.filter((e) => e.appId === app);
+  const appsInLog = [...new Set(shownEntries.map((e) => e.appId))];
 
   const describe = (e: ops.LogEntryView) => {
+    const step = e.memoryId ?? "";
+    if (e.kind === "legacy") {
+      if (step.startsWith("ask-")) return `Your AI self answered a question in legacy mode${e.count ? `, from ${plural(e.count, "memory", "memories")}` : ""}`;
+      return LEGACY_STEPS[step] ?? "A step of your legacy plan";
+    }
+    if (e.kind === "device") {
+      if (step.startsWith("added-")) return "A device was added by code and received your vault, sealed to its own key";
+      if (step.startsWith("signed-in-")) return "A device you added opened your vault for the first time";
+      if (step.startsWith("revoked-")) return "A device was revoked: its key slot and sessions were removed";
+      return "A device step";
+    }
+    if (e.kind === "remember") {
+      const t = e.memoryId ? title.get(e.memoryId) : undefined;
+      return t ? `Remembered "${t}"` : "Remembered a memory that has since been changed or deleted";
+    }
+    if (e.kind === "forget") return "Forgot a memory, for good";
+    if (e.kind === "handoff") return step.startsWith("left-") ? "Left a handoff note" : "Picked up a handoff note";
+    if (e.kind === "space") {
+      const name = spaceName(step);
+      if (step.startsWith("read-")) return `Read the space ${name} (${plural(e.count, "memory", "memories")})`;
+      if (step.startsWith("wrote-")) return `Wrote ${plural(e.count, "memory", "memories")} to the space ${name}`;
+      if (step.startsWith("forgot-")) return `Deleted ${plural(e.count, "memory", "memories")} from the space ${name}`;
+      if (step.startsWith("joined-")) return `Joined the space ${name}`;
+      if (step.startsWith("removed-")) return `Was removed from the space ${name}`;
+      return `Used the space ${name}`;
+    }
     if (e.kind === "propose") return "Suggested a memory to your inbox";
     if (e.kind === "ask") return `Your AI self answered a question${e.count ? `, from ${plural(e.count, "memory", "memories")}` : ""}`;
     if (e.kind === "shared") return `Opened a folder you share with them (${plural(e.count, "memory", "memories")})`;
@@ -119,13 +171,14 @@ export function LogTab() {
       </div>
 
       <Notice>
-        Every request a connected app makes, every memory it suggests and every time another vault opens a folder you share is written here. At the end of each hour all reads are sealed into one fingerprint you can verify in
-        this browser.{" "}
+        Every request a connected app or agent makes, every memory it suggests, every time another vault opens a folder you share, and every step of your legacy plan and your
+        devices is written here. At the end of each hour all of it is sealed into one fingerprint you can verify in this browser. The hours your vault was open are sealed too
+        and counted under Proof.{" "}
         {log.mode === "local" ? "Seals are kept by Sigil for now; publishing them on chain is planned." : "Seals are published on chain."}
       </Notice>
       {error ? <Notice kind="error">{error}</Notice> : null}
 
-      {log.entries.length === 0 ? (
+      {shownEntries.length === 0 ? (
         <Empty
           icon={<SealIcon />}
           title="No app has read your vault yet"
@@ -150,7 +203,7 @@ export function LogTab() {
                     {whoDid(e)}, {formatDateTime(e.at)}.
                     {e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
                   </p>
-                  {e.kind === "ask" && e.note ? (
+                  {(e.kind === "ask" || (e.kind === "legacy" && e.memoryId?.startsWith("ask-"))) && e.note ? (
                     shown === e.id ? (
                       <AskNoteView entry={e} />
                     ) : (
@@ -192,7 +245,7 @@ export function LogTab() {
 /** The question and answer of one entry, opened with this vault's own key. The server holds them sealed. */
 function AskNoteView({ entry }: { entry: ops.LogEntryView }) {
   const { data, openMemory } = useVault();
-  const note = data.box ? openAskNote(data.box, entry) : null;
+  const note = data.box ? (entry.kind === "legacy" ? openLegacyAskNote(data.box, data.legacy.plan?.id ?? "", entry) : openAskNote(data.box, entry)) : null;
   if (!note) return <p className="small log-unverified">This entry could not be opened with your vault key.</p>;
   return (
     <div className="ask-note" data-testid="ask-note">
