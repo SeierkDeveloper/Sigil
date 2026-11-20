@@ -193,3 +193,47 @@ describe("background sync in the connector", () => {
     void json;
   });
 });
+
+describe("signing a source in on the owner's computer", () => {
+  it("waits for the connector, which signs in through this machine with its own secret and seals the tokens for its key only", async () => {
+    const s = await signedUp(h);
+    const folder = await ops.addFolder(s.b.api, s.vault, "Slack");
+    const app = await ops.connectApp(s.b.api, s.vault, { name: "Connector", kind: "claude-desktop" }, []);
+    let data = await ops.loadVault(s.b.api, s.vault);
+    const sourceId = await sync.prepareOnComputer(s.b.api, s.vault, data, { kind: "slack", clientId: "1234.5678", folder, app: data.apps.find((a) => a.id === app.appId)! });
+    expect(sync.connectCommand(ORIGIN, sourceId)).toContain(`connect --source ${sourceId}`);
+    data = await ops.loadVault(s.b.api, s.vault);
+    const waiting = data.sync.find((x) => x.id === sourceId)!;
+    expect(waiting.state).toMatchObject({ kind: "slack", via: "connector", tokens: { access: "" } });
+    // The vault never runs a pass for it.
+    await expect(sync.syncNow(s.b.api, s.vault, data, waiting)).rejects.toThrow(/on your computer/);
+
+    const seen: { form: URLSearchParams }[] = [];
+    const tokens = tokenServer({ slack: true });
+    const fetcher = (async (u: string, init?: RequestInit) => {
+      seen.push({ form: new URLSearchParams(String(init?.body ?? "")) });
+      return tokens.fetch(u, init);
+    }) as typeof fetch;
+    const { connectOnThisComputer } = await import("../../connector/src/connect");
+    const done = connectOnThisComputer(readerFor(h, app.appKey), {
+      sourceId,
+      env: { SIGIL_SLACK_CLIENT_ID: "1234.5678", SIGIL_SLACK_CLIENT_SECRET: "CANARY-slack-secret" },
+      fetch: fetcher,
+      show: (url) => {
+        // The person signs in; the provider sends the browser back to this machine.
+        const u = new URL(url);
+        const back = new URL(u.searchParams.get("redirect_uri")!);
+        expect(back.hostname).toBe("127.0.0.1");
+        back.searchParams.set("code", "good-code");
+        back.searchParams.set("state", u.searchParams.get("state")!);
+        void fetch(back);
+      },
+    });
+    expect(await done).toEqual({ kind: "slack", account: "Team" });
+    // The secret went to the provider from this machine, and never to Sigil.
+    expect(seen[0].form.get("client_secret")).toBe("CANARY-slack-secret");
+    expect(dumpDb(h.db) + h.sent.join("\n")).not.toContain("CANARY");
+    data = await ops.loadVault(s.b.api, s.vault);
+    expect(data.sync.find((x) => x.id === sourceId)!.state).toMatchObject({ via: "connector", account: "Team", tokens: { access: "xoxp-CANARY-access" } });
+  });
+});

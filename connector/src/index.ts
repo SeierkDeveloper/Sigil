@@ -22,6 +22,7 @@
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
 import { randomBytes } from "node:crypto";
 import { isLoopbackHost, isSafeBaseUrl, samePath } from "./net";
+import { connectOnThisComputer } from "./connect";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { VaultReader } from "./reader";
@@ -62,6 +63,9 @@ function help(): never {
       "  sigil-connector --self               answer your ask links on this machine",
       "  sigil-connector --watch              keep the live sync sources you gave this app in sync, and back the vault up if you allowed it",
       "  sigil-connector --watch <folder>     also suggest new and changed Obsidian notes to the inbox",
+      "  sigil-connector connect --source ID  sign a live sync source in on this computer (Slack, or Google when its",
+      "                                       client needs a secret: set SIGIL_SLACK_CLIENT_ID and SIGIL_SLACK_CLIENT_SECRET",
+      "                                       or SIGIL_GOOGLE_CLIENT_ID and SIGIL_GOOGLE_CLIENT_SECRET here; never sent to Sigil)",
       "",
     ].join("\n"),
   );
@@ -109,6 +113,24 @@ async function main() {
   }
 
   const self = new SelfAgent(reader);
+
+  // Signs a live sync source in on this computer, for a provider that wants a client secret.
+  if (process.argv[2] === "connect") {
+    const sourceId = arg("--source");
+    if (!sourceId || !/^[A-Za-z0-9_-]{8,64}$/.test(sourceId)) fail("Name the source: sigil-connector connect --source <id> (the vault shows the whole command under Sync).");
+    const port = Number(arg("--port") ?? 0);
+    try {
+      const r = await connectOnThisComputer(reader, {
+        sourceId,
+        port: Number.isInteger(port) && port >= 0 && port < 65536 ? port : 0,
+        show: (url) => process.stderr.write(`Open this address in your browser and sign in:\n\n  ${url}\n\nWaiting for the sign-in (stop with Ctrl+C)...\n`),
+      });
+      process.stderr.write(`Signed in${r.account ? ` to ${r.account}` : ""}. Run sigil-connector --watch to keep it in sync.\n`);
+      process.exit(0);
+    } catch (err) {
+      fail((err as Error).message);
+    }
+  }
 
   if (process.argv.includes("--self")) {
     process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} answering ask links (stop with Ctrl+C)\n`);
