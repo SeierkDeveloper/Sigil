@@ -1,28 +1,28 @@
 "use client";
 
-// The page ground, behind every page: dark stone engraved with rows of
-// ciphertext. A soft light drifts slowly across it and a second one follows
-// the pointer; the engraving shows only where the light falls. Now and then a
-// few characters resolve into a plain word and lock again.
+// The page ground, behind every page: black, engraved with two ribbons of fine
+// parallel lines, the line language of the logo. A soft light drifts slowly
+// across the page and a second one follows the pointer; the engraving shows
+// only where the light falls. The ribbons bend and breathe very slowly and
+// move a little slower than the page when scrolling.
 //
-// One 2D canvas, 30 frames a second at most, stopped in a hidden tab. With
-// reduced motion it draws one finished frame and stays still.
+// One 2D canvas, 30 frames a second at most (the lines are redrawn at half
+// that unless the page scrolls), stopped in a hidden tab. With reduced motion
+// it draws one finished frame and stays still.
 
 import { useEffect, useRef } from "react";
 
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-const WORDS = ["work", "writing", "health", "money", "notes", "yours", "sealed", "private"];
-
-const CELL = 8; // px between characters
-const ROW = 30; // px between lines
+const LINES = 24; // lines in one ribbon
+const GAP = 5; // px between them where the ribbon lies flat
+const STEP = 12; // px between points along a line
 const FRAME_MS = 1000 / 30;
-const TICK_MS = 110;
+const LAYER_MS = 1000 / 15;
 
-type Word = { row: number; col: number; text: string; born: number };
-
-function randomChar() {
-  return ALPHABET[(Math.random() * ALPHABET.length) | 0];
-}
+// Where each ribbon sits in the repeating height, how it leans and how it bends.
+const RIBBONS = [
+  { at: 0.27, lean: 0.11, sway: 0.06, turns: 1.0, phase: 0.6, fold: 0.8, foldPhase: 1.9 },
+  { at: 0.77, lean: -0.08, sway: 0.05, turns: 1.3, phase: 3.4, fold: 1.1, foldPhase: 0.4 },
+];
 
 export function Backdrop() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -36,70 +36,68 @@ export function Backdrop() {
     const fine = window.matchMedia("(hover: hover) and (pointer: fine)");
     const layer = document.createElement("canvas");
     const lctx = layer.getContext("2d")!;
-    const monoFace = getComputedStyle(document.documentElement).getPropertyValue("--face-mono").trim();
-    const font = `400 11px ${monoFace || "ui-monospace"}, ui-monospace, Menlo, monospace`;
 
     let W = 0;
     let H = 0;
     let dpr = 1;
-    let cols = 0;
-    let rows = 0;
-    let layerH = 0;
-    let grid: string[] = []; // "" is a gap
-    let words: Word[] = [];
-    let pattern: CanvasPattern | null = null;
+    let layerH = 0; // the height after which the engraving repeats
     let raf = 0;
     let lastFrame = 0;
-    let lastTick = 0;
-    let nextWord = 0;
+    let lastLayer = 0;
+    let lastShift = -1;
     let disposed = false;
     const started = performance.now();
     // The pointer light eases toward the pointer and fades when it leaves.
     const pointer = { x: 0, y: 0, tx: 0, ty: 0, on: 0, target: 0 };
-
-    const cellX = (c: number) => c * CELL + CELL / 2;
-    const cellY = (r: number) => r * ROW + ROW / 2;
-
-    function drawCell(r: number, c: number, ch: string, strong = false) {
-      lctx.clearRect(c * CELL * dpr, r * ROW * dpr, CELL * dpr, ROW * dpr);
-      if (!ch) return;
-      lctx.fillStyle = strong ? "#fff" : "rgba(255,255,255,0.5)";
-      lctx.fillText(ch, cellX(c) * dpr, cellY(r) * dpr);
-    }
 
     function build() {
       W = window.innerWidth;
       H = Math.max(window.innerHeight, H);
       dpr = Math.min(window.devicePixelRatio || 1, 2);
       while (dpr > 1 && W * H * dpr * dpr > 3_300_000) dpr -= 0.5;
-      canvas!.width = Math.round(W * dpr);
-      canvas!.height = Math.round(H * dpr);
+      for (const c of [canvas!, layer]) {
+        c.width = Math.round(W * dpr);
+        c.height = Math.round(H * dpr);
+      }
       canvas!.style.width = `${W}px`;
       canvas!.style.height = `${H}px`;
+      layerH = Math.max(1100, H * 1.5);
+      lastShift = -1;
+    }
 
-      cols = Math.ceil(W / CELL);
-      rows = Math.ceil(H / ROW) + 1;
-      layerH = rows * ROW;
-      layer.width = Math.round(W * dpr);
-      layer.height = Math.round(layerH * dpr);
-      lctx.font = font.replace("11px", `${11 * dpr}px`);
-      lctx.textAlign = "center";
-      lctx.textBaseline = "middle";
+    const scrollShift = () => (reduced.matches ? 0 : (window.scrollY * 0.12) % layerH);
 
-      grid = new Array(cols * rows);
-      words = [];
-      for (let r = 0; r < rows; r++) {
-        // Groups of four with a space, some groups left out, like lines of a sealed text.
-        let skip = false;
-        for (let c = 0; c < cols; c++) {
-          const inGroup = c % 5;
-          if (inGroup === 0) skip = Math.random() < 0.24;
-          const ch = inGroup === 4 || skip ? "" : randomChar();
-          grid[r * cols + c] = ch;
-          if (ch) drawCell(r, c, ch);
+    // The ribbons, drawn fresh: every line follows the same bend, and the
+    // bundle narrows and opens again the way a ribbon does when it turns.
+    function drawLayer(now: number, shift: number) {
+      const t = reduced.matches ? 0 : (now - started) / 1000;
+      lctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      lctx.clearRect(0, 0, W, H);
+      lctx.lineWidth = 1;
+      lctx.strokeStyle = "#fff";
+      const reach = (LINES * GAP) / 2 + layerH * 0.2;
+      for (const r of RIBBONS) {
+        for (const wrap of [-layerH, 0, layerH]) {
+          const base = r.at * layerH - shift + wrap;
+          if (base < -reach || base > H + reach) continue;
+          for (let k = 0; k < LINES; k++) {
+            const side = k / (LINES - 1) - 0.5; // -0.5 to 0.5 across the ribbon
+            // Brighter toward one edge, with a firm outline, as in the logo.
+            lctx.globalAlpha = k === 0 || k === LINES - 1 ? 0.8 : 0.24 + 0.4 * (k / LINES);
+            lctx.beginPath();
+            for (let x = -STEP; x <= W + STEP; x += STEP) {
+              const u = (x / W) * Math.PI * 2;
+              const centre = base + r.lean * layerH * (x / W - 0.5) + r.sway * layerH * Math.sin(u * r.turns + r.phase + t * 0.021);
+              const open = 0.62 + 0.38 * Math.sin(u * r.fold + r.foldPhase + t * 0.016);
+              const y = centre + side * (LINES - 1) * GAP * open;
+              if (x === -STEP) lctx.moveTo(x, y);
+              else lctx.lineTo(x, y);
+            }
+            lctx.stroke();
+          }
         }
       }
-      pattern = ctx!.createPattern(layer, "repeat");
+      lctx.globalAlpha = 1;
     }
 
     function lights(now: number) {
@@ -122,11 +120,11 @@ export function Backdrop() {
       return out;
     }
 
-    // `reach` scales the radius: the glow of a light spreads wide, the engraving shows only near its centre.
+    // `reach` scales the radius: the wash of a light spreads wide, the engraving shows nearer its centre.
     function fillLights(list: ReturnType<typeof lights>, peak: number, reach: number) {
       for (const l of list) {
         const r = l.r * reach;
-        // Wider than tall, as a highlight sits on a brushed surface.
+        // Wider than tall, as a highlight sits on a polished surface.
         ctx!.save();
         ctx!.translate(l.x, l.y);
         ctx!.scale(1.5, 1);
@@ -141,74 +139,26 @@ export function Backdrop() {
     }
 
     function render(now: number) {
-      if (!pattern) return;
+      const shift = scrollShift();
+      if (shift !== lastShift || now - lastLayer >= LAYER_MS - 2 || reduced.matches) {
+        drawLayer(now, shift);
+        lastLayer = now;
+        lastShift = shift;
+      }
       const list = lights(now);
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.globalCompositeOperation = "source-over";
       ctx!.clearRect(0, 0, W, H);
       // 1. Where the light falls, and how strongly.
-      fillLights(list, 0.13, 0.5);
-      // 2. The engraving, kept only where there is light. It moves a little slower than the page.
+      fillLights(list, 0.24, 0.62);
+      // 2. The engraving, kept only where there is light.
       ctx!.globalCompositeOperation = "source-in";
-      const shift = reduced.matches ? 0 : (window.scrollY * 0.12) % layerH;
       ctx!.setTransform(1, 0, 0, 1, 0, 0);
-      pattern.setTransform(new DOMMatrix().translate(0, -shift * dpr));
-      ctx!.fillStyle = pattern;
-      ctx!.fillRect(0, 0, canvas!.width, canvas!.height);
-      // 3. The glow of the light itself, behind the engraving.
+      ctx!.drawImage(layer, 0, 0);
+      // 3. A faint wash of the light itself, behind the engraving.
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx!.globalCompositeOperation = "destination-over";
-      fillLights(list, 0.11, 1);
-    }
-
-    function placeWord(now: number, settled = false) {
-      const text = WORDS[(Math.random() * WORDS.length) | 0];
-      const [a] = lights(now);
-      const shift = reduced.matches ? 0 : (window.scrollY * 0.12) % layerH;
-      // Near the drifting light, on a group boundary, away from other words.
-      const cx = a.x + (Math.random() - 0.5) * a.r * 0.6;
-      const cy = a.y + (Math.random() - 0.5) * a.r * 0.35;
-      let col = Math.round(cx / CELL / 5) * 5;
-      col = Math.max(0, Math.min(cols - text.length - 1, col));
-      let row = Math.round((cy + shift) / ROW);
-      row = ((row % rows) + rows) % rows;
-      if (words.some((w) => w.row === row)) return;
-      words.push({ row, col, text, born: settled ? now - 3000 : now });
-      if (settled) for (let i = 0; i < text.length; i++) drawCell(row, col + i, text[i], true);
-    }
-
-    function tick(now: number) {
-      // A few characters change, as if the text were still being written.
-      for (let i = 0; i < 5; i++) {
-        const idx = (Math.random() * grid.length) | 0;
-        if (!grid[idx]) continue;
-        const r = (idx / cols) | 0;
-        const c = idx % cols;
-        if (words.some((w) => w.row === r && c >= w.col && c < w.col + w.text.length)) continue;
-        grid[idx] = randomChar();
-        drawCell(r, c, grid[idx]);
-      }
-      // Words resolve letter by letter, hold, then lock again.
-      const RESOLVE = 150;
-      const HOLD = 6500;
-      words = words.filter((w) => {
-        const age = now - w.born;
-        const n = w.text.length;
-        const closing = age - (n * RESOLVE + 600 + HOLD);
-        for (let i = 0; i < n; i++) {
-          const c = w.col + i;
-          const base = grid[w.row * cols + c];
-          if (closing > i * RESOLVE) drawCell(w.row, c, base);
-          else if (closing > i * RESOLVE - 500) drawCell(w.row, c, randomChar());
-          else if (age > i * RESOLVE + 600) drawCell(w.row, c, w.text[i], true);
-          else drawCell(w.row, c, randomChar());
-        }
-        return closing <= n * RESOLVE;
-      });
-      if (now > nextWord && words.length < 3) {
-        placeWord(now);
-        nextWord = now + 2600 + Math.random() * 2600;
-      }
+      fillLights(list, 0.05, 1);
     }
 
     function frame(now: number) {
@@ -220,10 +170,6 @@ export function Backdrop() {
       pointer.on += (pointer.target - pointer.on) * 0.06;
       pointer.x += (pointer.tx - pointer.x) * 0.09;
       pointer.y += (pointer.ty - pointer.y) * 0.09;
-      if (now - lastTick > TICK_MS) {
-        lastTick = now;
-        tick(now);
-      }
       render(now);
     }
 
@@ -232,10 +178,8 @@ export function Backdrop() {
       raf = 0;
       if (disposed) return;
       if (reduced.matches) {
-        // One finished frame: two words already readable.
+        // One finished frame.
         build();
-        placeWord(started, true);
-        placeWord(started, true);
         render(started);
         return;
       }
@@ -287,8 +231,7 @@ export function Backdrop() {
         reduced.removeEventListener("change", onVisible);
       };
     };
-    // The engraving is set in the site's own mono face.
-    document.fonts.load(font).then(begin, begin);
+    begin();
 
     return () => {
       disposed = true;
