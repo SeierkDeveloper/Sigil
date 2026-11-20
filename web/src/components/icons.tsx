@@ -402,3 +402,48 @@ export const MeetIcon = (p: IconProps) => (
     <path d="M6.5 13.5v2.5l2.5-2.5M17.5 17.5V20l-2.5-2.5M10.5 9.5h3M10.5 12h3" />
   </Line>
 );
+
+export const IdentityIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+    <circle cx="9" cy="11" r="2.2" />
+    <path d="M5.8 16c.6-1.6 1.8-2.4 3.2-2.4s2.6.8 3.2 2.4M14.5 10h3.5M14.5 13h2.5" />
+  </Line>
+);
+
+export const DraftIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M5.5 3.5h9l4 4v13h-13z" />
+    <path d="M14.5 3.5v4h4M8.5 12h7M8.5 15h4" />
+    <path d="m13.5 18.5 1.5 1.5 3-3" />
+  </Line>
+);
+
+export const EmergencyIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="3" />
+    <path d="M10 7.5h4v3.5h3.5v4H14v3.5h-4V15H6.5v-4H10z" />
+  </Line>
+);
+
+export const AgreementIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M5.5 3.5h13v17h-13z" />
+    <path d="M8.5 7.5h7M8.5 10.5h7" />
+    <path d="M8 16.5c1-1.5 1.8-1.5 2.3 0s1.3 1.5 2.2 0M14 17h2.5" />
+  </Line>
+);
+
+export const PackIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="m12 3 8 4v10l-8 4-8-4V7z" />
+    <path d="m4 7 8 4 8-4M12 11v10" />
+  </Line>
+);
+
+export const StyleIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M4 20c2-1 4-1 6 0s4 1 6 0" />
+    <path d="m14.5 4.5 4 4L9 18H5v-4z" />
+  </Line>
+);

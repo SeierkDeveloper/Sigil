@@ -5,9 +5,15 @@
 import { decryptJson, encryptJson } from "./crypto";
 import { AAD } from "./keys";
 
-export type SettingName = "self" | "model" | "thinking";
+/**
+ * self      the AI self's rules              model     the owner's model key
+ * thinking  how the vault thinks             work      what the AI self holds for approval and how it learns
+ * identity  the AI self's identity choices   wallet    the draft rules of its wallet
+ * packs     the knowledge packs this vault follows
+ */
+export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs";
 
-export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking"];
+export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs"];
 
 export function isSettingName(value: string): value is SettingName {
   return (SETTING_NAMES as readonly string[]).includes(value);

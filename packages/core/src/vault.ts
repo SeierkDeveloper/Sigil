@@ -28,7 +28,10 @@ export type SourceKind =
   | "agent"
   | "slack"
   | "drive"
-  | "meeting";
+  | "meeting"
+  | "style"
+  | "plan"
+  | "pack";
 
 export interface MemorySource {
   kind: SourceKind;
@@ -55,11 +58,15 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   slack: "Synced from Slack",
   drive: "Synced from Google Drive",
   meeting: "From a meeting transcript",
+  style: "Learned from your edits",
+  plan: "Planned by your AI self",
+  pack: "From a knowledge pack",
 };
 
 export function sourceLabel(source: MemorySource): string {
   if (source.kind === "app" && source.ref) return `Suggested by ${source.ref}`;
   if (source.kind === "agent" && source.ref) return `Remembered by ${source.ref}`;
+  if (source.kind === "pack" && source.ref) return `From the pack ${source.ref}`;
   return SOURCE_LABELS[source.kind] ?? "Saved";
 }
 
