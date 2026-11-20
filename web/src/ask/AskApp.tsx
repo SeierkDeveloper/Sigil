@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { newAskSession, openAskMessage, openIntro, parseAskFragment, randomId, sealAskMessage, type AskIntro, type AskReply, type AskSession } from "@sigil/core";
 import { createApi, ApiError } from "@/vault/api";
 import { formatDate, plural } from "@/lib/format";
+import { EditorIcon, EyeIcon, LockIcon, SealIcon } from "@/components/icons";
 
 interface LinkInfo {
   id: string;
@@ -163,7 +164,10 @@ export function AskApp({ linkId }: { linkId: string }) {
   if (phase.kind === "broken") {
     return (
       <div className="container ask-page">
-        <div className="vault-gate ask-card">
+        <div className="vault-gate ask-card" data-state="broken">
+          <span className="ask-seal" aria-hidden="true">
+            <SealIcon />
+          </span>
           <h1 className="page-title">This link cannot be used</h1>
           <div className="notice notice-error" role="alert">
             <div>{phase.message}</div>
@@ -177,16 +181,24 @@ export function AskApp({ linkId }: { linkId: string }) {
   const inactive = info.state !== "active" ? INACTIVE[info.state] : null;
   return (
     <div className="container ask-page">
-      <div className="ask-card">
-        <p className="eyebrow">An AI self</p>
-        <h1 className="page-title">{intro.name}</h1>
-        {intro.greeting ? <p className="page-lead">{intro.greeting}</p> : null}
-        <p className="ask-status small" data-online={info.online ? "true" : "false"} data-testid="ask-status">
-          {inactive
-            ? inactive
-            : info.online
-              ? `Online. ${plural(info.remaining, "question")} left on this link, until ${formatDate(info.expiresAt)}.`
-              : "Offline right now: the owner's vault is not open and their connector is not running. Questions can be asked once it is back."}
+      <div className="vault-gate ask-card" data-state={info.state} data-online={info.online ? "true" : "false"}>
+        <header className="ask-head">
+          <span className="ask-seal" aria-hidden="true">
+            <SealIcon />
+          </span>
+          <p className="eyebrow">An AI self</p>
+          <h1 className="page-title">{intro.name}</h1>
+          {intro.greeting ? <p className="page-lead">{intro.greeting}</p> : null}
+        </header>
+        <p className="ask-status" data-online={info.online ? "true" : "false"} data-state={info.state} data-testid="ask-status">
+          <span className="ask-status-lamp" aria-hidden="true" />
+          <span>
+            {inactive
+              ? inactive
+              : info.online
+                ? `Online. ${plural(info.remaining, "question")} left on this link, until ${formatDate(info.expiresAt)}.`
+                : "Offline right now: the owner's vault is not open and their connector is not running. Questions can be asked once it is back."}
+          </span>
         </p>
 
         {turns.length ? (
@@ -195,8 +207,12 @@ export function AskApp({ linkId }: { linkId: string }) {
               <li key={t.id} className="chat-turn" data-testid="ask-turn" data-status={t.status}>
                 <p className="chat-question">{t.question}</p>
                 <div className="chat-answer">
+                  <p className="chat-by">
+                    <span className="chat-by-name">{intro.name}</span>
+                    <span className="chat-by-kind">AI</span>
+                  </p>
                   {t.status === "waiting" ? (
-                    <p className="faint">
+                    <p className="faint chat-waiting">
                       <span className="spinner" aria-hidden="true" /> Waiting for the answer
                     </p>
                   ) : t.answer ? (
@@ -236,6 +252,9 @@ export function AskApp({ linkId }: { linkId: string }) {
               }}
             />
             <div className="form-actions">
+              <span className="chat-keys" aria-hidden="true">
+                Enter to ask, Shift and Enter for a new line
+              </span>
               <button type="submit" className="button button-primary" disabled={busy || !question.trim() || !info.online}>
                 {busy ? "Waiting" : "Ask"}
               </button>
@@ -243,11 +262,20 @@ export function AskApp({ linkId }: { linkId: string }) {
           </form>
         ) : null}
 
-        <p className="small faint ask-fine">
-          Your questions are encrypted in this browser for this AI self, and the answers are opened here. Sigil&apos;s server passes them on without being able to read
-          them. The owner sees your questions and the answers in their vault. Answers are written by an AI from the owner&apos;s notes, not by the person, and can be
-          wrong.
-        </p>
+        <ul className="ask-fine">
+          <li>
+            <LockIcon />
+            <span>Your questions are encrypted in this browser for this AI self, and the answers are opened here. Sigil&apos;s server passes them on without being able to read them.</span>
+          </li>
+          <li>
+            <EyeIcon />
+            <span>The owner sees your questions and the answers in their vault.</span>
+          </li>
+          <li>
+            <EditorIcon />
+            <span>Answers are written by an AI from the owner&apos;s notes, not by the person, and can be wrong.</span>
+          </li>
+        </ul>
       </div>
     </div>
   );
