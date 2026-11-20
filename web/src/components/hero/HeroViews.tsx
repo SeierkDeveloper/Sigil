@@ -1,11 +1,11 @@
 "use client";
 
-// Direction B: the same six lines of a vault, as four different readers get
+// Direction B: the same six lines of a vault, as five different readers get
 // them. You see your words, Sigil's server holds only ciphertext, and each app
 // gets plain text only for the folders it was given.
 
 import { useEffect, useRef, useState } from "react";
-import { ClaudeIcon, CursorIcon } from "@/components/icons";
+import { ChatGptIcon, ClaudeIcon, CursorIcon } from "@/components/icons";
 import { cipherText, useOnScreen, useReducedMotion } from "./clock";
 
 const LINES = [
@@ -21,6 +21,7 @@ const VIEWS = [
   { name: "You", icon: null, folders: ["Work", "Writing", "Health", "Money"], note: "Unlocked on your own device, by you alone.", dwell: 3200 },
   { name: "Sigil’s server", icon: null, folders: [], note: "Holds ciphertext. It cannot read a word.", dwell: 4800 },
   { name: "Claude", icon: ClaudeIcon, folders: ["Work", "Writing"], note: "Given two folders: Work and Writing.", dwell: 5400 },
+  { name: "ChatGPT", icon: ChatGptIcon, folders: ["Writing", "Health"], note: "Given two folders: Writing and Health.", dwell: 5400 },
   { name: "Cursor", icon: CursorIcon, folders: ["Work"], note: "Given one folder: Work.", dwell: 5400 },
 ] as const;
 
