@@ -51,6 +51,9 @@ export default function Security() {
             <a href="#round-six">Identity, work, proofs, emergency, agreements, packs</a>
           </li>
           <li>
+            <a href="#round-seven">Bundles, nodes, voice, capture, sessions, shared memory</a>
+          </li>
+          <li>
             <a href="#limits">Limits</a>
           </li>
           <li>
@@ -288,6 +291,46 @@ export default function Security() {
               <li>
                 <strong>Knowledge packs.</strong> Public by design and signed by the publisher&apos;s vault key. A follower pins that key and checks every version, in
                 order, against it and the hash of the version before.
+              </li>
+            </ul>
+          </section>
+
+          <section id="round-seven">
+            <h2>Bundles, nodes, voice, capture, sessions and shared memory</h2>
+            <ul>
+              <li>
+                <strong>The bundle.</strong> Every part of the vault as the node holds it (envelopes, sealed boxes, wrapped keys, hashes and public keys), with a
+                SHA-256 hash over all of it and an Ed25519 signature by your vault&apos;s key, made on your device. A restore unwraps the vault key from the bundle&apos;s
+                own key slot on your device and opens every folder, memory and setting under the record it claims before the node is asked to take it in, with a
+                statement your key signed for that node and that is at most ten minutes old.
+              </li>
+              <li>
+                <strong>Storage tokens.</strong> The vault&apos;s <code>backup</code> setting, an envelope under your vault key; for a connector you allow, an envelope
+                under a key from that app&apos;s secret. S3 requests are signed with AWS Signature Version 4 on the device; an Arweave upload is a data item signed
+                with your key file on the device, whose id the device checks. Where each copy went is sealed to your vault&apos;s key. The content security policy
+                lists the storage addresses the page may upload to.
+              </li>
+              <li>
+                <strong>Moving.</strong> A move statement and an arrival, both Ed25519 by your vault&apos;s key; the new node fetches the bundle only with a 32-byte
+                secret from the code you carry, of which the old node keeps the hash. Node to node requests use HTTPS only, follow no redirect, are limited in time
+                and size, and never reach a private network unless the operator allows it.
+              </li>
+              <li>
+                <strong>Capture keys.</strong> 32 random bytes per key; the node keeps the SHA-256 of the derived token. Captures are sealed boxes to the vault public
+                key, checked against a tag only the key and your vault can make, and bound to the key&apos;s id. Plain text is taken only for a key you allowed, and
+                sealed at once.
+              </li>
+              <li>
+                <strong>Voice.</strong> The speech model runs in a worker of the page with the same WebAssembly runtime as search by meaning; it is fetched from this
+                site, only when someone turns voice on. The microphone is allowed for this site only.
+              </li>
+              <li>
+                <strong>Sessions.</strong> A session link&apos;s 32-byte secret gives the bearer token (the node keeps its hash) and the visitor&apos;s X25519 key for the
+                relay. The intake is a sealed box to the public self&apos;s key; each turn&apos;s transcript a sealed box to your vault&apos;s key.
+              </li>
+              <li>
+                <strong>Shared memory.</strong> The space key, roles and member tags of team spaces. The node keeps who wrote each entry and enforces that writers
+                change only their own. Heirs are sealed and tagged by an admin&apos;s device and sealed again with every new key.
               </li>
             </ul>
           </section>

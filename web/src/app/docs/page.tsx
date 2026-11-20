@@ -8,7 +8,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the AI self at work, its identity and wallet, proving a fact, the emergency card, agreements and knowledge packs, the open standard, the API and the encryption model.",
+    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the AI self at work, its identity and wallet, proving a fact, the emergency card, agreements and knowledge packs, voice, capture keys, sessions, shared memory, backups and restoring, running your own node and moving between nodes, the open standard, the API and the encryption model.",
 };
 
 const KEY = "sigil_app.<app id>.<secret>";
@@ -50,6 +50,12 @@ const toc = [
   ["emergency", "Emergency card"],
   ["agreements", "Agreements"],
   ["packs", "Knowledge packs"],
+  ["voice", "Voice"],
+  ["capture-keys", "Capture from anywhere"],
+  ["sessions", "Sessions"],
+  ["shared-memory", "Shared memory"],
+  ["storage", "Backups and restoring"],
+  ["nodes", "Your own node and moving"],
   ["privacy-score", "Privacy score"],
   ["spec", "Open standard"],
   ["import", "Importing"],
@@ -947,6 +953,104 @@ export default function Docs() {
             </p>
           </section>
 
+          <section id="voice" className="doc-section">
+            <h2>Voice</h2>
+            <p>
+              In the AI self&apos;s test chat, and on ask links and the public page when you offer it, choose <strong>Turn on voice</strong>. A speech model
+              (Whisper, about 41 MB, English) is then fetched once from this site into the browser and runs in a worker on the device: press Speak, say the
+              question, press again, and what it heard is written into the question field for you to check. The audio never leaves the device; the browser&apos;s own
+              speech recognition, which sends audio to a cloud service in most browsers, is not used. With <strong>Read answers aloud</strong>, answers are spoken by
+              the browser&apos;s speech synthesis, only with a voice that runs on the device; when a device has none, nothing is read aloud. A node turns voice off
+              with <code>SIGIL_VOICE=off</code> and picks the model with <code>SIGIL_SPEECH_MODEL</code>.
+            </p>
+          </section>
+
+          <section id="capture-keys" className="doc-section">
+            <h2>Capture from anywhere</h2>
+            <p>
+              Under <strong>Devices</strong>, make a capture key for each phone, watch or shortcut. A key can only add to your inbox: it reads nothing, sends at
+              most 20 captures a minute and 300 a day, each one in your read log, and you revoke it on its own. What it sends is sealed to your vault&apos;s key on the
+              device that sends it, after that device checks the key against a tag your vault made for it.
+            </p>
+            <ul className="plain-list">
+              <li>
+                <strong>iPhone, Siri and headphones:</strong> a shortcut with Dictate Text, URL Encode and Open URLs, opening{" "}
+                <code>{`${site.url}/c#k=<capture key>&t=<what you said>`}</code>. The page seals the text on the phone and puts it in the inbox.
+              </li>
+              <li>
+                <strong>A watch:</strong> it cannot open the page, so give its key permission for plain text. The shortcut then sends{" "}
+                <code>POST /api/capture/v1/text</code> with the key&apos;s token, and Sigil seals the text to your vault&apos;s key the moment it arrives, keeping only the
+                sealed box. That one path has Sigil handle the text in the clear for that moment; it is off unless you allow it for that key.
+              </li>
+              <li>
+                <strong>Android:</strong> install Sigil to the home screen and use the share sheet, or open the same link from an app; HTTP shortcut apps can send the
+                plain text request for a key that allows it.
+              </li>
+            </ul>
+          </section>
+
+          <section id="sessions" className="doc-section">
+            <h2>Sessions</h2>
+            <p>
+              Under <strong>AI self</strong>, once your public AI self is set up, open sessions: topics, how many questions a session holds, its length, the days
+              and hours in your time zone, up to six intake questions, house rules (for example: not medical advice, see a doctor), how many sessions a day, and
+              the text a visitor agrees to. Visitors book a free time on your page; their intake is sealed in their browser to your public self&apos;s key, and the
+              session link they get holds the only key to the session. Answers come only from what you made public, under your rules and the house rules, each
+              marked as AI. You read every booking, what the visitor agreed to and the transcript, opened on your device, and can end a session or block its
+              visitor. Answers in a session are sent at once even when you hold other answers for approval. Payments are not part of Sigil.
+            </p>
+          </section>
+
+          <section id="shared-memory" className="doc-section">
+            <h2>Shared memory</h2>
+            <p>
+              Under <strong>Shared memory</strong>, start a family&apos;s or a team&apos;s history: a shared space with a timeline of stories (with a year, a month or
+              a day), the people in them (members and others, by name) and photos, each marked with who added it. Add members by vault code with read, write or
+              admin roles. A writer changes and deletes only what they wrote; leaving, being removed or deleting an account never deletes what others wrote, and the
+              history is deleted only by its last member. Name heirs by vault code, for one member or for all: their key is sealed now, and they become members when
+              that member&apos;s legacy plan releases. Download the whole history as one document, made on your device, to keep or print; it is also in each
+              member&apos;s bundle.
+            </p>
+          </section>
+
+          <section id="storage" className="doc-section">
+            <h2>Backups and restoring</h2>
+            <p>
+              Under <strong>Storage</strong>, download your vault as one bundle: every memory, key slot, setting, app, shared space and the sealed log with its
+              proofs, all still encrypted, signed with your vault key on your device. Or add your own storage and let it run every day or week while the vault is
+              open: an S3-compatible bucket (with CORS allowing this site), an IPFS pinning service or your own IPFS node with your own token, or Arweave through a
+              bundler with your own key file. Tokens are kept only in your vault, encrypted with your vault key, and used only from your device, or from a connector
+              you allow to back up while it runs with <code>--watch</code>. Where each copy went is in a record only your vault opens.
+            </p>
+            <p>
+              How long a copy lasts depends on where you keep it: a file as long as you keep it, a bucket while your account and the object exist, IPFS while the pin
+              is kept, Arweave while its network keeps what was paid for. Sigil does not pay for, renew or check any of these.
+            </p>
+            <p>
+              To restore, open <code>/vault/restore</code> on any Sigil node, give the file, a link, an IPFS content id, an Arweave id or your bucket (its address is
+              signed on your device and fetched by the node), and sign in with your recovery phrase or wallet. The bundle is opened and checked in full on your
+              device first; the node takes it in only with a statement your vault key signed for that node.
+            </p>
+          </section>
+
+          <section id="nodes" className="doc-section">
+            <h2>Your own node, and moving</h2>
+            <p>Every Sigil server is a node with the same site and API. With Docker, from the repository:</p>
+            <CodeBlock code={`SIGIL_ORIGIN=https://sigil.example.org SIGIL_PORT=8080 docker compose up -d --build`} label="Terminal" />
+            <p>
+              The node listens on <code>SIGIL_PORT</code>, keeps its data in a volume, and answers <code>GET /api/health</code>. Put a TLS proxy in front of it for a
+              public address. Settings are in the README; the addresses that go into the content security policy (<code>SIGIL_ORIGIN</code>,{" "}
+              <code>SIGIL_BACKUP_ORIGINS</code> and the chain read addresses) are fixed when the image is built.
+            </p>
+            <p>
+              To move, under <strong>Storage</strong>, give the new node&apos;s address and how long the old node should send your links on (7, 30 or 90 days), and sign.
+              Open the link you get on the new node and sign in there with your recovery phrase or wallet: it fetches your vault from the old node with the code in
+              the link, your device opens and checks it, and signs an arrival the old node checks. The old node then sends your ask links, public page, packs and
+              emergency card on to the new address, turns sign-ins and app keys away with the new address, and deletes the vault when the period ends. App keys keep
+              working: change <code>SIGIL_URL</code> to the new node. Every step is in the log of the node it happened on.
+            </p>
+          </section>
+
           <section id="privacy-score" className="doc-section">
             <h2>Privacy score</h2>
             <p>
@@ -994,9 +1098,10 @@ export default function Docs() {
           <section id="spec" className="doc-section">
             <h2>Open standard</h2>
             <p>
-              The <Link href="/spec">Sigil open standard</Link>, version 1.1, describes the memory format, folder keys and sealed boxes, the connector&apos;s tools and
+              The <Link href="/spec">Sigil open standard</Link>, version 1.2, describes the memory format, folder keys and sealed boxes, the connector&apos;s tools and
               permissions, the access log entry, hourly seals and presence, certificates, the AI self&apos;s identity and wallet rules, proofs of a fact, the
-              emergency card, agreements and knowledge packs, so anyone can build a vault, a connector or a checker. Its test
+              emergency card, agreements and knowledge packs, the vault bundle, storage, nodes and moving, capture keys, sessions and shared memory, so anyone can
+              build a vault, a connector, a node or a checker. Its test
               vectors are generated from the code in this repository, and a test checks on every run that the code still produces them.
             </p>
           </section>
@@ -1337,8 +1442,9 @@ export default function Docs() {
             <p>Sigil is open source. To run the whole site and server on your own machine:</p>
             <CodeBlock code={`git clone ${site.githubUrl}.git\ncd Sigil\nnpm install\nnpm run build\nnpm start`} label="Terminal" />
             <p>
-              It serves on <code>http://localhost:3000</code> and keeps its data in <code>web/.data/sigil.db</code>, with the search model&apos;s
-              files in <code>web/.data/models</code>. See the repository README for settings and tests.
+              It serves on <code>http://localhost:3000</code> and keeps its data in <code>web/.data/sigil.db</code>, with the model files in{" "}
+              <code>web/.data/models</code>. To run a node for others, see <a href="#nodes">Your own node, and moving</a>. See the repository README for settings and
+              tests.
             </p>
           </section>
         </div>

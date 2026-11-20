@@ -62,7 +62,7 @@ Cursor (`~/.cursor/mcp.json`), Claude Desktop and VS Code (`.vscode/mcp.json`, u
 SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --self
 ```
 
-Answers the ask links the owner gave this app, and the owner's public AI self when the owner picked this app for it, while it runs, so they work with the vault closed. Questions arrive as relay boxes only this machine and the asker can open; the answer goes back the same way, and the question and answer go to the owner's read log sealed to the vault's public key. The links show as online while it runs.
+Answers the ask links the owner gave this app, and the owner's public AI self when the owner picked this app for it (booked sessions included, with their house rules and intake), while it runs, so they work with the vault closed. Questions arrive as relay boxes only this machine and the asker can open; the answer goes back the same way, and the question and answer go to the owner's read log sealed to the vault's public key. The links show as online while it runs.
 
 ## Live sync and Obsidian
 
@@ -74,6 +74,14 @@ SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --watch "/path/to/Obsidian va
 Without a folder, it keeps the live sync sources (Gmail, Google Calendar, Google Drive, Slack) the owner lets this app sync in the background: every 5 minutes (`SIGIL_SYNC_MINUTES`) it opens each source with this app's key, asks the service for what changed, encrypts every item here with the folder key and writes it to the source's folder only. A client type that asks for a secret at the token step can be given `SIGIL_GOOGLE_CLIENT_SECRET` or `SIGIL_SLACK_CLIENT_SECRET` on this machine; it is never sent to Sigil.
 
 With a folder, it also watches it and suggests new and changed notes to the owner's inbox, sealed here, with the note's path, so the vault offers to update the memory imported from the same note. Use an app key that may suggest memories and read the folder the vault was imported into: on the first run, notes the vault already holds unchanged are not suggested again. Up to 8 notes go in one pass and the rest follow a minute later. What was sent is remembered as hashes in `~/.sigil-connector` (or `SIGIL_STATE_DIR`).
+
+## Backups
+
+When the owner lets this app back the vault up (under Storage in the vault), `--watch` also stores a copy of the vault on the owner's schedule: it asks the node for the vault's bundle (ciphertext), writes it from this machine to the owner's own storage (an S3-compatible bucket, IPFS or Arweave) with the owner's tokens, which only this app's key opens, and logs it with a record of where it went sealed to the vault's key. This app never holds the vault key, so its bundles are not signed; the owner's device checks every part when it restores one.
+
+## After a move
+
+When the vault moves to another node, the old node answers this app with the new address. Set `SIGIL_URL` to it; the same app key keeps working there.
 
 ## Search by meaning
 

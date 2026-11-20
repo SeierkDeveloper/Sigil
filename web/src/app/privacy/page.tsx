@@ -46,6 +46,11 @@ const stored: [string, string, string][] = [
   ["Emergency card", "The card encrypted with a key that is only in its link (the server never receives it), and the card and key again under your vault key. For each opening: the time, whether it was a phone, a tablet or a computer, and the browser's first language; up to 200 openings, kept after you take the card down until you delete your account.", "Encrypted, with readable openings"],
   ["Agreements", "For each agreement: the two vaults' public keys, its fingerprint, version and the fingerprint it amends, both signatures, whether it waits, was signed, declined or withdrawn, the document sealed to the other vault, and each side's copy under its own vault key.", "Encrypted and sealed, with readable fingerprints, signatures and times"],
   ["Knowledge packs", "The packs you publish, every version in readable form because you publish them, with the folder id each comes from. The packs you follow are a vault setting, encrypted; the server sees a pack being fetched and the line your log gets when your vault takes in a version.", "Readable by choice, follows encrypted"],
+  ["Backups", "For each copy of your vault that your device or connector stored: an id, when, its hash and size, which connector made it, and where it went (object names, content ids) sealed to your vault's key. Your storage settings and tokens are a vault setting, encrypted; for a connector you allow, encrypted for its key. The bundle itself is never kept here.", "Encrypted, with readable hashes, sizes and times"],
+  ["Nodes and moves", "The nodes your vault came from or went to, with the time each sends links on until. For a move out of this node: the move statement your key signed, the bundle (ciphertext) until the new node fetched it, and a hash of the move's secret. After a move, the addresses that point on and until when, kept apart from the account, which is deleted when the period ends.", "Readable addresses and times, bundle encrypted"],
+  ["Capture keys", "For each key: an id, a hash of its token, the tag your vault made over its public key, its name under your vault key, whether it may send plain text, how many captures it sent and when, and when it was revoked. What it sends is a suggestion in your inbox, sealed to your vault's key.", "Encrypted and hashed, with readable counts and times"],
+  ["Sessions", "Your session offer in readable form, because visitors see it. For each booking: the topic, the time, how many questions were asked, the consent text the visitor agreed to, their intake sealed to your public self's key, a hash of the session token and of the visitor's network address with your page, and each turn sealed to your vault's key. Visitors you blocked, as that hash.", "Readable offer and times, intake and turns encrypted"],
+  ["Shared memory", "As team spaces, with the kind of space (family or history) readable, which member wrote each entry, and the heirs named: their public key, role, the space key sealed to them, a tag and their name under the space key.", "Encrypted and sealed, with readable ids, kinds and times"],
 ];
 
 export default function Privacy() {
@@ -95,7 +100,9 @@ export default function Privacy() {
             <strong>Never stored or seen by Sigil:</strong> your vault key, folder keys, app keys, recovery phrase, passkey PRF output, wallet
             signatures, the titles, bodies and tags of memories and suggestions, folder and app names, who you share with, what you or a connected
             app searched for, the search vectors made from your memories, your model key, your AI self&apos;s rules, the questions and answers of
-            your ask links, the GitHub token you use for an import, legacy keys and the shares made from them, device secrets, space keys, and the photos you capture.
+            your ask links, the GitHub token you use for an import, legacy keys and the shares made from them, device secrets, space keys, the photos you capture, your
+            storage tokens, the contents of your bundles, what you say by voice (it is turned into text on your device), session intakes and conversations, and
+            the stories of a shared memory.
           </p>
 
           <h2>Why, and on what legal basis</h2>
@@ -151,12 +158,20 @@ export default function Privacy() {
             processes it. Choose the folders it may use with that in mind.
           </p>
 
+          <p>
+            Backups go from your device to the storage you choose, under your own account there and its terms; what it receives is ciphertext. When you move to
+            another node, that node receives your vault as ciphertext and runs under its operator&apos;s own notice. Voice runs on your device: no audio is sent
+            anywhere. Visitors who book a session agree to a text you write; you read their intake and the conversation in your vault.
+          </p>
+
           <h2>How long it is kept</h2>
           <ul>
             <li>Your vault, apps and read log: until you delete them, or your account.</li>
             <li>Sessions: 30 days, or until you sign out. Sign-in challenges: 5 minutes.</li>
             <li>Memories you gave an expiry: until the grace period after it is over (30 days unless you change it), then deleted for real.</li>
             <li>Ask link questions and answers in flight: one day. Ask links: until you delete them.</li>
+            <li>A vault that moved to another node: until the period its owner chose ends (at most 90 days), then deleted; the addresses that point on, until then.</li>
+            <li>Backup records: the last 200 per vault. Session bookings: until you delete the public AI self or your account.</li>
             <li>
               Seals: permanently, as they are a public record. They are built from salted hashes; your salts are deleted with your account, after
               which nothing in a seal can be linked to you.

@@ -44,6 +44,7 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
     "Folders",
     "Apps",
     "Agents",
+    "Shared memory",
     "Devices",
     "Legacy",
     "Proof",
@@ -52,6 +53,7 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
     "Read log",
     "Import",
     "Sync",
+    "Storage",
     "Settings",
   ];
   for (const name of tabs) {
@@ -79,10 +81,22 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
   await page.getByRole("button", { name: "Make the first agent vault" }).click();
   await page.getByRole("button", { name: "New space" }).click();
   await noSideScroll(page, "Agents forms");
+  await page.getByRole("tab", { name: "Storage" }).click();
+  await page.getByRole("button", { name: "Add storage" }).click();
+  await page.getByLabel("Kind").selectOption("arweave");
+  await noSideScroll(page, "Storage with a target form");
+  await page.getByRole("tab", { name: "Devices" }).click();
+  await page.getByRole("button", { name: "Make a capture key" }).click();
+  await expect(page.getByTestId("capture-made")).toBeVisible();
+  for (const d of await page.locator(".shortcut-steps details").all()) await d.evaluate((el) => ((el as HTMLDetailsElement).open = true));
+  await noSideScroll(page, "Devices with a capture key and its steps");
 
   await page.goto("/capture");
   await expect(page.getByRole("heading", { name: "Into your inbox" })).toBeVisible();
   await noSideScroll(page, "Quick capture");
+  await page.goto("/vault/restore");
+  await expect(page.getByRole("heading", { name: "Restore a vault" })).toBeVisible();
+  await noSideScroll(page, "Restore a vault");
 
   const fresh = await browser.newContext({ viewport: { width: WIDTH, height: 812 }, isMobile: true, hasTouch: true });
   const phone = await fresh.newPage();
