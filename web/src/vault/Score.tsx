@@ -46,10 +46,11 @@ export function PrivacyScoreCard({ app }: { app: AppView }) {
   if (!entries) return <span className="chip score-chip" data-level="loading">Privacy score: reading your log</span>;
   const s = scoreFor(data, app, entries);
   return (
-    <div className="score" data-level={s.level} data-testid="privacy-score">
+    <div className="score" data-level={s.level} data-testid="privacy-score" style={{ "--score": s.score } as React.CSSProperties}>
       <button type="button" className="chip score-chip" data-level={s.level} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         Privacy score <span className="score-number">{s.score}</span>
-        <span className="faint"> {LEVEL_TEXT[s.level]}</span>
+        <span className="score-meter" aria-hidden="true" />
+        <span className="faint score-level"> {LEVEL_TEXT[s.level]}</span>
       </button>
       {open ? (
         <div className="subpanel score-detail">
@@ -59,10 +60,13 @@ export function PrivacyScoreCard({ app }: { app: AppView }) {
           </p>
           <dl className="score-parts">
             {s.parts.map((p) => (
-              <div key={p.key} className="score-part" data-points={p.points}>
+              <div key={p.key} className="score-part" data-points={p.points} style={{ "--share": p.max ? p.points / p.max : 0 } as React.CSSProperties}>
                 <dt>
-                  {p.label} <span className="mono">-{p.points}</span>
-                  <span className="faint"> of {p.max}</span>
+                  <span className="score-part-label">{p.label}</span>{" "}
+                  <span className="score-part-points">
+                    <span className="mono">-{p.points}</span>
+                    <span className="faint"> of {p.max}</span>
+                  </span>
                 </dt>
                 <dd>{p.why}</dd>
               </div>
