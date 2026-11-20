@@ -89,6 +89,8 @@ export interface LinkInput {
   expiresAt: string;
   maxUses: number;
   perHour: number;
+  /** Offer voice to whoever opens the link: speech to text in their own browser. */
+  voice?: boolean;
 }
 
 export function createLink(db: Db, userId: string, l: LinkInput): void {
@@ -105,9 +107,9 @@ export function createLink(db: Db, userId: string, l: LinkInput): void {
       if (!l.appBox) throw new HttpError(400, "A link answered by an app needs the key wrapped for that app.", "invalid");
     }
     db.prepare(
-      `INSERT INTO ask_links (id, user_id, public_key, intro, owner_box, app_id, app_box, expires_at, max_uses, per_hour, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(l.id, userId, l.publicKey, l.intro, l.ownerBox, l.appId ?? null, l.appId ? (l.appBox ?? null) : null, new Date(l.expiresAt).toISOString(), l.maxUses, l.perHour, now());
+      `INSERT INTO ask_links (id, user_id, public_key, intro, owner_box, app_id, app_box, expires_at, max_uses, per_hour, created_at, voice)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(l.id, userId, l.publicKey, l.intro, l.ownerBox, l.appId ?? null, l.appId ? (l.appBox ?? null) : null, new Date(l.expiresAt).toISOString(), l.maxUses, l.perHour, now(), l.voice ? 1 : 0);
   });
 }
 
@@ -131,6 +133,7 @@ export function listLinks(db: Db, userId: string) {
     online: online(r.agent_seen_at),
     createdAt: String(r.created_at),
     revokedAt: str(r.revoked_at),
+    voice: Number(r.voice) === 1,
   }));
 }
 
@@ -176,6 +179,7 @@ export function publicLink(db: Db, linkId: string) {
     online: state === "active" && online(r.agent_seen_at),
     expiresAt: String(r.expires_at),
     remaining: Math.max(0, Number(r.max_uses) - Number(r.uses)),
+    voice: Number(r.voice) === 1,
   };
 }
 

@@ -16,7 +16,7 @@
 // of each turn, sealed to the vault public key, and can end a session or
 // block a visitor. Sessions are free.
 
-import { openSealedJson, sealJson, decodeBoxPublicKey, type BoxKeyPair } from "./box";
+import { boxKeyPairFromSecret, openSealedJson, sealJson, decodeBoxPublicKey, type BoxKeyPair } from "./box";
 import { hkdf, randomBytes } from "./crypto";
 import { fromBase64Url, toBase64Url } from "./encoding";
 
@@ -256,6 +256,11 @@ export async function sessionToken(secret: string): Promise<string> {
   return toBase64Url(await hkdf(fromBase64Url(secret), "sigil:auth:session"));
 }
 
+/** The visitor's key pair for the session's relay, made from the link's secret: the link alone lets the visitor carry on, on any device. */
+export async function sessionAsker(secret: string): Promise<BoxKeyPair> {
+  return boxKeyPairFromSecret(await hkdf(fromBase64Url(secret), "sigil:session:asker"));
+}
+
 export function sessionUrl(origin: string, bookingId: string, secret: string): string {
   return `${origin.replace(/\/$/, "")}/s/${bookingId}#${secret}`;
 }
@@ -333,4 +338,44 @@ export interface SessionTurnNote {
 
 export function sessionTurnContext(bookingId: string, turn: number): string {
   return `session-turn:${bookingId}:${turn}`;
+}
+
+/** A waiting question's booking, as the node hands it to the side that answers. */
+export interface PendingBooking {
+  id: string;
+  topic: string;
+  /** The intake, sealed to the public self's key. */
+  intake: string;
+  houseRules: string;
+  turns: number;
+  /** The number this question will have. */
+  turn: number;
+}
+
+/** What the answering side tells its AI self for a question in a booked session. The intake opens with the public self's key pair. */
+export function contextForBooking(pair: BoxKeyPair, selfId: string, b: PendingBooking): string {
+  let intake: IntakeAnswers | null = null;
+  try {
+    intake = openIntake(pair, selfId, b.id, b.intake);
+  } catch {
+    intake = null;
+  }
+  return sessionContext({ houseRules: b.houseRules, turns: b.turns }, intake, b.turn);
+}
+
+export function sealTurnNote(vaultPublicKey: string, note: SessionTurnNote): string {
+  return sealJson(decodeBoxPublicKey(vaultPublicKey), note, sessionTurnContext(note.bookingId, note.turn));
+}
+
+export function openTurnNote(pair: BoxKeyPair, bookingId: string, turn: number, sealed: string): SessionTurnNote {
+  const v = openSealedJson<SessionTurnNote>(pair, sealed, sessionTurnContext(bookingId, turn));
+  return {
+    v: 1,
+    bookingId,
+    turn,
+    question: String(v.question ?? "").slice(0, 2000),
+    answer: String(v.answer ?? "").slice(0, 6000),
+    sources: (Array.isArray(v.sources) ? v.sources : []).slice(0, 12).map((s) => ({ id: String(s?.id ?? ""), title: String(s?.title ?? "") })),
+    refused: typeof v.refused === "string" ? v.refused : null,
+  };
 }

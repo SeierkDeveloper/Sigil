@@ -6,7 +6,25 @@
 //   a connected app  -> "Authorization: Bearer <app token>", reads and suggestions only, every call logged
 
 import { z } from "zod";
-import { isBoxPublicKey, isEnvelope, isHandle, isMeetBox, isRelayBox, isSealed, isSettingName, isSigningKey, isSpaceRole, PUBLIC_MAX_PER_VISITOR, randomId } from "@sigil/core";
+import {
+  isBoxPublicKey,
+  isEnvelope,
+  isHandle,
+  isMeetBox,
+  isRelayBox,
+  isSealed,
+  isSettingName,
+  isSigningKey,
+  isSpaceKind,
+  isSpaceRole,
+  parseBundle,
+  PUBLIC_MAX_PER_VISITOR,
+  randomId,
+  CAPTURE_PER_MINUTE,
+  CAPTURE_TEXT_LIMIT,
+  MOVE_MAX_DAYS,
+  type VaultBundle,
+} from "@sigil/core";
 import { getDb, type Db } from "./db";
 import { serverConfig } from "./config";
 import {
@@ -130,6 +148,12 @@ import { cardOpens, openPublicCard, ownerCard, putCard, revokeCard } from "./eme
 import { agreementSeal, declineAgreement, listAgreements, peerSigningKey, proposeAgreement, removeAgreement, signAgreementRow } from "./agreements";
 import { deletePack, listPacks, logFollow, packVersions, publicPack, publishPack } from "./packs";
 import { deleteCertificate, getCertificate, listCertificates, MAX_CERT_BYTES, MAX_CERT_HOURS, presenceCounts, presenceProofs, presenceTask, publishCertificate, recordPresence, rootsFor, setSignKey } from "./life";
+import { bundleBody, importBundle } from "./bundles";
+import { appBackup, backupAppIds, listRuns, recordAppRun, recordRun, setBackupApp } from "./backups";
+import { assertNotMoved, cancelMove, fetchMove, fetchRemote, finishMove, health, notifyOldNode, recordArrival, remoteOrigin, sendMove, startMove, vaultNodes } from "./nodes";
+import { captureByToken, captureInto, captureText, captureVaultKey, createCaptureKey, listCaptureKeys, revokeCaptureKey, type CaptureAuth } from "./captures";
+import { askInSession, book, closeSession, ownerSessions, publicOffer, saveOffer, sessionQuestionStatus, sessionStatus } from "./sessions";
+import { addHeir, leaveSpace, removeHeir } from "./spaces";
 
 // ---------------------------------------------------------------- input shapes
 
@@ -170,6 +194,7 @@ const linkShape = z.object({
   expiresAt: isoTime,
   maxUses: z.number().int().min(1).max(MAX_LINK_USES),
   perHour: z.number().int().min(1).max(MAX_PER_HOUR),
+  voice: z.boolean().optional(),
 });
 const answerShape = z.object({ sealed: relay(64 * 1024), note: sealed(128 * 1024), cited: z.number().int().min(0).max(50) });
 const hexTag = z.string().regex(/^[0-9a-f]{64}$/, "Invalid tag");
@@ -215,6 +240,19 @@ const hex32 = z.string().regex(/^0x[0-9a-f]{64}$/, "Expected a 32-byte hash");
 const evmAddress = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Expected an address");
 const edSignature = z.string().regex(/^[A-Za-z0-9_-]{86}$/, "Expected a signature");
 const pairingCodeShape = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/, "Invalid code");
+const sha256Shape = z.string().regex(/^[0-9a-f]{64}$/, "Expected a hash");
+const bundleShape = z.custom<VaultBundle>((v) => {
+  try {
+    return !!parseBundle(JSON.stringify(v));
+  } catch {
+    return false;
+  }
+}, "Expected a Sigil vault bundle");
+const signInShape = z.object({ kind: z.enum(["wallet", "phrase"]), ref: z.string().min(8).max(200), authToken: token });
+const runShape = z.object({ id, hash: hex32Shape(), size: z.number().int().min(0).max(1e10), record: z.string().max(64 * 1024).refine(isSealed, "Expected a sealed box"), places: z.number().int().min(0).max(20) });
+function hex32Shape() {
+  return z.string().regex(/^0x[0-9a-f]{64}$/, "Expected a 32-byte hash");
+}
 
 function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const r = schema.safeParse(value);
@@ -253,11 +291,33 @@ function appOf(ctx: Ctx): AppAuth {
   rateLimit(`app-ip:${clientIp(ctx.req)}`, 600, 60_000);
   const auth = m ? appByToken(ctx.db, m[1]) : null;
   if (!auth) throw new HttpError(401, "This app key was revoked or does not exist. Create a new one in your Sigil vault.", "app_revoked");
+  assertNotMoved(ctx.db, "vault", auth.userId);
   rateLimit(`app:${auth.appId}`, 240, 60_000);
   return auth;
 }
 
+/** A capture key's device: write-only into the inbox. */
+function captureOf(ctx: Ctx): CaptureAuth {
+  const header = ctx.req.headers.get("authorization") ?? "";
+  const m = /^Bearer\s+([A-Za-z0-9_-]{43})$/.exec(header.trim());
+  rateLimit(`capture-ip:${clientIp(ctx.req)}`, 120, 60_000);
+  const auth = m ? captureByToken(ctx.db, m[1]) : null;
+  if (!auth) throw new HttpError(401, "This capture key was revoked or does not exist. Make a new one in your Sigil vault, under Devices.", "capture_revoked");
+  assertNotMoved(ctx.db, "vault", auth.userId);
+  rateLimit(`capture:${auth.id}`, CAPTURE_PER_MINUTE, 60_000);
+  return auth;
+}
+
+/** The bearer of a session link. */
+function sessionBearer(ctx: Ctx): string {
+  const m = /^Bearer\s+([A-Za-z0-9_-]{43})$/.exec((ctx.req.headers.get("authorization") ?? "").trim());
+  if (!m) throw new HttpError(401, "This session link is not complete. Open it again from where you saved it.", "no_session");
+  return m[1];
+}
+
 function signedIn(ctx: Ctx, userId: string, body: Record<string, unknown>, keyslotId: string | null = null): Response {
+  // A vault that moved to another node signs in there now.
+  assertNotMoved(ctx.db, "vault", userId);
   markActive(ctx.db, userId);
   const sessionToken = createSession(ctx.db, userId, keyslotId);
   return json({ userId, ...body }, 200, { "set-cookie": sessionCookie(ctx.req, sessionToken, serverConfig.sessionDays * 86400) });
@@ -297,6 +357,9 @@ route("GET", "status", (ctx) => {
     seals: { enabled: serverConfig.sealsEnabled, periodSeconds: serverConfig.sealSeconds, mode: anchor.mode, job, ...queue, ...sealStats(ctx.db) },
   });
 });
+
+// A node's health, for a load balancer, a container's health check, or another node.
+route("GET", "health", (ctx) => json(health(siteOrigin(ctx.req)), 200, { "access-control-allow-origin": "*" }));
 
 route("GET", "stats", (ctx) => {
   rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
@@ -534,6 +597,10 @@ route("GET", "vault", (ctx) => {
     emergency: { card: ownerCard(ctx.db, userId), opens: cardOpens(ctx.db, userId) },
     agreements: listAgreements(ctx.db, userId),
     packs: listPacks(ctx.db, userId),
+    captureKeys: listCaptureKeys(ctx.db, userId),
+    backups: { runs: listRuns(ctx.db, userId), apps: [...backupAppIds(ctx.db, userId)] },
+    nodes: vaultNodes(ctx.db, userId, siteOrigin(ctx.req)),
+    sessions: ownerSessions(ctx.db, userId),
   });
 });
 
@@ -740,12 +807,14 @@ route("POST", "self/questions/:id/answer", async (ctx, [questionId]) => {
 
 route("GET", "ask/:id", (ctx, [linkId]) => {
   rateLimit(`ask-read:${clientIp(ctx.req)}`, 120, 60_000);
+  assertNotMoved(ctx.db, "ask", linkId);
   return json(publicLink(ctx.db, linkId));
 });
 
 route("POST", "ask/:id/questions", async (ctx, [linkId]) => {
   rateLimit(`ask:${clientIp(ctx.req)}`, 8, 60_000);
   rateLimit(`ask-hour:${clientIp(ctx.req)}`, 60, 3600_000);
+  assertNotMoved(ctx.db, "ask", linkId);
   const body = parse(z.object({ id, sessionId: id, askerKey: boxPublicKey, sealed: relay(64 * KB) }), await readJson(ctx.req, 80 * KB));
   return json(askQuestion(ctx.db, linkId, body), 201);
 });
@@ -1029,7 +1098,11 @@ route("GET", "agents/:id/handoffs", (ctx, [appId]) => json({ handoffs: ownerHand
 
 route("POST", "spaces", async (ctx) => {
   const userId = userOf(ctx);
-  createSpace(ctx.db, userId, parse(z.object({ id, meta: envelope(4096), member: memberShape }), await readJson(ctx.req, 16 * KB)));
+  createSpace(
+    ctx.db,
+    userId,
+    parse(z.object({ id, meta: envelope(4096), member: memberShape, kind: z.string().refine(isSpaceKind, "Expected team, family or history").optional() }), await readJson(ctx.req, 16 * KB)) as Parameters<typeof createSpace>[2],
+  );
   return json({ ok: true }, 201);
 });
 
@@ -1060,6 +1133,7 @@ route("POST", "spaces/:id/rotate", async (ctx, [spaceId]) => {
       memories: z.array(spaceMemoryShape).max(5000),
       members: z.array(z.object({ id, sealedKey: sealed(1024), tag: hexTag, label: envelope(1024) })).max(50),
       remove: z.array(id).min(1).max(50),
+      heirs: z.array(z.object({ id, sealedKey: sealed(1024), tag: hexTag, label: envelope(1024) })).max(20).optional(),
     }),
     await readJson(ctx.req, 64 * MB),
   );
@@ -1293,6 +1367,7 @@ const publicShape = z.object({
   perVisitorHour: z.number().int().min(1).max(PUBLIC_MAX_PER_VISITOR),
   showAnswers: z.boolean(),
   enabled: z.boolean(),
+  voice: z.boolean().optional(),
 });
 
 route("GET", "public/self", (ctx) => {
@@ -1526,6 +1601,7 @@ route("GET", "emergency/opens", (ctx) => json({ opens: cardOpens(ctx.db, userOf(
 // Anyone with the link: the card's ciphertext. Each opening is logged for the owner without anything that identifies the opener.
 route("GET", "e/:id", (ctx, [cardId]) => {
   rateLimit(`emergency:${clientIp(ctx.req)}`, 60, 60_000);
+  assertNotMoved(ctx.db, "emergency", cardId);
   return json(openPublicCard(ctx.db, cardId, ctx.req));
 });
 
@@ -1600,6 +1676,7 @@ route("POST", "packs/:id/log", async (ctx, [packId]) => {
 // A pack, by its link: the latest version, or one by number. Public, like the pack itself.
 route("GET", "packs/at/:id", (ctx, [packId]) => {
   rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  assertNotMoved(ctx.db, "pack", packId);
   const v = ctx.url.searchParams.get("version");
   const version = v && /^\d{1,6}$/.test(v) ? Number(v) : undefined;
   return new Response(publicPack(ctx.db, packId, version), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "access-control-allow-origin": "*" } });
@@ -1609,6 +1686,250 @@ route("GET", "packs/at/:id/versions", (ctx, [packId]) => {
   rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
   return json({ versions: packVersions(ctx.db, packId) });
 });
+
+// ---- shared memory: leaving it, and heirs
+
+route("POST", "spaces/:id/leave", (ctx, [spaceId]) => {
+  leaveSpace(ctx.db, userOf(ctx), spaceId);
+  return json({ ok: true });
+});
+
+route("POST", "spaces/:id/heirs", async (ctx, [spaceId]) => {
+  const userId = userOf(ctx);
+  const body = parse(
+    z.object({ id, publicKey: boxPublicKey, role: spaceRole, sealedKey: sealed(1024), tag: hexTag, label: envelope(1024), forMember: id.nullable() }),
+    await readJson(ctx.req, 16 * KB),
+  );
+  addHeir(ctx.db, userId, spaceId, body as Parameters<typeof addHeir>[3]);
+  return json({ ok: true }, 201);
+});
+
+route("DELETE", "spaces/:id/heirs/:hid", (ctx, [spaceId, heirId]) => {
+  removeHeir(ctx.db, userOf(ctx), spaceId, heirId);
+  return json({ ok: true });
+});
+
+// ---- the vault as one bundle, backups and restoring
+
+// What this node keeps for the vault, for the owner's device to seal and store.
+route("GET", "bundle", (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`bundle:${userId}`, 20, 60_000);
+  return json({ body: bundleBody(ctx.db, userId, siteOrigin(ctx.req), "vault") });
+});
+
+route("POST", "backups", async (ctx) => {
+  const userId = userOf(ctx);
+  recordRun(ctx.db, userId, parse(runShape, await readJson(ctx.req, 80 * KB)));
+  return json({ runs: listRuns(ctx.db, userId) }, 201);
+});
+
+route("PUT", "apps/:id/backup", async (ctx, [appId]) => {
+  const userId = userOf(ctx);
+  setBackupApp(ctx.db, userId, appId, parse(z.object({ box: envelope(128 * KB) }), await readJson(ctx.req, 160 * KB)).box);
+  return json({ ok: true });
+});
+
+route("DELETE", "apps/:id/backup", (ctx, [appId]) => {
+  setBackupApp(ctx.db, userOf(ctx), appId, null);
+  return json({ ok: true });
+});
+
+route("GET", "connector/v1/backup", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, ...appBackup(ctx.db, auth) });
+});
+
+route("GET", "connector/v1/backup/bundle", (ctx) => {
+  const auth = appOf(ctx);
+  appBackup(ctx.db, auth);
+  rateLimit(`bundle:${auth.userId}`, 20, 60_000);
+  return json({ appId: auth.appId, body: bundleBody(ctx.db, auth.userId, siteOrigin(ctx.req), "connector") });
+});
+
+route("POST", "connector/v1/backup/done", async (ctx) => {
+  const auth = appOf(ctx);
+  recordAppRun(ctx.db, auth, parse(runShape, await readJson(ctx.req, 80 * KB)));
+  return json({ ok: true }, 201);
+});
+
+// A bundle from a public address (an IPFS or Arweave gateway, a presigned bucket address), fetched for a restore. Nothing is kept.
+route("POST", "restore/fetch", async (ctx) => {
+  rateLimit(`restore-fetch:${clientIp(ctx.req)}`, 10, 60_000);
+  assertSameOrigin(ctx.req);
+  const { url } = parse(z.object({ url: z.string().url().max(4000) }), await readJson(ctx.req, 8 * KB));
+  // https only (http only on this machine), and never into a private network unless this node allows it.
+  remoteOrigin(new URL(url).origin);
+  const res = await fetchRemote(url);
+  if (!res.ok) throw new HttpError(502, `That address answered ${res.status}.`, "fetch_failed");
+  return new Response(new Uint8Array(await res.arrayBuffer()), { status: 200, headers: { "content-type": "application/octet-stream", "cache-control": "no-store" } });
+});
+
+// Restoring a bundle as a new vault on this node, with the owner's sign-in and a statement signed for this node.
+route("POST", "restore", async (ctx) => {
+  rateLimit(`restore:${clientIp(ctx.req)}`, 10, 60_000);
+  assertSameOrigin(ctx.req);
+  const body = parse(
+    z.object({
+      bundle: bundleShape,
+      signIn: signInShape,
+      statement: z.object({ issuedAt: isoTime, signature: edSignature }),
+      arrival: z.object({ code: z.string().max(400), at: isoTime, signature: edSignature, redirectDays: z.number().int().min(1).max(MOVE_MAX_DAYS) }).optional(),
+    }),
+    await readJson(ctx.req, 512 * MB),
+  );
+  const origin = siteOrigin(ctx.req);
+  let arrival: { moveId: string; from: string; secret: string } | null = null;
+  if (body.arrival) {
+    // A restore that ends a move: the move must be the one the old node holds for this bundle.
+    const fetched = await fetchMove(body.arrival.code, origin);
+    if (fetched.bundle.hash !== body.bundle.hash) throw new HttpError(400, "This bundle is not the one the move names.", "bad_bundle");
+    const parts = body.arrival.code.split(".");
+    arrival = { moveId: fetched.move.statement.id, from: fetched.from, secret: parts[3] };
+  }
+  const report = importBundle(ctx.db, body.bundle, origin, body.signIn, body.statement);
+  let nodeRow: string | null = null;
+  if (arrival && body.arrival) {
+    nodeRow = recordArrival(ctx.db, report.userId, { ...arrival, at: body.arrival.at, signature: body.arrival.signature }, body.arrival.redirectDays);
+  }
+  const sessionToken = createSession(ctx.db, report.userId, null);
+  const confirmed = nodeRow ? await notifyOldNode(ctx.db, report.userId, nodeRow) : null;
+  return json({ report, confirmed }, 201, { "set-cookie": sessionCookie(ctx.req, sessionToken, serverConfig.sessionDays * 86400) });
+});
+
+// ---- nodes: where the vault lives, and moving it
+
+route("GET", "nodes", (ctx) => json(vaultNodes(ctx.db, userOf(ctx), siteOrigin(ctx.req))));
+
+route("POST", "nodes/moves", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`move:${userId}`, 10, 60_000);
+  const body = parse(
+    z.object({ move: z.object({ statement: z.record(z.string(), z.unknown()), signature: edSignature }), secretHash: sha256Shape, bundle: bundleShape }),
+    await readJson(ctx.req, 512 * MB),
+  );
+  return json(startMove(ctx.db, userId, siteOrigin(ctx.req), body as unknown as Parameters<typeof startMove>[3]), 201);
+});
+
+route("DELETE", "nodes/moves/:id", (ctx, [moveId]) => {
+  cancelMove(ctx.db, userOf(ctx), moveId);
+  return json({ ok: true });
+});
+
+// The new node asks for the move with the secret from the move code.
+route("GET", "nodes/moves/:id", (ctx, [moveId]) => {
+  rateLimit(`move-fetch:${clientIp(ctx.req)}`, 30, 60_000);
+  const m = /^Bearer\s+([A-Za-z0-9_-]{43})$/.exec((ctx.req.headers.get("authorization") ?? "").trim());
+  if (!m) throw new HttpError(401, "This move needs its secret.", "no_secret");
+  return json(sendMove(ctx.db, moveId, m[1]));
+});
+
+// The new node passes on the arrival the vault's key signed.
+route("POST", "nodes/moves/:id/done", async (ctx, [moveId]) => {
+  rateLimit(`move-done:${clientIp(ctx.req)}`, 30, 60_000);
+  const m = /^Bearer\s+([A-Za-z0-9_-]{43})$/.exec((ctx.req.headers.get("authorization") ?? "").trim());
+  if (!m) throw new HttpError(401, "This move needs its secret.", "no_secret");
+  const body = parse(z.object({ at: isoTime, signature: edSignature }), await readJson(ctx.req, 4 * KB));
+  return json(finishMove(ctx.db, moveId, m[1], body));
+});
+
+// The new node fetches a move from the old one, for the owner on the restore page.
+route("POST", "nodes/arrive", async (ctx) => {
+  rateLimit(`arrive:${clientIp(ctx.req)}`, 10, 60_000);
+  assertSameOrigin(ctx.req);
+  const { code } = parse(z.object({ code: z.string().max(400) }), await readJson(ctx.req, 4 * KB));
+  const got = await fetchMove(code, siteOrigin(ctx.req));
+  return json({ move: got.move, bundle: got.bundle });
+});
+
+route("POST", "nodes/:id/notify", async (ctx, [rowId]) => {
+  const userId = userOf(ctx);
+  return json({ confirmed: await notifyOldNode(ctx.db, userId, rowId) });
+});
+
+// ---- capture keys: made in the vault, used by a device or a shortcut
+
+route("POST", "capture-keys", async (ctx) => {
+  const userId = userOf(ctx);
+  createCaptureKey(ctx.db, userId, parse(z.object({ id, tokenHash: sha256Shape, tag: hexTag, note: envelope(2048), plain: z.boolean() }), await readJson(ctx.req, 8 * KB)));
+  return json({ captureKeys: listCaptureKeys(ctx.db, userId) }, 201);
+});
+
+route("DELETE", "capture-keys/:id", (ctx, [captureId]) => {
+  const userId = userOf(ctx);
+  revokeCaptureKey(ctx.db, userId, captureId);
+  return json({ captureKeys: listCaptureKeys(ctx.db, userId) });
+});
+
+route("GET", "capture/v1/key", (ctx) => json(captureVaultKey(ctx.db, captureOf(ctx))));
+
+route("POST", "capture/v1", async (ctx) => {
+  const auth = captureOf(ctx);
+  const body = parse(z.object({ id, sealed: sealed(3 * MB) }), await readJson(ctx.req, 4 * MB));
+  return json(captureInto(ctx.db, auth, body.id, body.sealed), 201);
+});
+
+route("POST", "capture/v1/text", async (ctx) => {
+  const auth = captureOf(ctx);
+  const body = parse(z.object({ text: z.string().max(CAPTURE_TEXT_LIMIT), title: z.string().max(300).optional() }), await readJson(ctx.req, 16 * KB));
+  return json(captureText(ctx.db, auth, body.text, body.title ?? ""), 201);
+});
+
+// ---- sessions with the public AI self
+
+route("PUT", "public/self/sessions", async (ctx) => {
+  const userId = userOf(ctx);
+  return json({ offer: saveOffer(ctx.db, userId, parse(z.object({ offer: z.record(z.string(), z.unknown()) }), await readJson(ctx.req, 32 * KB)).offer) });
+});
+
+route("GET", "sessions", (ctx) => json(ownerSessions(ctx.db, userOf(ctx))));
+
+route("POST", "sessions/:id/end", (ctx, [bookingId]) => {
+  closeSession(ctx.db, userOf(ctx), bookingId, false);
+  return json({ ok: true });
+});
+
+route("POST", "sessions/:id/block", (ctx, [bookingId]) => {
+  closeSession(ctx.db, userOf(ctx), bookingId, true);
+  return json({ ok: true });
+});
+
+route("GET", "public/at/:handle/sessions", (ctx, [handle]) => {
+  rateLimit(`public-read:${clientIp(ctx.req)}`, 120, 60_000);
+  assertNotMoved(ctx.db, "public", handle.toLowerCase());
+  return json(publicOffer(ctx.db, handle.toLowerCase()));
+});
+
+route("POST", "public/at/:handle/sessions", async (ctx, [handle]) => {
+  const ip = clientIp(ctx.req);
+  rateLimit(`book:${ip}`, 6, 60_000);
+  const offer = publicOffer(ctx.db, handle.toLowerCase());
+  const body = parse(
+    z.object({ id, slotStart: isoTime, topic: z.string().max(80), intake: sealed(32 * KB), tokenHash: sha256Shape, askerKey: boxPublicKey }),
+    await readJson(ctx.req, 48 * KB),
+  );
+  return json(book(ctx.db, handle.toLowerCase(), visitorOf(ip, offer.selfId), { ...body, slotStart: new Date(body.slotStart).toISOString() }), 201);
+});
+
+route("GET", "sessions/:id", (ctx, [bookingId]) => {
+  rateLimit(`session-read:${clientIp(ctx.req)}`, 240, 60_000);
+  return json(sessionStatus(ctx.db, bookingId, sessionBearer(ctx)));
+});
+
+route("POST", "sessions/:id/questions", async (ctx, [bookingId]) => {
+  rateLimit(`session-ask:${clientIp(ctx.req)}`, 8, 60_000);
+  const body = parse(z.object({ id, sealed: relay(64 * KB) }), await readJson(ctx.req, 80 * KB));
+  return json(askInSession(ctx.db, bookingId, sessionBearer(ctx), body), 201);
+});
+
+route("GET", "sessions/:id/questions/:qid", (ctx, [bookingId, questionId]) => {
+  rateLimit(`session-poll:${clientIp(ctx.req)}`, 240, 60_000);
+  return json(sessionQuestionStatus(ctx.db, bookingId, sessionBearer(ctx), questionId));
+});
+
+// ---- voice: the speech model the page loads when someone turns voice on
+
+route("GET", "voice", () => json({ enabled: serverConfig.voiceEnabled, model: serverConfig.speechModel }));
 
 // ---------------------------------------------------------------- dispatch
 
@@ -1642,7 +1963,8 @@ function match(pattern: string, path: string[]): string[] | null {
 
 export async function handleApi(req: Request, path: string[], db: Db = getDb()): Promise<Response> {
   const ctx: Ctx = { req, db, method: req.method.toUpperCase(), path, url: new URL(req.url) };
-  if (path[0] === "connector") {
+  // Bearer-only routes: connectors, capture keys and node-to-node calls never use a cookie, so any origin may call them.
+  if (path[0] === "connector" || (path[0] === "capture" && path[1] === "v1") || (path[0] === "nodes" && path[1] === "moves" && path.length >= 3 && ctx.method !== "DELETE")) {
     if (ctx.method === "OPTIONS") return withCors(new Response(null, { status: 204 }));
     return withCors(await dispatch(ctx));
   }

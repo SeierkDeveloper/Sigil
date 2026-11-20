@@ -16,6 +16,7 @@ import {
   cleanModelSettings,
   cleanQuestion,
   cleanRules,
+  contextForBooking,
   createModelCaller,
   decodeBoxPublicKey,
   decryptJson,
@@ -27,8 +28,10 @@ import {
   randomId,
   sealAskMessage,
   sealJson,
+  sealTurnNote,
   withoutCitations,
   type AskLinkSecret,
+  type PendingBooking,
   type AskNote,
   type AskReply,
   type PublicItem,
@@ -185,7 +188,10 @@ export class SelfAgent {
       return 0;
     }
     if (!pub.enabled) return 0;
-    const { questions } = await this.reader.request<{ questions: { id: string; selfId: string; sessionId: string; askerKey: string; sealed: string }[] }>("GET", "public/pending");
+    const { questions } = await this.reader.request<{ questions: { id: string; selfId: string; sessionId: string; askerKey: string; sealed: string; booking?: PendingBooking | null }[] }>(
+      "GET",
+      "public/pending",
+    );
     if (!questions.length) return 0;
     const secret = await openPublicForApp(this.reader.appSecret, this.reader.appId, pub.id, pub.box);
     const settings = cleanModelSettings(secret?.model);
@@ -202,7 +208,9 @@ export class SelfAgent {
       try {
         const opened = cleanQuestion(openAskMessage(key, ids, "q", q.sealed));
         question = opened.text;
-        const a = await answerAsSelf({ question, history: opened.history, rules: secret.rules, memories, model, asker: "public" });
+        // A booked session: the house rules, the topic and the intake go to the model as well.
+        const context = q.booking ? contextForBooking(pair, pub.id, q.booking) : null;
+        const a = await answerAsSelf({ question, history: opened.history, rules: secret.rules, memories, model, asker: "public", context });
         reply = { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) };
       } catch {
         reply = { v: 1, text: AGENT_ERROR_TEXT, refused: "error", sources: [] };
@@ -212,9 +220,11 @@ export class SelfAgent {
       try {
         await this.reader.request("POST", `public/questions/${q.id}/answer`, {
           sealed: sealAskMessage(key, ids, "a", reply),
-          note: sealJson(decodeBoxPublicKey(secret.boxPublic), note, askNoteContext(q.id, pub.id)),
+          note: q.booking
+            ? sealTurnNote(secret.boxPublic, { v: 1, bookingId: q.booking.id, turn: q.booking.turn, question, answer: reply.text, sources: reply.sources, refused: reply.refused })
+            : sealJson(decodeBoxPublicKey(secret.boxPublic), note, askNoteContext(q.id, pub.id)),
           cited: reply.sources.length,
-          wall: reply.refused === "error" ? null : { question, answer: reply.text, sources: reply.sources },
+          wall: reply.refused === "error" || q.booking ? null : { question, answer: reply.text, sources: reply.sources },
         });
         n++;
       } catch {

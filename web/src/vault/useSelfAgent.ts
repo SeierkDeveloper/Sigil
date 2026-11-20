@@ -65,8 +65,10 @@ export function useSelfAgent(api: Api, vault: Unlocked, data: VaultData | null, 
           else answered += await serveOnce(api, d, { model, box: d.box, boxPublic: d.boxPublic, embedQuery: s.embedQuery, vectors: s.vectors });
         }
         if (d.publicSelf?.enabled && !d.publicSelf.appId) {
-          if (d.work.holdPublic) keep(await holdPublicOnce(api, vault, d, known, { model }));
-          else answered += await servePublicOnce(api, d, { model });
+          if (d.work.holdPublic) {
+            keep(await holdPublicOnce(api, vault, d, known, { model }));
+            answered += await servePublicOnce(api, d, { model, sessionsOnly: true });
+          } else answered += await servePublicOnce(api, d, { model });
         }
         if (d.meets.some((m) => m.state === "running" || m.state === "invited")) {
           if (d.work.holdMeets) keep(await holdMeetsOnce(api, vault, d, known, { model }));

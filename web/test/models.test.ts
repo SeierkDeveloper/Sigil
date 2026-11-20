@@ -89,16 +89,17 @@ describe("upgrading the database", () => {
     old.close();
     const db = openDb(file);
     expect(db.prepare("SELECT id, kind, sealed FROM read_log").all()).toEqual([{ id: "e1", kind: "read", sealed: 1 }]);
-    db.prepare("INSERT INTO read_log VALUES ('e2', 'u1', 'a1', 'propose', 'p1', 1, '2026-01-01T00:00:01.000Z', 'cd', '0x02', 5, 0, NULL)").run();
-    expect(() => db.prepare("INSERT INTO read_log VALUES ('e3', 'u1', 'a1', 'write', null, 1, 'x', 'ef', '0x03', 5, 0, NULL)").run()).toThrow();
-    db.prepare("INSERT INTO read_log VALUES ('e4', 'u1', 'vault', 'presence', 'sig', 1, '2026-01-01T00:00:02.000Z', 'ef', '0x04', 5, 0, NULL)").run();
-    db.prepare("INSERT INTO read_log VALUES ('e5', 'u1', 'a1', 'protected', 'm1', 1, '2026-01-01T00:00:03.000Z', 'ff', '0x05', 5, 0, NULL)").run();
-    db.prepare("INSERT INTO read_log VALUES ('e6', 'u1', 'vault', 'disclose', '0x06', 1, '2026-01-01T00:00:04.000Z', 'ff', '0x06', 5, 0, NULL)").run();
-    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(6);
+    db.prepare("INSERT INTO read_log VALUES ('e2', 'u1', 'a1', 'propose', 'p1', 1, '2026-01-01T00:00:01.000Z', 'cd', '0x02', 5, 0, NULL, NULL)").run();
+    expect(() => db.prepare("INSERT INTO read_log VALUES ('e3', 'u1', 'a1', 'write', null, 1, 'x', 'ef', '0x03', 5, 0, NULL, NULL)").run()).toThrow();
+    db.prepare("INSERT INTO read_log VALUES ('e4', 'u1', 'vault', 'presence', 'sig', 1, '2026-01-01T00:00:02.000Z', 'ef', '0x04', 5, 0, NULL, NULL)").run();
+    db.prepare("INSERT INTO read_log VALUES ('e5', 'u1', 'a1', 'protected', 'm1', 1, '2026-01-01T00:00:03.000Z', 'ff', '0x05', 5, 0, NULL, NULL)").run();
+    db.prepare("INSERT INTO read_log VALUES ('e6', 'u1', 'vault', 'disclose', '0x06', 1, '2026-01-01T00:00:04.000Z', 'ff', '0x06', 5, 0, NULL, NULL)").run();
+    db.prepare("INSERT INTO read_log VALUES ('e7', 'u1', 'vault', 'backup', '0x07', 1, '2026-01-01T00:00:05.000Z', 'ff', '0x07', 5, 1, NULL, '{\"origin\":\"https://old.example\",\"unsealed\":true}')").run();
+    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(7);
     db.close();
     // Opening again changes nothing.
     const again = openDb(file);
-    expect(again.prepare("SELECT COUNT(*) AS n FROM read_log").get()).toEqual({ n: 5 });
+    expect(again.prepare("SELECT COUNT(*) AS n FROM read_log").get()).toEqual({ n: 6 });
     again.close();
   });
 

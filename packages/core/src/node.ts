@@ -15,8 +15,10 @@
 //      ask links, the public page, packs and the emergency card on to the new
 //      address for the period, and then deletes the vault.
 //
-// Every step is a "node" entry in the read log, sealed with the hour, on the
-// node where it happened; the old node's entries travel in the bundle.
+// Every step is a "node" entry in the read log of the node where it happened,
+// sealed with the hour there. The log from before the move travels in the
+// bundle with its proofs; the old node's seals stay published after it deletes
+// the vault, since they hold only salted leaves.
 
 import { ed25519 } from "@noble/curves/ed25519.js";
 import { sha256 } from "@noble/hashes/sha2.js";

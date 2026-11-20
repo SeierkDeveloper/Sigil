@@ -82,8 +82,14 @@ export interface ProofResult {
 }
 
 /** Proof that a sealed log entry is part of its hour's seal. */
-export function proofFor(db: Db, entry: LogEntry): ProofResult | null {
+export function proofFor(db: Db, entry: LogEntry): (ProofResult & { origin?: string; periodSeconds?: number }) | null {
   if (!entry.sealed) return null;
+  if (entry.carried) {
+    // Sealed on the node the vault came from: its proof travelled with it, against that node's root.
+    if (!("root" in entry.carried)) return null;
+    const c = entry.carried;
+    return { hour: entry.hour, root: c.root, leaf: entry.leaf, index: c.index, proof: c.proof, origin: c.origin, periodSeconds: c.periodSeconds };
+  }
   return proofForLeaf(db, entry.hour, entry.leaf);
 }
 

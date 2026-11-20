@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -644,6 +644,147 @@ CREATE TABLE IF NOT EXISTS pack_versions (
   PRIMARY KEY (pack_id, version)
 );
 
+-- Backups: each bundle the owner's device or connector made and stored. record
+-- says where it went (object keys, content ids), sealed to the vault public key.
+CREATE TABLE IF NOT EXISTS backup_runs (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  by_app TEXT,
+  hash TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  record TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS backup_runs_by_user ON backup_runs (user_id, created_at);
+
+-- A connector the owner lets back the vault up while it watches: the storage
+-- targets and their tokens, under a key from that app's own secret.
+CREATE TABLE IF NOT EXISTS backup_apps (
+  app_id TEXT PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  box TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- The nodes a vault came from (role previous) and, on the node it left, the
+-- node it went to (role next). arrival is what the new node sends the old one,
+-- kept until the old node confirmed it.
+CREATE TABLE IF NOT EXISTS vault_nodes (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  origin TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('previous', 'next')),
+  move_id TEXT,
+  state TEXT NOT NULL CHECK (state IN ('waiting', 'confirmed')),
+  arrival TEXT,
+  since TEXT NOT NULL,
+  until TEXT
+);
+CREATE INDEX IF NOT EXISTS vault_nodes_by_user ON vault_nodes (user_id, since);
+
+-- Moves out of this node: the statement the owner's device signed, the bundle
+-- that goes with it, and a hash of the secret the new node fetches it with.
+CREATE TABLE IF NOT EXISTS moves (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  to_origin TEXT NOT NULL,
+  statement TEXT NOT NULL,
+  signature TEXT NOT NULL,
+  secret_hash TEXT NOT NULL,
+  bundle TEXT NOT NULL,
+  bundle_hash TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('signed', 'sent', 'done', 'cancelled')),
+  created_at TEXT NOT NULL,
+  sent_at TEXT,
+  done_at TEXT
+);
+CREATE INDEX IF NOT EXISTS moves_by_user ON moves (user_id, created_at);
+
+-- Addresses of a vault that moved away, sent on to its new node until "until".
+-- Kept apart from the account, which is deleted when the period ends.
+CREATE TABLE IF NOT EXISTS moved (
+  kind TEXT NOT NULL CHECK (kind IN ('vault', 'ask', 'public', 'pack', 'emergency')),
+  ref TEXT NOT NULL,
+  to_origin TEXT NOT NULL,
+  until TEXT NOT NULL,
+  PRIMARY KEY (kind, ref)
+);
+
+-- Capture keys: one per device or shortcut, write-only into the inbox. note is
+-- the owner's name for it under the vault key; tag vouches for the vault key.
+CREATE TABLE IF NOT EXISTS capture_keys (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT UNIQUE,
+  tag TEXT NOT NULL,
+  note TEXT NOT NULL,
+  plain INTEGER NOT NULL DEFAULT 0,
+  sent INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT,
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS capture_keys_by_user ON capture_keys (user_id);
+
+-- Sessions with the public AI self: the owner's offer (public), the bookings
+-- (the intake sealed to the public self's key), each turn's note sealed to the
+-- vault public key for the owner's transcript, and visitors the owner blocked.
+CREATE TABLE IF NOT EXISTS session_offers (
+  self_id TEXT PRIMARY KEY REFERENCES public_selves(id) ON DELETE CASCADE,
+  offer TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS session_bookings (
+  id TEXT PRIMARY KEY,
+  self_id TEXT NOT NULL REFERENCES public_selves(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  topic TEXT NOT NULL,
+  slot_start TEXT NOT NULL,
+  slot_end TEXT NOT NULL,
+  turns INTEGER NOT NULL,
+  used INTEGER NOT NULL DEFAULT 0,
+  intake TEXT NOT NULL,
+  consent TEXT NOT NULL,
+  token_hash TEXT NOT NULL UNIQUE,
+  asker_key TEXT NOT NULL,
+  visitor TEXT NOT NULL,
+  state TEXT NOT NULL CHECK (state IN ('booked', 'ended', 'blocked')),
+  created_at TEXT NOT NULL,
+  ended_at TEXT,
+  UNIQUE (self_id, slot_start)
+);
+CREATE INDEX IF NOT EXISTS session_bookings_by_user ON session_bookings (user_id, slot_start);
+CREATE TABLE IF NOT EXISTS session_turns (
+  booking_id TEXT NOT NULL REFERENCES session_bookings(id) ON DELETE CASCADE,
+  turn INTEGER NOT NULL,
+  note TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (booking_id, turn)
+);
+CREATE TABLE IF NOT EXISTS session_blocks (
+  self_id TEXT NOT NULL REFERENCES public_selves(id) ON DELETE CASCADE,
+  visitor TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (self_id, visitor)
+);
+
+-- Heirs of a shared memory: dormant members, sealed and tagged by an admin's
+-- device, made members when the legacy plan of the member they are named for
+-- (or of any member, when for_member is null) releases.
+CREATE TABLE IF NOT EXISTS space_heirs (
+  id TEXT PRIMARY KEY,
+  space_id TEXT NOT NULL REFERENCES spaces(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('read', 'write', 'admin')),
+  sealed_key TEXT NOT NULL,
+  tag TEXT NOT NULL,
+  label TEXT NOT NULL,
+  for_member TEXT,
+  added_by TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (space_id, public_key)
+);
+
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
   hour INTEGER PRIMARY KEY,
@@ -669,14 +810,16 @@ CREATE TABLE IF NOT EXISTS seal_leaves (
 // answers, every read of a protected folder and the owner's answer to it, and
 // every step of a conversation between two AI selves, and the steps of the AI
 // self's identity, its work, proofs of facts, the emergency card, agreements and
-// knowledge packs. leaf = Merkle leaf of the entry (salted). note, for answers only, is
-// the question and answer sealed to the vault's public key.
+// knowledge packs, backups, moves between nodes, captures and sessions. leaf =
+// Merkle leaf of the entry (salted). note, for answers only, is the question and
+// answer sealed to the vault's public key. carried, for an entry that came with a
+// bundle from another node, is where it was sealed there and its proof.
 const READ_LOG = `
 CREATE TABLE IF NOT EXISTS read_log (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync', 'identity', 'work', 'disclose', 'emergency', 'agreement', 'pack')),
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync', 'identity', 'work', 'disclose', 'emergency', 'agreement', 'pack', 'backup', 'node', 'capture', 'session')),
   memory_id TEXT,
   count INTEGER NOT NULL,
   at TEXT NOT NULL,
@@ -684,7 +827,8 @@ CREATE TABLE IF NOT EXISTS read_log (
   leaf TEXT NOT NULL,
   hour INTEGER NOT NULL,
   sealed INTEGER NOT NULL DEFAULT 0,
-  note TEXT
+  note TEXT,
+  carried TEXT
 );
 CREATE INDEX IF NOT EXISTS read_log_by_user ON read_log (user_id, at);
 CREATE INDEX IF NOT EXISTS read_log_unsealed ON read_log (sealed, hour);
@@ -695,8 +839,9 @@ CREATE INDEX IF NOT EXISTS read_log_by_kind ON read_log (user_id, kind, hour);
 /** Older versions allowed fewer kinds in the log and had no notes. Rebuild the table, keeping every row. */
 function migrateReadLog(db: Db): void {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes("'pack'")) return;
+  if (!row?.sql || row.sql.includes("'session'")) return;
   const hasNote = row.sql.includes("note TEXT");
+  const hasCarried = row.sql.includes("carried TEXT");
   db.exec("BEGIN IMMEDIATE");
   try {
     db.exec("ALTER TABLE read_log RENAME TO read_log_old");
@@ -705,7 +850,7 @@ function migrateReadLog(db: Db): void {
     db.exec("DROP INDEX IF EXISTS read_log_by_app");
     db.exec("DROP INDEX IF EXISTS read_log_by_kind");
     db.exec(READ_LOG);
-    const cols = `id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed${hasNote ? ", note" : ""}`;
+    const cols = `id, user_id, app_id, kind, memory_id, count, at, salt, leaf, hour, sealed${hasNote ? ", note" : ""}${hasCarried ? ", carried" : ""}`;
     db.exec(`INSERT INTO read_log (${cols}) SELECT ${cols} FROM read_log_old`);
     db.exec("DROP TABLE read_log_old");
     db.exec("COMMIT");
@@ -771,6 +916,14 @@ export function openDb(file: string): Db {
   addColumn(db, "sessions", "keyslot_id", "TEXT");
   // Whether an app may write a folder (agents) or only read it.
   addColumn(db, "grants", "mode", "TEXT NOT NULL DEFAULT 'read'");
+  // Round seven: shared memories keep their kind in the clear, a vault that moved away points to its new node,
+  // public questions may belong to a booked session, and the public page and ask links may offer voice.
+  addColumn(db, "spaces", "kind", "TEXT NOT NULL DEFAULT 'team'");
+  addColumn(db, "users", "moved_to", "TEXT");
+  addColumn(db, "users", "delete_at", "TEXT");
+  addColumn(db, "public_questions", "booking_id", "TEXT");
+  addColumn(db, "public_selves", "voice", "INTEGER NOT NULL DEFAULT 0");
+  addColumn(db, "ask_links", "voice", "INTEGER NOT NULL DEFAULT 0");
   db.exec("CREATE INDEX IF NOT EXISTS memories_to_delete ON memories (delete_after) WHERE delete_after IS NOT NULL;");
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return db;

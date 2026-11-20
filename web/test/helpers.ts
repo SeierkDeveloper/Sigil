@@ -17,9 +17,12 @@ export interface Harness {
 export interface Browser {
   api: Api;
   cookie(): string | null;
+  /** The browser's own fetch, for pages that call the site without the Api (the restore page). */
+  fetcher: Fetcher;
 }
 
-export function harness(): Harness {
+/** A node of its own: a private database, reached at the origin given (no server listens there; requests go straight into the router). */
+export function harness(origin = ORIGIN): Harness {
   resetRateLimits();
   const db = openDb(":memory:");
   const sent: string[] = [];
@@ -27,16 +30,16 @@ export function harness(): Harness {
   const raw: Harness["raw"] = async (method, path, init = {}) => {
     const body = init.body === undefined ? undefined : typeof init.body === "string" ? init.body : JSON.stringify(init.body);
     if (body) sent.push(body);
-    const req = new Request(`${ORIGIN}/api/${path}`, { method, body, headers: init.headers });
+    const req = new Request(`${origin}/api/${path}`, { method, body, headers: init.headers });
     return handleApi(req, path.split("?")[0].split("/"), db);
   };
 
   const browser = (): Browser => {
     let cookie: string | null = null;
     const fetcher: Fetcher = async (input, init = {}) => {
-      const url = new URL(input, ORIGIN);
+      const url = new URL(input, origin);
       const headers = new Headers(init.headers);
-      headers.set("origin", ORIGIN);
+      headers.set("origin", origin);
       if (cookie) headers.set("cookie", `sigil_session=${cookie}`);
       if (typeof init.body === "string") sent.push(init.body);
       const req = new Request(url, { method: init.method, headers, body: init.body as string | undefined });
@@ -48,7 +51,7 @@ export function harness(): Harness {
       }
       return res;
     };
-    return { api: createApi(fetcher, ORIGIN), cookie: () => cookie };
+    return { api: createApi(fetcher, origin), cookie: () => cookie, fetcher };
   };
 
   return { db, browser, raw, sent };
@@ -78,10 +81,10 @@ export async function wallet() {
 }
 
 /** A connector on "this machine": its requests go straight into the router, and every body it sends is recorded. */
-export function readerFor(h: Harness, appKey: string, opts: Partial<ReaderOptions> = {}) {
+export function readerFor(h: Harness, appKey: string, opts: Partial<ReaderOptions> = {}, origin = ORIGIN) {
   return new VaultReader({
     appKey,
-    baseUrl: ORIGIN,
+    baseUrl: origin,
     ...opts,
     fetcher: async (input, init = {}) => {
       const url = new URL(input);

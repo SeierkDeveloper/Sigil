@@ -93,5 +93,22 @@ export const serverConfig = {
     const rpc = process.env.SIGIL_IDENTITY_READ_RPC?.trim() ?? "";
     return { chainId, registry, rpcUrl: /^https:\/\/[^\s]+$/.test(rpc) ? rpc : "" };
   },
+  /**
+   * Whether this node may talk to nodes and storage addresses on a private
+   * network (localhost, 10.x, 192.168.x). Off by default, so a request to move
+   * a vault here cannot be used to reach the node's own network; turn it on
+   * for nodes on one machine or one private network.
+   */
+  get nodeAllowPrivate(): boolean {
+    return flag("SIGIL_NODE_ALLOW_PRIVATE", false);
+  },
+  /** Speech to text on the device, offered in the AI self's chats. The model runs in the browser; the server only hands out its files. On by default. */
+  get voiceEnabled(): boolean {
+    return flag("SIGIL_VOICE", true);
+  },
+  /** The speech model the page loads when someone turns voice on. */
+  get speechModel(): string {
+    return process.env.SIGIL_SPEECH_MODEL?.trim() || "Xenova/whisper-tiny.en";
+  },
   sessionDays: 30,
 };

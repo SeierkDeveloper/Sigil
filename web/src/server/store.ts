@@ -502,7 +502,11 @@ export interface LogEntry {
   sealed: boolean;
   /** For an answer of the AI self: the question and answer, sealed to the vault's public key. */
   note?: string | null;
+  /** For an entry that came with a bundle from another node: where it was sealed there and its proof, or that it was not sealed yet. */
+  carried?: CarriedSeal | null;
 }
+
+export type CarriedSeal = { origin: string; periodSeconds: number; root: string; index: number; proof: string[] } | { origin: string; unsealed: true };
 
 export function logRead(db: Db, auth: AppAuth, kind: ReadKind, memoryId: string | null, count: number, at = new Date(), note: string | null = null): LogEntry {
   const entry = {
@@ -545,6 +549,7 @@ function toEntry(r: Row): LogEntry {
     hour: Number(r.hour),
     sealed: Number(r.sealed) === 1,
     ...(r.note ? { note: String(r.note) } : {}),
+    ...(r.carried ? { carried: JSON.parse(String(r.carried)) as CarriedSeal } : {}),
   };
 }
 

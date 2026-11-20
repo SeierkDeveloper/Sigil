@@ -447,3 +447,39 @@ export const StyleIcon = (p: IconProps) => (
     <path d="m14.5 4.5 4 4L9 18H5v-4z" />
   </Line>
 );
+
+export const MicIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5v3.5M9 21h6" />
+  </Line>
+);
+
+export const SpeakerIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+    <path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11" />
+  </Line>
+);
+
+export const PersonIcon = (p: IconProps) => (
+  <Line {...p}>
+    <circle cx="12" cy="8" r="3.5" />
+    <path d="M5 20a7 7 0 0 1 14 0" />
+  </Line>
+);
+
+export const StoryIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M4.5 5.5c2.5-1 5-1 7.5.5 2.5-1.5 5-1.5 7.5-.5v13c-2.5-1-5-1-7.5.5-2.5-1.5-5-1.5-7.5-.5z" />
+    <path d="M12 6v13" />
+  </Line>
+);
+
+export const NodeIcon = (p: IconProps) => (
+  <Line {...p}>
+    <rect x="3.5" y="4" width="17" height="6" rx="1.5" />
+    <rect x="3.5" y="14" width="17" height="6" rx="1.5" />
+    <path d="M7 7h.01M7 17h.01M12 10v4" />
+  </Line>
+);

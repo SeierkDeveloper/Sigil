@@ -11,6 +11,8 @@ import { tx, type Db } from "./db";
 import { serverConfig } from "./config";
 import { HttpError, logRead, type AppAuth } from "./store";
 import { sha256Hex } from "@sigil/core";
+import { bookingFor, recordTurn } from "./sessions";
+import { assertNotMoved } from "./nodes";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -33,6 +35,7 @@ export interface PublicSelfInput {
   perVisitorHour: number;
   showAnswers: boolean;
   enabled: boolean;
+  voice?: boolean;
 }
 
 function online(seen: unknown, at = Date.now()): boolean {
@@ -72,6 +75,7 @@ export function ownerPublicSelf(db: Db, userId: string) {
     perVisitorHour: Number(r.per_visitor_hour),
     showAnswers: Number(r.show_answers) === 1,
     enabled: Number(r.enabled) === 1,
+    voice: Number(r.voice) === 1,
     copyHash: r.copy_hash == null ? null : String(r.copy_hash),
     publishedAt: r.published_at == null ? null : String(r.published_at),
     items: Number(items.n),
@@ -98,14 +102,14 @@ export function savePublicSelf(db: Db, userId: string, s: PublicSelfInput): void
     const at = now();
     if (!cur) {
       db.prepare(
-        `INSERT INTO public_selves (id, user_id, handle, name, greeting, public_key, owner_box, app_id, app_box, per_visitor_hour, show_answers, enabled, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      ).run(s.id, userId, s.handle, s.name, s.greeting, s.publicKey, s.ownerBox, s.appId, s.appId ? s.appBox : null, s.perVisitorHour, s.showAnswers ? 1 : 0, s.enabled ? 1 : 0, at, at);
+        `INSERT INTO public_selves (id, user_id, handle, name, greeting, public_key, owner_box, app_id, app_box, per_visitor_hour, show_answers, enabled, voice, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(s.id, userId, s.handle, s.name, s.greeting, s.publicKey, s.ownerBox, s.appId, s.appId ? s.appBox : null, s.perVisitorHour, s.showAnswers ? 1 : 0, s.enabled ? 1 : 0, s.voice ? 1 : 0, at, at);
     } else {
       if (String(cur.public_key) !== s.publicKey) throw new HttpError(400, "The public key of a public AI self does not change. Turn it off and make a new one.", "invalid");
       db.prepare(
-        "UPDATE public_selves SET handle = ?, name = ?, greeting = ?, owner_box = ?, app_id = ?, app_box = ?, per_visitor_hour = ?, show_answers = ?, enabled = ?, updated_at = ? WHERE id = ?",
-      ).run(s.handle, s.name, s.greeting, s.ownerBox, s.appId, s.appId ? s.appBox : null, s.perVisitorHour, s.showAnswers ? 1 : 0, s.enabled ? 1 : 0, at, s.id);
+        "UPDATE public_selves SET handle = ?, name = ?, greeting = ?, owner_box = ?, app_id = ?, app_box = ?, per_visitor_hour = ?, show_answers = ?, enabled = ?, voice = ?, updated_at = ? WHERE id = ?",
+      ).run(s.handle, s.name, s.greeting, s.ownerBox, s.appId, s.appId ? s.appBox : null, s.perVisitorHour, s.showAnswers ? 1 : 0, s.enabled ? 1 : 0, s.voice ? 1 : 0, at, s.id);
       if (!s.enabled) db.prepare("DELETE FROM public_questions WHERE self_id = ? AND answered_at IS NULL").run(s.id);
     }
   });
@@ -151,7 +155,12 @@ export function hideAnswer(db: Db, userId: string, answerId: string, hidden: boo
 
 function byHandle(db: Db, handle: string): Row {
   const r = db.prepare("SELECT * FROM public_selves WHERE handle = ?").get(handle) as Row | undefined;
-  if (!r) throw new HttpError(404, "There is no public AI self with that name.", "no_public");
+  if (!r) {
+    assertNotMoved(db, "public", handle);
+    throw new HttpError(404, "There is no public AI self with that name.", "no_public");
+  }
+  const moved = db.prepare("SELECT moved_to FROM users WHERE id = ?").get(String(r.user_id)) as Row | undefined;
+  if (moved?.moved_to) assertNotMoved(db, "public", handle);
   return r;
 }
 
@@ -179,6 +188,8 @@ export function publicPage(db: Db, handle: string) {
     online: enabled && online(r.agent_seen_at),
     perVisitorHour: Number(r.per_visitor_hour),
     showAnswers: Number(r.show_answers) === 1,
+    voice: Number(r.voice) === 1,
+    sessions: enabled && !!db.prepare("SELECT 1 FROM session_offers WHERE self_id = ? AND json_extract(offer, '$.enabled') = 1").get(String(r.id)),
     items: enabled ? items(db, String(r.id)).map(({ body: _b, ...i }) => i) : [],
     wall: enabled && Number(r.show_answers) === 1 ? wall(db, String(r.id), false).map(({ hidden: _h, ...w }) => w) : [],
   };
@@ -206,7 +217,7 @@ export function askPublic(db: Db, handle: string, visitor: string, q: { id: stri
     if (!online(r.agent_seen_at, at)) {
       throw new HttpError(503, "The owner's AI self is offline right now: their vault is not open and their connector is not running. Try again later.", "offline");
     }
-    const mine = db.prepare("SELECT COUNT(*) AS n FROM public_questions WHERE self_id = ? AND visitor = ? AND created_at > ?").get(selfId, visitor, at - 3600_000) as Row;
+    const mine = db.prepare("SELECT COUNT(*) AS n FROM public_questions WHERE self_id = ? AND visitor = ? AND created_at > ? AND booking_id IS NULL").get(selfId, visitor, at - 3600_000) as Row;
     if (Number(mine.n) >= Number(r.per_visitor_hour)) throw new HttpError(429, "You have asked as many questions as the owner allows in an hour. Try again later.", "visitor_limit");
     const waiting = db.prepare("SELECT COUNT(*) AS n FROM public_questions WHERE session_id = ? AND answered_at IS NULL AND created_at > ?").get(q.sessionId, at - ANSWER_WAIT_MS) as Row;
     if (Number(waiting.n) > 0) throw new HttpError(429, "Wait for the answer to your last question first.", "waiting");
@@ -253,9 +264,18 @@ export function publicPending(db: Db, agent: PublicAgent, at = Date.now()) {
   db.prepare("UPDATE public_selves SET agent_seen_at = ? WHERE id = ?").run(at, selfId);
   return (
     db
-      .prepare("SELECT id, session_id, asker_key, sealed, created_at FROM public_questions WHERE self_id = ? AND answered_at IS NULL AND created_at > ? ORDER BY created_at LIMIT 20")
+      .prepare("SELECT id, session_id, asker_key, sealed, created_at, booking_id FROM public_questions WHERE self_id = ? AND answered_at IS NULL AND created_at > ? ORDER BY created_at LIMIT 20")
       .all(selfId, at - ANSWER_WAIT_MS) as Row[]
-  ).map((q) => ({ id: String(q.id), selfId, sessionId: String(q.session_id), askerKey: String(q.asker_key), sealed: String(q.sealed), createdAt: new Date(Number(q.created_at)).toISOString() }));
+  ).map((q) => ({
+    id: String(q.id),
+    selfId,
+    sessionId: String(q.session_id),
+    askerKey: String(q.asker_key),
+    sealed: String(q.sealed),
+    createdAt: new Date(Number(q.created_at)).toISOString(),
+    // A question in a booked session comes with its booking: the topic, the sealed intake, the house rules and which turn it is.
+    booking: q.booking_id == null ? null : bookingFor(db, String(q.booking_id)),
+  }));
 }
 
 /** The connector's copy of the public self (its key and rules wrapped for that app) and the public copy it answers from. */
@@ -283,10 +303,15 @@ export function answerPublic(db: Db, agent: PublicAgent, questionId: string, a: 
     const r = agentSelf(db, agent);
     if (!r) throw new HttpError(403, "This agent does not answer the public AI self.", "public_off");
     const selfId = String(r.id);
-    const q = db.prepare("SELECT answered_at FROM public_questions WHERE id = ? AND self_id = ?").get(questionId, selfId) as Row | undefined;
+    const q = db.prepare("SELECT answered_at, booking_id FROM public_questions WHERE id = ? AND self_id = ?").get(questionId, selfId) as Row | undefined;
     if (!q) throw new HttpError(404, "That question was not found. It may have expired.", "no_question");
     if (q.answered_at) throw new HttpError(409, "That question was already answered.", "answered");
     db.prepare("UPDATE public_questions SET answer = ?, answered_at = ? WHERE id = ?").run(a.sealed, at.getTime(), questionId);
+    if (q.booking_id != null) {
+      // A turn of a booked session: the transcript gets the note, never the page.
+      recordTurn(db, String(q.booking_id), a.note, a.cited, at);
+      return;
+    }
     db.prepare("UPDATE public_selves SET answered = answered + 1 WHERE id = ?").run(selfId);
     if (a.wall && Number(r.show_answers) === 1) {
       db.prepare("INSERT OR IGNORE INTO public_wall (id, self_id, question, answer, sources, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
