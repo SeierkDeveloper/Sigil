@@ -1,21 +1,615 @@
+/*
+  The Sigil extension: the vault's look at popup size. Black, silver and white,
+  hairlines, the display face for the name, the mono face for labels.
+*/
+
+@font-face {
+  font-family: "Sigil Display";
+  src: url("fonts/display-roman.woff2") format("woff2");
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sigil Sans";
+  src: url("fonts/sans-roman.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sigil Mono";
+  src: url("fonts/mono-400.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   --bg: #060607;
   --surface: #0b0b0d;
-  --line: rgba(255, 255, 255, 0.18);
+  --surface-2: #121215;
+  --line: rgba(255, 255, 255, 0.085);
+  --line-strong: rgba(255, 255, 255, 0.18);
+  --line-bright: rgba(255, 255, 255, 0.42);
   --text: #f4f4f5;
   --muted: #a9aab0;
+  --faint: #7b7c84;
+  --silver: #c9ccd1;
+  --ink: #08080a;
   --metal: linear-gradient(180deg, #fdfdfd 0%, #d9dbdf 42%, #a9acb2 100%);
+  --metal-hover: linear-gradient(180deg, #ffffff 0%, #eceef0 42%, #c2c5ca 100%);
+  --display: "Sigil Display", Didot, "Bodoni 72", Georgia, serif;
+  --sans: "Sigil Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Sigil Mono", ui-monospace, Menlo, Consolas, monospace;
+  --ease: 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
-* { box-sizing: border-box; }
-body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
-body.popup { width: 320px; }
-h1 { margin: 0 0 8px; font: 400 24px/1.1 Didot, "Bodoni 72", Georgia, serif; }
-p { margin: 0 0 12px; color: var(--muted); }
-label { display: block; margin: 12px 0 4px; font-weight: 600; font-size: 13px; }
-input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font: 13px ui-monospace, Menlo, monospace; }
-button { min-height: 38px; margin: 12px 8px 0 0; padding: 0 14px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--text); font: 600 13px ui-sans-serif, system-ui, sans-serif; cursor: pointer; }
-button.primary { background: var(--metal); color: #08080a; border-color: transparent; }
-button:disabled { opacity: 0.5; cursor: default; }
-.note { min-height: 1.5em; margin-top: 12px; color: var(--text); }
-.box { max-width: 560px; padding: 20px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(120% 60% at 50% 0%, #131316, var(--bg) 70%);
+  color: var(--text);
+  font: 14px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1 {
+  margin: 0;
+  font: 400 30px/1 var(--display);
+  font-variation-settings: "opsz" 30;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+:focus-visible {
+  outline: 1px solid #fff;
+  outline-offset: 3px;
+}
+
+button {
+  font: 600 13px var(--sans);
+  color: var(--text);
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- popup */
+
+body.popup {
+  position: relative;
+  width: 340px;
+  padding: 18px 16px 12px;
+  overflow: hidden;
+}
+
+/* A lit top edge, as on a plate of metal. */
+body.popup::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+}
+
+/* Rows of ciphertext engraved behind the name, drifting slowly. */
+.cipher {
+  position: absolute;
+  top: 6px;
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.075);
+  font: 10px/1 var(--mono);
+  letter-spacing: 0.22em;
+  white-space: nowrap;
+  -webkit-mask-image: radial-gradient(70% 100% at 70% 30%, #000, transparent 75%);
+  mask-image: radial-gradient(70% 100% at 70% 30%, #000, transparent 75%);
+  pointer-events: none;
+}
+
+.cipher span:nth-child(2) {
+  margin-left: -40px;
+}
+
+.cipher span:nth-child(3) {
+  margin-left: -90px;
+}
+
+.head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 9px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 2px;
+  background: var(--bg);
+  color: var(--muted);
+  font: 10px/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pair i {
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+.pair-yes,
+.pair-no,
+body:not([data-paired="checking"]) .pair-wait {
+  display: none;
+}
+
+[data-paired="yes"] .pair {
+  border: 1px solid var(--line-bright);
+  color: var(--text);
+}
+
+[data-paired="yes"] .pair i {
+  background: currentColor;
+}
+
+[data-paired="yes"] .pair-yes,
+[data-paired="no"] .pair-no {
+  display: inline;
+}
+
+#status {
+  position: relative;
+  min-height: 1.5em;
+  margin-bottom: 14px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  position: relative;
+  display: grid;
+  gap: 8px;
+}
+
+.act {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)), var(--surface);
+  text-align: left;
+  overflow: hidden;
+  transition: border-color var(--ease), background var(--ease), opacity var(--ease), transform var(--ease);
+}
+
+.act > svg {
+  justify-self: center;
+  width: 38px;
+  height: 38px;
+  padding: 9px;
+  border: 1px solid var(--line-bright);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%);
+  color: #eef0f2;
+}
+
+.act-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.act strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.act small {
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.act:not(:disabled):hover {
+  border-color: var(--line-bright);
+}
+
+.act:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+/* The one silver plate. */
+.act.primary {
+  border-color: transparent;
+  background: var(--metal);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.28), 0 10px 28px -14px rgba(255, 255, 255, 0.3);
+  color: var(--ink);
+}
+
+.act.primary > svg {
+  border-color: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+}
+
+.act.primary small {
+  color: rgba(8, 8, 10, 0.66);
+}
+
+.act.primary:not(:disabled):hover {
+  border-color: transparent;
+  background: var(--metal-hover);
+}
+
+.act:disabled {
+  opacity: 0.42;
+}
+
+.act.primary:disabled {
+  box-shadow: none;
+}
+
+/* What happened, said once: working, sent, or why not. */
+.note {
+  min-height: 1.5em;
+  margin: 12px 0 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.popup .note {
+  position: relative;
+  min-height: 0;
+  padding: 10px 12px 10px 34px;
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+.popup .note:empty {
+  display: none;
+}
+
+.popup .note::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: 14px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--silver);
+  transform: rotate(45deg);
+}
+
+[data-state="sent"] .note {
+  border-color: var(--line-bright);
+}
+
+[data-state="sent"] .note::before {
+  border-color: transparent;
+  background: var(--metal);
+}
+
+[data-state="failed"] .note {
+  border-style: dashed;
+  border-color: var(--line-bright);
+}
+
+.foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.sealed {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--faint);
+  font: 10px/1.4 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sealed svg {
+  width: 13px;
+  height: 13px;
+  color: var(--silver);
+}
+
+.link {
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--line-bright);
+  text-underline-offset: 4px;
+}
+
+.link:hover {
+  color: var(--text);
+  text-decoration-color: currentColor;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cipher span {
+    animation: drift 46s linear infinite alternate;
+  }
+
+  .cipher span:nth-child(2) {
+    animation-duration: 58s;
+    animation-direction: alternate-reverse;
+  }
+
+  [data-state="working"] .note::before {
+    animation: turn 1.1s linear infinite;
+  }
+
+  [data-state="sent"] .note,
+  [data-state="failed"] .note {
+    animation: rise 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+
+  [data-state="working"] .act.primary::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: -60%;
+    width: 45%;
+    background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+    transform: skewX(-18deg);
+    animation: sheen 1.2s ease-in-out infinite;
+  }
+}
+
+@keyframes drift {
+  to {
+    transform: translateX(-70px);
+  }
+}
+
+@keyframes turn {
+  to {
+    transform: rotate(405deg);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes sheen {
+  to {
+    left: 120%;
+  }
+}
+
+/* ---------------------------------------------------------------- options */
+
+body.options {
+  min-height: 100vh;
+  padding: 48px 16px;
+}
+
+.box {
+  position: relative;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 32px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)), var(--surface);
+  box-shadow: 0 0 0 6px rgba(6, 6, 7, 0.9), 0 0 0 7px var(--line), 0 40px 80px -40px #000;
+}
+
+.box::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+}
+
+.eyebrow {
+  margin-bottom: 14px;
+  color: var(--silver);
+  font: 11px/1.4 var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.box h1 {
+  margin-bottom: 16px;
+  font-size: 34px;
+  line-height: 1.06;
+}
+
+.box p {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.paired {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 20px 0 4px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.paired::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+[data-paired="yes"] .paired {
+  border: 1px solid var(--line-bright);
+}
+
+[data-paired="yes"] .paired::before {
+  background: currentColor;
+}
+
+label {
+  display: block;
+  margin: 20px 0 8px;
+  color: var(--silver);
+  font: 11px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+input {
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: var(--ink);
+  color: var(--text);
+  font: 16px var(--mono);
+  transition: border-color var(--ease), box-shadow var(--ease);
+}
+
+input::placeholder {
+  color: var(--faint);
+}
+
+input:hover {
+  border-color: var(--line-bright);
+}
+
+input:focus {
+  outline: none;
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.row button {
+  min-height: 46px;
+  padding: 0 24px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 14px;
+  transition: border-color var(--ease), background var(--ease);
+}
+
+.row button:hover {
+  border-color: var(--line-bright);
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.row button.primary {
+  min-width: 140px;
+  border-color: transparent;
+  background: var(--metal);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.28), 0 10px 28px -12px rgba(255, 255, 255, 0.28);
+  color: var(--ink);
+}
+
+.row button.primary:hover {
+  background: var(--metal-hover);
+}
+
+.options .note {
+  margin-top: 16px;
+}
+
+.options .note:empty {
+  display: none;
+}
+
+.box .fine {
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+@media (max-width: 520px) {
+  body.options {
+    padding: 16px;
+  }
+
+  .box {
+    padding: 24px 16px;
+  }
+
+  .row button {
+    flex: 1 1 140px;
+  }
+}

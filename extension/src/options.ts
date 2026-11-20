@@ -15,6 +15,7 @@ async function show() {
   const s = await store.get();
   paired.textContent = s ? `Paired with ${s.baseUrl}. Suggestions go to that vault's Inbox.` : "Not paired yet.";
   forget.hidden = !s;
+  document.body.dataset.paired = s ? "yes" : "no";
   if (s) url.value = s.baseUrl;
 }
 

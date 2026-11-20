@@ -5,13 +5,35 @@
     <title>Sigil</title>
     <link rel="stylesheet" href="extension.css" />
   </head>
-  <body class="popup">
-    <h1>Sigil</h1>
+  <body class="popup" data-paired="checking">
+    <div class="cipher" aria-hidden="true">
+      <span>v1.kQ3xT9mZ2LpA7cVfR8dYhN4wGsJ6uBeX1oHqK5tMyC0zWiD3aPnE9rFbU2lSgO7jIv4x</span>
+      <span>8dYhN4wGsJ6uBeX1oHqK5tMyC0zWiD3aPnE9rFbU2lSgO7jIv4xkQ3xT9mZ2LpA7cVfR.v1</span>
+      <span>C0zWiD3aPnE9rFbU2lSgO7jIv4xkQ3xT9mZ2LpA7cVfR8dYhN4wGsJ6uBeX1oHqK5tMy</span>
+    </div>
+    <header class="head">
+      <h1>Sigil</h1>
+      <span class="pair"><i></i><span class="pair-yes">Paired</span><span class="pair-no">Not paired</span><span class="pair-wait">Checking</span></span>
+    </header>
     <p id="status">Checking</p>
-    <button type="button" class="primary" data-action="selection" disabled>Save selection</button>
-    <button type="button" data-action="page" disabled>Save this page</button>
+    <div class="actions">
+      <button type="button" class="act primary" data-action="selection" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h8" /><path d="M17 15v6M14 18h6" /></svg>
+        <span class="act-text"><strong>Save selection</strong><small>The text you marked on this page</small></span>
+      </button>
+      <button type="button" class="act" data-action="page" disabled>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4V20.5H7Z" /><path d="M14 3.5v4h4M10 12h5M10 15.5h5" /></svg>
+        <span class="act-text"><strong>Save this page</strong><small>The readable text of this tab</small></span>
+      </button>
+    </div>
     <p class="note" id="result" role="status"></p>
-    <button type="button" id="options">Options</button>
+    <footer class="foot">
+      <span class="sealed">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="1.5" /><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" /></svg>
+        Encrypted in this browser
+      </span>
+      <button type="button" id="options" class="link">Options</button>
+    </footer>
     <script type="module" src="popup.js"></script>
   </body>
 </html>

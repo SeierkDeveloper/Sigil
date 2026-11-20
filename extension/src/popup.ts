@@ -20,7 +20,11 @@ async function ask(message: object): Promise<Reply> {
   }
 }
 
+/** The look of the popup follows these; they change nothing else. */
+const show = (key: "paired" | "state", value: string) => (document.body.dataset[key] = value);
+
 void ask({ type: "sigil:status" }).then((r) => {
+  show("paired", r.ok ? "yes" : "no");
   status.textContent = r.ok ? r.message : "Not paired with a vault yet. Open the options to paste an app key.";
   for (const b of buttons) b.disabled = !r.ok;
 });
@@ -30,9 +34,11 @@ for (const b of buttons) {
     const id = await tabId();
     if (id === undefined) return;
     for (const x of buttons) x.disabled = true;
+    show("state", "working");
     result.textContent = "Encrypting for your vault";
     const r = await ask({ type: b.dataset.action === "page" ? "sigil:save-page" : "sigil:save-selection", tabId: id });
     result.textContent = r.ok ? `${r.message} Review it in your vault's Inbox.` : r.error;
+    show("state", r.ok ? "sent" : "failed");
     for (const x of buttons) x.disabled = false;
   });
 }
