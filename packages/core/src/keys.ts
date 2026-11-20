@@ -34,6 +34,11 @@ export const AAD = {
   appFolderKey: (appId: string, folderId: string) => `sigil:app-folder-key:${appId}:${folderId}`,
   shareNote: (shareId: string) => `sigil:share-note:${shareId}`,
   embedding: (model: string, key: string) => `sigil:embedding:${model}:${key}`,
+  setting: (name: string) => `sigil:setting:${name}`,
+  appSelf: (appId: string) => `sigil:app-self:${appId}`,
+  askLinkOwner: (linkId: string) => `sigil:ask-link:${linkId}`,
+  askLinkApp: (appId: string, linkId: string) => `sigil:ask-link-app:${appId}:${linkId}`,
+  askIntro: (linkId: string) => `sigil:ask-intro:${linkId}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */
@@ -175,6 +180,11 @@ export function parseAppKey(key: string): AppKeyParts {
 export interface AppKeys {
   authToken: string;
   wrapKey: Uint8Array;
+}
+
+/** The key that wraps what an app needs to answer as the owner's AI self (rules, model key, ask links). */
+export async function appSelfKey(secret: Uint8Array): Promise<Uint8Array> {
+  return hkdf(secret, "sigil:wrap:self");
 }
 
 export async function appKeys(secret: Uint8Array): Promise<AppKeys> {

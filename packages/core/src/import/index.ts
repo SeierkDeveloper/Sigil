@@ -118,3 +118,8 @@ export function parseExport(fileName: string, bytes: Uint8Array): ImportResult {
 
 export { parseChatGptConversations } from "./chatgpt";
 export { parseClaudeConversations, parseClaudeProjects, parseClaudeMemories } from "./claude";
+
+export * from "./files";
+export * from "./notes";
+export * from "./google";
+export * from "./github";

@@ -5,7 +5,7 @@
 // Nothing becomes a memory without that step.
 
 import { openSealedJson, sealJson, type BoxKeyPair } from "./box";
-import { cleanTags, MAX_TITLE } from "./vault";
+import { cleanTags, MAX_TITLE, type MemorySource } from "./vault";
 
 /** How a proposal reached the inbox. */
 export type ProposalVia = "mcp" | "extension" | "sdk";
@@ -18,7 +18,16 @@ export interface ProposalDraft {
   folder?: string;
   /** For pages saved with the browser extension. */
   url?: string;
+  /**
+   * Where the text lives outside Sigil, for a change to something already
+   * imported (a note in a watched Obsidian folder). The vault offers to update
+   * the memory with the same source instead of adding a second one.
+   */
+  source?: { kind: SyncSourceKind; ref: string };
 }
+
+/** Sources that can send changes through the inbox. */
+export type SyncSourceKind = "obsidian";
 
 export interface ProposalPayload {
   v: 1;
@@ -29,6 +38,7 @@ export interface ProposalPayload {
   url: string | null;
   via: ProposalVia;
   createdAt: string;
+  source?: MemorySource | null;
 }
 
 /** A proposal as the server stores it: ids, a time and one sealed box. */
@@ -59,7 +69,15 @@ export function cleanProposal(draft: ProposalDraft, via: ProposalVia, now = new 
     }
   }
   const folder = draft.folder?.trim().slice(0, 120) || null;
-  return { v: 1, title: title || body.slice(0, 80), body, tags: cleanTags(draft.tags), folder, url, via, createdAt: now };
+  const source = cleanSyncSource(draft.source);
+  return { v: 1, title: title || body.slice(0, 80), body, tags: cleanTags(draft.tags), folder, url, via, createdAt: now, ...(source ? { source } : {}) };
+}
+
+function cleanSyncSource(s: unknown): MemorySource | null {
+  if (!s || typeof s !== "object") return null;
+  const { kind, ref } = s as { kind?: unknown; ref?: unknown };
+  if (kind !== "obsidian" || typeof ref !== "string" || !ref.trim()) return null;
+  return { kind, ref: ref.trim().slice(0, 1000) };
 }
 
 /** Seals a proposal for the vault. Runs where the app runs: the connector, the extension or the SDK. */
@@ -79,6 +97,7 @@ export function openProposal(pair: BoxKeyPair, stored: Pick<StoredProposal, "id"
     url: typeof p.url === "string" ? p.url : null,
     via: p.via === "extension" || p.via === "sdk" ? p.via : "mcp",
     createdAt: typeof p.createdAt === "string" ? p.createdAt : new Date(0).toISOString(),
+    source: cleanSyncSource(p.source),
   };
 }
 
