@@ -16,7 +16,16 @@ import { formatDate, formatDateTime, plural } from "@/lib/format";
 import * as selfOps from "../selfOps";
 import type { AskLinkView } from "../ops";
 import { errorText, useVault } from "../context";
-import { CopyButton, Empty, Notice } from "../ui";
+import { ChatGptIcon, ClaudeIcon, DeviceIcon } from "@/components/icons";
+import { AppMark } from "../marks";
+import { Band, CopyButton, Empty, Notice, PlateHead, Quiet } from "../ui";
+
+const STATE_WORD: Record<ReturnType<typeof useVault>["agent"]["state"], string> = {
+  serving: "Answering",
+  "no-model": "No key",
+  failed: "Stopped",
+  off: "At rest",
+};
 
 /** Your AI self: the model key, the rules, a test chat, the apps that may answer as it, and links. */
 export function SelfTab() {
@@ -30,8 +39,10 @@ export function SelfTab() {
           your own model with your own key. Sigil&apos;s server never sees your memories, your rules or your key.
         </p>
       </div>
-      <p className="small self-status" data-state={agent.state}>
-        {agentLine(agent, data.model !== null)}
+      <p className="self-status" data-state={agent.state}>
+        <span className="self-status-lamp" aria-hidden="true" />
+        <span className="self-status-word">{STATE_WORD[agent.state]}</span>
+        <span className="self-status-line">{agentLine(agent, data.model !== null)}</span>
       </p>
       <ModelSection />
       <RulesSection />
@@ -105,26 +116,37 @@ function ModelSection() {
   };
 
   return (
-    <section className="subpanel" aria-labelledby="self-model">
-      <h3 id="self-model" className="settings-heading">
-        Model
-      </h3>
+    <section className="subpanel plate" aria-labelledby="self-model">
+      <PlateHead number="01" id="self-model" title="Model" lead="The model that writes the answers, called with your own key.">
+        <span className="plate-state" data-on={data.model ? "true" : "false"}>
+          {data.model ? "Key saved" : "No key yet"}
+        </span>
+      </PlateHead>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {note ? <Notice kind="success">{note}</Notice> : null}
       {data.model && !editing ? (
-        <div className="row self-model">
-          <p className="small">
-            {PROVIDER_NAMES[data.model.provider]}, <span className="mono">{data.model.model}</span>, key <span className="mono">{maskKey(data.model.apiKey)}</span>
-          </p>
-          <div className="row">
-            <button type="button" className="button button-small" onClick={() => setEditing(true)}>
-              Change
-            </button>
-            <button type="button" className="button button-small button-ghost" onClick={() => void remove()} disabled={busy}>
-              Remove
-            </button>
+        <>
+          <div className="self-model">
+            <span className="mark" aria-hidden="true">
+              {data.model.provider === "openai" ? <ChatGptIcon /> : <ClaudeIcon />}
+            </span>
+            <p className="self-model-line">
+              {PROVIDER_NAMES[data.model.provider]}, <span className="mono">{data.model.model}</span>, key <span className="mono">{maskKey(data.model.apiKey)}</span>
+            </p>
+            <div className="self-model-actions">
+              <button type="button" className="button button-small" onClick={() => setEditing(true)}>
+                Change
+              </button>
+              <button type="button" className="button button-small button-ghost" onClick={() => void remove()} disabled={busy}>
+                Remove
+              </button>
+            </div>
           </div>
-        </div>
+          <p className="device-line">
+            <DeviceIcon />
+            <span>Encrypted in this browser with your vault key. Answers are requested straight from the provider and billed to this key.</span>
+          </p>
+        </>
       ) : (
         <form onSubmit={save} aria-label="Model key">
           <div className="grid grid-2">
@@ -271,82 +293,93 @@ function RulesSection() {
   };
 
   return (
-    <form className="subpanel self-rules" onSubmit={save} aria-label="Rules">
-      <h3 className="settings-heading">Rules</h3>
-      <p className="small muted">They apply to the test chat below and to apps that answer as you. Each link keeps its own copy, set when you make it.</p>
+    <form className="subpanel plate self-rules" onSubmit={save} aria-label="Rules">
+      <PlateHead number="02" title="Rules" lead="They apply to the test chat below and to apps that answer as you. Each link keeps its own copy, set when you make it.">
+        <span className="plate-state" data-on={data.self ? "true" : "false"}>
+          {data.self ? "Saved" : "Not saved yet"}
+        </span>
+      </PlateHead>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {saved ? <Notice kind="success">{saved}</Notice> : null}
-      <div className="field">
-        <label className="field-label" htmlFor="rule-name">
-          Name it uses
-        </label>
-        <input id="rule-name" className="input" value={draft.name} maxLength={80} onChange={(e) => set("name", e.target.value)} />
-      </div>
-      <div className="field">
-        <span className="field-label">Folders it may use</span>
-        <FolderChoice id="rule-folder" legend="Folders it may use" selected={draft.folderIds} onChange={(v) => set("folderIds", v)} />
-        <span className="field-hint">Nothing outside these folders is ever given to the model. With the Self card folder, it also knows your Self card.</span>
-      </div>
-      <div className="grid grid-2">
+      <Band label="Who it is" hint="The name it answers under and how it sounds.">
         <div className="field">
-          <label className="field-label" htmlFor="rule-allow">
-            Topics it may talk about
+          <label className="field-label" htmlFor="rule-name">
+            Name it uses
           </label>
-          <textarea id="rule-allow" className="textarea" rows={3} value={draft.allowTopics} onChange={(e) => set("allowTopics", e.target.value)} />
-          <span className="field-hint">Separated by commas. Leave empty for any topic not listed next to it.</span>
+          <input id="rule-name" className="input" value={draft.name} maxLength={80} onChange={(e) => set("name", e.target.value)} />
         </div>
         <div className="field">
-          <label className="field-label" htmlFor="rule-deny">
-            Topics it never talks about
+          <label className="field-label" htmlFor="rule-tone">
+            Tone
           </label>
-          <textarea id="rule-deny" className="textarea" rows={3} value={draft.denyTopics} onChange={(e) => set("denyTopics", e.target.value)} />
-          <span className="field-hint">A question about one of these is refused before your model is asked.</span>
+          <input id="rule-tone" className="input" value={draft.tone} maxLength={600} onChange={(e) => set("tone", e.target.value)} />
         </div>
-      </div>
-      <div className="field">
-        <label className="field-label" htmlFor="rule-never">
-          Things it must never say
-        </label>
-        <textarea id="rule-never" className="textarea" rows={3} value={draft.neverSay} onChange={(e) => set("neverSay", e.target.value)} />
-        <span className="field-hint">One per line. An answer that contains one is replaced by a refusal on the device, before anyone sees it.</span>
-      </div>
-      <div className="field">
-        <label className="field-label" htmlFor="rule-tone">
-          Tone
-        </label>
-        <input id="rule-tone" className="input" value={draft.tone} maxLength={600} onChange={(e) => set("tone", e.target.value)} />
-      </div>
-      <div className="grid grid-2">
+      </Band>
+      <Band label="What it may read" hint="Nothing outside these folders is ever given to the model.">
         <div className="field">
-          <label className="field-label" htmlFor="rule-unknown">
-            When it does not know
-          </label>
-          <select id="rule-unknown" className="select" value={draft.unknown} onChange={(e) => set("unknown", e.target.value as SelfRules["unknown"])}>
-            <option value="say">It says so</option>
-            <option value="redirect">It says where to ask instead</option>
-          </select>
+          <span className="field-label">Folders it may use</span>
+          <FolderChoice id="rule-folder" legend="Folders it may use" selected={draft.folderIds} onChange={(v) => set("folderIds", v)} />
+          <span className="field-hint">With the Self card folder, it also knows your Self card.</span>
         </div>
-        <div className="field">
+        <div className="field field-short">
           <label className="field-label" htmlFor="rule-sources">
             Memories it may read per answer
           </label>
           <input id="rule-sources" className="input" type="number" min={1} max={12} value={draft.maxSources} onChange={(e) => set("maxSources", Number(e.target.value) || 1)} />
         </div>
-      </div>
-      <div className="field">
-        <label className="field-label" htmlFor="rule-unknown-text">
-          What it says then
-        </label>
-        <input
-          id="rule-unknown-text"
-          className="input"
-          value={draft.unknownText}
-          maxLength={400}
-          onChange={(e) => set("unknownText", e.target.value)}
-          placeholder={draft.unknown === "redirect" ? "I don't know. Ask me directly by email." : undefined}
-        />
-      </div>
-      <div className="form-actions">
+      </Band>
+      <Band label="What it may say" hint="Checked on your device, before your model is asked and before anyone sees an answer.">
+        <div className="grid grid-2">
+          <div className="field">
+            <label className="field-label" htmlFor="rule-allow">
+              Topics it may talk about
+            </label>
+            <textarea id="rule-allow" className="textarea" rows={3} value={draft.allowTopics} onChange={(e) => set("allowTopics", e.target.value)} />
+            <span className="field-hint">Separated by commas. Leave empty for any topic not listed next to it.</span>
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="rule-deny">
+              Topics it never talks about
+            </label>
+            <textarea id="rule-deny" className="textarea" rows={3} value={draft.denyTopics} onChange={(e) => set("denyTopics", e.target.value)} />
+            <span className="field-hint">A question about one of these is refused before your model is asked.</span>
+          </div>
+        </div>
+        <div className="field">
+          <label className="field-label" htmlFor="rule-never">
+            Things it must never say
+          </label>
+          <textarea id="rule-never" className="textarea" rows={3} value={draft.neverSay} onChange={(e) => set("neverSay", e.target.value)} />
+          <span className="field-hint">One per line. An answer that contains one is replaced by a refusal on the device, before anyone sees it.</span>
+        </div>
+      </Band>
+      <Band label="When it does not know" hint="What it answers when its folders hold nothing on the question.">
+        <div className="grid grid-2">
+          <div className="field">
+            <label className="field-label" htmlFor="rule-unknown">
+              When it does not know
+            </label>
+            <select id="rule-unknown" className="select" value={draft.unknown} onChange={(e) => set("unknown", e.target.value as SelfRules["unknown"])}>
+              <option value="say">It says so</option>
+              <option value="redirect">It says where to ask instead</option>
+            </select>
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="rule-unknown-text">
+              What it says then
+            </label>
+            <input
+              id="rule-unknown-text"
+              className="input"
+              value={draft.unknownText}
+              maxLength={400}
+              onChange={(e) => set("unknownText", e.target.value)}
+              placeholder={draft.unknown === "redirect" ? "I don't know. Ask me directly by email." : undefined}
+            />
+          </div>
+        </div>
+      </Band>
+      <div className="form-actions plate-actions">
         <button type="submit" className="button button-primary" disabled={busy}>
           {busy ? "Saving" : "Save rules"}
         </button>
@@ -402,29 +435,34 @@ function TestChat() {
   };
 
   return (
-    <section className="subpanel self-chat" aria-labelledby="self-chat">
-      <h3 id="self-chat" className="settings-heading">
-        Test chat
-      </h3>
-      <p className="small muted">Ask what others would ask. It answers exactly as it would for them, and shows you the memories it used. Nothing here is logged or sent to Sigil.</p>
+    <section className="subpanel plate self-chat" aria-labelledby="self-chat">
+      <PlateHead
+        number="03"
+        id="self-chat"
+        title="Test chat"
+        lead="Ask what others would ask. It answers exactly as it would for them, and shows you the memories it used. Nothing here is logged or sent to Sigil."
+      />
       {!ready ? (
         <Notice>{!data.model ? "Add your model key above to try it." : "Save rules with at least one folder to try it."}</Notice>
       ) : (
         <>
-          {turns.length ? (
+          {turns.length || busy ? (
             <ol className="chat" aria-label="Conversation">
               {turns.map((t, i) => (
                 <li key={i} className="chat-turn" data-testid="chat-turn">
                   <p className="chat-question">{t.question}</p>
-                  <div className="chat-answer">
+                  <div className="chat-answer" data-refused={t.answer.refused ? "true" : "false"}>
+                    <p className="chat-by">
+                      <span className="chat-by-name">{data.self?.name || "Your AI self"}</span>
+                    </p>
                     <p>{t.answer.text}</p>
-                    {t.answer.refused ? <span className="chip">{REFUSED[t.answer.refused] ?? "Declined"}</span> : null}
+                    {t.answer.refused ? <p className="chat-refused">{REFUSED[t.answer.refused] ?? "Declined"}</p> : null}
                     {t.answer.citations.length ? (
-                      <p className="chat-sources small">
-                        Used{" "}
+                      <p className="chat-sources">
+                        <span className="chat-sources-label">Used</span>
                         {t.answer.citations.map((c, j) => (
-                          <span key={c.id}>
-                            {j ? ", " : ""}[{j + 1}]{" "}
+                          <span key={c.id} className="chat-source">
+                            <span className="chat-source-n">[{j + 1}]</span>{" "}
                             <button type="button" className="text-button" onClick={() => openMemory(c.id)}>
                               {c.title}
                             </button>{" "}
@@ -436,8 +474,23 @@ function TestChat() {
                   </div>
                 </li>
               ))}
+              {busy ? (
+                <li className="chat-turn" data-status="waiting">
+                  <p className="chat-question">{question.trim()}</p>
+                  <div className="chat-answer">
+                    <p className="chat-by">
+                      <span className="chat-by-name">{data.self?.name || "Your AI self"}</span>
+                    </p>
+                    <p className="faint chat-waiting">
+                      <span className="spinner" aria-hidden="true" /> Thinking
+                    </p>
+                  </div>
+                </li>
+              ) : null}
             </ol>
-          ) : null}
+          ) : (
+            <Quiet>Nothing asked yet. Try a question someone else would ask.</Quiet>
+          )}
           {error ? <Notice kind="error">{error}</Notice> : null}
           <form className="chat-form" onSubmit={ask} aria-label="Ask your AI self">
             <label className="visually-hidden" htmlFor="chat-question">
@@ -459,6 +512,9 @@ function TestChat() {
               }}
             />
             <div className="form-actions">
+              <span className="chat-keys" aria-hidden="true">
+                Enter to ask, Shift and Enter for a new line
+              </span>
               <button type="submit" className="button button-primary" disabled={busy || !question.trim()}>
                 {busy ? "Thinking" : "Ask"}
               </button>
@@ -498,27 +554,33 @@ function AppsSection() {
   };
 
   return (
-    <section className="subpanel" aria-labelledby="self-apps">
-      <h3 id="self-apps" className="settings-heading">
-        Apps that answer as you
-      </h3>
-      <p className="small muted">
-        An app you allow can use the ask_self tool in its connector, and answer the links you give it while the connector runs with --self. Your rules and model key
-        are encrypted for that app&apos;s key only. It reads memories through its own folders, so a folder must be both in the rules and given to the app.
-      </p>
+    <section className="subpanel plate" aria-labelledby="self-apps">
+      <PlateHead
+        number="04"
+        id="self-apps"
+        title="Apps that answer as you"
+        lead={
+          <>
+            An app you allow can use the <span className="mono">ask_self</span> tool in its connector, and answer the links you give it while the connector runs with{" "}
+            <span className="mono">--self</span>. Your rules and model key are encrypted for that app&apos;s key only. It reads memories through its own folders, so a
+            folder must be both in the rules and given to the app.
+          </>
+        }
+      />
       {error ? <Notice kind="error">{error}</Notice> : null}
       {apps.length === 0 ? (
-        <p className="small">
+        <Quiet>
           No connector app yet.{" "}
           <button type="button" className="text-button" onClick={() => goTo("apps")}>
             Connect one under Apps
           </button>
           .
-        </p>
+        </Quiet>
       ) : (
-        <ul className="list">
+        <ul className="list self-apps">
           {apps.map((a) => (
-            <li key={a.id} className="list-row">
+            <li key={a.id} className="list-row" data-on={a.canAskSelf ? "true" : "false"}>
+              <AppMark kind={a.kind} />
               <div className="list-row-main">
                 <p className="list-row-title">{a.name}</p>
                 <p className="list-row-meta">{a.canAskSelf ? "May answer as your AI self." : "Does not answer as your AI self."}</p>
@@ -589,22 +651,25 @@ function LinksSection() {
   };
 
   return (
-    <section className="subpanel self-links" aria-labelledby="self-links">
-      <div className="row self-links-head">
-        <h3 id="self-links" className="settings-heading">
-          Ask links
-        </h3>
+    <section className="subpanel plate self-links" aria-labelledby="self-links">
+      <PlateHead
+        number="05"
+        id="self-links"
+        title="Ask links"
+        lead={
+          <>
+            Anyone with a link can ask your AI self questions within that link&apos;s rules, until it expires or runs out. Questions and answers travel end to end
+            encrypted between their browser and the place that answers: this vault while it is open, or the connector of an app you choose. When neither is running,
+            the link says your AI self is offline. Every question and answer is written, sealed, to your read log.
+          </>
+        }
+      >
         {!creating ? (
           <button type="button" className="button button-small" onClick={() => setCreating(true)} disabled={!data.self}>
             New link
           </button>
         ) : null}
-      </div>
-      <p className="small muted">
-        Anyone with a link can ask your AI self questions within that link&apos;s rules, until it expires or runs out. Questions and answers travel end to end
-        encrypted between their browser and the place that answers: this vault while it is open, or the connector of an app you choose. When neither is running,
-        the link says your AI self is offline. Every question and answer is written, sealed, to your read log.
-      </p>
+      </PlateHead>
       {!data.self ? <Notice>Save your rules first. A new link starts from them.</Notice> : null}
       {error ? <Notice kind="error">{error}</Notice> : null}
       {creating && data.self ? (
@@ -622,7 +687,14 @@ function LinksSection() {
         <div className="app-key-panel link-made" data-testid="link-made">
           <p className="panel-title">Your link is ready</p>
           <p className="app-key mono" data-testid="ask-url">
-            {made.url}
+            {made.url.includes("#") ? (
+              <>
+                <span className="link-made-address">{made.url.slice(0, made.url.indexOf("#"))}</span>
+                <span className="link-made-key">{made.url.slice(made.url.indexOf("#"))}</span>
+              </>
+            ) : (
+              made.url
+            )}
           </p>
           <p className="small muted">The part after # holds the key that protects the conversation. Browsers never send it to the server, so share the whole link.</p>
           <div className="row">
@@ -636,32 +708,64 @@ function LinksSection() {
       {data.askLinks.length === 0 ? (
         !creating && data.self ? <Empty title="No links yet">Make one to let someone ask your AI self.</Empty> : null
       ) : (
-        <ul className="list link-list">
+        <ul className="link-list">
           {data.askLinks.map((l) => {
             const st = linkState(l);
             const url = selfOps.linkUrl(origin, l);
             const answeredBy = l.appId ? `${appName.get(l.appId) ?? "A removed app"}, through its connector` : "This vault, while it is open";
             const here = !l.appId && st.active && agent.state === "serving";
             return (
-              <li key={l.id} className="list-row link-row" data-state={st.active ? "active" : "inactive"} data-testid="link-row">
-                <div className="list-row-main">
-                  <p className="list-row-title">
-                    {l.label} <span className="badge">{st.label}</span>
-                    {st.active ? <span className={l.online || here ? "chip chip-strong" : "chip"}>{l.online || here ? "Online" : "Offline"}</span> : null}
-                  </p>
-                  <p className="list-row-meta">
-                    Asked {l.uses} of {l.maxUses} times, {plural(l.answered, "answer")}
-                    {l.lastAskedAt ? `, last on ${formatDateTime(l.lastAskedAt)}` : ""}. Up to {l.perHour} an hour. {st.label === "Expired" ? "Expired" : "Expires"}{" "}
-                    {formatDate(l.expiresAt)}. Answered by: {answeredBy}.
-                  </p>
-                  {l.secret ? (
-                    <p className="list-row-meta">
-                      Folders: {selfFolders(data, l.secret.rules)}
-                      {cleanRules(l.secret.rules).denyTopics.length ? `. Never: ${cleanRules(l.secret.rules).denyTopics.join(", ")}` : ""}.
-                    </p>
-                  ) : null}
+              <li key={l.id} className="link-row" data-state={st.active ? "active" : "inactive"} data-online={st.active && (l.online || here) ? "true" : "false"} data-testid="link-row">
+                <div className="link-row-head">
+                  <span className="link-row-lamp" aria-hidden="true" />
+                  <p className="link-row-title">{l.label}</p>
+                  <span className="badge">{st.label}</span>
+                  {st.active ? <span className={l.online || here ? "chip chip-strong" : "chip"}>{l.online || here ? "Online" : "Offline"}</span> : null}
                 </div>
-                <div className="list-row-actions">
+                <div className="link-meter" aria-hidden="true">
+                  <span style={{ width: `${Math.min(100, Math.round((l.uses / Math.max(1, l.maxUses)) * 100))}%` }} />
+                </div>
+                <dl className="link-facts">
+                  <div>
+                    <dt>Asked</dt>
+                    <dd>
+                      {l.uses} of {l.maxUses} times
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Answered</dt>
+                    <dd>{plural(l.answered, "answer")}</dd>
+                  </div>
+                  <div>
+                    <dt>Pace</dt>
+                    <dd>Up to {l.perHour} an hour</dd>
+                  </div>
+                  <div>
+                    <dt>{st.label === "Expired" ? "Expired" : "Expires"}</dt>
+                    <dd>{formatDate(l.expiresAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Last asked</dt>
+                    <dd>{l.lastAskedAt ? formatDateTime(l.lastAskedAt) : "Not yet"}</dd>
+                  </div>
+                  <div>
+                    <dt>Answered by</dt>
+                    <dd>{answeredBy}</dd>
+                  </div>
+                  {l.secret ? (
+                    <div>
+                      <dt>Folders</dt>
+                      <dd>{selfFolders(data, l.secret.rules)}</dd>
+                    </div>
+                  ) : null}
+                  {l.secret && cleanRules(l.secret.rules).denyTopics.length ? (
+                    <div>
+                      <dt>Never</dt>
+                      <dd>{cleanRules(l.secret.rules).denyTopics.join(", ")}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+                <div className="link-row-actions">
                   {st.active && url ? <CopyButton text={url} label="Copy link" /> : null}
                   {confirm === l.id ? (
                     <>
@@ -750,89 +854,98 @@ function NewLinkForm({ onCancel, onCreate }: { onCancel(): void; onCreate(input:
 
   return (
     <form className="subpanel new-link" onSubmit={submit} aria-label="New link">
+      <p className="new-link-title">A new link</p>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      <div className="grid grid-2">
-        <div className="field">
-          <label className="field-label" htmlFor="link-label">
-            Label
-          </label>
-          <input id="link-label" className="input" value={label} maxLength={80} onChange={(e) => setLabel(e.target.value)} placeholder="For the book club" />
-          <span className="field-hint">Only you see it, in this list and in your read log.</span>
+      <Band label="What they see" hint="The page they open shows the name and the greeting.">
+        <div className="grid grid-2">
+          <div className="field">
+            <label className="field-label" htmlFor="link-label">
+              Label
+            </label>
+            <input id="link-label" className="input" value={label} maxLength={80} onChange={(e) => setLabel(e.target.value)} placeholder="For the book club" />
+            <span className="field-hint">Only you see it, in this list and in your read log.</span>
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="link-name">
+              Name they see
+            </label>
+            <input id="link-name" className="input" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+          </div>
         </div>
         <div className="field">
-          <label className="field-label" htmlFor="link-name">
-            Name they see
+          <label className="field-label" htmlFor="link-greeting">
+            Greeting
           </label>
-          <input id="link-name" className="input" value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+          <input id="link-greeting" className="input" value={greeting} maxLength={400} onChange={(e) => setGreeting(e.target.value)} placeholder="Ask me about my reading." />
+          <span className="field-hint">Shown on the page, encrypted with a key that only the link holds.</span>
         </div>
-      </div>
-      <div className="field">
-        <label className="field-label" htmlFor="link-greeting">
-          Greeting
-        </label>
-        <input id="link-greeting" className="input" value={greeting} maxLength={400} onChange={(e) => setGreeting(e.target.value)} placeholder="Ask me about my reading." />
-        <span className="field-hint">Shown on the page, encrypted with a key that only the link holds.</span>
-      </div>
-      <div className="field">
-        <span className="field-label">Folders this link may use</span>
-        <FolderChoice id="link-folder" legend="Folders this link may use" selected={folders} onChange={setFolders} />
-      </div>
-      <div className="grid grid-2">
+      </Band>
+      <Band label="What it may use" hint="This link keeps its own copy of these rules.">
         <div className="field">
-          <label className="field-label" htmlFor="link-allow">
-            Topics it may talk about
-          </label>
-          <input id="link-allow" className="input" value={allow} onChange={(e) => setAllow(e.target.value)} />
+          <span className="field-label">Folders this link may use</span>
+          <FolderChoice id="link-folder" legend="Folders this link may use" selected={folders} onChange={setFolders} />
         </div>
-        <div className="field">
-          <label className="field-label" htmlFor="link-deny">
-            Topics it never talks about
-          </label>
-          <input id="link-deny" className="input" value={deny} onChange={(e) => setDeny(e.target.value)} />
+        <div className="grid grid-2">
+          <div className="field">
+            <label className="field-label" htmlFor="link-allow">
+              Topics it may talk about
+            </label>
+            <input id="link-allow" className="input" value={allow} onChange={(e) => setAllow(e.target.value)} />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="link-deny">
+              Topics it never talks about
+            </label>
+            <input id="link-deny" className="input" value={deny} onChange={(e) => setDeny(e.target.value)} />
+          </div>
         </div>
-      </div>
-      <div className="grid grid-3 link-limits">
+      </Band>
+      <Band label="Limits" hint="When the time or the total is reached, the link stops by itself.">
+        <div className="grid grid-3 link-limits">
+          <div className="field">
+            <label className="field-label" htmlFor="link-days">
+              Expires after
+            </label>
+            <select id="link-days" className="select" value={days} onChange={(e) => setDays(Number(e.target.value))}>
+              <option value={1}>1 day</option>
+              <option value={7}>7 days</option>
+              <option value={30}>30 days</option>
+              <option value={90}>90 days</option>
+            </select>
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="link-uses">
+              Questions in all
+            </label>
+            <input id="link-uses" className="input" type="number" min={1} max={1000} value={maxUses} onChange={(e) => setMaxUses(Number(e.target.value) || 1)} />
+          </div>
+          <div className="field">
+            <label className="field-label" htmlFor="link-hour">
+              Questions an hour
+            </label>
+            <input id="link-hour" className="input" type="number" min={1} max={120} value={perHour} onChange={(e) => setPerHour(Number(e.target.value) || 1)} />
+          </div>
+        </div>
+      </Band>
+      <Band label="Who answers" hint="The link is online while that place is running.">
         <div className="field">
-          <label className="field-label" htmlFor="link-days">
-            Expires after
+          <label className="field-label" htmlFor="link-by">
+            Answered by
           </label>
-          <select id="link-days" className="select" value={days} onChange={(e) => setDays(Number(e.target.value))}>
-            <option value={1}>1 day</option>
-            <option value={7}>7 days</option>
-            <option value={30}>30 days</option>
-            <option value={90}>90 days</option>
+          <select id="link-by" className="select" value={by} onChange={(e) => setBy(e.target.value)}>
+            <option value="vault">This vault, while it is open</option>
+            {answerers.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}, through its connector
+              </option>
+            ))}
           </select>
+          <span className="field-hint">
+            {by === "vault" ? "Keep this vault open in a tab for the link to be online." : "Run the connector with --self on your machine for the link to be online."}
+          </span>
         </div>
-        <div className="field">
-          <label className="field-label" htmlFor="link-uses">
-            Questions in all
-          </label>
-          <input id="link-uses" className="input" type="number" min={1} max={1000} value={maxUses} onChange={(e) => setMaxUses(Number(e.target.value) || 1)} />
-        </div>
-        <div className="field">
-          <label className="field-label" htmlFor="link-hour">
-            Questions an hour
-          </label>
-          <input id="link-hour" className="input" type="number" min={1} max={120} value={perHour} onChange={(e) => setPerHour(Number(e.target.value) || 1)} />
-        </div>
-      </div>
-      <div className="field">
-        <label className="field-label" htmlFor="link-by">
-          Answered by
-        </label>
-        <select id="link-by" className="select" value={by} onChange={(e) => setBy(e.target.value)}>
-          <option value="vault">This vault, while it is open</option>
-          {answerers.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}, through its connector
-            </option>
-          ))}
-        </select>
-        <span className="field-hint">
-          {by === "vault" ? "Keep this vault open in a tab for the link to be online." : "Run the connector with --self on your machine for the link to be online."}
-        </span>
-      </div>
-      <div className="form-actions">
+      </Band>
+      <div className="form-actions plate-actions">
         <button type="submit" className="button button-primary" disabled={busy}>
           {busy ? "Making the link" : "Make link"}
         </button>
