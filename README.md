@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/readme/banner.svg" width="100%" alt="Sigil: your AI self, owned by you, forever" />
+<img src="docs/readme/sigil-banner.svg" width="100%" alt="Sigil: your AI self, owned by you, forever" />
 
 <br/>
 
