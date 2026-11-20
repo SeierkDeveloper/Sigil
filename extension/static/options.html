@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Sigil options</title>
+    <link rel="stylesheet" href="extension.css" />
+  </head>
+  <body>
+    <div class="box">
+      <h1>Pair with your vault</h1>
+      <p>
+        In your Sigil vault, open Apps, connect a Browser extension with "May suggest memories" turned on, and paste its app key here. What you save
+        is encrypted in this browser for your vault and waits in its Inbox until you approve it.
+      </p>
+      <p id="paired" role="status"></p>
+      <form id="pair">
+        <label for="url">Address of your Sigil site</label>
+        <input id="url" type="url" placeholder="https://" required autocomplete="off" />
+        <label for="key">App key</label>
+        <input id="key" type="password" placeholder="sigil_app..." required autocomplete="off" spellcheck="false" />
+        <button type="submit" class="primary">Pair</button>
+        <button type="button" id="forget" hidden>Forget this vault</button>
+      </form>
+      <p class="note" id="note" role="status"></p>
+      <p>The app key is kept in this browser's extension storage. Anyone with access to this browser profile could use it to suggest memories, never to read them unless you gave it folders. Revoke it in your vault at any time.</p>
+    </div>
+    <script type="module" src="options.js"></script>
+  </body>
+</html>

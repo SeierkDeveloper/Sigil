@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Sigil",
+  "version": "0.1.0",
+  "description": "Save the selected text, the current page or a ChatGPT or Claude conversation to your Sigil inbox, encrypted in the browser.",
+  "permissions": ["contextMenus", "storage", "activeTab", "scripting"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Sigil", "default_popup": "popup.html" },
+  "options_page": "options.html",
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'" }
+}

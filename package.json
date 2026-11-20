@@ -3,17 +3,26 @@
   "private": true,
   "version": "0.1.0",
   "description": "Sigil: your AI self, owned by you, forever.",
-  "workspaces": ["packages/core", "connector", "web", "e2e"],
+  "workspaces": [
+    "packages/core",
+    "packages/sdk",
+    "connector",
+    "extension",
+    "web",
+    "e2e"
+  ],
   "scripts": {
     "test": "npm run test:unit && npm run test:contracts && npm run test:e2e",
-    "test:unit": "npm run test -w @sigil/core && npm run test -w @sigil/web && npm run test -w sigil-connector",
+    "test:unit": "npm run test -w @sigil/core && npm run test -w @sigil/web && npm run test -w sigil-connector && npm run test -w sigil-extension && npm run test -w @sigil/sdk",
     "test:contracts": "cd contracts && forge test",
     "test:e2e": "npm run build && npm run test -w @sigil/e2e",
-    "build": "npm run build -w sigil-connector && npm run build -w @sigil/web",
+    "build": "npm run build -w sigil-connector && npm run build -w sigil-extension && npm run build -w @sigil/sdk && npm run build -w @sigil/web",
     "dev": "npm run dev -w @sigil/web",
     "start": "npm run start -w @sigil/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint -w @sigil/web"
   },
-  "engines": { "node": ">=22.13" }
+  "engines": {
+    "node": ">=22.13"
+  }
 }

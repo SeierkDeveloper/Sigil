@@ -1,0 +1,21 @@
+{
+  "name": "sigil-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Save the selected text, the current page or a ChatGPT or Claude conversation to your Sigil inbox, encrypted in the browser.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@sigil/core": "*",
+    "@types/chrome": "^0.3.7",
+    "esbuild": "^0.28.2",
+    "happy-dom": "^21.0.4",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}
