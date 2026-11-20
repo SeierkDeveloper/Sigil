@@ -32,10 +32,11 @@ test("the header menus open and lead to every page", async ({ page }) => {
 test("every page in the menu answers with its own heading and no broken layout", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  expect(pages.length).toBe(17);
+  expect(pages.length).toBe(21);
   for (const item of pages) {
     const res = await page.goto(item.href);
-    expect(res?.status(), item.href).toBe(200);
+    // A link to another part of the page already open loads nothing new, so the address is asked for directly.
+    expect(res ? res.status() : (await page.request.get(item.href)).status(), item.href).toBe(200);
     if (item.href !== "/vault") await expect(page.locator("h1"), item.href).toHaveCount(1);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, `${item.href} scrolls sideways`).toBeLessThanOrEqual(0);

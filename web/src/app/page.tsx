@@ -4,7 +4,21 @@ import { CodeBlock } from "@/components/CodeBlock";
 import { HeroVisual } from "@/components/hero/HeroVisual";
 import { LatestSeal } from "@/components/live/LatestSeal";
 import { LiveStats } from "@/components/live/LiveStats";
-import { ArrowIcon, BookIcon, CheckIcon, ClaudeIcon, CodeIcon, EyeIcon, GitHubIcon, LockIcon, SealIcon } from "@/components/icons";
+import {
+  ArrowIcon,
+  BookIcon,
+  CheckIcon,
+  ClaudeIcon,
+  CodeIcon,
+  ExtensionIcon,
+  EyeIcon,
+  FolderIcon,
+  GitHubIcon,
+  GlobeIcon,
+  LockIcon,
+  SealIcon,
+  ShareIcon,
+} from "@/components/icons";
 import { cipherText } from "@/lib/cipher";
 import { EXAMPLE_KEY, mcpConfig } from "@/lib/connector";
 
@@ -38,6 +52,37 @@ const importSteps = [
   { label: "Sorted", text: "Every conversation becomes one memory, dated, in a folder of its own." },
   { label: "Encrypted", text: "Each memory is locked with its folder's key before anything is stored." },
   { label: "Yours", text: "Search it, edit it, and decide which app may read which folder." },
+];
+
+const smart = [
+  { title: "An inbox you approve", text: "Apps you allow suggest memories. Each waits, sealed for your vault, until you keep it, merge it or reject it." },
+  { title: "Search by meaning", text: "Ask for your car and find the note about the automobile. The model runs in your browser; the question never leaves it." },
+  { title: "A timeline and no doubles", text: "Every memory by the day it was written and where it came from, and duplicates found for you to merge." },
+  { title: "A Self card", text: "A short card on who you are and how you like answers, which connected apps are asked to read first." },
+];
+
+const ways = [
+  {
+    icon: ExtensionIcon,
+    title: "Save from the browser",
+    text: "The extension sends a selection, a page, or a ChatGPT or Claude conversation to your inbox. It is encrypted in the browser, for your vault only.",
+    href: "/docs#extension",
+    link: "The browser extension",
+  },
+  {
+    icon: GlobeIcon,
+    title: "Sign in with Sigil",
+    text: "A web app asks, you tick the folders it may read in a window on this site, and it gets a key of its own. Revoke it like any other app.",
+    href: "/docs#sign-in-with-sigil",
+    link: "For web apps",
+  },
+  {
+    icon: ShareIcon,
+    title: "Share a folder with another vault",
+    text: "Swap a vault code, compare its fingerprint, and they can read that one folder. Stop sharing and the folder gets a new key.",
+    href: "/docs#sharing",
+    link: "How sharing works",
+  },
 ];
 
 // One record, as its owner sees it and as the server holds it.
@@ -278,6 +323,99 @@ export default function Home() {
                 Where to find the export
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container split">
+          <div>
+            <p className="eyebrow">Smart memory</p>
+            <h2 className="section-title">A memory that grows, with you at the door</h2>
+            <p className="section-lead">
+              Your apps can add to what they know about you, but only through your inbox. Everything that sorts and searches the vault runs on your
+              own device, on text the server never sees.
+            </p>
+            <ul className="smart-list">
+              {smart.map((f) => (
+                <li key={f.title}>
+                  <strong>{f.title}</strong>
+                  <span>{f.text}</span>
+                </li>
+              ))}
+            </ul>
+            <Link href="/docs#inbox" className="arrow-link split-link">
+              How the inbox works <ArrowIcon />
+            </Link>
+          </div>
+          <div className="inbox-preview" aria-label="Example of a suggestion waiting in the inbox">
+            <div className="inbox-preview-card">
+              <div className="inbox-preview-head">
+                <span className="mark" aria-hidden="true">
+                  <ClaudeIcon />
+                </span>
+                <p>
+                  <strong>Claude Desktop</strong>
+                  <span>through the connector</span>
+                </p>
+                <span className="badge">
+                  <LockIcon /> Sealed for you
+                </span>
+              </div>
+              <p className="inbox-preview-title">Prefers metric units</p>
+              <p className="inbox-preview-body">Asked twice for kilometres and Celsius instead of miles and Fahrenheit. Wants this in every answer.</p>
+              <ul className="inbox-preview-facts">
+                <li>
+                  <FolderIcon />
+                  <span>Suggested folder</span>
+                  <strong>Writing</strong>
+                </li>
+                <li>
+                  <i aria-hidden="true" />
+                  <span>In your vault</span>
+                  <strong>Something close</strong>
+                </li>
+              </ul>
+              <div className="inbox-preview-actions" aria-hidden="true">
+                <span data-kind="approve">Approve</span>
+                <span>Merge</span>
+                <span>Reject</span>
+              </div>
+              <div className="inbox-preview-stamp" aria-hidden="true">
+                <span>
+                  <CheckIcon />
+                </span>
+                Approved
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
+        <div className="container">
+          <div className="section-header">
+            <p className="eyebrow">Ways in and out</p>
+            <h2 className="section-title">Beyond the connector</h2>
+            <p className="section-lead">
+              Three more ways to reach a vault. Each one is granted by you, shows in your read log where it reads, and can be taken back.
+            </p>
+          </div>
+          <div className="grid grid-3">
+            {ways.map(({ icon: Icon, title, text, href, link }) => (
+              <article key={title} className="card">
+                <span className="card-icon">
+                  <Icon />
+                </span>
+                <h3 className="card-title">{title}</h3>
+                <p className="card-text">{text}</p>
+                <p className="card-link">
+                  <Link href={href} className="arrow-link">
+                    {link} <ArrowIcon />
+                  </Link>
+                </p>
+              </article>
+            ))}
           </div>
         </div>
       </section>

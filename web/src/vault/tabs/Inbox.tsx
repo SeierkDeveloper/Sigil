@@ -217,20 +217,6 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
               </span>
             ) : null}
           </div>
-          {p ? (
-            <ul className="proposal-facts" aria-label="About this suggestion">
-              <li className="proposal-fact">
-                <FolderIcon />
-                <span className="proposal-fact-label">Suggested folder</span>
-                <span className="proposal-fact-value">{folderHint ?? "None"}</span>
-              </li>
-              <li className="proposal-fact" data-kind={close ? close.how : "new"}>
-                <span className="proposal-fact-diamond" aria-hidden="true" />
-                <span className="proposal-fact-label">In your vault</span>
-                <span className="proposal-fact-value">{close ? (close.how === "same" ? "Already there" : "Something close") : "No copy found"}</span>
-              </li>
-            </ul>
-          ) : null}
           {error ? <Notice kind="error">{error}</Notice> : null}
 
           {!p ? (
@@ -243,90 +229,106 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
               </div>
             </>
           ) : (
-            <>
-              {close ? (
-                <Notice>
-                  {close.how === "same" ? "This is already in your vault as " : "This looks close to "}
-                  <strong>&quot;{close.memory.title}&quot;</strong>. You can merge it in instead of keeping two.
-                </Notice>
-              ) : null}
-              <div className="field">
-                <label className="field-label" htmlFor={`p-title-${proposal.id}`}>
-                  Title
-                </label>
-                <input id={`p-title-${proposal.id}`} className="input" value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor={`p-body-${proposal.id}`}>
-                  Memory
-                </label>
-                <textarea id={`p-body-${proposal.id}`} className="textarea" rows={Math.min(14, Math.max(4, body.split("\n").length + 1))} value={body} onChange={(e) => setBody(e.target.value)} />
-              </div>
-              <div className="field">
-                <label className="field-label" htmlFor={`p-tags-${proposal.id}`}>
-                  Tags
-                </label>
-                <input id={`p-tags-${proposal.id}`} className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Separated by commas" />
-              </div>
-
-              <div className="segmented proposal-mode" role="group" aria-label="What to do with it">
-                <button type="button" aria-pressed={mode === "new"} onClick={() => setMode("new")}>
-                  Keep as a new memory
-                </button>
-                <button type="button" aria-pressed={mode === "merge"} onClick={() => setMode("merge")}>
-                  Merge into a memory
-                </button>
-              </div>
-
-              {mode === "new" ? (
+            <div className="proposal-body">
+              <div className="proposal-main">
                 <div className="field">
-                  <label className="field-label" htmlFor={`p-folder-${proposal.id}`}>
-                    Folder
+                  <label className="field-label" htmlFor={`p-title-${proposal.id}`}>
+                    Title
                   </label>
-                  <select id={`p-folder-${proposal.id}`} className="select" value={folderId} onChange={(e) => setFolderId(e.target.value)}>
-                    {p.folder && !suggested ? <option value={NEW_FOLDER}>New folder: {p.folder}</option> : null}
-                    {writable.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                        {suggested?.id === f.id ? " (suggested)" : ""}
-                      </option>
-                    ))}
-                  </select>
+                  <input id={`p-title-${proposal.id}`} className="input" value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} />
                 </div>
-              ) : (
                 <div className="field">
-                  <label className="field-label" htmlFor={`p-merge-${proposal.id}`}>
-                    Find the memory
+                  <label className="field-label" htmlFor={`p-body-${proposal.id}`}>
+                    Memory
                   </label>
-                  <input id={`p-merge-${proposal.id}`} className="input" type="search" value={mergeQuery} onChange={(e) => setMergeQuery(e.target.value)} placeholder="Search your memories" />
-                  <fieldset className="checkbox-list merge-targets">
-                    <legend className="visually-hidden">Memory to merge into</legend>
-                    {[...(targetMemory && !candidates.some((c) => c.id === targetMemory.id) ? [targetMemory] : []), ...candidates].map((m) => (
-                      <label key={m.id} className="checkbox">
-                        <input type="radio" name={`merge-${proposal.id}`} checked={target === m.id} onChange={() => setMergeInto(m.id)} />
-                        <span>{m.title}</span>
-                      </label>
-                    ))}
-                  </fieldset>
-                  <span className="field-hint">The text is added to the end of that memory under today&apos;s date, and the tags are joined.</span>
+                  <textarea id={`p-body-${proposal.id}`} className="textarea" rows={Math.min(14, Math.max(4, body.split("\n").length + 1))} value={body} onChange={(e) => setBody(e.target.value)} />
                 </div>
-              )}
+                <div className="field">
+                  <label className="field-label" htmlFor={`p-tags-${proposal.id}`}>
+                    Tags
+                  </label>
+                  <input id={`p-tags-${proposal.id}`} className="input" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="Separated by commas" />
+                </div>
 
-              <div className="form-actions">
+              </div>
+              <div className="proposal-side">
+                <ul className="proposal-facts" aria-label="About this suggestion">
+                  <li className="proposal-fact">
+                    <FolderIcon />
+                    <span className="proposal-fact-label">Suggested folder</span>
+                    <span className="proposal-fact-value">{folderHint ?? "None"}</span>
+                  </li>
+                  <li className="proposal-fact" data-kind={close ? close.how : "new"}>
+                    <span className="proposal-fact-diamond" aria-hidden="true" />
+                    <span className="proposal-fact-label">In your vault</span>
+                    <span className="proposal-fact-value">{close ? (close.how === "same" ? "Already there" : "Something close") : "No copy found"}</span>
+                  </li>
+                </ul>
+                {close ? (
+                  <Notice>
+                    {close.how === "same" ? "This is already in your vault as " : "This looks close to "}
+                    <strong>&quot;{close.memory.title}&quot;</strong>. You can merge it in instead of keeping two.
+                  </Notice>
+                ) : null}
+                <div className="segmented proposal-mode" role="group" aria-label="What to do with it">
+                  <button type="button" aria-pressed={mode === "new"} onClick={() => setMode("new")}>
+                    Keep as a new memory
+                  </button>
+                  <button type="button" aria-pressed={mode === "merge"} onClick={() => setMode("merge")}>
+                    Merge into a memory
+                  </button>
+                </div>
+
                 {mode === "new" ? (
-                  <button type="button" className="button button-primary" onClick={approve} disabled={!!busy || !title.trim() || !folderId}>
-                    {busy === "approve" ? "Saving" : "Approve"}
-                  </button>
+                  <div className="field">
+                    <label className="field-label" htmlFor={`p-folder-${proposal.id}`}>
+                      Folder
+                    </label>
+                    <select id={`p-folder-${proposal.id}`} className="select" value={folderId} onChange={(e) => setFolderId(e.target.value)}>
+                      {p.folder && !suggested ? <option value={NEW_FOLDER}>New folder: {p.folder}</option> : null}
+                      {writable.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                          {suggested?.id === f.id ? " (suggested)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 ) : (
-                  <button type="button" className="button button-primary" onClick={merge} disabled={!!busy || !targetMemory}>
-                    {busy === "merge" ? "Merging" : "Merge"}
-                  </button>
+                  <div className="field">
+                    <label className="field-label" htmlFor={`p-merge-${proposal.id}`}>
+                      Find the memory
+                    </label>
+                    <input id={`p-merge-${proposal.id}`} className="input" type="search" value={mergeQuery} onChange={(e) => setMergeQuery(e.target.value)} placeholder="Search your memories" />
+                    <fieldset className="checkbox-list merge-targets">
+                      <legend className="visually-hidden">Memory to merge into</legend>
+                      {[...(targetMemory && !candidates.some((c) => c.id === targetMemory.id) ? [targetMemory] : []), ...candidates].map((m) => (
+                        <label key={m.id} className="checkbox">
+                          <input type="radio" name={`merge-${proposal.id}`} checked={target === m.id} onChange={() => setMergeInto(m.id)} />
+                          <span>{m.title}</span>
+                        </label>
+                      ))}
+                    </fieldset>
+                    <span className="field-hint">The text is added to the end of that memory under today&apos;s date, and the tags are joined.</span>
+                  </div>
                 )}
-                <button type="button" className="button button-ghost" onClick={reject} disabled={!!busy}>
-                  {busy === "reject" ? "Rejecting" : "Reject"}
-                </button>
+
+                <div className="form-actions">
+                  {mode === "new" ? (
+                    <button type="button" className="button button-primary" onClick={approve} disabled={!!busy || !title.trim() || !folderId}>
+                      {busy === "approve" ? "Saving" : "Approve"}
+                    </button>
+                  ) : (
+                    <button type="button" className="button button-primary" onClick={merge} disabled={!!busy || !targetMemory}>
+                      {busy === "merge" ? "Merging" : "Merge"}
+                    </button>
+                  )}
+                  <button type="button" className="button button-ghost" onClick={reject} disabled={!!busy}>
+                    {busy === "reject" ? "Rejecting" : "Reject"}
+                  </button>
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
