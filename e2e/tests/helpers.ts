@@ -6,6 +6,13 @@ import path from "node:path";
 
 export const ROOT = path.resolve(import.meta.dirname, "../..");
 
+/** The tiny model in the repository, for the connector's search by meaning. Same as the server's in playwright.config.ts. */
+export const MODEL_ENV = {
+  SIGIL_EMBED_MODEL: "sigil/tiny-embedder",
+  SIGIL_MODEL_DIR: path.join(ROOT, "packages/core/test/fixtures/tiny-model"),
+  SIGIL_MODEL_FETCH: "off",
+};
+
 /** Installs a window.ethereum backed by a real key held in the test process. */
 export async function installWallet(context: BrowserContext) {
   const account = privateKeyToAccount(generatePrivateKey());
@@ -39,7 +46,7 @@ export async function connectMcp(appKey: string, baseUrl: string) {
   const transport = new StdioClientTransport({
     command: process.execPath,
     args: [path.join(ROOT, "connector/dist/index.js")],
-    env: { ...(process.env as Record<string, string>), SIGIL_APP_KEY: appKey, SIGIL_URL: baseUrl },
+    env: { ...(process.env as Record<string, string>), ...MODEL_ENV, SIGIL_APP_KEY: appKey, SIGIL_URL: baseUrl },
     stderr: "pipe",
   });
   const client = new Client({ name: "sigil-e2e", version: "1.0.0" });
@@ -63,4 +70,43 @@ export async function createWithWallet(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Open my vault" }).click();
   await page.getByRole("heading", { name: "Your vault" }).waitFor();
   return phrase;
+}
+
+/** Connects an app from the Apps tab and returns its key. Folders by name; suggestions on or off. */
+export async function connectApp(page: Page, opts: { name?: string; folders: string[]; suggest?: boolean; kind?: string }) {
+  await page.getByRole("tab", { name: "Apps" }).click();
+  const first = page.getByRole("button", { name: "Connect your first app" });
+  if (await first.isVisible()) await first.click();
+  else await page.getByRole("button", { name: "Connect an app" }).click();
+  const form = page.getByRole("form", { name: "Connect an app" });
+  if (opts.kind) await form.getByLabel("App", { exact: true }).selectOption(opts.kind);
+  if (opts.name) await form.getByLabel("Name in your vault").fill(opts.name);
+  for (const f of opts.folders) await form.getByLabel(f, { exact: true }).check();
+  if (opts.suggest) await form.getByLabel(/May suggest memories/).check();
+  await form.getByRole("button", { name: "Create app key" }).click();
+  const appKey = (await page.getByTestId("app-key").innerText()).trim();
+  await page.getByLabel("I have copied the app key.").check();
+  await page.getByRole("button", { name: "Done" }).click();
+  return appKey;
+}
+
+export async function writeMemory(page: Page, m: { title: string; body: string; tags?: string; folder?: string }) {
+  await page.getByRole("tab", { name: "Memories" }).click();
+  const empty = page.getByRole("button", { name: "Write a memory" });
+  if (await empty.isVisible()) await empty.click();
+  else await page.getByRole("button", { name: "New memory" }).click();
+  const form = page.getByRole("form", { name: "New memory" });
+  await form.getByLabel("Title").fill(m.title);
+  await form.getByLabel("Memory", { exact: true }).fill(m.body);
+  if (m.tags) await form.getByLabel("Tags").fill(m.tags);
+  if (m.folder) await form.getByLabel("Folder").selectOption({ label: m.folder });
+  await form.getByRole("button", { name: "Save memory" }).click();
+  await page.locator(".memory-item-title", { hasText: m.title }).first().waitFor();
+}
+
+export async function addFolder(page: Page, name: string) {
+  await page.getByRole("tab", { name: "Folders" }).click();
+  await page.getByLabel("New folder").fill(name);
+  await page.getByRole("button", { name: "Add folder" }).click();
+  await page.locator(".list-row-title", { hasText: name }).first().waitFor();
 }

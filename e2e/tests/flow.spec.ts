@@ -66,7 +66,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   // ---- the connector, over MCP stdio, exactly as Claude Desktop would start it
   const mcp = await connectMcp(appKey, baseURL!);
   const tools = await mcp.listTools();
-  expect(tools.tools.map((t) => t.name).sort()).toEqual(["list_folders", "read_memory", "search_memories"]);
+  expect(tools.tools.map((t) => t.name).sort()).toEqual(["get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
 
   expect(textOf(await mcp.callTool({ name: "list_folders", arguments: {} }))).toContain("- ChatGPT (2 memories)");
 

@@ -7,6 +7,9 @@ export const PORT = 3210;
 export const BASE_URL = `http://localhost:${PORT}`;
 const dataDir = mkdtempSync(path.join(tmpdir(), "sigil-e2e-"));
 
+/** Search by meaning runs on a tiny model kept in the repository, so no test touches the network. */
+export const TEST_MODEL = { SIGIL_EMBED_MODEL: "sigil/tiny-embedder", SIGIL_MODEL_DIR: path.resolve(import.meta.dirname, "../packages/core/test/fixtures/tiny-model"), SIGIL_MODEL_FETCH: "off" };
+
 export default defineConfig({
   testDir: "tests",
   timeout: 120_000,
@@ -33,6 +36,7 @@ export default defineConfig({
       SIGIL_SEAL_SECONDS: "4",
       SIGIL_SEALS: "on",
       SIGIL_ANCHOR: "off",
+      ...TEST_MODEL,
     },
   },
 });
