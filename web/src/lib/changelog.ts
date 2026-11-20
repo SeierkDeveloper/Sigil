@@ -4,11 +4,71 @@ export interface Release {
   date: string; // ISO day
   title: string;
   summary: string;
-  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import" | "Legacy" | "Devices" | "Agents" | "Proof";
+  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import" | "Legacy" | "Devices" | "Agents" | "Proof" | "Sync" | "Trust";
   items: string[];
 }
 
 export const releases: Release[] = [
+  {
+    date: "2026-11-20",
+    title: "An open standard and a privacy score",
+    area: "Trust",
+    summary: "The formats, keys, tools and log written down as an open standard with test vectors from the code, and a privacy score per app from your own read log.",
+    items: [
+      "docs/spec: memories and folders, keys, envelopes and sealed boxes, the connector's tools and permissions, the access log, seals and presence, certificates, version 1.0.0",
+      "Test vectors generated from the code, and a check on every test run that the code still produces them; the standard on its own page, /spec",
+      "A privacy score for every app and agent under Apps and Agents, computed in your browser from your own read log, with every point explained",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Selves meet selves",
+    area: "AI self",
+    summary: "Your AI self can talk with someone else's, only after both of you said yes, for one purpose and a fixed number of turns.",
+    items: [
+      "Invites by vault code, to find a time, check whether a collab fits, or swap intros; the other owner says yes and picks what their self may use",
+      "Every turn encrypted under a key only the two vaults can derive, so the relay can neither read nor write one",
+      "Each self answers within its own rules and folders, with its owner's model, and may read the calendar to find a time",
+      "The whole transcript for both owners, a stop button for either, and every step in both read logs and seals",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "A public AI self",
+    area: "AI self",
+    summary: "A page at /@you where anyone can ask your AI self, answered only from folders you made public.",
+    items: [
+      "A public copy of the folders you choose, masked with their rules, as the only thing it answers from; protected folders can never be public",
+      "Questions sealed in the visitor's browser and answered by your open vault or your connector with your own model key; offline said plainly",
+      "Every answer marked as AI with its sources; greeting, tone, topics, a limit per visitor, an off switch",
+      "Every question and answer sealed in your read log; answers on the page only if you want, each one you can hide",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Protected vaults for health, money and legal",
+    area: "Vault",
+    summary: "A folder can be protected: nothing reads it without your fresh yes for that read, and what leaves the vault can be masked.",
+    items: [
+      "Protect a folder as health, money, legal or other; the server knows only that it is protected and holds its ciphertext back",
+      "Requests wait in your inbox; a yes covers one read for ten minutes; your own AI self asks the same way",
+      "Protected reads and your answers marked with their own kinds in the read log and the hourly seal",
+      "Redaction on the device of card numbers, IBANs, account, ID and passport numbers, phone numbers and email addresses, per folder",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Your whole digital life, kept in sync",
+    area: "Sync",
+    summary: "Gmail, Google Calendar, Google Drive and Slack stay in sync in folders you choose, fetched and encrypted on your device.",
+    items: [
+      "Sign-in with OAuth and PKCE from your browser as a public client, the tokens encrypted with your vault key",
+      "Only what changed is fetched: history ids, sync tokens, change tokens and the newest message per channel",
+      "No duplicates with Takeout imports, ids two devices agree on, pause, and disconnect that deletes the sign-in",
+      "Background sync with sigil-connector --watch, the source wrapped for that app's key only",
+      "Meeting transcripts from Zoom, Meet and Teams as meeting memories: who was there, decisions, promises",
+    ],
+  },
   {
     date: "2026-11-20",
     title: "Legacy: your AI self outlives you",

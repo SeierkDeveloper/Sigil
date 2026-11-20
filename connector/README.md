@@ -62,19 +62,26 @@ Cursor (`~/.cursor/mcp.json`), Claude Desktop and VS Code (`.vscode/mcp.json`, u
 SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --self
 ```
 
-Answers the ask links the owner gave this app, while it runs, so they work with the vault closed. Questions arrive as relay boxes only this machine and the asker can open; the answer goes back the same way, and the question and answer go to the owner's read log sealed to the vault's public key. The links show as online while it runs.
+Answers the ask links the owner gave this app, and the owner's public AI self when the owner picked this app for it, while it runs, so they work with the vault closed. Questions arrive as relay boxes only this machine and the asker can open; the answer goes back the same way, and the question and answer go to the owner's read log sealed to the vault's public key. The links show as online while it runs.
 
-## Keeping an Obsidian vault in sync
+## Live sync and Obsidian
 
 ```sh
+SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --watch                                       # live sync sources given to this app
 SIGIL_APP_KEY=... SIGIL_URL=... node dist/index.js --watch "/path/to/Obsidian vault" [--folder Obsidian]
 ```
 
-Watches the folder and suggests new and changed notes to the owner's inbox, sealed here, with the note's path, so the vault offers to update the memory imported from the same note. Use an app key that may suggest memories and read the folder the vault was imported into: on the first run, notes the vault already holds unchanged are not suggested again. Up to 8 notes go in one pass and the rest follow a minute later. What was sent is remembered as hashes in `~/.sigil-connector` (or `SIGIL_STATE_DIR`).
+Without a folder, it keeps the live sync sources (Gmail, Google Calendar, Google Drive, Slack) the owner lets this app sync in the background: every 5 minutes (`SIGIL_SYNC_MINUTES`) it opens each source with this app's key, asks the service for what changed, encrypts every item here with the folder key and writes it to the source's folder only. A client type that asks for a secret at the token step can be given `SIGIL_GOOGLE_CLIENT_SECRET` or `SIGIL_SLACK_CLIENT_SECRET` on this machine; it is never sent to Sigil.
+
+With a folder, it also watches it and suggests new and changed notes to the owner's inbox, sealed here, with the note's path, so the vault offers to update the memory imported from the same note. Use an app key that may suggest memories and read the folder the vault was imported into: on the first run, notes the vault already holds unchanged are not suggested again. Up to 8 notes go in one pass and the rest follow a minute later. What was sent is remembered as hashes in `~/.sigil-connector` (or `SIGIL_STATE_DIR`).
 
 ## Search by meaning
 
 A small sentence model (`Xenova/all-MiniLM-L6-v2` by default) runs here on WebAssembly. Its files are fetched once from the public model hub into `SIGIL_MODEL_DIR` (`.data/models` in the repository, `~/.sigil/models` elsewhere); vectors stay in memory and are never sent anywhere. `SIGIL_MODEL_FETCH=off` uses only files already on disk, and `SIGIL_SEMANTIC=off` searches by words only.
+
+## Protected folders
+
+Folders the owner protected are left out of searches; the tool says which. Naming one in a search, or reading a memory in one, asks the owner in their inbox; the same call works once they say yes, within 10 minutes, for that one read. Each folder's redaction rules (card, IBAN, account, ID, passport and phone numbers, email addresses) are applied here before any text is handed to the app.
 
 ## HTTP mode
 

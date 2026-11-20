@@ -309,17 +309,19 @@ export default function ConnectorPage() {
               <span className="card-number">Self</span>
               <h3 className="card-title">Answering your ask links</h3>
               <p className="card-text">
-                With <code>--self</code> it answers the ask links you gave this app, while your vault is closed. Questions arrive sealed, are answered
-                on your machine with your own model key, and go back sealed. Your links show as online while it runs.
+                With <code>--self</code> it answers the ask links you gave this app, and your public AI self when you picked this app for it, while your
+                vault is closed. Questions arrive sealed, are answered on your machine with your own model key, and go back sealed. They show as online
+                while it runs.
               </p>
               <CodeBlock code={`${shellCommand(EXAMPLE_KEY)} --self`} label="Terminal" />
             </article>
             <article className="card">
               <span className="card-number">Watch</span>
-              <h3 className="card-title">Keeping Obsidian in sync</h3>
+              <h3 className="card-title">Live sync and Obsidian</h3>
               <p className="card-text">
-                With <code>--watch</code> and a folder it watches an Obsidian vault and suggests new and changed notes to your inbox, sealed on your
-                machine. A small file in your home folder remembers what was sent, as hashes only.
+                With <code>--watch</code> it keeps the live sync sources you gave this app (Gmail, Calendar, Drive, Slack) in sync while your vault is
+                closed, every few minutes, encrypting on your machine. With a folder too, it watches an Obsidian vault and suggests new and changed notes
+                to your inbox; a small file in your home folder remembers what was sent, as hashes only.
               </p>
               <CodeBlock code={`${shellCommand(EXAMPLE_KEY)} --watch ~/Obsidian`} label="Terminal" />
             </article>

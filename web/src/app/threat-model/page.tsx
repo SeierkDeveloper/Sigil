@@ -105,6 +105,30 @@ const covered = [
 
 const notCovered = [
   {
+    threat: "Redaction that misses a number",
+    answer:
+      "Redaction masks common shapes of card, IBAN, account, ID, passport and phone numbers and email addresses. A number written in an unusual way can slip through. For records that must never leave, protect the folder rather than rely on masking.",
+  },
+  {
+    threat: "Your own device after you say yes",
+    answer:
+      "On your own device every key is at hand; the protected gate there is the vault's own code. A yes lets the app or AI self have that read, and what it does with the text afterwards is up to it.",
+  },
+  {
+    threat: "A server that swaps the key of a public AI self",
+    answer:
+      "The public page takes its key from the server, so a server that swapped it could read a visitor's question. It could not read anything private: the public self only answers from what you published.",
+  },
+  {
+    threat: "What another self is told",
+    answer:
+      "In a conversation between two selves, the other owner and their model provider read everything your self says. Your self follows your rules, but rules can be worked around by careful wording. Give it only the folders you would share with that person.",
+  },
+  {
+    threat: "Live sync services",
+    answer: "Google and Slack see your sign-in and serve your data to your device under their own terms. Revoke Sigil's access in your account there as well as disconnecting here, if you want it gone on both sides.",
+  },
+  {
     threat: "A server and your trusted people working together",
     answer:
       "The server decides when your legacy plan's period is over. It cannot open anything alone, but together with enough of your trusted people it could hand out the shares early. And what a person opened during a release stays with them.",
@@ -153,6 +177,21 @@ const notCovered = [
       "Models make mistakes, and rules written as topics and phrases can be worked around by careful wording. Give an ask link only the folders you would be happy to see quoted, and read its answers in your log.",
   },
   {
+    threat: "An app, agent or link reaching for your health, money or legal folder",
+    answer:
+      "Protect the folder. The server then holds its ciphertext back from every app, agent and link until you say yes for that read, and a yes covers one read for ten minutes. Each protected read is logged with its own kind and sealed, so it cannot later pass as an ordinary read.",
+  },
+  {
+    threat: "The server reads your mail or your sync sign-in",
+    answer:
+      "Live sync signs in and fetches from your device. The tokens are encrypted with your vault key (and for a background connector, with a key from its secret) before they are saved; mail, events, files and messages are encrypted on the device like every memory.",
+  },
+  {
+    threat: "The relay reads or fakes what two AI selves say",
+    answer:
+      "Every turn is encrypted under a key only the two vaults can derive from their own keys. The server passes the boxes and can neither read one nor write one that opens.",
+  },
+  {
     threat: "Bugs",
     answer: "This is early software. It is open source and tested, and it has not had an independent audit yet.",
   },
@@ -163,7 +202,7 @@ const parties = [
   {
     who: "Sigil's server",
     sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address, how often an ask link is used, and when an expiring memory is to be deleted.",
-    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers.",
+    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other.",
   },
   {
     who: "A connected app",
@@ -174,6 +213,16 @@ const parties = [
     who: "Someone with your ask link",
     sees: "The link's name and greeting, and the answers of your AI self to their own questions.",
     not: "Which memories an answer came from, anything outside the link's folders, other people's questions.",
+  },
+  {
+    who: "A visitor to your public AI self",
+    sees: "Its name and greeting, the titles and text of the public copy you published, its answers, and the answers you show on the page.",
+    not: "Anything you did not make public, your protected folders, other visitors.",
+  },
+  {
+    who: "Another vault your AI self meets",
+    sees: "What your self says in that conversation, and your self's name for it.",
+    not: "Your memories themselves, the folders you chose, anything after either of you stops.",
   },
   {
     who: "Your model provider",

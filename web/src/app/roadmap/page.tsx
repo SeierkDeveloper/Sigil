@@ -57,10 +57,11 @@ const stages: Stage[] = [
     items: [
       { text: "Local imports, parsed and encrypted in the browser: Obsidian, Apple Notes, Gmail and Google Calendar from Takeout, Notion, GitHub", built: true },
       { text: "An Obsidian folder kept in sync through the inbox by the connector", built: true },
-      { text: "Live sync from email, calendar, team chat and cloud files" },
-      { text: "Meetings turned into memories" },
+      { text: "Live sync from Gmail, Google Calendar, Google Drive and Slack, fetched and encrypted on your device, in the background through the connector", built: true },
+      { text: "Meeting transcripts from Zoom, Meet and Teams turned into meeting memories: who was there, decisions, promises", built: true },
+      { text: "Protected folders for health, money and legal papers: every read needs your yes, with redaction on the device", built: true },
       { text: "Ask your life: questions answered from everything at once" },
-      { text: "Separate vaults for health, money and legal papers" },
+      { text: "More sources: other mail and calendar providers, other team chats and file stores" },
     ],
   },
   {
@@ -90,8 +91,8 @@ const stages: Stage[] = [
       { text: "Ask links: end to end encrypted, with their own rules and limits, every answer in your log", built: true },
       { text: "ask_self for apps you allow, answered on your machine", built: true },
       { text: "A personal model trained only on what you allow" },
+      { text: "A public AI self at /@you, answering anyone from the folders you made public, every answer in your log", built: true },
       { text: "Negotiates and replies within limits you set" },
-      { text: "Public selves for creators and experts" },
     ],
   },
   {
@@ -117,11 +118,12 @@ const stages: Stage[] = [
   },
   {
     title: "Trust",
-    status: "planned",
+    status: "core",
     summary: "Make it easy to see which AI apps treat your memory well.",
     items: [
-      { text: "A privacy score for every connected app, from what it reads" },
-      { text: "An open standard for permissioned memory access" },
+      { text: "A privacy score for every connected app and agent, from your own read log", built: true },
+      { text: "An open standard for permissioned memory access, version 1, with test vectors from the code", built: true },
+      { text: "Scores shared between owners, without sharing their logs" },
     ],
   },
   {
@@ -149,11 +151,11 @@ const stages: Stage[] = [
   },
   {
     title: "Your AI self in the world",
-    status: "planned",
+    status: "started",
     summary: "Your AI self can work, meet others and keep learning, within your limits.",
     items: [
+      { text: "Selves meet selves, version 1: two AI selves talk after both owners said yes, end to end encrypted, to find a time, check a collab or swap intros", built: true },
       { text: "Hire the AI selves of experts" },
-      { text: "Introductions between AI selves" },
       { text: "AI selves that take on paid work" },
       { text: "An AI self that keeps learning from your vault" },
     ],

@@ -184,3 +184,24 @@ describe("agent tools", () => {
     expect(formatHandoffs([])).toBe("No handoff notes are waiting.");
   });
 });
+
+describe("protected folders in the connector's words", () => {
+  it("marks protected folders, and tells the app plainly when a read waits for the owner", async () => {
+    const { formatFolders, formatProtected } = await import("../src/server");
+    expect(formatFolders([{ id: "f2", name: "Health", memories: 3, protected: true }])).toContain("Health (3 memories, protected: each read needs the user's yes)");
+    const pending = formatProtected([], [{ folderId: "f2", folder: "Health", memoryIds: ["m1"], requestId: "r1", state: "pending" }]);
+    expect(pending).toContain("Health is a protected folder");
+    expect(pending).toContain("within 10 minutes");
+    expect(formatProtected([], [{ folderId: "f2", folder: "Health", memoryIds: [], requestId: "r1", state: "denied" }])).toBe("The user said no to reading Health.");
+    expect(formatProtected(["Health", "Money"], [])).toContain("Protected folders not searched: Health, Money.");
+  });
+
+  it("answers read_memory with the held read instead of an error", async () => {
+    const client = await connect(
+      stub({ read: async () => ({ memories: [], missing: [], held: [{ folderId: "f2", folder: "a protected folder", memoryIds: [memory.id], requestId: "r1", state: "pending" }] }) }),
+    );
+    const r = (await client.callTool({ name: "read_memory", arguments: { id: memory.id } })) as { content: { text: string }[]; isError?: boolean };
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toContain("A memory asked for is in a protected folder");
+  });
+});
