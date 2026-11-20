@@ -98,7 +98,7 @@ describe("wallet rules", () => {
 
     const call = decodeFunctionData({ abi: id.WALLET_ABI, data: id.configureCalldata(rules) });
     expect(call.functionName).toBe("configure");
-    const [perTx, perDay, expires, targets, selectors] = call.args as [bigint, bigint, bigint, string[], { target: string; selector: string }[]];
+    const [perTx, perDay, expires, targets, selectors] = call.args as unknown as [bigint, bigint, bigint, string[], { target: string; selector: string }[]];
     expect([perTx, perDay, expires]).toEqual([50_000_000_000_000_000n, 200_000_000_000_000_000n, 1_811_808_000n]);
     expect(targets.map((t) => t.toLowerCase())).toEqual(["0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"]);
     expect(selectors).toEqual([{ target: checksumAddress("0x2222222222222222222222222222222222222222"), selector: functionSelector("order(uint256)") }]);
@@ -117,7 +117,7 @@ describe("the calls for the chain", () => {
     const data = await id.registerCalldata(o.vault, chain, "0x000000000000000000000000000000000000dEaD", "https://x.example/api/identity/at/x", 1_900_000_000n);
     const call = decodeFunctionData({ abi: id.REGISTRY_ABI, data });
     expect(call.functionName).toBe("register");
-    expect((call.args as unknown[])[0]).toBe((await selfIdentityKey(o.vault.raw)).address);
+    expect((call.args as unknown as unknown[])[0]).toBe((await selfIdentityKey(o.vault.raw)).address);
     expect(id.freezeCalldata()).toBe(toFunctionSelector("function freeze()"));
   });
 

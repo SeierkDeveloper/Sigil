@@ -14,7 +14,6 @@ import { getSignKey } from "./life";
 import { proofFor, sealPending } from "./seal";
 
 type Row = Record<string, unknown>;
-const now = () => new Date().toISOString();
 
 export const OFFERS_PER_HOUR = 20;
 export type AgreementState = "proposed" | "signed" | "declined" | "withdrawn";

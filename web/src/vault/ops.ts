@@ -1079,6 +1079,17 @@ export interface VaultExport {
   publicSelf: { handle: string; name: string; greeting: string; enabled: boolean; folders: string[]; perVisitorHour: number; answers: { question: string; answer: string; hidden: boolean; createdAt: string }[] } | null;
   /** Conversations of your AI self with others, with their transcripts. */
   meets: { with: string; purpose: string; state: string; createdAt: string; transcript: { turn: number; by: string; text: string }[] }[];
+  /** The AI self's identity, its signed statement and the draft rules of its wallet. The self key itself is never in the file: it is made again from the vault key. */
+  identity: { address: string; statement: unknown; choices: IdentityChoices; walletRules: WalletRules | null } | null;
+  /** The approval queue and what is held back. */
+  work: { settings: WorkSettings; drafts: { kind: string; state: string; title: string; draft: string; final: string | null; createdAt: string }[] };
+  /** Proofs of a fact, complete with their evidence. */
+  proofs: unknown[];
+  /** The emergency card, without its key. */
+  emergency: { card: unknown; published: string | null; opens: { at: string; device: string; lang: string }[] };
+  /** Agreements, with their texts and signatures. */
+  agreements: { title: string; text: string; version: number; state: string; hash: string; parties: string[]; signatures: (string | null)[]; createdAt: string; signedAt: string | null }[];
+  packs: { published: { title: string; version: number; folder: string }[]; following: { title: string; version: number; origin: string; id: string }[] };
 }
 
 /** Everything in the vault, decrypted, as one JSON document. Built on the device. */
@@ -1168,6 +1179,32 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
       createdAt: m.createdAt,
       transcript: m.lines.filter((l) => l.ok).map((l) => ({ turn: l.turn, by: l.mine ? "my AI self" : `${m.peerName}'s AI self`, text: l.text })),
     })),
+    identity: data.identity ? { address: data.identity.address, statement: data.identity.statement, choices: data.identityChoices, walletRules: data.walletRules } : null,
+    work: {
+      settings: data.work,
+      drafts: data.drafts
+        .filter((d) => d.record)
+        .map((d) => ({ kind: d.kind, state: d.state, title: d.record!.title, draft: d.record!.draft, final: d.record!.final, createdAt: d.createdAt })),
+    },
+    proofs: data.disclosures.map((d) => d.proof).filter(Boolean),
+    emergency: { card: data.emergency.card?.card ?? null, published: data.emergency.card?.createdAt ?? null, opens: data.emergency.opens.map((o) => ({ at: o.at, device: o.device, lang: o.lang })) },
+    agreements: data.agreements
+      .filter((a) => a.doc)
+      .map((a) => ({
+        title: a.doc!.title,
+        text: a.doc!.text,
+        version: a.version,
+        state: a.state,
+        hash: a.hash,
+        parties: a.doc!.parties.map((p) => p.name),
+        signatures: [a.fromSig, a.toSig],
+        createdAt: a.createdAt,
+        signedAt: a.signedAt,
+      })),
+    packs: {
+      published: data.packs.map((p) => ({ title: p.title, version: p.version, folder: folderName.get(p.folderId) ?? "" })),
+      following: data.follows.map((f) => ({ title: f.title, version: f.version, origin: f.origin, id: f.id })),
+    },
   };
 }
 

@@ -31,12 +31,21 @@ import { useSemanticIndex } from "./semantic";
 import { useSelfAgent } from "./useSelfAgent";
 import { modelCaller } from "./selfOps";
 import { makeBrief, shouldMakeBrief } from "./thinkOps";
+import { refresh as refreshPacks } from "./packOps";
+import { WorkTab } from "./tabs/Work";
+import { IdentityTab } from "./tabs/Identity";
+import { EmergencyTab } from "./tabs/Emergency";
+import { AgreementsTab } from "./tabs/Agreements";
+import { PacksTab } from "./tabs/Packs";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "memories", label: "Memories" },
   { id: "inbox", label: "Inbox" },
   { id: "self", label: "AI self" },
+  { id: "work", label: "Work" },
+  { id: "identity", label: "Identity" },
   { id: "meet", label: "Meet" },
+  { id: "agreements", label: "Agreements" },
   { id: "review", label: "Review" },
   { id: "timeline", label: "Timeline" },
   { id: "profile", label: "Self card" },
@@ -46,6 +55,8 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "devices", label: "Devices" },
   { id: "legacy", label: "Legacy" },
   { id: "proof", label: "Proof" },
+  { id: "emergency", label: "Emergency" },
+  { id: "packs", label: "Packs" },
   { id: "log", label: "Read log" },
   { id: "import", label: "Import" },
   { id: "sync", label: "Sync" },
@@ -166,9 +177,21 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
     () => [...(memories ?? NO_MEMORIES), ...(incoming ?? []).filter((s) => s.acceptedAt).flatMap((s) => s.memories)],
     [memories, incoming],
   );
+  // Stable, so effects that update the data now and then are not restarted by every change.
+  const updateData = useCallback((fn: (d: ops.VaultData) => ops.VaultData) => setData((d) => (d ? fn(d) : d)), []);
   const semantic = useSemanticIndex(api, vault, indexed);
-  const agent = useSelfAgent(api, vault, data, semantic);
+  const agent = useSelfAgent(api, vault, data, semantic, updateData);
   const liveSync = useLiveSync(api, vault, data, setData);
+
+  // Knowledge packs this vault follows: new versions are checked and taken in once per opening.
+  const packsTried = useRef(false);
+  useEffect(() => {
+    if (!data || packsTried.current || data.follows.length === 0) return;
+    packsTried.current = true;
+    refreshPacks(api, data, vault)
+      .then((r) => (r.updated.length ? ops.loadVault(api, vault).then((d) => setData(d)) : undefined))
+      .catch(() => undefined);
+  }, [api, vault, data]);
 
   // The weekly brief, once per opening, when it is due and the owner wants it.
   const briefTried = useRef(false);
@@ -182,8 +205,6 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
       .catch(() => undefined);
   }, [api, vault, data]);
 
-  // Stable, so effects that update the data now and then are not restarted by every change.
-  const updateData = useCallback((fn: (d: ops.VaultData) => ops.VaultData) => setData((d) => (d ? fn(d) : d)), []);
 
   const ctx = useMemo<VaultCtx | null>(
     () =>
@@ -283,6 +304,16 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
                   {data.proposals.length + waitingRequests}
                 </span>
               ) : null}
+              {t.id === "work" && data.drafts.some((d) => d.state === "waiting") ? (
+                <span className="tab-count" aria-label={`${data.drafts.filter((d) => d.state === "waiting").length} drafts waiting`}>
+                  {data.drafts.filter((d) => d.state === "waiting").length}
+                </span>
+              ) : null}
+              {t.id === "agreements" && data.agreements.some((a) => a.role === "to" && a.state === "proposed") ? (
+                <span className="tab-count" aria-label="An agreement waits for your signature">
+                  {data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length}
+                </span>
+              ) : null}
               {t.id === "meet" && data.meets.some((m) => m.role === "invitee" && m.state === "invited") ? (
                 <span className="tab-count" aria-label="An invite is waiting">
                   {data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length}
@@ -296,7 +327,10 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "memories" ? <MemoriesTab /> : null}
           {tab === "inbox" ? <InboxTab /> : null}
           {tab === "self" ? <SelfTab /> : null}
+          {tab === "work" ? <WorkTab /> : null}
+          {tab === "identity" ? <IdentityTab /> : null}
           {tab === "meet" ? <MeetTab /> : null}
+          {tab === "agreements" ? <AgreementsTab /> : null}
           {tab === "review" ? <ReviewTab /> : null}
           {tab === "timeline" ? <TimelineTab /> : null}
           {tab === "profile" ? <ProfileTab /> : null}
@@ -306,6 +340,8 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "devices" ? <DevicesTab /> : null}
           {tab === "legacy" ? <LegacyTab /> : null}
           {tab === "proof" ? <ProofTab /> : null}
+          {tab === "emergency" ? <EmergencyTab /> : null}
+          {tab === "packs" ? <PacksTab /> : null}
           {tab === "log" ? <LogTab /> : null}
           {tab === "import" ? <ImportTab /> : null}
           {tab === "sync" ? <SyncTab /> : null}

@@ -157,7 +157,7 @@ describe("answers held for approval", () => {
     const m = stub(() => "I like CANARY-soup [1].");
 
     // The vault checks in so the link is online, then a guest asks.
-    expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toBe(0);
+    expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toHaveLength(0);
     const { publicKey } = parseAskFragment(url.split("#")[1]);
     const session = newAskSession(link.id, publicKey);
     const qid = randomId();
@@ -168,10 +168,10 @@ describe("answers held for approval", () => {
     });
     expect(res.status).toBe(201);
 
-    expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toBe(1);
+    expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toHaveLength(1);
     data = await ops.loadVault(o.b.api, o.vault);
     // Drafted once, not twice; nothing was sent to the asker.
-    expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toBe(0);
+    expect(await work.holdLinksOnce(o.b.api, o.vault, data, data.drafts, { model: m.model })).toHaveLength(0);
     const poll = async () => (await (await h.raw("GET", `ask/${link.id}/questions/${qid}`)).json()) as { status: string; answer?: string };
     expect((await poll()).status).toBe("waiting");
     const held = data.drafts[0];

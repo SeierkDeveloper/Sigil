@@ -205,12 +205,12 @@ function drafted(drafts: DraftView[]): Set<string> {
   return new Set(drafts.map((d) => d.ref).filter((r): r is string => !!r));
 }
 
-/** Drafts answers to waiting ask link questions instead of sending them. Returns how many it drafted. */
-export async function holdLinksOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: WorkDeps & { model: ModelCaller }): Promise<number> {
-  if (!vaultLinks(data).length) return 0;
+/** Drafts answers to waiting ask link questions instead of sending them. Returns the drafts it made. */
+export async function holdLinksOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: WorkDeps & { model: ModelCaller }): Promise<DraftView[]> {
+  if (!vaultLinks(data).length) return [];
   const { questions } = await api.get<{ questions: PendingQuestion[] }>("self/pending");
   const seen = drafted(known);
-  let n = 0;
+  const made: DraftView[] = [];
   for (const q of questions) {
     const ref = `q:${q.id}`;
     if (seen.has(ref)) continue;
@@ -219,22 +219,21 @@ export async function holdLinksOnce(api: Api, vault: Unlocked, data: VaultData, 
     const link = data.askLinks.find((l) => l.id === q.linkId);
     const channel: AnswerChannel = { kind: "link", questionId: q.id, linkId: q.linkId, sessionId: q.sessionId, askerKey: q.askerKey };
     try {
-      await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Answer on "${link?.label ?? "an ask link"}"`, input: c.question, from: link?.label ?? "", channel, draft: c.reply.text, sources: c.citations, usedModel: true, refused: c.reply.refused }));
-      n++;
+      made.push(await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Answer on "${link?.label ?? "an ask link"}"`, input: c.question, from: link?.label ?? "", channel, draft: c.reply.text, sources: c.citations, usedModel: true, refused: c.reply.refused })));
     } catch {
       // Drafted on another device meanwhile.
     }
   }
-  return n;
+  return made;
 }
 
 /** Drafts answers for visitors of the public AI self instead of sending them. */
-export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: { model: ModelCaller }): Promise<number> {
+export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: { model: ModelCaller }): Promise<DraftView[]> {
   const self = data.publicSelf;
-  if (!self?.secret || !self.enabled) return 0;
+  if (!self?.secret || !self.enabled) return [];
   const { questions, items } = await pendingPublic(api);
   const seen = drafted(known);
-  let n = 0;
+  const made: DraftView[] = [];
   for (const q of questions) {
     const ref = `p:${q.id}`;
     if (seen.has(ref)) continue;
@@ -242,20 +241,19 @@ export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData,
     if (!c) continue;
     const channel: AnswerChannel = { kind: "public", questionId: q.id, selfId: self.id, sessionId: q.sessionId, askerKey: q.askerKey };
     try {
-      await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Answer to a visitor of @${self.handle}`, input: c.question, from: `@${self.handle}`, channel, draft: c.reply.text, sources: c.reply.sources, usedModel: true, refused: c.reply.refused }));
-      n++;
+      made.push(await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Answer to a visitor of @${self.handle}`, input: c.question, from: `@${self.handle}`, channel, draft: c.reply.text, sources: c.reply.sources, usedModel: true, refused: c.reply.refused })));
     } catch {
       // Drafted on another device meanwhile.
     }
   }
-  return n;
+  return made;
 }
 
 /** Drafts this side's turns in meetings of selves instead of sending them. */
-export async function holdMeetsOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: { model: ModelCaller }): Promise<number> {
-  if (!data.box) return 0;
+export async function holdMeetsOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: { model: ModelCaller }): Promise<DraftView[]> {
+  if (!data.box) return [];
   const seen = drafted(known);
-  let n = 0;
+  const made: DraftView[] = [];
   for (const m of await waitingMeets(api, vault, data.box)) {
     const ref = `m:${m.id}:${m.turns + 1}`;
     if (seen.has(ref)) continue;
@@ -263,13 +261,12 @@ export async function holdMeetsOnce(api: Api, vault: Unlocked, data: VaultData, 
     if (!t) continue;
     const channel: AnswerChannel = { kind: "meet", meetId: m.id, turn: t.turn, done: t.done };
     try {
-      await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Turn ${t.turn} with ${m.record?.label ?? m.peerName}`, input: m.lines.filter((l) => !l.mine).at(-1)?.text ?? m.note, from: m.peerName, channel, draft: t.text, sources: [], usedModel: true }));
-      n++;
+      made.push(await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Turn ${t.turn} with ${m.record?.label ?? m.peerName}`, input: m.lines.filter((l) => !l.mine).at(-1)?.text ?? m.note, from: m.peerName, channel, draft: t.text, sources: [], usedModel: true })));
     } catch {
       // Drafted on another device meanwhile.
     }
   }
-  return n;
+  return made;
 }
 
 /** Sends an approved answer through the channel it came from. */
