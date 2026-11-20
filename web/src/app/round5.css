@@ -1050,3 +1050,60 @@ button.score-chip[aria-expanded="true"]::after {
   }
 }
 
+/* ------------------------------------------------------------------ /vault/connect: the sign-in return */
+
+.connect-card {
+  max-width: 520px;
+  text-align: center;
+}
+
+.connect-card .ask-head {
+  margin-bottom: var(--space-5);
+}
+
+.connect-card .page-title {
+  margin-bottom: 0;
+}
+
+/* A run of lines the sign-in travels along, back to the vault. */
+.connect-wire {
+  --cut: 6px;
+  position: relative;
+  display: block;
+  width: 168px;
+  height: 9px;
+  margin: 0 auto var(--space-5);
+  overflow: hidden;
+  background: var(--ruled-faint), rgba(255, 255, 255, 0.05);
+  clip-path: var(--lean);
+}
+
+.connect-wire::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 30%;
+  width: 40%;
+  background: var(--ruled);
+}
+
+[data-motion] .connect-wire::after {
+  left: 0;
+  animation: connect-run 1500ms linear infinite;
+}
+
+@keyframes connect-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.connect-card .page-lead {
+  max-width: 40ch;
+  font-size: var(--text-base);
+}
+

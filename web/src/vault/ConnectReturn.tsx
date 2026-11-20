@@ -6,6 +6,7 @@
 // that page.
 
 import { useEffect } from "react";
+import { SyncIcon } from "@/components/icons";
 import { CONNECT_CHANNEL, type ConnectMessage } from "./syncOps";
 
 export function ConnectReturn() {
@@ -24,9 +25,16 @@ export function ConnectReturn() {
     window.setTimeout(() => window.close(), 300);
   }, []);
   return (
-    <div className="container ask-page">
-      <div className="vault-gate">
-        <h1 className="page-title">Signing in</h1>
+    <div className="container ask-page connect-return">
+      <div className="vault-gate ask-card connect-card" data-state="active">
+        <header className="ask-head">
+          <span className="ask-seal" aria-hidden="true">
+            <SyncIcon />
+          </span>
+          <p className="eyebrow">Live sync</p>
+          <h1 className="page-title">Signing in</h1>
+        </header>
+        <span className="connect-wire" aria-hidden="true" />
         <p className="page-lead">Your vault takes it from here, and this window closes on its own. If it stays open, close it and connect the source again under Sync.</p>
       </div>
     </div>
