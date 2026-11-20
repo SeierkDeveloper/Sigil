@@ -26,19 +26,19 @@
 
 :root {
   color-scheme: dark;
-  --bg: #060607;
-  --surface: #0b0b0d;
-  --surface-2: #121215;
+  --bg: #040404;
+  --surface: #080808;
+  --surface-2: #0d0d0d;
   --line: rgba(255, 255, 255, 0.085);
   --line-strong: rgba(255, 255, 255, 0.18);
   --line-bright: rgba(255, 255, 255, 0.42);
-  --text: #f4f4f5;
-  --muted: #a9aab0;
-  --faint: #7b7c84;
-  --silver: #c9ccd1;
-  --ink: #08080a;
-  --metal: linear-gradient(180deg, #fdfdfd 0%, #d9dbdf 42%, #a9acb2 100%);
-  --metal-hover: linear-gradient(180deg, #ffffff 0%, #eceef0 42%, #c2c5ca 100%);
+  --text: #f4f4f4;
+  --muted: #a9a9a9;
+  --faint: #7b7b7b;
+  --silver: #c9c9c9;
+  --ink: #060606;
+  --metal: linear-gradient(180deg, #fdfdfd 0%, #d9d9d9 42%, #a9a9a9 100%);
+  --metal-hover: linear-gradient(180deg, #ffffff 0%, #ececec 42%, #c2c2c2 100%);
   --display: "Sigil Display", Didot, "Bodoni 72", Georgia, serif;
   --sans: "Sigil Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Sigil Mono", ui-monospace, Menlo, Consolas, monospace;
@@ -51,7 +51,7 @@
 
 body {
   margin: 0;
-  background: radial-gradient(120% 60% at 50% 0%, #131316, var(--bg) 70%);
+  background: radial-gradient(120% 60% at 50% 0%, #0e0e0e, var(--bg) 70%);
   color: var(--text);
   font: 14px/1.5 var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -230,7 +230,7 @@ body:not([data-paired="checking"]) .pair-wait {
   border: 1px solid var(--line-bright);
   border-radius: 50%;
   background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%);
-  color: #eef0f2;
+  color: #eeeeee;
 }
 
 .act-text {
@@ -273,7 +273,7 @@ body:not([data-paired="checking"]) .pair-wait {
 }
 
 .act.primary small {
-  color: rgba(8, 8, 10, 0.66);
+  color: rgba(6, 6, 6, 0.66);
 }
 
 .act.primary:not(:disabled):hover {
@@ -451,7 +451,7 @@ body.options {
   border: 1px solid var(--line-strong);
   border-radius: 4px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012)), var(--surface);
-  box-shadow: 0 0 0 6px rgba(6, 6, 7, 0.9), 0 0 0 7px var(--line), 0 40px 80px -40px #000;
+  box-shadow: 0 0 0 6px rgba(4, 4, 4, 0.9), 0 0 0 7px var(--line), 0 40px 80px -40px #000;
 }
 
 .box::before {
