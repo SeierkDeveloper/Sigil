@@ -118,7 +118,7 @@ export function DocumentChecker() {
   };
 
   return (
-    <div className="certificate-checker document-checker">
+    <div className="document-checker">
       <div className="field">
         <label className="field-label" htmlFor="doc-file">
           A signed file

@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d0e10?style=for-the-badge&labelColor=0b0c0e)](LICENSE)
 [![Encryption](https://img.shields.io/badge/AES--256--GCM-client--side-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-encryption-model)
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
-[![Tests](https://img.shields.io/badge/tests-398%20%2B%2037%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
+[![Tests](https://img.shields.io/badge/tests-531%20%2B%2043%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
@@ -636,7 +636,7 @@ The logo, favicon and app icons are made from `web/brand/sigil-logo.png` with `n
 ## Tests
 
 ```sh
-npm run test:unit       # 383: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
+npm run test:unit       # 463: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
                         #      the AI self and its rules, briefs, contradictions, expiry, every import
                         #      parser with fixtures, seals, server, connector, extension, SDK, Shamir
                         #      split and combine, sealed shares and bundles, the legacy heartbeat and
@@ -646,9 +646,16 @@ npm run test:unit       # 383: cryptography, sealed boxes, the ask link relay, s
                         #      the protected read gate, PKCE and token storage, Gmail, Calendar,
                         #      Drive and Slack sync against recorded fixtures, meeting transcripts,
                         #      the public copy and page, selves meet sealing and turns, the privacy
-                        #      score, and the open standard's vectors against the code
-npm run test:contracts  # 15: SigilSeal, with fuzzing and a cross-check against the browser
-npm run test:e2e        # 37: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
+                        #      score, the self key, EIP-712 digests and signatures checked against viem,
+                        #      the identity statement, wallet rules and the configure call, drafts,
+                        #      held answers and learning from edits, field commitments and every kind
+                        #      of proof of a fact, the emergency card's key and openings, agreement
+                        #      signatures and amendments, signed packs, pinning and following, and the
+                        #      open standard's vectors against the code
+npm run test:contracts  # 68: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
+                        #     wallet's caps, freeze and expiry, and the standard's vectors signed in
+                        #     TypeScript and accepted by both new contracts
+npm run test:e2e        # 43: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
                         #     the inbox, the Self card, search by meaning, sharing, Sign in with Sigil,
                         #     the AI self test chat, an ask link answered across two browsers, the
                         #     weekly brief, contradictions, expiry, merging every group, the site,
@@ -658,10 +665,14 @@ npm run test:e2e        # 37: sign up, import (ChatGPT, Claude, Takeout, Obsidia
                         #     screen at 375 pixels, Gmail live sync with Google played by the test,
                         #     a meeting transcript, a protected read approved in the inbox, the
                         #     public AI self asked from another browser, two selves meeting across
-                        #     two browsers, the privacy score
+                        #     two browsers, the privacy score, the Identity tab off chain, a draft
+                        #     approved with an edit and learned from, a proof of a fact and of an age
+                        #     verified in another browser, the emergency card opened on a phone and
+                        #     revoked, an agreement signed across two browsers, a pack followed and
+                        #     updated
 ```
 
-The server tests check that no plaintext ever reaches the database or leaves the browser, and that the server never holds a model key, a rule, a question, an answer, a legacy share, a device secret, a space key, a sync token, a mail or a turn between two selves in readable form. Live sync is tested against recorded API fixtures with the HTTP mocked; no test calls Google or Slack. Search by meaning is tested with a tiny generated model kept in `packages/core/test/fixtures/tiny-model`, and every model call is answered by the tests themselves, so no test needs the network or a real model.
+The server tests check that no plaintext ever reaches the database or leaves the browser, and that the server never holds a model key, a rule, a question, an answer, a legacy share, a device secret, a space key, a sync token, a mail or a turn between two selves in readable form. Live sync is tested against recorded API fixtures with the HTTP mocked; no test calls Google or Slack. No test reaches a chain: the contracts run in Foundry, and the vault's chain reads are tested with the RPC answered by the test. Search by meaning is tested with a tiny generated model kept in `packages/core/test/fixtures/tiny-model`, and every model call is answered by the tests themselves, so no test needs the network or a real model.
 
 ---
 
