@@ -21,6 +21,7 @@
 
 import { createServer as createHttpServer, type IncomingMessage } from "node:http";
 import { randomBytes } from "node:crypto";
+import { isLoopbackHost, isSafeBaseUrl, samePath } from "./net";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { VaultReader } from "./reader";
@@ -90,6 +91,8 @@ async function main() {
   const baseUrl = process.env.SIGIL_URL?.trim();
   if (!appKey) fail("SIGIL_APP_KEY is not set. Create an app key in your Sigil vault under Apps.");
   if (!baseUrl || !/^https?:\/\//.test(baseUrl)) fail("SIGIL_URL is not set. Use the address of the Sigil site your vault is on.");
+  // The app key's token travels with every request: https only, plain http only to this machine.
+  if (!isSafeBaseUrl(baseUrl)) fail("SIGIL_URL must start with https:// (plain http is allowed only for localhost).");
 
   let reader: VaultReader;
   try {
@@ -204,13 +207,18 @@ async function main() {
 
   const port = Number(arg("--port") ?? 8787);
   const host = arg("--host") ?? "127.0.0.1";
-  const token = process.env.SIGIL_HTTP_TOKEN?.trim() || randomBytes(24).toString("base64url");
+  // Plain HTTP with the key's reads behind it: only on this machine unless the owner says otherwise.
+  if (!isLoopbackHost(host) && !process.argv.includes("--allow-network")) {
+    fail(`--host ${host} would serve plain HTTP to the network. Use 127.0.0.1, or add --allow-network and put TLS in front of it.`);
+  }
+  const given = process.env.SIGIL_HTTP_TOKEN?.trim();
+  const token = given || randomBytes(24).toString("base64url");
   if (!/^[A-Za-z0-9_-]{16,128}$/.test(token)) fail("SIGIL_HTTP_TOKEN must be 16 to 128 letters, digits, - or _.");
   const path = `/mcp/${token}`;
 
   const http = createHttpServer(async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
-    if (url.pathname !== path) {
+    if (!samePath(url.pathname, path)) {
       res.writeHead(404, { "content-type": "text/plain" }).end("Not found");
       return;
     }
@@ -231,7 +239,9 @@ async function main() {
     }
   });
   http.listen(port, host, () => {
-    process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} listening on http://${host}:${port}${path}\n`);
+    // A token the owner set is not printed again (logs of MCP clients keep what is written here).
+    const shown = given ? `/mcp/<SIGIL_HTTP_TOKEN>` : path;
+    process.stderr.write(`sigil-connector ${CONNECTOR_VERSION} listening on http://${host}:${port}${shown}\n`);
     process.stderr.write("Keep this address private: anyone who has it can read what this app key can read.\n");
   });
 }

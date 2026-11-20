@@ -49,10 +49,38 @@ function text(value: string) {
   return { content: [{ type: "text" as const, text: value }] };
 }
 
+/**
+ * What the AI model is told when the server refused a call: a fixed sentence
+ * for the reason the server gave by code, never the server's own words. A
+ * server (or anyone in the way) could otherwise put instructions for the model
+ * in an error message.
+ */
+const SERVER_REASONS: Record<string, string> = {
+  app_revoked: "This app key was revoked or does not exist. The user can create a new one in their Sigil vault under Apps.",
+  rate_limited: "Too many requests to Sigil just now. Wait a moment and try again.",
+  too_large: "That request was too large for Sigil.",
+  invalid: "Sigil did not accept that request as it was written.",
+  not_found: "Sigil did not find what was asked for, or this app may not see it.",
+  not_protected: "This app may not read a protected folder with that name.",
+  moved: "This vault moved to another Sigil node. The user can give this app the new address.",
+  not_agent: "This key does not belong to an agent.",
+  not_member: "This agent is not in that space.",
+  role: "This app's role does not allow that.",
+  propose_off: "The user has not let this app suggest memories.",
+  self_off: "The user has not let this app answer as their AI self.",
+  server: "Something went wrong on the Sigil server. Try again later.",
+};
+
+export function serverReason(err: ReaderError): string {
+  return SERVER_REASONS[err.code] ?? `Sigil refused this request (status ${err.status || "unknown"}${err.code && err.code !== "error" ? `, reason ${err.code}` : ""}). The user can see why in their Sigil vault.`;
+}
+
 function failure(err: unknown) {
   const message =
     err instanceof ReaderError
-      ? err.message
+      ? err.fromServer
+        ? serverReason(err)
+        : err.message
       : err instanceof Error
         ? `Sigil could not complete this: ${err.message}`
         : "Sigil could not complete this.";

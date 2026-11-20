@@ -3,10 +3,21 @@
 // save something; it checks the request, seals the suggestion and sends it.
 
 import { conversationDrafts, extractPage, pageDraft, selectionDraft, siteOf } from "./capture";
-import { parseMessage, type Reply } from "./messages";
+import { allowedFrom, parseMessage, type Reply } from "./messages";
 import { chromeStore, send } from "./pairing";
 
 const store = chromeStore();
+
+// The app key is for this worker and the extension's own pages only. Content
+// scripts run inside other sites' pages; they never need it, so they cannot
+// read it (StorageArea.setAccessLevel, Chrome 102 and later).
+void (async () => {
+  try {
+    await chrome.storage.local.setAccessLevel?.({ accessLevel: "TRUSTED_CONTEXTS" });
+  } catch {
+    // An older browser keeps the default; content scripts still never ask for the key.
+  }
+})();
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
@@ -75,10 +86,10 @@ chrome.runtime.onMessage.addListener((raw, sender, respond: (r: Reply) => void) 
         const drafts = conversationDrafts(msg.conversation);
         const sent = await send(store, drafts);
         respond({ ok: true, sent, message: `Sent ${plural(sent, "suggestion", "suggestions")} to your Sigil inbox.` });
-      } else if (msg.type === "sigil:save-page") {
-        respond(await savePage(msg.tabId));
-      } else if (msg.type === "sigil:save-selection") {
-        respond(await saveSelection(msg.tabId));
+      } else if (msg.type === "sigil:save-page" || msg.type === "sigil:save-selection") {
+        // Only the popup (an extension page, not a tab) may ask to read a tab; a content script in a page may not.
+        if (!allowedFrom(msg, sender)) throw new Error("Only the Sigil button may save a page.");
+        respond(msg.type === "sigil:save-page" ? await savePage(msg.tabId) : await saveSelection(msg.tabId));
       } else {
         const s = await store.get();
         respond(s ? { ok: true, sent: 0, message: `Paired with ${s.baseUrl}.` } : { ok: false, error: "Not paired yet." });

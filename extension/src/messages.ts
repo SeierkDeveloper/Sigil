@@ -55,3 +55,13 @@ export function parseMessage(raw: unknown): Message | null {
       return null;
   }
 }
+
+/**
+ * Who may ask for what. A content script runs inside a page of another site;
+ * it may only hand over the conversation of the page it runs in. Reading a tab
+ * (the page or the selection) is for the popup, an extension page with no tab.
+ */
+export function allowedFrom(msg: Message, sender: { tab?: { url?: string } }): boolean {
+  if (msg.type === "sigil:save-page" || msg.type === "sigil:save-selection") return !sender.tab;
+  return true;
+}
