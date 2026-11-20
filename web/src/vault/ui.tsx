@@ -76,3 +76,39 @@ export function download(filename: string, content: string, type = "application/
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** The head of one numbered plate in a tab: its number, its title, one line under it and, on the right, its state. */
+export function PlateHead({ number, id, title, lead, children }: { number: string; id?: string; title: string; lead?: React.ReactNode; children?: React.ReactNode }) {
+  return (
+    <header className="plate-head">
+      <span className="plate-number" aria-hidden="true">
+        {number}
+      </span>
+      <div className="plate-heading">
+        <h3 id={id} className="plate-title">
+          {title}
+        </h3>
+        {lead ? <p className="plate-lead">{lead}</p> : null}
+      </div>
+      {children ? <div className="plate-aside">{children}</div> : null}
+    </header>
+  );
+}
+
+/** One band of a long form: what the fields are about on the left, the fields on the right. */
+export function Band({ label, hint, children }: { label: string; hint?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="band">
+      <div className="band-side">
+        <p className="band-label">{label}</p>
+        {hint ? <p className="band-hint">{hint}</p> : null}
+      </div>
+      <div className="band-main">{children}</div>
+    </div>
+  );
+}
+
+/** Nothing here yet, said in one line inside a plate. */
+export function Quiet({ children }: { children: React.ReactNode }) {
+  return <p className="quiet">{children}</p>;
+}
