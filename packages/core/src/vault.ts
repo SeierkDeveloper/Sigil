@@ -25,7 +25,10 @@ export type SourceKind =
   | "github"
   | "notion"
   | "capture"
-  | "agent";
+  | "agent"
+  | "slack"
+  | "drive"
+  | "meeting";
 
 export interface MemorySource {
   kind: SourceKind;
@@ -49,6 +52,9 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   notion: "Imported from Notion",
   capture: "Captured on a device",
   agent: "Remembered by an agent",
+  slack: "Synced from Slack",
+  drive: "Synced from Google Drive",
+  meeting: "From a meeting transcript",
 };
 
 export function sourceLabel(source: MemorySource): string {
@@ -136,10 +142,37 @@ export interface StoredApp {
 
 export type FolderKind = "profile" | "agent";
 
+/** What a protected folder holds. Encrypted with the name: the server only knows that a folder is protected. */
+export type ProtectKind = "health" | "money" | "legal" | "other";
+
+export const PROTECT_KINDS: readonly ProtectKind[] = ["health", "money", "legal", "other"];
+
+/** Patterns masked on the device before a memory from this folder leaves the vault (to an app, a model or a public page). */
+export type RedactRule = "card" | "iban" | "account" | "national_id" | "passport" | "phone" | "email";
+
+export const REDACT_RULES: readonly RedactRule[] = ["card", "iban", "account", "national_id", "passport", "phone", "email"];
+
 export interface FolderMeta {
   name: string;
   /** "profile" marks the folder that holds the Self card, "agent" an agent's own folder. Encrypted like the name, so the server cannot tell. */
   kind?: FolderKind;
+  /** Set when the folder is protected: no app, agent, AI self or link reads it without a fresh yes from the owner. */
+  protect?: ProtectKind;
+  /** What is masked on the device before anything from this folder leaves the vault. */
+  redact?: RedactRule[];
+}
+
+/** The settings a folder carries next to its name. */
+export interface FolderGuard {
+  protect?: ProtectKind;
+  redact?: RedactRule[];
+}
+
+export function cleanGuard(value: unknown): FolderGuard {
+  const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  const protect = PROTECT_KINDS.includes(v.protect as ProtectKind) ? (v.protect as ProtectKind) : undefined;
+  const redact = Array.isArray(v.redact) ? REDACT_RULES.filter((r) => (v.redact as unknown[]).includes(r)) : [];
+  return { ...(protect ? { protect } : {}), ...(redact.length ? { redact } : {}) };
 }
 
 export type AppKind = "claude-desktop" | "claude-code" | "cursor" | "chatgpt" | "other" | "extension" | "web";
@@ -149,7 +182,7 @@ export interface AppMeta {
   kind: AppKind;
 }
 
-export interface OpenFolder {
+export interface OpenFolder extends FolderGuard {
   id: string;
   name: string;
   key: CryptoKey;
@@ -189,9 +222,9 @@ export async function vaultCryptoKey(vaultKey: Uint8Array): Promise<CryptoKey> {
 
 // ---------------------------------------------------------------- folders
 
-function folderMeta(name: string, kind?: FolderKind): FolderMeta {
+function folderMeta(name: string, kind?: FolderKind, guard: FolderGuard = {}): FolderMeta {
   const clean = name.trim().slice(0, 120) || "Untitled";
-  return kind ? { name: clean, kind } : { name: clean };
+  return { name: clean, ...(kind ? { kind } : {}), ...cleanGuard(guard) };
 }
 
 export async function createFolder(
@@ -219,12 +252,17 @@ export async function openFolder(vaultKey: CryptoKey, stored: StoredFolder): Pro
 export async function openFolderWithRaw(stored: Pick<StoredFolder, "id" | "meta">, raw: Uint8Array): Promise<OpenFolder> {
   const key = await importKey(raw);
   const meta = await decryptJson<FolderMeta>(key, stored.meta, AAD.folderMeta(stored.id));
-  return { id: stored.id, name: meta.name, key, raw, ...(meta.kind === "profile" || meta.kind === "agent" ? { kind: meta.kind } : {}) };
+  return { id: stored.id, name: meta.name, key, raw, ...(meta.kind === "profile" || meta.kind === "agent" ? { kind: meta.kind } : {}), ...cleanGuard(meta) };
 }
 
-/** The folder's name (and kind) encrypted under its own key. Renaming keeps the kind. */
-export async function renameFolder(folder: Pick<OpenFolder, "id" | "key" | "kind">, name: string): Promise<string> {
-  return encryptJson(folder.key, folderMeta(name, folder.kind), AAD.folderMeta(folder.id));
+/** The folder's name (and kind, protection and redaction) encrypted under its own key. Renaming keeps the rest. */
+export async function renameFolder(folder: Pick<OpenFolder, "id" | "key" | "kind" | "protect" | "redact">, name: string): Promise<string> {
+  return encryptJson(folder.key, folderMeta(name, folder.kind, folder), AAD.folderMeta(folder.id));
+}
+
+/** The folder's meta with new protection and redaction settings, its name and kind kept. */
+export async function guardFolder(folder: Pick<OpenFolder, "id" | "key" | "kind" | "name">, guard: FolderGuard): Promise<string> {
+  return encryptJson(folder.key, folderMeta(folder.name, folder.kind, guard), AAD.folderMeta(folder.id));
 }
 
 // ---------------------------------------------------------------- memories

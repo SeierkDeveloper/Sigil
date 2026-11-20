@@ -48,6 +48,11 @@ export const AAD = {
   handoff: (handoffId: string) => `sigil:handoff:${handoffId}`,
   spaceMeta: (spaceId: string) => `sigil:space-meta:${spaceId}`,
   spaceNote: (spaceId: string) => `sigil:space-note:${spaceId}`,
+  syncOwner: (sourceId: string) => `sigil:sync:${sourceId}`,
+  syncApp: (appId: string, sourceId: string) => `sigil:sync-app:${appId}:${sourceId}`,
+  publicOwner: (selfId: string) => `sigil:public-self:${selfId}`,
+  publicApp: (appId: string, selfId: string) => `sigil:public-self-app:${appId}:${selfId}`,
+  meetOwner: (meetId: string) => `sigil:meet:${meetId}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */
@@ -194,6 +199,11 @@ export interface AppKeys {
 /** The key that wraps what an app needs to answer as the owner's AI self (rules, model key, ask links). */
 export async function appSelfKey(secret: Uint8Array): Promise<Uint8Array> {
   return hkdf(secret, "sigil:wrap:self");
+}
+
+/** The key that wraps live sync sources (their tokens, folder and cursor) for a connector the owner lets sync in the background. */
+export async function appSyncKey(secret: Uint8Array): Promise<Uint8Array> {
+  return hkdf(secret, "sigil:wrap:sync");
 }
 
 export async function appKeys(secret: Uint8Array): Promise<AppKeys> {

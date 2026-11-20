@@ -82,6 +82,11 @@ export const fromHex32 = (hex: string) => {
  *   presence   the owner's vault was open in that hour; the memory id field holds the vault's signature over the hour
  *   remember   an agent wrote a memory          forget    an agent deleted one
  *   handoff    an agent left or picked up a note space     a team space was read, written or changed
+ *   protected  a memory in a protected folder was read, after the owner's yes (the memory id field holds the memory)
+ *   approval   the owner said yes or no to a request to read a protected folder
+ *   public     the public AI self answered a question (sealed note, like "ask")
+ *   meet       a step of a conversation between two AI selves (invite, answer, a turn, stop)
+ *   sync       a connector wrote what a live sync source fetched, in the background
  */
 export type ReadKind =
   | "folders"
@@ -96,9 +101,33 @@ export type ReadKind =
   | "remember"
   | "forget"
   | "handoff"
-  | "space";
+  | "space"
+  | "protected"
+  | "approval"
+  | "public"
+  | "meet"
+  | "sync";
 
-export const READ_KINDS: readonly ReadKind[] = ["folders", "index", "read", "propose", "shared", "ask", "legacy", "device", "presence", "remember", "forget", "handoff", "space"];
+export const READ_KINDS: readonly ReadKind[] = [
+  "folders",
+  "index",
+  "read",
+  "propose",
+  "shared",
+  "ask",
+  "legacy",
+  "device",
+  "presence",
+  "remember",
+  "forget",
+  "handoff",
+  "space",
+  "protected",
+  "approval",
+  "public",
+  "meet",
+  "sync",
+];
 
 export interface ReadEntryFields {
   id: string;

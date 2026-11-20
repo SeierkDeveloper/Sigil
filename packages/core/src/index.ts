@@ -21,3 +21,8 @@ export * from "./pairing";
 export * from "./agent";
 export * from "./space";
 export * from "./life";
+export * from "./protect";
+export * from "./score";
+export * from "./meet";
+export * from "./publicself";
+export * from "./sync/index";
