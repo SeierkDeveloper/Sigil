@@ -254,6 +254,7 @@ function ProposalCard({ proposal, appName, appKind }: { proposal: ops.ProposalVi
                 </div>
                 {p.image ? (
                   <figure className="memory-photo">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- a photo decrypted on this device, as a data: address */}
                     <img src={`data:${p.image.type};base64,${p.image.data}`} alt={`Photo with ${title || "this capture"}`} />
                     <figcaption className="small faint">Sealed on your device with the text, and kept with the memory when you approve it.</figcaption>
                   </figure>

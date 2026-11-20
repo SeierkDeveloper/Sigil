@@ -401,6 +401,7 @@ function Editor({ memory, defaultFolder, onClose }: { memory: Memory | null; def
       </div>
       {memory?.image ? (
         <figure className="memory-photo">
+          {/* eslint-disable-next-line @next/next/no-img-element -- a photo decrypted on this device, as a data: address */}
           <img src={`data:${memory.image.type};base64,${memory.image.data}`} alt={`Photo kept with ${memory.title}`} />
           <figcaption className="small faint">Encrypted with this memory, like its text.</figcaption>
         </figure>

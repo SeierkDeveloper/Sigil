@@ -24,8 +24,6 @@ export function PairNewDevice({ api, onUnlocked, onCancel }: { api: Api; onUnloc
   useEffect(() => {
     let alive = true;
     done.current = false;
-    setState("waiting");
-    setError(null);
     startPairing(api, window.location.origin)
       .then((s) => alive && setSession(s))
       .catch((err) => alive && setError(errorText(err)));
@@ -94,7 +92,16 @@ export function PairNewDevice({ api, onUnlocked, onCancel }: { api: Api; onUnloc
         </div>
       ) : null}
       {state === "expired" ? (
-        <button type="button" className="button button-primary" onClick={() => setRound((r) => r + 1)}>
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => {
+            setState("waiting");
+            setError(null);
+            setSession(null);
+            setRound((r) => r + 1);
+          }}
+        >
           Make a new code
         </button>
       ) : null}

@@ -43,7 +43,6 @@ export function CertificateChecker() {
     const id = new URLSearchParams(window.location.search).get("certificate");
     if (!id || !/^[A-Za-z0-9_-]{8,64}$/.test(id)) return;
     let alive = true;
-    setState({ kind: "loading" });
     fetch(`/api/certificates/${id}`, { cache: "no-store" })
       .then(async (r) => {
         const body = await r.text();

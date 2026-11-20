@@ -30,6 +30,12 @@ const stored: [string, string, string][] = [
   ["Ask link questions", "Questions in flight and their answers, as boxes only the asker and your vault or connector can open, with the asker's public key for that conversation. Deleted a day after they were asked.", "Encrypted, with readable ids and times"],
   ["Read log", "For every request by a connected app, every suggestion, every time a vault opens a folder you share and every answer of your AI self: which app, share or link, what kind, which memory, suggestion or question id, how many items, when, and a random salt. For an answer, the question and answer sealed to your vault's public key.", "Readable to the server, answers encrypted"],
   ["Seals", "One Merkle root per hour and the salted leaves it is made of. They contain no readable personal data.", "Hashes"],
+  ["Last activity", "When you last signed in or did something in your vault, for your legacy plan's heartbeat.", "Readable time"],
+  ["Legacy plan", "Its period, how many people are needed, which folder ids each person receives and whether they may talk to your AI self, each person's share, bundle and note sealed to their vault, the plan under your vault key, the warning stages reached, who asked for a release, shares passed between them (sealed), and when it was released or opened.", "Encrypted and sealed, with readable ids, counts and times"],
+  ["Paired devices", "A key slot per device: a hash of its token, your vault key locked with its device key, its name under your vault key, and when it was last used. A pairing in progress keeps the new device's one-time public key, the code made from it and one sealed box, for ten minutes at most.", "Encrypted and hashed, with readable ids and times"],
+  ["Agents", "For each agent: its own folder id, which tools it may use, whether it may write each folder, and the public half of the key pair made from its secret. Its handoff notes, encrypted.", "Readable rules and ids, notes encrypted"],
+  ["Team spaces", "Each space's encrypted name and memories, and per member: which vault or agent, its public key, its role, the space key sealed to it, a tag made with the space key and its name in the space, encrypted.", "Encrypted and sealed, with readable ids, roles and times"],
+  ["Presence and certificates", "Your vault's signing public key, one read-log entry per hour your vault was open with its signature, and the certificates you publish by link (which hold seal roots, proofs and signatures, and nothing from your vault).", "Readable signatures and hashes"],
 ];
 
 export default function Privacy() {
@@ -79,7 +85,7 @@ export default function Privacy() {
             <strong>Never stored or seen by Sigil:</strong> your vault key, folder keys, app keys, recovery phrase, passkey PRF output, wallet
             signatures, the titles, bodies and tags of memories and suggestions, folder and app names, who you share with, what you or a connected
             app searched for, the search vectors made from your memories, your model key, your AI self&apos;s rules, the questions and answers of
-            your ask links, and the GitHub token you use for an import.
+            your ask links, the GitHub token you use for an import, legacy keys and the shares made from them, device secrets, space keys, and the photos you capture.
           </p>
 
           <h2>Why, and on what legal basis</h2>

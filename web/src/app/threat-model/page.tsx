@@ -86,9 +86,34 @@ const covered = [
     threat: "Guessing sign-ins or app keys",
     answer: "Secrets are 256 bits of randomness, and sign-in and connector requests are rate limited per address and per app.",
   },
+  {
+    threat: "Someone takes over the server and wants your legacy",
+    answer:
+      "It holds sealed shares and bundles it cannot open. The legacy key exists only in your browser and, after a release, in the browsers of your trusted people. Each bundle is sealed to one person's vault as well, so even the combined shares open only that person's part.",
+  },
+  {
+    threat: "The server hands a new device its own key, or adds a member to a team space",
+    answer:
+      "A pairing code is a hash of the new device's key, so a swapped key fails the check before anything is sealed, and both screens show the same fingerprint. A space member carries a tag made with the space key; one the server added fails, and admins seal nothing until it is removed.",
+  },
+  {
+    threat: "A lost or stolen phone",
+    answer:
+      "Revoke it under Devices: its key slot and every session it opened end at once, and it forgets its device key when it next reaches Sigil. Without the device key, its offline copy is ciphertext.",
+  },
 ];
 
 const notCovered = [
+  {
+    threat: "A server and your trusted people working together",
+    answer:
+      "The server decides when your legacy plan's period is over. It cannot open anything alone, but together with enough of your trusted people it could hand out the shares early. And what a person opened during a release stays with them.",
+  },
+  {
+    threat: "Reading more into a life certificate than it says",
+    answer:
+      "A certificate proves that whoever could open a vault signed in each listed hour and that the site sealed it then. It does not prove who that is, that it is one person, or that a person rather than a program kept the vault open.",
+  },
   {
     threat: "Malware on the device where you unlock the vault",
     answer: "Whatever can read your screen or your browser's memory can read what you can read. Encryption protects the vault on the server and on the network, not on a compromised device.",

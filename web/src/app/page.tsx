@@ -18,6 +18,10 @@ import {
   LockIcon,
   SealIcon,
   ShareIcon,
+  AgentIcon,
+  CertificateIcon,
+  HourglassIcon,
+  PhoneIcon,
 } from "@/components/icons";
 import { cipherText } from "@/lib/cipher";
 import { EXAMPLE_KEY, mcpConfig } from "@/lib/connector";
@@ -37,6 +41,37 @@ const promises = [
     icon: SealIcon,
     title: "Every read on the record",
     text: "Each time an app reads your vault, it is written to a log you can see. Every hour the log is sealed with a fingerprint you can check yourself.",
+  },
+];
+
+const further = [
+  {
+    icon: HourglassIcon,
+    title: "Your AI self outlives you",
+    text: "Name the people who receive your vault, the folders each gets and whether they may talk to your AI self. They open it only together, only after the time you chose without a sign of you.",
+    href: "/legacy",
+    link: "How legacy works",
+  },
+  {
+    icon: PhoneIcon,
+    title: "On your phone and every device",
+    text: "Install it like an app, add a device by scanning a code, and share text, links and photos into your inbox, sealed on the phone.",
+    href: "/docs#devices",
+    link: "Phone and devices",
+  },
+  {
+    icon: AgentIcon,
+    title: "Agents get their own memory",
+    text: "Cursor, Claude Code and other agents remember, recall and leave notes for their next session, in folders and team spaces you set the rules for.",
+    href: "/docs#agents",
+    link: "Agent vaults",
+  },
+  {
+    icon: CertificateIcon,
+    title: "Proof of a real life",
+    text: "A certificate that your vault has months of continuous sealed history, checked in anyone's browser, without showing a word of it.",
+    href: "/verify#certificate",
+    link: "Check a certificate",
   },
 ];
 
@@ -425,6 +460,35 @@ export default function Home() {
       </section>
 
       <section className="section">
+        <div className="container">
+          <div className="section-header">
+            <p className="eyebrow">Further</p>
+            <h2 className="section-title">After you, beside you, everywhere</h2>
+            <p className="section-lead">
+              The same keys and the same sealed record, carried further: to the people who come after you, to every device you own, to the agents
+              that work for you, and into a proof that a real life stands behind a vault.
+            </p>
+          </div>
+          <div className="grid grid-2">
+            {further.map(({ icon: Icon, title, text, href, link }) => (
+              <article key={title} className="card">
+                <span className="card-icon">
+                  <Icon />
+                </span>
+                <h3 className="card-title">{title}</h3>
+                <p className="card-text">{text}</p>
+                <p className="card-link">
+                  <Link href={href} className="arrow-link">
+                    {link} <ArrowIcon />
+                  </Link>
+                </p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="section">
         <div className="container split">
           <div>
             <p className="eyebrow">Seals</p>
@@ -584,7 +648,7 @@ export default function Home() {
             <h2 className="section-title">From a vault to an AI self</h2>
             <p className="section-lead">
               The vault is the first stage, and the first version of your AI self is here: it answers as you, within your rules, with your own
-              model key. Over time it could work and earn for you, and outlive you on terms you set in advance.
+              model key, and it can outlive you on terms you set in advance. Over time it could work and earn for you.
             </p>
             <div className="hero-actions">
               <Link href="/ai-self" className="button">
@@ -613,8 +677,9 @@ export default function Home() {
               <CheckIcon />
               <span>
                 <strong>Started:</strong> memory that thinks (search by meaning on your device, a timeline, duplicates, a Self card, a weekly brief,
-                memories that disagree, expiry), your whole digital life (local imports from notes, mail, calendar and code), and your AI self, version
-                1, with ask links. <strong>Next:</strong> seals published on chain, and live sync.
+                memories that disagree, expiry), your whole digital life (local imports from notes, mail, calendar and code), your AI self, version
+                1, with ask links, legacy, the installable app with devices added by code, agent vaults with team spaces, and life certificates.{" "}
+                <strong>Next:</strong> seals published on chain, and live sync.
               </span>
             </li>
           </ul>

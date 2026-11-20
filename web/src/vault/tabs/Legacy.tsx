@@ -103,7 +103,6 @@ function OwnerPlan() {
   const people = record!.people;
   const answered = people.filter((p) => !p.publicKey && state.answers[p.id]);
   const waiting = people.filter((p) => !p.publicKey && !state.answers[p.id]);
-  const nameOf = (id: string) => people.find((p) => p.id === id)?.label ?? "A trusted person";
   const complete = plan.people.some((p) => p.sealed);
 
   return (

@@ -188,7 +188,6 @@ function AddDevice({ fragment, onAdded }: { fragment: string | null; onAdded(slo
 
   const follow = useCallback(
     async (frag: string) => {
-      setError(null);
       try {
         setStep({ kind: "confirm", target: await devices.findByLink(api, frag) });
       } catch (err) {
@@ -200,8 +199,16 @@ function AddDevice({ fragment, onAdded }: { fragment: string | null; onAdded(slo
   );
 
   useEffect(() => {
-    if (fragment) void follow(fragment);
-  }, [fragment, follow]);
+    if (!fragment) return;
+    let alive = true;
+    devices
+      .findByLink(api, fragment)
+      .then((target) => alive && setStep({ kind: "confirm", target }))
+      .catch((err) => alive && setError(errorText(err)));
+    return () => {
+      alive = false;
+    };
+  }, [fragment, api]);
 
   const find = async (e: React.FormEvent) => {
     e.preventDefault();

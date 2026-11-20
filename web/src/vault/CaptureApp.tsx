@@ -165,6 +165,7 @@ export function CaptureApp() {
             <div className="capture-photo">
               {photo ? (
                 <figure className="memory-photo">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- a photo decrypted on this device, as a data: address */}
                   <img src={`data:${photo.type};base64,${photo.data}`} alt="The photo to capture" />
                   <button type="button" className="text-button small" onClick={() => setPhoto(null)}>
                     Remove the photo

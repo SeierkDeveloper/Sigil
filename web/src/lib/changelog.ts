@@ -4,11 +4,62 @@ export interface Release {
   date: string; // ISO day
   title: string;
   summary: string;
-  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import";
+  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import" | "Legacy" | "Devices" | "Agents" | "Proof";
   items: string[];
 }
 
 export const releases: Release[] = [
+  {
+    date: "2026-11-20",
+    title: "Legacy: your AI self outlives you",
+    area: "Legacy",
+    summary: "Name the people who receive your vault, the folders each gets and whether they may talk to your AI self. They open it together, only after you have been away for the period you chose.",
+    items: [
+      "Trusted people by vault code with a fingerprint, or by an invite link whose answer your vault checks before it seals anything",
+      "A legacy key split with Shamir's secret sharing in your browser, each share sealed to one person's vault; each person's bundle sealed to them as well, so nobody opens another's",
+      "A heartbeat from every sign-in and vault action, a check-in button, the next check-in date, and first and last warnings in your read log and in the vault when you come back",
+      "A release room that relays shares sealed to the keys you named; shares combined in the trusted person's browser, folders read only, and your AI self in a labelled legacy mode",
+      "Every step in your read log and the hourly seal; every change makes a new legacy key; a public page that explains it, limits included",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Your phone and every device",
+    area: "Devices",
+    summary: "Sigil installs as an app, adds a device by QR code with keys sealed to that device only, and captures text, links and photos into your inbox.",
+    items: [
+      "An installable app with icons from the mark, an offline app shell and, when you turn it on, an encrypted copy of the vault to read offline",
+      "Add a device: a one-time key and a QR code on the new device, a code made from its key, a fingerprint on both screens, and the vault key sent sealed through a relay that keeps it ten minutes",
+      "A device list with revoke: the key slot and every session of that device end at once, and it forgets its key the next time it reaches Sigil",
+      "Quick capture and the share sheet: text, a link or a photo sealed on the phone to your vault's public key, without unlocking, queued while offline",
+      "Photos kept inside a memory's encrypted body, and every vault screen laid out for a 375 pixel phone",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Agents get their own memory",
+    area: "Agents",
+    summary: "Agent vaults for Cursor, Claude Code and any MCP client, team spaces shared by vaults and agents, and sealed handoff notes.",
+    items: [
+      "An agent vault: its own folder and key, other folders to read or write, and a switch for each tool, enforced by the server",
+      "remember, recall, forget, leave_handoff and pick_up_handoffs in the connector, all in the read log and the seals",
+      "Team spaces with read, write and admin roles, the space key sealed to every member, member tags a server cannot forge, and a new key on removal",
+      "Handoff notes for an agent's next session or for the other agents in a space, encrypted on the machine",
+      "Setup steps for Claude Code, Cursor, VS Code, Claude Desktop and other MCP clients",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Proof of a real life, version 1",
+    area: "Proof",
+    summary: "A certificate that a vault has months of continuous sealed history, without a word of what is in it.",
+    items: [
+      "A signing key made from the vault key, and one signed presence statement per seal period while the vault is open, sealed with the hour",
+      "A certificate built and signed in the browser: first and last seal, hours and days with activity, the longest gap, how long it ran without a gap of more than 30 days, and the proof of every hour",
+      "A download, and a share link that opens the verify page",
+      "The verify page checks it in the browser against the published seals, and against SigilSeal on chain when the seals are anchored",
+    ],
+  },
   {
     date: "2026-11-20",
     title: "Your AI self, version 1",

@@ -10703,6 +10703,19 @@ body:has(.vault[data-consent]) .site-header-inner {
   margin-bottom: var(--space-4);
 }
 
+/* Six steps sit in two rows of three on the legacy page. */
+@media (min-width: 901px) {
+  .steps-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    row-gap: var(--space-7);
+  }
+
+  .steps-3 .step:nth-child(3n)::after {
+    right: 0;
+    background: linear-gradient(90deg, var(--color-line-strong), transparent);
+  }
+}
+
 /* ------------------------------------------------------------------ phone widths */
 
 @media (max-width: 760px) {
