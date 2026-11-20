@@ -523,9 +523,9 @@ function Spaces() {
           </div>
         </form>
       ) : null}
-      {data.spaces.length === 0 && !making ? <p className="small faint">You are not in any space yet.</p> : null}
+      {data.spaces.filter((s) => s.kind === "team").length === 0 && !making ? <p className="small faint">You are not in any team space yet. Shared family and team history lives under Shared memory.</p> : null}
       <ul className="space-list">
-        {data.spaces.map((s) => (
+        {data.spaces.filter((s) => s.kind === "team").map((s) => (
           <SpaceCard key={s.id} space={s} />
         ))}
       </ul>

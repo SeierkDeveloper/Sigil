@@ -245,6 +245,8 @@ export interface VaultData {
   captureKeys: CaptureKeyView[];
   /** Sessions with the public AI self: the offer and the bookings. */
   sessions: SessionsView;
+  /** Whether the owner turned voice on for the test chat (kept encrypted). */
+  voiceOn: boolean;
 }
 
 export interface LogEntryView {
@@ -661,6 +663,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   unreadable += captured.unreadable;
   const booked = openSessions(pub.self, box, data.sessions);
   unreadable += booked.unreadable;
+  const voice = await later(async () => (settings.voice ? (await openSetting<{ on?: boolean }>(vault.key, "voice", settings.voice)).on === true : false), false);
 
   return {
     access: data.access ?? [],
@@ -681,6 +684,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     nodes: data.nodes ?? NO_NODES,
     captureKeys: captured.keys,
     sessions: booked.sessions,
+    voiceOn: voice,
     legacy,
     trusted,
     agents: (data.agents ?? []).map((a) => ({ appId: a.appId, homeFolderId: a.homeFolderId, rules: a.rules, publicKey: a.publicKey, createdAt: a.createdAt })),

@@ -1,0 +1,43 @@
+# Run your own Sigil node: docker compose up -d --build
+#
+# Settings come from the shell or a .env file next to this one (see README,
+# "Run your own node"). The node listens on SIGIL_PORT (8080 unless set); put a
+# TLS proxy in front of it for a public address, and set SIGIL_ORIGIN to that
+# address. Data lives in the sigil-data volume: back it up, or better, let each
+# vault back itself up to its owner's own storage.
+
+services:
+  sigil:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SITE_URL: ${SIGIL_ORIGIN:-http://localhost:8080}
+        SIGIL_ORIGIN: ${SIGIL_ORIGIN:-}
+        SIGIL_BACKUP_ORIGINS: ${SIGIL_BACKUP_ORIGINS:-}
+        SIGIL_CHAIN_READ_RPC: ${SIGIL_CHAIN_READ_RPC:-}
+        SIGIL_IDENTITY_READ_RPC: ${SIGIL_IDENTITY_READ_RPC:-}
+    image: sigil-node:local
+    restart: unless-stopped
+    ports:
+      - "${SIGIL_PORT:-8080}:3000"
+    environment:
+      SIGIL_ORIGIN: ${SIGIL_ORIGIN:-}
+      SIGIL_SEALS: ${SIGIL_SEALS:-on}
+      SIGIL_ANCHOR: ${SIGIL_ANCHOR:-off}
+      SIGIL_SEMANTIC: ${SIGIL_SEMANTIC:-on}
+      SIGIL_VOICE: ${SIGIL_VOICE:-on}
+      SIGIL_MODEL_FETCH: ${SIGIL_MODEL_FETCH:-on}
+      SIGIL_NODE_ALLOW_PRIVATE: ${SIGIL_NODE_ALLOW_PRIVATE:-off}
+      SIGIL_GOOGLE_CLIENT_ID: ${SIGIL_GOOGLE_CLIENT_ID:-}
+      SIGIL_SLACK_CLIENT_ID: ${SIGIL_SLACK_CLIENT_ID:-}
+    volumes:
+      - sigil-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 40s
+      retries: 3
+
+volumes:
+  sigil-data:

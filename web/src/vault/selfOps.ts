@@ -164,6 +164,8 @@ export interface NewLinkInput {
   perHour: number;
   /** null: this vault answers while it is open. An app id: the connector with that app key answers. */
   appId: string | null;
+  /** Offer voice to whoever opens the link. */
+  voice?: boolean;
 }
 
 export function linkUrl(origin: string, link: Pick<AskLinkView, "id" | "publicKey" | "secret">): string | null {
@@ -195,6 +197,7 @@ export async function createLink(api: Api, vault: Unlocked, data: VaultData, inp
     expiresAt,
     maxUses: Math.min(Math.max(Math.round(input.maxUses), 1), 1000),
     perHour: Math.min(Math.max(Math.round(input.perHour), 1), 120),
+    voice: input.voice === true,
   };
   await api.post("self/links", body);
   const view: AskLinkView = {

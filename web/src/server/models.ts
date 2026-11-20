@@ -1,6 +1,7 @@
-// Serves the files of the sentence model the vault page runs in the browser.
-// They are public model weights, the same for everyone; no memory, query or
-// vector ever comes here. Files are kept on disk under the data folder and, when
+// Serves the files of the sentence model the vault page runs in the browser,
+// and of the speech model a page runs when someone turns voice on. They are
+// public model weights, the same for everyone; no memory, query, vector or
+// sound ever comes here. Files are kept on disk under the data folder and, when
 // missing, fetched once from the public model hub (SIGIL_MODEL_FETCH=off turns
 // that off, so a server can be given the files by hand and never go online).
 
@@ -9,7 +10,7 @@ import { mkdir, readFile, rename, stat } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { isModelId, MODEL_FILES } from "@sigil/core";
+import { isModelId, MODEL_FILES, SPEECH_MODEL_FILES } from "@sigil/core";
 import { serverConfig } from "./config";
 import { dataFile } from "./db";
 
@@ -31,16 +32,28 @@ async function download(model: string, file: string, target: string, fetcher: ty
   await rename(part, target);
 }
 
-/** GET /models/<owner>/<name>/<file>, for the configured model and its known files only. */
+/** The model a path asks for, if it is one this site serves, and its file. */
+function served(parts: string[]): { model: string; file: string } | null {
+  const offered: [string, boolean, readonly string[]][] = [
+    [serverConfig.embedModel, serverConfig.semanticEnabled, MODEL_FILES],
+    [serverConfig.speechModel, serverConfig.voiceEnabled, SPEECH_MODEL_FILES],
+  ];
+  for (const [model, on, files] of offered) {
+    const prefix = model.split("/");
+    const file = parts.slice(prefix.length).join("/");
+    const sameModel = parts.length > prefix.length && prefix.every((p, i) => parts[i] === p);
+    if (on && isModelId(model) && sameModel && files.includes(file)) return { model, file };
+  }
+  return null;
+}
+
+/** GET /models/<owner>/<name>/<file>, for the configured models and their known files only. */
 export async function handleModel(req: Request, parts: string[], fetcher: typeof fetch = fetch): Promise<Response> {
   if (req.method !== "GET" && req.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
-  const model = serverConfig.embedModel;
+  const found = served(parts);
+  if (!found) return new Response("Not found", { status: 404 });
+  const { model, file } = found;
   const prefix = model.split("/");
-  const file = parts.slice(prefix.length).join("/");
-  const sameModel = parts.length > prefix.length && prefix.every((p, i) => parts[i] === p);
-  if (!serverConfig.semanticEnabled || !isModelId(model) || !sameModel || !(MODEL_FILES as readonly string[]).includes(file)) {
-    return new Response("Not found", { status: 404 });
-  }
   const target = path.join(modelDir(), ...prefix, ...file.split("/"));
   const exists = await stat(target).then((s) => s.isFile(), () => false);
   if (!exists) {

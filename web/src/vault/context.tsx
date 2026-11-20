@@ -52,6 +52,8 @@ export type TabId =
   | "log"
   | "import"
   | "sync"
+  | "storage"
+  | "shared"
   | "settings";
 
 export const Ctx = createContext<VaultCtx | null>(null);

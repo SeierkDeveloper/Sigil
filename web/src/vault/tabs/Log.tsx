@@ -74,8 +74,9 @@ export function LogTab() {
         ...data.packs.map((p) => [p.id, `Your pack "${p.title}"`] as const),
         ...data.follows.map((f) => [f.id, `The pack "${f.title}"`] as const),
         ...(data.emergency.card ? [[data.emergency.card.id, "Your emergency card"] as const] : []),
+        ...data.captureKeys.map((k) => [k.id, `Capture key "${k.name}"`] as const),
       ]),
-    [data.apps, data.shares.outgoing, data.askLinks, data.publicSelf, data.meets, data.agreements, data.packs, data.follows, data.emergency.card],
+    [data.apps, data.shares.outgoing, data.askLinks, data.publicSelf, data.meets, data.agreements, data.packs, data.follows, data.emergency.card, data.captureKeys],
   );
   const people = useMemo(() => new Map((data.legacy.record?.people ?? []).map((p) => [p.id, p.label] as const)), [data.legacy.record]);
   const whoDid = (e: ops.LogEntryView) => {
@@ -84,6 +85,9 @@ export function LogTab() {
     if (e.kind === "emergency") return appName.get(e.appId) ?? "An earlier emergency card";
     if (e.kind === "agreement") return appName.get(e.appId) ?? "An agreement you removed";
     if (e.kind === "pack") return appName.get(e.appId) ?? "A pack";
+    if (e.kind === "capture") return appName.get(e.appId) ?? "A capture key";
+    if (e.kind === "node") return e.appId === "vault" ? "Your vault" : `The node ${e.appId}`;
+    if (e.kind === "backup") return e.appId === "vault" ? "Your vault, on a device" : (appName.get(e.appId) ?? "A connector");
     return (
       appName.get(e.appId) ??
       (e.kind === "shared" ? "A vault you no longer share with" : e.kind === "ask" ? "A deleted ask link" : e.kind === "public" ? "A public AI self you deleted" : e.kind === "meet" ? "A conversation you removed" : "Removed app")
@@ -128,6 +132,8 @@ export function LogTab() {
       if (step.startsWith("forgot-")) return `Deleted ${plural(e.count, "memory", "memories")} from the space ${name}`;
       if (step.startsWith("joined-")) return `Joined the space ${name}`;
       if (step.startsWith("removed-")) return `Was removed from the space ${name}`;
+      if (step.startsWith("left-")) return `Left the space ${name}; what was written there stays`;
+      if (step.startsWith("heir-")) return `Became a member of ${name} as an heir, when a member's legacy plan released`;
       return `Used the space ${name}`;
     }
     if (e.kind === "protected") {
@@ -186,6 +192,29 @@ export function LogTab() {
       if (step.startsWith("unfollowed-")) return "You stopped following the pack";
       if (step === "withdrawn") return "The pack was taken down";
       return "A step of a knowledge pack";
+    }
+    if (e.kind === "backup") return `A copy of the vault was stored in ${plural(e.count, "place")}, bundle ${step.slice(0, 18)}...`;
+    if (e.kind === "node") {
+      if (step.startsWith("restored-")) return "The vault was restored on this node from a bundle";
+      if (step.startsWith("move-signed-")) return "You signed a move of the vault to another node";
+      if (step.startsWith("move-cancelled-")) return "You cancelled a move to another node";
+      if (step.startsWith("bundle-sent-")) return "The new node fetched the vault's bundle for the move";
+      if (step.startsWith("arrived-")) return "The vault arrived here from another node, signed by your key";
+      if (step.startsWith("confirmed-")) return "The old node confirmed the move and sends your links on";
+      if (step.startsWith("moved-")) return "The vault moved to another node; links are sent on there";
+      return "A step of where your vault lives";
+    }
+    if (e.kind === "capture") {
+      if (step === "key-made") return "A capture key was made";
+      if (step === "key-revoked") return "A capture key was revoked";
+      return "Sent something to your inbox";
+    }
+    if (e.kind === "session") {
+      if (step.startsWith("booked-")) return "A visitor booked a session with your public AI self";
+      if (step.startsWith("turn-")) return `Your public AI self answered in a session${e.count ? `, from ${plural(e.count, "public note")}` : ""}`;
+      if (step.startsWith("ended-")) return "You ended a session";
+      if (step.startsWith("blocked-")) return "You ended a session and blocked its visitor";
+      return "A step of a session";
     }
     if (e.kind === "sync") return step.startsWith("wrote-") ? `Wrote ${plural(e.count, "memory", "memories")} from live sync, in the background` : `Removed ${plural(e.count, "memory", "memories")} that are gone at the source`;
     if (e.kind === "propose") return "Suggested a memory to your inbox";
@@ -275,7 +304,7 @@ export function LogTab() {
                   <p className="list-row-title">{describe(e)}</p>
                   <p className="list-row-meta">
                     {whoDid(e)}, {formatDateTime(e.at)}.
-                    {e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
+                    {e.carried ? ` Came with the vault from ${e.carried.origin}${"root" in e.carried ? ", sealed there" : ", before its hour was sealed there"}.` : e.sealed ? null : ` Sealed after ${formatTime(sealsAt(e))}.`}
                   </p>
                   {(e.kind === "ask" || e.kind === "public" || (e.kind === "legacy" && e.memoryId?.startsWith("ask-"))) && e.note ? (
                     shown === e.id ? (
@@ -289,7 +318,7 @@ export function LogTab() {
                   {check && "ok" in check ? (
                     check.ok ? (
                       <p className="small log-verified" data-testid="verified">
-                        Verified: part of the seal for {formatSealPeriod(check.hour, log.periodSeconds)}, root {shortHash(check.root, 8)}.{" "}
+                        Verified: part of the seal for {check.origin ? `an hour on ${check.origin}` : formatSealPeriod(check.hour, log.periodSeconds)}, root {shortHash(check.root, 8)}.{" "}
                         <button type="button" className="text-button" onClick={() => void copyEntry(e)}>
                           {copied === e.id ? "Copied" : "Copy entry"}
                         </button>
@@ -300,8 +329,8 @@ export function LogTab() {
                   ) : null}
                 </div>
                 <div className="list-row-actions">
-                  <span className="badge">{e.sealed ? "Sealed" : "Waiting for seal"}</span>
-                  {e.sealed ? (
+                  <span className="badge">{e.carried ? ("root" in e.carried ? "Sealed elsewhere" : "Not sealed") : e.sealed ? "Sealed" : "Waiting for seal"}</span>
+                  {e.sealed && (!e.carried || "root" in e.carried) ? (
                     <button type="button" className="button button-small" onClick={() => void verify(e)} disabled={!!check && "state" in check}>
                       {check && "state" in check ? "Checking" : "Verify"}
                     </button>

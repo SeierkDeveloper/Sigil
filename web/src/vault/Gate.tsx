@@ -242,6 +242,14 @@ export function Gate({ api, mode, onMode, onCreated, onUnlocked, onSignOut }: Pr
           </button>
         </p>
       ) : null}
+      {mode !== "unlock" ? (
+        <p className="small muted gate-signout">
+          Have a bundle of your vault, or a move code from another node?{" "}
+          <a className="text-button" href="/vault/restore" data-testid="restore-link">
+            Restore or move it here
+          </a>
+        </p>
+      ) : null}
       {mode === "create" ? (
         <p className="small faint gate-terms">
           By creating a vault you accept the <a href="/terms">terms</a>. Sigil cannot recover a vault if every way into it is lost.

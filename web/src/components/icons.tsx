@@ -483,3 +483,9 @@ export const NodeIcon = (p: IconProps) => (
     <path d="M7 7h.01M7 17h.01M12 10v4" />
   </Line>
 );
+
+export const DownloadIcon = (p: IconProps) => (
+  <Line {...p}>
+    <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19.5h14" />
+  </Line>
+);

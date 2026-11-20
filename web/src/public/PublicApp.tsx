@@ -11,6 +11,8 @@ import { newAskSession, openAskMessage, randomId, sealAskMessage, type AskSessio
 import { createApi, ApiError } from "@/vault/api";
 import { formatDate, plural } from "@/lib/format";
 import { EditorIcon, EyeIcon, LockIcon, PublicIcon } from "@/components/icons";
+import { VoiceControls } from "@/voice/VoiceControls";
+import { SessionBooking } from "./SessionBooking";
 
 interface PageInfo {
   id: string;
@@ -22,6 +24,10 @@ interface PageInfo {
   online: boolean;
   perVisitorHour: number;
   showAnswers: boolean;
+  /** The owner offers voice: speech to text in the visitor's own browser. */
+  voice?: boolean;
+  /** The owner takes booked sessions. */
+  sessions?: boolean;
   items: { id: string; title: string; tags: string[]; editedAt: string }[];
   wall: { id: string; question: string; answer: string; sources: { id: string; title: string }[]; createdAt: string }[];
 }
@@ -247,6 +253,16 @@ export function PublicApp({ handle }: { handle: string }) {
           </div>
         ) : null}
 
+        {info.enabled && info.voice ? (
+          <VoiceControls
+            label="Public page voice"
+            onText={(text) => setQuestion(text)}
+            answer={(() => {
+              const last = [...turns].reverse().find((t) => t.status === "answered" && t.reply);
+              return last ? { id: last.id, text: last.reply!.text } : null;
+            })()}
+          />
+        ) : null}
         {info.enabled ? (
           <form className="chat-form" onSubmit={ask} aria-label="Ask a question">
             <label className="field-label" htmlFor="public-question">
@@ -276,6 +292,8 @@ export function PublicApp({ handle }: { handle: string }) {
             </div>
           </form>
         ) : null}
+
+        {info.enabled && info.sessions ? <SessionBooking handle={info.handle} name={info.name} /> : null}
 
         {info.wall.length ? (
           <section className="public-wall" aria-labelledby="public-wall">

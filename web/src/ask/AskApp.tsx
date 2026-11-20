@@ -11,6 +11,7 @@ import { newAskSession, openAskMessage, openIntro, parseAskFragment, randomId, s
 import { createApi, ApiError } from "@/vault/api";
 import { formatDate, plural } from "@/lib/format";
 import { EditorIcon, EyeIcon, LockIcon, SealIcon } from "@/components/icons";
+import { VoiceControls } from "@/voice/VoiceControls";
 
 interface LinkInfo {
   id: string;
@@ -20,6 +21,8 @@ interface LinkInfo {
   online: boolean;
   expiresAt: string;
   remaining: number;
+  /** The owner offers voice with this link: speech to text in the asker's own browser. */
+  voice?: boolean;
 }
 
 type Phase =
@@ -232,6 +235,16 @@ export function AskApp({ linkId }: { linkId: string }) {
           </div>
         ) : null}
 
+        {!inactive && info.voice ? (
+          <VoiceControls
+            label="Ask link voice"
+            onText={(text) => setQuestion(text)}
+            answer={(() => {
+              const last = [...turns].reverse().find((t) => t.status === "answered" && t.answer);
+              return last ? { id: last.id, text: last.answer! } : null;
+            })()}
+          />
+        ) : null}
         {!inactive ? (
           <form className="chat-form" onSubmit={ask} aria-label="Ask a question">
             <label className="field-label" htmlFor="ask-question">

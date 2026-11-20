@@ -37,6 +37,10 @@ import { IdentityTab } from "./tabs/Identity";
 import { EmergencyTab } from "./tabs/Emergency";
 import { AgreementsTab } from "./tabs/Agreements";
 import { PacksTab } from "./tabs/Packs";
+import { StorageTab } from "./tabs/Storage";
+import { SharedTab } from "./tabs/Shared";
+import { lastBackupAt, runBackup } from "./storageOps";
+import { backupDue } from "@sigil/core";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "memories", label: "Memories" },
@@ -52,6 +56,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "folders", label: "Folders" },
   { id: "apps", label: "Apps" },
   { id: "agents", label: "Agents" },
+  { id: "shared", label: "Shared memory" },
   { id: "devices", label: "Devices" },
   { id: "legacy", label: "Legacy" },
   { id: "proof", label: "Proof" },
@@ -60,6 +65,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "log", label: "Read log" },
   { id: "import", label: "Import" },
   { id: "sync", label: "Sync" },
+  { id: "storage", label: "Storage" },
   { id: "settings", label: "Settings" },
 ];
 
@@ -193,6 +199,18 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
       .catch(() => undefined);
   }, [api, vault, data]);
 
+  // A copy of the vault to the owner's own storage, once per opening, when the schedule says one is due.
+  const backupTried = useRef(false);
+  useEffect(() => {
+    if (!data || backupTried.current) return;
+    backupTried.current = true;
+    const s = data.backups.settings;
+    if (!s.targets.length || !backupDue(s.every, lastBackupAt(data.backups))) return;
+    runBackup(api, vault, data)
+      .then(() => ops.loadVault(api, vault).then((d) => setData(d)))
+      .catch(() => undefined);
+  }, [api, vault, data]);
+
   // The weekly brief, once per opening, when it is due and the owner wants it.
   const briefTried = useRef(false);
   useEffect(() => {
@@ -314,6 +332,11 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
                   {data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length}
                 </span>
               ) : null}
+              {t.id === "shared" && data.spaces.some((s) => s.kind !== "team" && !s.me.acceptedAt) ? (
+                <span className="tab-count" aria-label="A shared memory waits for you to accept it">
+                  {data.spaces.filter((s) => s.kind !== "team" && !s.me.acceptedAt).length}
+                </span>
+              ) : null}
               {t.id === "meet" && data.meets.some((m) => m.role === "invitee" && m.state === "invited") ? (
                 <span className="tab-count" aria-label="An invite is waiting">
                   {data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length}
@@ -345,6 +368,8 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "log" ? <LogTab /> : null}
           {tab === "import" ? <ImportTab /> : null}
           {tab === "sync" ? <SyncTab /> : null}
+          {tab === "storage" ? <StorageTab /> : null}
+          {tab === "shared" ? <SharedTab /> : null}
           {tab === "settings" ? <SettingsTab onDeleted={onDeleted} /> : null}
         </div>
       </div>

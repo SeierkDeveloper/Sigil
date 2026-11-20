@@ -4,11 +4,71 @@ export interface Release {
   date: string; // ISO day
   title: string;
   summary: string;
-  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import" | "Legacy" | "Devices" | "Agents" | "Proof" | "Sync" | "Trust";
+  area: "Site" | "Vault" | "Connector" | "Seals" | "Core" | "Inbox" | "Search" | "Extension" | "SDK" | "Sharing" | "AI self" | "Import" | "Legacy" | "Devices" | "Agents" | "Proof" | "Sync" | "Trust" | "Nodes";
   items: string[];
 }
 
 export const releases: Release[] = [
+  {
+    date: "2026-11-20",
+    title: "Your whole vault in one encrypted bundle, kept where you choose",
+    area: "Nodes",
+    summary: "Download the vault as one bundle, or store it in your own bucket, on IPFS or on Arweave with your own tokens, and restore it on any Sigil node with your recovery phrase or wallet.",
+    items: [
+      "Every memory, key slot, setting, app, shared space and the sealed log with its proofs, still encrypted, signed with your vault key on your device",
+      "Your own S3-compatible bucket, an IPFS pinning service or your own IPFS node, and Arweave through a bundler with your own key file; tokens kept only encrypted with your vault key, uploads made from your device",
+      "Copies every day or week while your vault is open, and in the background from a connector you run with --watch",
+      "Restore into an empty vault on any node from a file, a link, an IPFS content id, an Arweave id or your bucket; the bundle is opened and checked in full on your device first",
+      "How long a copy lasts depends on where you keep it: the docs say so plainly",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Run your own node, and move your vault between nodes",
+    area: "Nodes",
+    summary: "A Dockerfile and a compose file start a Sigil node with one command; a vault moves from one node to another with a statement signed by its own key.",
+    items: [
+      "docker compose up -d --build: the same site and API, data in a volume, a health endpoint at /api/health",
+      "A move signed on the old node, fetched by the new one with a code you carry, opened with your sign-in and confirmed by an arrival your key signs",
+      "The old node sends your ask links, public page, packs and emergency card on to the new address for up to 90 days, then deletes the vault",
+      "A node list in the vault: where it lives, where it came from, where its copies are; every step in the log and the hourly seal",
+      "The open standard 1.2.0 with the bundle, the move and their test vectors; earlier vectors unchanged",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Talk to your AI self, and capture from anywhere",
+    area: "AI self",
+    summary: "Speak to your AI self in the test chat, on ask links and on the public page, with speech to text on your device and answers read aloud by a voice on your device; and capture keys for phones, watches and shortcuts.",
+    items: [
+      "Whisper in ONNX form in a worker on the device, loaded only when voice is turned on (about 41 MB, once); the browser's own speech recognition, which sends audio to a cloud, is never used",
+      "Answers read aloud only with voices that run on the device",
+      "Capture keys, one per device or shortcut: write-only into the inbox, sealed to your vault's key on the sending device, limited, logged and revoked on their own",
+      "Ready-made steps for an Apple shortcut (Siri, headphones, and a watch with plain text allowed for that key) and for Android's share sheet and HTTP shortcut apps",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Sessions with an expert's AI self",
+    area: "AI self",
+    summary: "Open times when anyone may book a short conversation with your public AI self, with topics, a number of questions, an intake, house rules and a cap per day. Free.",
+    items: [
+      "Visitors book on your page; their intake is sealed in their browser for your device, and the session link holds the only key to the session",
+      "Answers only from what you made public, under your house rules, each marked as AI",
+      "You read every booking, what the visitor agreed to and the transcript, and can end a session or block its visitor",
+    ],
+  },
+  {
+    date: "2026-11-20",
+    title: "Shared family and team memory",
+    area: "Agents",
+    summary: "A family's or a team's history on a shared space: a timeline of stories with dates, people and photos, who added what, heirs, and a copy to keep or print.",
+    items: [
+      "Roles as in team spaces; a member changes and deletes only what they wrote, and leaving or a deleted account never deletes what others wrote",
+      "Heirs named by vault code become members when the legacy plan of the member they are named for releases",
+      "The whole history as one readable document made on your device, and part of each member's bundle",
+    ],
+  },
   {
     date: "2026-11-20",
     title: "The AI self gets an identity and a wallet of its own",
