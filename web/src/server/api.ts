@@ -89,6 +89,7 @@ import {
 import { getSeal, listSeals, proofFor, proofForLeaf, publicStats, sealPending, sealQueue, sealStats } from "./seal";
 import { anchorStatus } from "./anchor";
 import {
+  assertNotCrossSite,
   assertSameOrigin,
   clearSessionCookie,
   clientIp,
@@ -214,6 +215,7 @@ const planShape = z.object({
   threshold: z.number().int().min(1).max(12),
   periodDays: z.number().int().min(30).max(730),
   check: hexTag,
+  release: hexTag,
   ownerBox: envelope(64 * 1024),
   people: z.array(personShape).min(1).max(12),
 });
@@ -277,6 +279,7 @@ interface Ctx {
 function userOf(ctx: Ctx): string {
   const userId = sessionUser(ctx.db, getCookie(ctx.req, SESSION_COOKIE));
   if (!userId) throw new HttpError(401, "Please sign in to your vault.", "signed_out");
+  assertNotCrossSite(ctx.req);
   if (ctx.method !== "GET") assertSameOrigin(ctx.req);
   // Any vault action counts as alive for the owner's legacy plan.
   markActive(ctx.db, userId);
@@ -426,6 +429,7 @@ route("GET", "session", (ctx) => {
 });
 
 route("POST", "auth/logout", (ctx) => {
+  assertSameOrigin(ctx.req);
   const t = getCookie(ctx.req, SESSION_COOKIE);
   if (t) deleteSession(ctx.db, t);
   return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(ctx.req) });
@@ -471,7 +475,8 @@ route("POST", "auth/passkey/login", async (ctx) => {
   const { userId, credentialId } = await verifyAuthentication(ctx.db, ctx.req, body.challengeId, body.response);
   const slot = keyslotForPasskey(ctx.db, credentialId);
   if (!slot) throw new HttpError(404, "This passkey is no longer linked to a vault.", "unknown_passkey");
-  return signedIn(ctx, userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } });
+  // The session belongs to the sign-in method that opened it: removing the method ends it.
+  return signedIn(ctx, userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } }, slot.id);
 });
 
 // ---- wallet
@@ -495,7 +500,7 @@ route("POST", "auth/wallet/login", async (ctx) => {
   const body = parse(z.object({ address, authToken: token }), await readJson(ctx.req, 8 * KB));
   const slot = keyslotByToken(ctx.db, "wallet", body.address, body.authToken);
   if (!slot) throw new HttpError(404, "No vault opens with this wallet. Create one, or sign in another way.", "unknown_wallet");
-  return signedIn(ctx, slot.userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } });
+  return signedIn(ctx, slot.userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } }, slot.id);
 });
 
 // ---- recovery phrase
@@ -506,7 +511,7 @@ route("POST", "auth/phrase/login", async (ctx) => {
   const body = parse(z.object({ lookupId, authToken: token }), await readJson(ctx.req, 8 * KB));
   const slot = keyslotByToken(ctx.db, "phrase", body.lookupId, body.authToken);
   if (!slot) throw new HttpError(404, "No vault opens with this recovery phrase.", "unknown_phrase");
-  return signedIn(ctx, slot.userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } });
+  return signedIn(ctx, slot.userId, { keyslot: { kind: slot.kind, wrappedKey: slot.wrappedKey } }, slot.id);
 });
 
 // ---- a paired device: its own secret gives the token and the key that wraps the vault key
@@ -996,7 +1001,8 @@ route("GET", "legacy/plans/:id/bundle", (ctx, [planId]) => json(bundleFor(ctx.db
 
 route("POST", "legacy/plans/:id/opened", async (ctx, [planId]) => {
   const userId = userOf(ctx);
-  markOpened(ctx.db, userId, planId, parse(z.object({ kept: envelope(512 * KB) }), await readJson(ctx.req, 600 * KB)).kept);
+  const body = parse(z.object({ kept: envelope(512 * KB), proof: hexTag }), await readJson(ctx.req, 600 * KB));
+  markOpened(ctx.db, userId, planId, body.kept, body.proof);
   return json({ ok: true });
 });
 
@@ -1169,6 +1175,7 @@ route("POST", "presence", async (ctx) => {
 
 route("GET", "proof/presence", (ctx) => {
   const userId = userOf(ctx);
+  rateLimit(`presence-proofs:${userId}`, 10, 60_000);
   return json({ origin: siteOrigin(ctx.req), periodSeconds: serverConfig.sealSeconds, hours: presenceProofs(ctx.db, userId) });
 });
 
@@ -1218,7 +1225,7 @@ route("POST", "connector/v1/handoffs", async (ctx) => {
 route("POST", "connector/v1/handoffs/picked", async (ctx) => {
   const auth = appOf(ctx);
   assertTool(ctx.db, auth, "handoff");
-  pickHandoffs(ctx.db, auth, parse(z.object({ ids: z.array(id).min(1).max(100) }), await readJson(ctx.req, 16 * KB)).ids);
+  pickHandoffs(ctx.db, auth, parse(z.object({ ids: z.array(id).min(1).max(100) }), await readJson(ctx.req, 16 * KB)).ids, agentSpaceIds(ctx.db, auth.appId));
   return json({ ok: true });
 });
 
@@ -1742,7 +1749,12 @@ route("GET", "connector/v1/backup/bundle", (ctx) => {
   const auth = appOf(ctx);
   appBackup(ctx.db, auth);
   rateLimit(`bundle:${auth.userId}`, 20, 60_000);
-  return json({ appId: auth.appId, body: bundleBody(ctx.db, auth.userId, siteOrigin(ctx.req), "connector") });
+  const body = bundleBody(ctx.db, auth.userId, siteOrigin(ctx.req), "connector");
+  // The bundle carries every memory as ciphertext, those of protected folders too: that is on the record like any protected read.
+  const guarded = new Set(body.folders.filter((f) => f.protected).map((f) => f.id));
+  const inGuarded = body.memories.filter((m) => guarded.has(m.folderId)).length;
+  if (inGuarded) logRead(ctx.db, auth, "protected", null, inGuarded);
+  return json({ appId: auth.appId, body });
 });
 
 route("POST", "connector/v1/backup/done", async (ctx) => {

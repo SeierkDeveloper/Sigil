@@ -140,7 +140,8 @@ export function addMember(db: Db, userId: string, spaceId: string, m: NewMember)
     const app = m.appId ? (db.prepare("SELECT revoked_at FROM apps WHERE id = ? AND user_id = ?").get(m.appId, userId) as Row | undefined) : undefined;
     if (!agent || agent.userId !== userId || !app || app.revoked_at) throw new HttpError(404, "That agent was not found in your vault.", "no_agent");
     if (agent.publicKey !== m.publicKey) throw new HttpError(400, "That is not the agent's key.", "invalid");
-    if (me.role !== "admin" && m.role === "admin") throw new HttpError(403, "Only an admin may make another admin.", "role");
+    // An agent reads and writes; only people are admins of a space (as setRole says too).
+    if (m.role === "admin") throw new HttpError(400, "An agent can read or write in a space, but not be its admin.", "role");
     insertMember(db, spaceId, userId, agent.appId, m, me.id, at, at);
     logRead(db, { appId: agent.appId, userId }, "space", `joined-${spaceId}`, 1);
   });

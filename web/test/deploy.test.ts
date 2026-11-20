@@ -53,6 +53,6 @@ describe("the node's container", () => {
     const res = await h.raw("GET", "health");
     expect(res.status).toBe(200);
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
-    expect(await res.json()).toMatchObject({ ok: true, node: { origin: "https://node.example", version: expect.any(String), spec: "1.2.0" } });
+    expect(await res.json()).toMatchObject({ ok: true, node: { origin: "https://node.example", version: expect.any(String), spec: "1.3.0" } });
   });
 });

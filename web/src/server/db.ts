@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -597,10 +597,12 @@ CREATE INDEX IF NOT EXISTS emergency_opens_by_user ON emergency_opens (user_id, 
 -- vault key. The server sees the hash, the keys and the signatures, which it
 -- checks against the vaults' signing keys; never the text. A signed agreement
 -- is never changed: an amendment is a new row whose previous is the old hash.
+-- A party that deletes its vault leaves the row to the other party (its id
+-- becomes null), so nobody can erase the other side's signed record.
 CREATE TABLE IF NOT EXISTS agreements (
   id TEXT PRIMARY KEY,
-  from_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  to_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  from_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+  to_id TEXT REFERENCES users(id) ON DELETE SET NULL,
   from_key TEXT NOT NULL,
   to_key TEXT NOT NULL,
   hash TEXT NOT NULL UNIQUE,
@@ -891,6 +893,28 @@ function migrateKeyslots(db: Db): void {
   }
 }
 
+/** Agreements once went with either party's account. Now a party's id becomes null and the other keeps the row. Rebuild it, keeping every row. */
+function migrateAgreements(db: Db): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'agreements'").get() as { sql?: string } | undefined;
+  if (!row?.sql || !row.sql.includes("from_id TEXT NOT NULL")) return;
+  const create = SCHEMA.slice(SCHEMA.indexOf("CREATE TABLE IF NOT EXISTS agreements ("), SCHEMA.indexOf(");", SCHEMA.indexOf("CREATE TABLE IF NOT EXISTS agreements (")) + 2);
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("ALTER TABLE agreements RENAME TO agreements_old");
+    db.exec(create);
+    db.exec("INSERT INTO agreements SELECT * FROM agreements_old");
+    db.exec("DROP TABLE agreements_old");
+    db.exec("CREATE INDEX IF NOT EXISTS agreements_by_from ON agreements (from_id); CREATE INDEX IF NOT EXISTS agreements_by_to ON agreements (to_id);");
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
 function addColumn(db: Db, table: string, column: string, type: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
@@ -909,6 +933,7 @@ export function openDb(file: string): Db {
   migrateReadLog(db);
   migrateKeyslots(db);
   db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
+  migrateAgreements(db);
   addColumn(db, "memories", "delete_after", "TEXT");
   // The last sign-in or vault action of the owner: the legacy plan's heartbeat.
   addColumn(db, "users", "last_active_at", "TEXT");
@@ -924,6 +949,7 @@ export function openDb(file: string): Db {
   addColumn(db, "public_questions", "booking_id", "TEXT");
   addColumn(db, "public_selves", "voice", "INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "ask_links", "voice", "INTEGER NOT NULL DEFAULT 0");
+  addColumn(db, "legacy_plans", "release_hash", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS memories_to_delete ON memories (delete_after) WHERE delete_after IS NOT NULL;");
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   return db;

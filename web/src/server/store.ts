@@ -150,7 +150,8 @@ export function listKeyslots(db: Db, userId: string) {
 export function addKeyslot(db: Db, userId: string, slot: KeyslotInput, passkey?: PasskeyInput): string {
   return tx(db, () => {
     if (slot.kind === "phrase") {
-      // A new recovery phrase replaces the old one.
+      // A new recovery phrase replaces the old one, and every session the old one opened ends with it.
+      db.prepare("DELETE FROM sessions WHERE keyslot_id IN (SELECT id FROM keyslots WHERE user_id = ? AND kind = 'phrase')").run(userId);
       db.prepare("DELETE FROM keyslots WHERE user_id = ? AND kind = 'phrase'").run(userId);
     }
     const taken = db.prepare("SELECT 1 FROM keyslots WHERE kind = ? AND ref = ?").get(slot.kind, slot.ref);
@@ -580,6 +581,11 @@ export function deleteAccount(db: Db, userId: string): void {
   tx(db, () => {
     db.prepare("DELETE FROM grants WHERE user_id = ?").run(userId);
     db.prepare("DELETE FROM memories WHERE user_id = ?").run(userId);
+    // Agreements stay with the other party: this side counts as removed, and a row nobody keeps any more goes.
+    db.prepare("UPDATE agreements SET from_removed = 1 WHERE from_id = ?").run(userId);
+    db.prepare("UPDATE agreements SET to_removed = 1 WHERE to_id = ?").run(userId);
+    db.prepare("DELETE FROM agreements WHERE from_removed = 1 AND to_removed = 1").run();
+    db.prepare("DELETE FROM agreements WHERE state = 'proposed' AND (from_id = ? OR to_id = ?)").run(userId, userId);
     db.prepare("DELETE FROM users WHERE id = ?").run(userId);
   });
 }

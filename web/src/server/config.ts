@@ -110,5 +110,14 @@ export const serverConfig = {
   get speechModel(): string {
     return process.env.SIGIL_SPEECH_MODEL?.trim() || "Xenova/whisper-tiny.en";
   },
+  /**
+   * How many proxies stand in front of the node and add to X-Forwarded-For. 1
+   * by default (the host's proxy, such as Railway's, or Next.js itself when the
+   * node is reached directly). 0 ignores forwarded headers.
+   */
+  get proxyHops(): number {
+    const n = Number(process.env.SIGIL_PROXY_HOPS);
+    return process.env.SIGIL_PROXY_HOPS?.trim() && Number.isInteger(n) && n >= 0 && n <= 5 ? n : 1;
+  },
   sessionDays: 30,
 };

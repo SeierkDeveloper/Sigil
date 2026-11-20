@@ -165,6 +165,6 @@ describe("a node's health", () => {
   it("names the node, its version and the open standard it follows", async () => {
     const res = await newNode.raw("GET", "health");
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ ok: true, node: { origin: NEW, spec: "1.2.0" } });
+    expect(await res.json()).toMatchObject({ ok: true, node: { origin: NEW, spec: "1.3.0" } });
   });
 });

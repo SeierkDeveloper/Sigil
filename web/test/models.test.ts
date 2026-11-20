@@ -95,7 +95,7 @@ describe("upgrading the database", () => {
     db.prepare("INSERT INTO read_log VALUES ('e5', 'u1', 'a1', 'protected', 'm1', 1, '2026-01-01T00:00:03.000Z', 'ff', '0x05', 5, 0, NULL, NULL)").run();
     db.prepare("INSERT INTO read_log VALUES ('e6', 'u1', 'vault', 'disclose', '0x06', 1, '2026-01-01T00:00:04.000Z', 'ff', '0x06', 5, 0, NULL, NULL)").run();
     db.prepare("INSERT INTO read_log VALUES ('e7', 'u1', 'vault', 'backup', '0x07', 1, '2026-01-01T00:00:05.000Z', 'ff', '0x07', 5, 1, NULL, '{\"origin\":\"https://old.example\",\"unsealed\":true}')").run();
-    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(7);
+    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(8);
     db.close();
     // Opening again changes nothing.
     const again = openDb(file);
