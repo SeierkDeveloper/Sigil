@@ -17,7 +17,7 @@ import {
   isSigningKey,
   isSpaceKind,
   isSpaceRole,
-  parseBundle,
+  BUNDLE_FORMAT,
   PUBLIC_MAX_PER_VISITOR,
   randomId,
   CAPTURE_PER_MINUTE,
@@ -241,12 +241,10 @@ const evmAddress = z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Expected an address"
 const edSignature = z.string().regex(/^[A-Za-z0-9_-]{86}$/, "Expected a signature");
 const pairingCodeShape = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{5}-[0-9A-HJKMNP-TV-Z]{5}$/, "Invalid code");
 const sha256Shape = z.string().regex(/^[0-9a-f]{64}$/, "Expected a hash");
+// The bundle's own checks (form, hash, signature, restore statement) run in importBundle; this only rejects what is plainly not one.
 const bundleShape = z.custom<VaultBundle>((v) => {
-  try {
-    return !!parseBundle(JSON.stringify(v));
-  } catch {
-    return false;
-  }
+  const b = v as Partial<VaultBundle> | null;
+  return !!b && typeof b === "object" && b.format === BUNDLE_FORMAT && b.version === 1 && !!b.body && typeof b.hash === "string";
 }, "Expected a Sigil vault bundle");
 const signInShape = z.object({ kind: z.enum(["wallet", "phrase"]), ref: z.string().min(8).max(200), authToken: token });
 const runShape = z.object({ id, hash: hex32Shape(), size: z.number().int().min(0).max(1e10), record: z.string().max(64 * 1024).refine(isSealed, "Expected a sealed box"), places: z.number().int().min(0).max(20) });

@@ -313,7 +313,7 @@ export default function Security() {
               <li>
                 <strong>Moving.</strong> A move statement and an arrival, both Ed25519 by your vault&apos;s key; the new node fetches the bundle only with a 32-byte
                 secret from the code you carry, of which the old node keeps the hash. Node to node requests use HTTPS only, follow no redirect, are limited in time
-                and size, and never reach a private network unless the operator allows it.
+                and size, and refuse addresses written as private unless the operator allows them.
               </li>
               <li>
                 <strong>Capture keys.</strong> 32 random bytes per key; the node keeps the SHA-256 of the derived token. Captures are sealed boxes to the vault public

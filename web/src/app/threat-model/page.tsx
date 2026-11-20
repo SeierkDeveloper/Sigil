@@ -151,7 +151,7 @@ const covered = [
   {
     threat: "A node used to reach a private network",
     answer:
-      "A node fetches another node or a restore address over HTTPS only, follows no redirect and refuses private network addresses, unless its operator allows them for nodes on one machine or one network.",
+      "A node fetches another node or a restore address over HTTPS only, follows no redirect, and refuses addresses written as private (localhost, 10.x, 192.168.x and the like) unless its operator allows them for nodes on one machine or one network. A public name that resolves to a private address is not caught by that check: an operator who runs other services on its network should also limit the node's outgoing traffic.",
   },
   {
     threat: "A leaked capture key",
