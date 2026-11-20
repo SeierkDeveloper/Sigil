@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d0e10?style=for-the-badge&labelColor=0b0c0e)](LICENSE)
 [![Encryption](https://img.shields.io/badge/AES--256--GCM-client--side-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-encryption-model)
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
-[![Tests](https://img.shields.io/badge/tests-600%20%2B%2049%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
+[![Tests](https://img.shields.io/badge/tests-600%20%2B%2052%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
@@ -751,7 +751,7 @@ npm run test:unit       # 532: cryptography, sealed boxes, the ask link relay, s
 npm run test:contracts  # 68: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
                         #     wallet's caps, freeze and expiry, and the standard's vectors signed in
                         #     TypeScript and accepted by both new contracts
-npm run test:e2e        # 49: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
+npm run test:e2e        # 52: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
                         #     the inbox, the Self card, search by meaning, sharing, Sign in with Sigil,
                         #     the AI self test chat, an ask link answered across two browsers, the
                         #     weekly brief, contradictions, expiry, merging every group, the site,
