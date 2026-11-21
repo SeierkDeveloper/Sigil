@@ -48,6 +48,20 @@ export function legacyCheck(key: Uint8Array, planId: string, epoch: number): str
   return toHex(hmac(sha256, key, utf8(`sigil-legacy-check:v1:${planId}:${epoch}`)));
 }
 
+/**
+ * What a trusted person shows the node when they open a released plan: a value
+ * only the legacy key gives, so only whoever combined enough shares has it. The
+ * node keeps only its hash (legacyReleaseHash) and checks it, so one trusted
+ * person alone cannot mark a plan released and pass its heirs their keys.
+ */
+export function legacyReleaseProof(key: Uint8Array, planId: string, epoch: number): string {
+  return toHex(hmac(sha256, key, utf8(`sigil-legacy-release:v1:${planId}:${epoch}`)));
+}
+
+export function legacyReleaseHash(proof: string): string {
+  return toHex(sha256(utf8(proof)));
+}
+
 // ---------------------------------------------------------------- splitting
 
 /**
@@ -390,6 +404,8 @@ export interface SealedPlan {
   threshold: number;
   periodDays: number;
   check: string;
+  /** The hash of the release proof: the node checks a trusted person's proof against it. */
+  release: string;
   ownerBox: string;
   people: SealedPerson[];
 }
@@ -469,8 +485,9 @@ export async function sealLegacyPlan(vaultKey: CryptoKey, input: LegacyPlanInput
     includeModel: input.includeModel,
     people: input.people,
   });
+  const release = legacyReleaseHash(legacyReleaseProof(key, input.planId, input.epoch));
   key.fill(0);
-  return { complete, epoch: input.epoch, threshold: input.threshold, periodDays, check, ownerBox, people };
+  return { complete, epoch: input.epoch, threshold: input.threshold, periodDays, check, release, ownerBox, people };
 }
 
 // ---------------------------------------------------------------- after release

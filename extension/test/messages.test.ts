@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMessage } from "../src/messages";
+import { allowedFrom, parseMessage } from "../src/messages";
 
 const conversation = { site: "chatgpt", title: "T", url: "https://chatgpt.com/c/1", turns: [{ speaker: "user", text: "hi" }] };
 
@@ -37,5 +37,14 @@ describe("messages between the extension's parts", () => {
   it("cuts an overlong title", () => {
     const m = parseMessage({ type: "sigil:capture-conversation", conversation: { ...conversation, title: "t".repeat(1000) } });
     expect(m && m.type === "sigil:capture-conversation" && m.conversation.title.length).toBe(300);
+  });
+
+  it("lets only the popup ask to read a tab, never a script inside a page", () => {
+    const page = parseMessage({ type: "sigil:save-page", tabId: 7 })!;
+    const selection = parseMessage({ type: "sigil:save-selection", tabId: 7 })!;
+    expect(allowedFrom(page, {})).toBe(true);
+    expect(allowedFrom(page, { tab: { url: "https://chatgpt.com/c/1" } })).toBe(false);
+    expect(allowedFrom(selection, { tab: { url: "https://claude.ai/chat/1" } })).toBe(false);
+    expect(allowedFrom(parseMessage({ type: "sigil:capture-conversation", conversation })!, { tab: { url: "https://chatgpt.com/c/1" } })).toBe(true);
   });
 });

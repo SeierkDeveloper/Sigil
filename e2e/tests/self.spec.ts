@@ -4,7 +4,7 @@
 // owner's open vault while another browser asks, end to end encrypted.
 
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { addFolder, createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const MODEL_KEY = "sk-ant-e2e-CANARY-key-5d1f";
 const FOOD = "CANARY-risotto-e2e";
@@ -44,7 +44,7 @@ async function setUpSelf(page: Page) {
   await addFolder(page, "Health");
   await writeMemory(page, { title: "Blood test", body: `${HEALTH} food diary.`, folder: "Health" });
 
-  await page.getByRole("tab", { name: "AI self" }).click();
+  await openTab(page, "AI self");
   const model = page.getByRole("form", { name: "Model key" });
   await expect(model.getByLabel("Model")).toHaveValue("claude-opus-5-5");
   await model.getByLabel("API key").fill(MODEL_KEY);
@@ -139,7 +139,7 @@ test("an ask link: another browser asks, the open vault answers, and the owner's
   for (const secret of [QUESTION, FOOD, MODEL_KEY, "Book club", "Ask me about food"]) expect(ownerWire, secret).not.toContain(secret);
 
   // The owner's read log holds the question and answer, opened with the vault's key.
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   const row = page.locator(".log-row[data-kind='ask']").first();
   await expect(row).toContainText("Your AI self answered a question, from 1 memory");
   await expect(row).toContainText('Ask link "Book club"');

@@ -21,8 +21,8 @@ import {
   type VaultBundle,
 } from "@sigil/core";
 import { tx, type Db } from "./db";
-import { serverConfig } from "./config";
 import { HttpError, logRead } from "./store";
+import { guardedFetch, hostAllowed, PrivateAddressError, readLimited } from "./netguard";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -35,14 +35,13 @@ export function health(origin: string) {
 // ---------------------------------------------------------------- talking to another node
 
 export type NodeFetch = (input: string, init?: RequestInit) => Promise<Response>;
-let nodeFetch: NodeFetch = (input, init) => fetch(input, init);
+// Every address someone else named is fetched through guardedFetch: each name is checked against every address it resolves to when the connection is made.
+let nodeFetch: NodeFetch = guardedFetch;
 
 /** Tests answer other nodes themselves. */
 export function setNodeFetch(f: NodeFetch | null): void {
-  nodeFetch = f ?? ((input, init) => fetch(input, init));
+  nodeFetch = f ?? guardedFetch;
 }
-
-const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1\]?$|\[?f[cd][0-9a-f]{2}:|\[?fe80:)/i;
 
 /** Another node's address, refused when it points into a private network unless this node allows that (a node on one machine, or tests). */
 export function remoteOrigin(value: string): string {
@@ -53,7 +52,7 @@ export function remoteOrigin(value: string): string {
     throw new HttpError(400, (err as Error).message, "bad_node");
   }
   const host = new URL(origin).hostname;
-  if ((PRIVATE_HOST.test(host) || host.endsWith(".local") || host.endsWith(".internal")) && !serverConfig.nodeAllowPrivate) {
+  if (!hostAllowed(host)) {
     throw new HttpError(400, "That node is on a private network. This node only talks to public nodes.", "private_node");
   }
   return origin;
@@ -62,15 +61,25 @@ export function remoteOrigin(value: string): string {
 /** A request to another node or a storage address: a time limit, no redirects, a size limit. */
 export async function fetchRemote(url: string, init: RequestInit = {}, maxBytes = 256 * 1024 * 1024): Promise<Response> {
   let res: Response;
+  const signal = AbortSignal.timeout(30_000);
   try {
-    res = await nodeFetch(url, { ...init, redirect: "manual", signal: AbortSignal.timeout(30_000) });
-  } catch {
+    res = await nodeFetch(url, { ...init, redirect: "manual", signal });
+  } catch (err) {
+    if (err instanceof PrivateAddressError) throw new HttpError(400, "That address is on a private network. This node only talks to public addresses.", "private_node");
     throw new HttpError(502, "The other side could not be reached.", "unreachable");
   }
   if (res.status >= 300 && res.status < 400) throw new HttpError(502, "The other side answered with a redirect, which is not followed.", "redirect");
   const declared = Number(res.headers.get("content-length") ?? "0");
   if (declared > maxBytes) throw new HttpError(413, "What the other side sent is too large.", "too_large");
-  return res;
+  // The body is read here, never past the limit, whatever length the other side declared (or left out).
+  let bytes: Uint8Array;
+  try {
+    bytes = await readLimited(res, maxBytes);
+  } catch (err) {
+    if (err instanceof RangeError) throw new HttpError(413, "What the other side sent is too large.", "too_large");
+    throw new HttpError(502, "The other side stopped answering.", "unreachable");
+  }
+  return new Response(bytes.byteLength ? (bytes as BodyInit) : null, { status: res.status, headers: res.headers });
 }
 
 // ---------------------------------------------------------------- moving out

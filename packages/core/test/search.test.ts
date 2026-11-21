@@ -36,3 +36,25 @@ describe("search", () => {
     expect(search(items, "mountains zebra")).toEqual([]);
   });
 });
+
+describe("search over a big vault", () => {
+  it("answers from a word index with the same hits and order as the plain search", async () => {
+    const { search: run, INDEX_FROM } = await import("../src/search");
+    const words = "garden harbour invoice train bread starter tomato tomatoes guitar marathon".split(" ");
+    const items = Array.from({ length: INDEX_FROM + 500 }, (_, i) => ({
+      id: `m${i}`,
+      title: `${words[i % words.length]} note ${i}`,
+      tags: i % 3 ? [words[(i + 1) % words.length]] : [],
+      text: Array.from({ length: 12 }, (_, k) => words[(i * 7 + k * 3) % words.length]).join(" "),
+      editedAt: new Date(Date.UTC(2026, 0, 1) + i * 60_000).toISOString(),
+    }));
+    for (const q of ["garden", "tom", "harbour invoice", "note 12", "nothing-here", "guitar mara"]) {
+      const big = run(items, q).map((h) => [h.item.id, h.score]);
+      // The plain search, on each item alone, as the reference.
+      const plain = items.flatMap((it) => run([it], q).map((h) => [h.item.id, h.score]));
+      expect(new Set(big.map((x) => x[0]))).toEqual(new Set(plain.map((x) => x[0])));
+      const scores = new Map(plain.map((x) => [x[0], x[1]]));
+      for (const [id, score] of big) expect(Math.abs((score as number) - (scores.get(id) as number))).toBeLessThanOrEqual(0.5);
+    }
+  });
+});

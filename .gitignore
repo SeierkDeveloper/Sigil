@@ -17,3 +17,5 @@ contracts/broadcast/
 *.tsbuildinfo
 next-env.d.ts
 web/public/vendor/
+web/perf/last-run.json
+web/.data-seed

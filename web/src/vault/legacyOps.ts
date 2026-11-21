@@ -5,6 +5,7 @@
 import {
   answerAsSelf,
   combineLegacyShares,
+  legacyReleaseProof,
   decryptMemory,
   formatLegacyInvite,
   fromBase64Url,
@@ -177,6 +178,7 @@ export async function saveLegacy(api: Api, vault: Unlocked, data: VaultData, dra
     threshold: sealed.threshold,
     periodDays: sealed.periodDays,
     check: sealed.check,
+    release: sealed.release,
     ownerBox: sealed.ownerBox,
     people: await Promise.all(
       sealed.people.map(async (p, i) => ({
@@ -331,9 +333,11 @@ export async function openRelease(api: Api, vault: Unlocked, box: BoxKeyPair, t:
   });
   const r = await api.get<{ personId: string; epoch: number; bundle: string }>(`legacy/plans/${t.planId}/bundle`);
   const bundle = await openLegacyBundle(key, box, { planId: t.planId, epoch: r.epoch, trusteeId: t.personId, sealed: r.bundle });
+  // Shows the node the shares were combined: only the legacy key gives this value.
+  const proof = legacyReleaseProof(key, t.planId, r.epoch);
   key.fill(0);
   const kept: LegacyKept = { v: 1, planId: t.planId, epoch: r.epoch, bundle };
-  await api.post(`legacy/plans/${t.planId}/opened`, { kept: await sealKept(vault.key, kept) });
+  await api.post(`legacy/plans/${t.planId}/opened`, { kept: await sealKept(vault.key, kept), proof });
   return kept;
 }
 

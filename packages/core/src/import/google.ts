@@ -153,9 +153,9 @@ const SUBJECT_PREFIX = /^((re|fw|fwd|aw|sv|vs)(\[\d+\])?:\s*)+/i;
 function threadKey(h: Map<string, string>): string {
   const gm = h.get("x-gm-thrid");
   if (gm) return gm;
-  const refs = (h.get("references") ?? "").match(/<[^>]+>/g);
+  const refs = (h.get("references") ?? "").match(/<[^<>]+>/g);
   if (refs?.length) return refs[0];
-  const reply = /<[^>]+>/.exec(h.get("in-reply-to") ?? "")?.[0];
+  const reply = /<[^<>]+>/.exec(h.get("in-reply-to") ?? "")?.[0];
   if (reply) return reply;
   return h.get("message-id") ?? `subject:${decodeHeader(h.get("subject") ?? "").replace(SUBJECT_PREFIX, "").toLowerCase()}`;
 }
@@ -193,7 +193,7 @@ export function mboxDrafts(text: string, fileName = "mail.mbox"): { drafts: Memo
     threads.set(key, t);
   }
   const notes: string[] = [];
-  let list = [...threads.entries()].map(([key, t]) => ({ key, ...t, last: Math.max(...t.messages.map((m) => m.at)) }));
+  let list = [...threads.entries()].map(([key, t]) => ({ key, ...t, last: t.messages.reduce((n, m) => (m.at > n ? m.at : n), -Infinity) }));
   list.sort((a, b) => b.last - a.last);
   if (list.length > MAX_THREADS) {
     notes.push(`${fileName}: only the newest ${MAX_THREADS.toLocaleString("en-US")} of ${list.length.toLocaleString("en-US")} threads were taken.`);
@@ -242,8 +242,19 @@ function icsUnescape(v: string): string {
   return v.replace(/\\n/gi, "\n").replace(/\\([,;\\])/g, "$1");
 }
 
+/** The first colon outside double quotes: where an iCalendar line's name and parameters end. -1 when there is none. */
+function icsColon(line: string): number {
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') quoted = !quoted;
+    else if (c === ":" && !quoted) return i;
+  }
+  return -1;
+}
+
 function parseIcsLine(line: string): IcsProp | null {
-  const colon = line.search(/:(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+  const colon = icsColon(line);
   if (colon <= 0) return null;
   const [name, ...rawParams] = line.slice(0, colon).split(";");
   const params: Record<string, string> = {};

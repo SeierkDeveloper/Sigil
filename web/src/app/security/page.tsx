@@ -385,11 +385,34 @@ export default function Security() {
           <section id="report">
             <h2>Reporting a problem</h2>
             <p>
-              If you find a security issue, please report it privately through the security advisories of the{" "}
+              Please report a security issue privately to <strong>security@sigil.fun</strong> (a placeholder until it is confirmed; until then, use the private
+              security advisories of the{" "}
               <a href={site.githubUrl} target="_blank" rel="noopener noreferrer">
                 Sigil repository
-              </a>{" "}
-              rather than in a public issue.
+              </a>
+              ), not in a public issue. Say what you found, how to reproduce it and what someone could do with it. Do not test against vaults that are not yours. We
+              will tell you when it is fixed and, if you want, credit you. There is no bounty at present.
+            </p>
+          </section>
+
+          <section id="review">
+            <h2>The review before launch</h2>
+            <p>
+              Before Sigil opened to people, every part was reviewed: the cryptography, every permission check of the API, the connector, the extension and the
+              contracts, with fuzz tests for every parser of outside input and every route. Each finding, its fix and the test that shows it are written down in{" "}
+              <a href={`${site.githubUrl}/blob/main/docs/SECURITY-REVIEW.md`} target="_blank" rel="noopener noreferrer">
+                docs/SECURITY-REVIEW.md
+              </a>
+              , together with what is known and not fixed yet and what still needs an outside audit. That review was made by the project itself; it is not an audit.
+            </p>
+          </section>
+
+          <section id="immune">
+            <h2>Hidden instructions in memories</h2>
+            <p>
+              Mail, chats and imports can carry text written to steer an AI. Sigil checks every memory from outside on your device, holds what looks like that in
+              your inbox until you let it through, quotes every memory it hands to a model as data, and puts every catch in your read log. A public test attacks
+              these defences every hour and publishes its sealed record at <a href="/immune">/immune</a>.
             </p>
           </section>
         </div>

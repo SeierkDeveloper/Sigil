@@ -11,6 +11,7 @@ import { Notice, Spinner } from "./ui";
 import { offlineCopy, thisDevice } from "./offline";
 import { OfflineVault } from "./OfflineVault";
 import { RestoreApp } from "./RestoreApp";
+import { startGuide } from "./guideOps";
 
 type Phase =
   | { kind: "checking" }
@@ -107,7 +108,18 @@ export function VaultApp({ consent, restore = false }: { consent?: ConsentReques
         ) : null}
         {phase.kind === "phrase" ? (
           <div className="vault-gate">
-            <PhraseScreen phrase={phase.phrase} title="Save your recovery phrase" onDone={() => setPhase({ kind: "open", vault: phase.vault })} />
+            <PhraseScreen
+              phrase={phase.phrase}
+              title="Save your recovery phrase"
+              check
+              onDone={() => {
+                const vault = phase.vault;
+                // The getting-started guide begins here; if its note cannot be saved, the vault opens all the same.
+                void startGuide(api, vault)
+                  .catch(() => undefined)
+                  .finally(() => setPhase({ kind: "open", vault }));
+              }}
+            />
           </div>
         ) : null}
         {phase.kind === "open" && consent !== undefined ? <Consent api={api} vault={phase.vault} request={consent} /> : null}

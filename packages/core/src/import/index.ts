@@ -2,11 +2,10 @@
 // browser: the export file is read, parsed and encrypted on the device, and the
 // server only ever receives the encrypted result.
 
-import { unzipSync } from "fflate";
 import type { MemoryDraft, SourceKind } from "../vault";
 import { parseChatGptConversations } from "./chatgpt";
 import { parseClaudeConversations, parseClaudeMemories, parseClaudeProjects } from "./claude";
-import { clampBody } from "./util";
+import { clampBody, unzipLimited, ZipTooLarge } from "./util";
 
 export { toIso, clampBody, MAX_BODY_CHARS } from "./util";
 
@@ -64,8 +63,9 @@ export function parseExport(fileName: string, bytes: Uint8Array): ImportResult {
   if (isZip(bytes)) {
     let entries: Record<string, Uint8Array>;
     try {
-      entries = unzipSync(bytes, { filter: (f) => f.name.toLowerCase().endsWith(".json") && !f.name.startsWith("__MACOSX") });
-    } catch {
+      entries = unzipLimited(bytes, (f) => f.name.toLowerCase().endsWith(".json") && !f.name.startsWith("__MACOSX"));
+    } catch (err) {
+      if (err instanceof ZipTooLarge) throw new ImportError("This zip file opens to more than an import can hold.");
       throw new ImportError("This zip file could not be opened.");
     }
     for (const [path, content] of Object.entries(entries)) {

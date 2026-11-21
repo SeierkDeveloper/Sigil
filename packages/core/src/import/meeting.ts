@@ -8,11 +8,11 @@
 // something was decided or agreed, a promise is a sentence where someone says
 // they will do something. The transcript itself is kept under the extract.
 
-import { unzipSync } from "fflate";
 import { sha256Hex } from "../keys";
 import type { ModelCaller } from "../model";
 import type { MemoryDraft } from "../vault";
 import { LocalImportError, textOf } from "./files";
+import { unzipLimited } from "./util";
 
 export interface TranscriptTurn {
   speaker: string;
@@ -43,11 +43,11 @@ function seconds(text: string): number | undefined {
 const SPEAKER = /^([\p{L}][\p{L}\p{M}'.\- ]{0,40}?)\s*:\s+(.+)$/u;
 
 function splitSpeaker(line: string): { speaker: string | null; text: string } {
-  const v = /^<v(?:\.[^ >]*)?\s+([^>]+)>(.*?)(?:<\/v>)?$/.exec(line.trim());
-  if (v) return { speaker: v[1].trim(), text: v[2].replace(/<[^>]+>/g, "").trim() };
+  const v = /^<v(?:\.[^ <>]*)?\s+([^<>\s][^<>]*)>(.*?)(?:<\/v>)?$/.exec(line.trim());
+  if (v) return { speaker: v[1].trim(), text: v[2].replace(/<[^<>]+>/g, "").trim() };
   const m = SPEAKER.exec(line.trim());
   if (m && !/^(https?|www)$/i.test(m[1]) && !/^\d/.test(m[1])) return { speaker: m[1].trim(), text: m[2].trim() };
-  return { speaker: null, text: line.replace(/<[^>]+>/g, "").trim() };
+  return { speaker: null, text: line.replace(/<[^<>]+>/g, "").trim() };
 }
 
 function push(turns: TranscriptTurn[], speaker: string | null, text: string, at?: number): void {
@@ -118,7 +118,7 @@ export function parseTxt(text: string): Transcript {
 export function docxText(bytes: Uint8Array): string {
   let entries: Record<string, Uint8Array>;
   try {
-    entries = unzipSync(bytes, { filter: (f) => f.name === "word/document.xml" });
+    entries = unzipLimited(bytes, (f) => f.name === "word/document.xml");
   } catch {
     throw new LocalImportError("This Word document could not be opened.");
   }
@@ -128,7 +128,7 @@ export function docxText(bytes: Uint8Array): string {
   return doc
     .split(/<\/w:p>/)
     .map((p) =>
-      [...p.matchAll(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>|<w:tab\/>|<w:br\/>/g)]
+      [...p.matchAll(/<w:t(?:\s[^<>]*)?>([^<]*)<\/w:t>|<w:tab\/>|<w:br\/>/g)]
         .map((m) => (m[1] !== undefined ? m[1] : m[0] === "<w:tab/>" ? "\t" : "\n"))
         .join(""),
     )

@@ -178,6 +178,7 @@ export async function verifyAgreement(a: SignedAgreement, opts: { published?: Ro
     };
     await compare("published", opts.published, "seals this site publishes");
     await compare("chain", opts.onChain, "seals on chain");
+    if (ok && !opts.published && !opts.onChain) add("roots", false, "The roots were not compared with any published or on-chain seals, so the proofs only show the document agrees with itself.");
   }
   return { ok: checks.every((c) => c.ok), checks };
 }

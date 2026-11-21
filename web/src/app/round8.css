@@ -1,0 +1,304 @@
+/*
+  Round eight: the first five minutes and a simpler vault. The main row of five
+  sections (and the ones the owner pinned) with More beside it, the More index
+  (the four groups of round six, each section with a pin), and the
+  getting-started guide above them. Plain, in the existing tokens, for the
+  design pass to replace.
+*/
+
+/* ------------------------------------------------------------------ the main row */
+
+.tabs.tabs-main {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-top: 1px solid var(--color-line-strong);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tabs.tabs-main::-webkit-scrollbar {
+  display: none;
+}
+
+.tabs-main > .tab:first-child {
+  padding-left: var(--space-4);
+}
+
+.tabs-main > .tab:first-child::after {
+  left: var(--space-4);
+}
+
+.tab-more {
+  margin-left: auto;
+  border-left: 1px solid var(--color-line);
+}
+
+.tab-more[aria-expanded="true"] {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
+
+.tab[data-pinned="true"] {
+  font-style: italic;
+}
+
+/* ------------------------------------------------------------------ More */
+
+.vault-more {
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.vault-more-lead {
+  margin: 0 0 var(--space-3);
+}
+
+.more-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.more-item[data-current="true"] > .tab {
+  color: var(--color-text);
+}
+
+.tab-group-tabs > .more-item:first-child > .tab {
+  margin-left: calc(-1 * var(--space-4));
+}
+
+.pin-button {
+  min-height: 28px;
+  margin-right: var(--space-3);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-faint);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.pin-button[aria-pressed="true"] {
+  color: var(--color-text);
+  border-color: var(--color-line-bright);
+}
+
+@media (max-width: 640px) {
+  .tab-group-tabs > .more-item {
+    grid-column: span 6;
+    display: flex;
+    justify-content: space-between;
+    background: var(--color-surface);
+  }
+
+  .tab-group-tabs > .more-item:first-child > .tab {
+    margin-left: 0;
+  }
+
+  .more-item > .tab {
+    flex: 1;
+    text-align: left;
+  }
+}
+
+/* ------------------------------------------------------------------ the getting-started guide */
+
+.guide {
+  margin: 0 0 var(--space-5);
+}
+
+.guide-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.guide-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-lg, 1.125rem);
+}
+
+.guide-progress {
+  height: 3px;
+  margin: var(--space-3) 0 var(--space-4);
+  background: var(--color-line);
+}
+
+.guide-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transition: width var(--transition);
+}
+
+.guide-steps-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guide-step {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+}
+
+.guide-step[data-current="true"] {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-2);
+}
+
+.guide-step[data-state="done"] .guide-step-title,
+.guide-step[data-state="skipped"] .guide-step-title {
+  color: var(--color-text-faint);
+}
+
+.guide-step-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  font-weight: 600;
+}
+
+.guide-step-mark {
+  min-width: 4.5em;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+
+.guide-step-body {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  min-width: 0;
+}
+
+.guide-step-body p {
+  margin: 0;
+}
+
+.guide-howto {
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.guide-clients {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+
+.guide-client {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.guide-client[data-selected="true"] {
+  border-color: var(--color-line-bright);
+}
+
+.guide-client input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.guide-client-name {
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ the phrase check */
+
+.phrase-check {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.phrase-check legend {
+  margin-bottom: var(--space-2);
+}
+
+.phrase-check .field-error {
+  grid-column: 1 / -1;
+  color: var(--color-danger, #ff8a8a);
+}
+
+/* ------------------------------------------------------------------ help lines */
+
+.screen-help {
+  max-width: 68ch;
+  margin: 0 0 var(--space-4);
+}
+
+/* ------------------------------------------------------------------ held for review */
+
+.held {
+  margin-bottom: var(--space-5);
+}
+
+.held-row .list-row-main {
+  min-width: 0;
+}
+
+.held-excerpt {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--color-line-strong);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.held-mark {
+  padding: 0 2px;
+  background: rgba(255, 138, 138, 0.18);
+  color: var(--color-text);
+  outline: 1px solid rgba(255, 138, 138, 0.5);
+}
+
+.immune-sources summary {
+  cursor: pointer;
+  margin: var(--space-2) 0;
+}
+
+/* ------------------------------------------------------------------ /immune */
+
+.immune-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-5);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.immune-table tr[data-outcome="fell"] td {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.section-subtitle {
+  margin: var(--space-5) 0 var(--space-3);
+  font-size: var(--text-base, 1rem);
+}

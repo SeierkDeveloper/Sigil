@@ -88,6 +88,8 @@ export interface MemoryHead {
   when?: string;
   /** For a story in a shared memory: the ids of the people in it. */
   people?: string[];
+  /** Set when the owner let a memory through that the immune system held back: the fingerprint of the body they approved (clearedHash). */
+  cleared?: string;
 }
 
 /** A photo kept with a memory, inside its encrypted body. */
@@ -337,6 +339,7 @@ export async function encryptMemory(folder: Pick<OpenFolder, "id" | "key">, memo
     ...(memory.expiresAt ? { expiresAt: memory.expiresAt } : {}),
     ...(memory.when ? { when: memory.when } : {}),
     ...(memory.people?.length ? { people: memory.people } : {}),
+    ...(memory.cleared ? { cleared: memory.cleared } : {}),
   };
   return {
     id: memory.id,

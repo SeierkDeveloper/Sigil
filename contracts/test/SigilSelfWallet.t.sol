@@ -30,6 +30,13 @@ contract TestToken {
         balanceOf[to] += amount;
         return true;
     }
+
+    /// A token function that moves value without being transfer or approve (as in ERC-1363).
+    function transferAndCall(address to, uint256 amount, bytes calldata) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
 }
 
 /// A contract the self may call.
@@ -573,5 +580,73 @@ contract SigilSelfWalletTest is Test {
         vm.prank(selfKey);
         vm.expectRevert(SigilSelfWallet.RulesExpired.selector);
         wallet.execute(friend, 1, "");
+    }
+
+    // ---------------------------------------------------------------- round eight: review fixes
+
+    function testOtherFunctionsOfACappedTokenAreRefusedEvenWhenAllowed() public {
+        // The owner allowed transferAndCall on the token by mistake: it would move the token around its caps.
+        vm.prank(owner);
+        wallet.setSelector(address(token), TestToken.transferAndCall.selector, true);
+        bytes memory data = abi.encodeWithSelector(TestToken.transferAndCall.selector, friend, 1_000e18, "");
+        vm.prank(selfKey);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TokenMoveRefused.selector, TestToken.transferAndCall.selector));
+        wallet.execute(address(token), 0, data);
+        assertEq(token.balanceOf(friend), 0);
+    }
+
+    function testTheOwnerCancelsSignedCalls() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _sign(selfPk, friend, 0.25 ether, "", 0, deadline);
+        vm.prank(owner);
+        wallet.cancelSignedCalls();
+        assertEq(wallet.nonce(), 1);
+        vm.prank(relayer);
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, 0.25 ether, "", deadline, sig);
+        assertEq(friend.balance, 0);
+        // Only the owner may cancel.
+        vm.prank(selfKey);
+        vm.expectRevert(SigilSelfWallet.NotOwner.selector);
+        wallet.cancelSignedCalls();
+    }
+
+    function testUnfreezingCancelsCallsSignedBefore() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory sig = _sign(selfPk, friend, 0.25 ether, "", 0, deadline);
+        vm.prank(owner);
+        wallet.freeze();
+        vm.prank(owner);
+        wallet.unfreeze();
+        vm.prank(relayer);
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, 0.25 ether, "", deadline, sig);
+    }
+
+    function testFuzzASignatureWorksOnceOnlyAndNotInItsOtherForm(uint64 amount) public {
+        amount = uint64(bound(amount, 1, 1 ether));
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes32 digest = wallet.executeDigest(friend, amount, "", 0, deadline);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(selfPk, digest);
+        // The malleable twin (r, n - s, other v) is refused.
+        bytes32 twinS = bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - uint256(s));
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, amount, "", deadline, abi.encodePacked(r, twinS, v == 27 ? uint8(28) : uint8(27)));
+        bytes memory sig = abi.encodePacked(r, s, v);
+        wallet.executeWithSig(friend, amount, "", deadline, sig);
+        assertEq(friend.balance, amount);
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, amount, "", deadline, sig);
+        // The same signature on another chain fails too.
+        vm.chainId(block.chainid + 1);
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, amount, "", deadline, sig);
+    }
+
+    function testFuzzRandomSignaturesNeverPass(bytes32 r, bytes32 s, uint8 v, uint64 amount) public {
+        vm.assume(uint256(r) != 0);
+        uint256 deadline = block.timestamp + 1 hours;
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, uint256(amount) % 1 ether, "", deadline, abi.encodePacked(r, s, v));
     }
 }

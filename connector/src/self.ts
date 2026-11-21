@@ -10,6 +10,7 @@
 import {
   AAD,
   agentSessionKey,
+  linkGreetingKey,
   answerAsSelf,
   appSelfKey,
   askNoteContext,
@@ -106,7 +107,7 @@ export class SelfAgent {
     const byId = new Map(ranked.map((h) => [h.id, h]));
     const memories: SelfMemory[] = full.map((m) => {
       const h = byId.get(m.id)!;
-      return { id: m.id, folderId: h.folderId, folder: m.folder, title: m.title, tags: m.tags, body: m.body, editedAt: m.editedAt };
+      return { id: m.id, folderId: h.folderId, folder: m.folder, title: m.title, tags: m.tags, body: m.body, editedAt: m.editedAt, ...(m.kind ? { source: { kind: m.kind } } : {}), ...(m.cleared ? { cleared: m.cleared } : {}) };
     });
     // Keep the ranking order from above.
     memories.sort((a, b) => ranked.findIndex((h) => h.id === a.id) - ranked.findIndex((h) => h.id === b.id));
@@ -141,7 +142,7 @@ export class SelfAgent {
       const link = self.links.get(q.linkId);
       if (!link) continue;
       const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
-      const key = agentSessionKey(linkPair(link), q.linkId, q.sessionId, q.askerKey);
+      const key = agentSessionKey(linkPair(link), q.linkId, q.sessionId, q.askerKey, linkGreetingKey(link));
       let reply: AskReply;
       let question = "";
       let citations: AskNote["citations"] = [];

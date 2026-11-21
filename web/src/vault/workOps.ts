@@ -38,6 +38,7 @@ import {
   type WorkSettings,
 } from "@sigil/core";
 import type { Api } from "./api";
+import { reportCaught } from "./immuneOps";
 import { addFolder, createMemory, deleteMemories, updateMemory, type Unlocked, type VaultData } from "./ops";
 import { composeLinkAnswer, selfMemories, sendLinkAnswer, type PendingQuestion } from "./selfOps";
 import { composePublicAnswer, pendingPublic, sendPublicAnswer } from "./publicOps";
@@ -160,7 +161,7 @@ export async function draftReply(api: Api, vault: Unlocked, data: VaultData, inp
   } else {
     draft = plainReply({ message, from: input.from, subject }, hints);
   }
-  const who = input.from.replace(/<[^>]*>/g, "").trim();
+  const who = input.from.replace(/<[^<>]*>/g, "").trim();
   return saveDraft(
     api,
     vault,
@@ -239,6 +240,7 @@ export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData,
     if (seen.has(ref) || q.booking) continue;
     const c = await composePublicAnswer(data, items, q, deps.model);
     if (!c) continue;
+    reportCaught(api, "public", c.caught ?? 0);
     const channel: AnswerChannel = { kind: "public", questionId: q.id, selfId: self.id, sessionId: q.sessionId, askerKey: q.askerKey };
     try {
       made.push(await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Answer to a visitor of @${self.handle}`, input: c.question, from: `@${self.handle}`, channel, draft: c.reply.text, sources: c.reply.sources, usedModel: true, refused: c.reply.refused })));

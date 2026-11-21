@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const SECRET = "CANARY-passport-X1234567";
 
@@ -17,7 +17,7 @@ test("a proof of one field and of an age, verified in another browser, revealing
   await createWithWallet(page);
   await writeMemory(page, { title: "Passport", body: `Born: 1990-04-02\nNationality: Example\nNumber: ${SECRET}` });
 
-  await page.getByRole("tab", { name: "Proof" }).click();
+  await openTab(page, "Proof");
   const prove = page.locator("#prove");
   await prove.getByLabel("Memory").selectOption({ label: "Passport" });
   await prove.getByLabel("Field").selectOption({ label: "Nationality: Example" });

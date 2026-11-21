@@ -246,4 +246,32 @@ contract SigilSealTest is Test {
         proof[0] = bytes32(uint256(proof[0]) ^ 1);
         assertFalse(seals.verify(HOUR_ID, leaves[idx], proof));
     }
+
+    // ---------------------------------------------------------------- round eight: entries checked by their data
+
+    function testFuzzVerifyDataTakesEveryEntryAndNoInnerNode(uint256 seed, uint8 size) public {
+        uint256 n = bound(size, 2, 32);
+        bytes[] memory data = new bytes[](n);
+        bytes32[] memory leaves = new bytes32[](n);
+        for (uint256 i = 0; i < n; i++) {
+            data[i] = abi.encode(seed, i);
+            leaves[i] = _leaf(data[i]);
+        }
+        bytes32 root = _root(leaves);
+        vm.prank(sealer);
+        seals.seal(HOUR_ID, root, uint32(n));
+        for (uint256 i = 0; i < n; i++) {
+            assertTrue(seals.verifyData(HOUR_ID, data[i], _proof(leaves, i)));
+        }
+        // An inner node passed as data is hashed as a leaf, so it never leads to the root.
+        bytes32 inner = _node(leaves[0], leaves[1]);
+        bytes32[] memory rest = _proof(leaves, 0);
+        bytes32[] memory up = new bytes32[](rest.length > 0 ? rest.length - 1 : 0);
+        for (uint256 i = 0; i < up.length; i++) up[i] = rest[i + 1];
+        assertFalse(seals.verifyData(HOUR_ID, abi.encodePacked(inner), up));
+        // Nor does the root itself with an empty proof.
+        assertFalse(seals.verifyData(HOUR_ID, abi.encodePacked(root), new bytes32[](0)));
+        // An hour without a seal verifies nothing.
+        assertFalse(seals.verifyData(HOUR_ID + 1, data[0], _proof(leaves, 0)));
+    }
 }

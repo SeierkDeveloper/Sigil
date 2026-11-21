@@ -14,6 +14,9 @@
 import { hybridSearch, type HybridOptions } from "./semantic";
 import { tokenize } from "./search";
 import type { ModelCaller, ModelMessage } from "./model";
+import { randomBytes } from "./crypto";
+import { DEFAULT_IMMUNE, isHeld, newNonce, scanText, stripHidden, UNTRUSTED_NOTE, wrapUntrusted, type ImmuneSettings } from "./immune";
+import type { SourceKind } from "./vault";
 
 export type UnknownPolicy = "say" | "redirect";
 
@@ -132,6 +135,10 @@ export interface SelfMemory {
   body: string;
   editedAt: string;
   expiresAt?: string;
+  /** Where it came from: memories from outside are checked for hidden instructions before any model sees them. */
+  source?: { kind: SourceKind };
+  /** The fingerprint of the body the owner let through after a hold. */
+  cleared?: string;
 }
 
 export interface SelfSource {
@@ -155,10 +162,11 @@ export function retrieve(
   rules: SelfRules,
   memories: SelfMemory[],
   question: string,
-  opts: Pick<HybridOptions, "queryVector" | "vectors"> & { now?: number } = {},
+  opts: Pick<HybridOptions, "queryVector" | "vectors"> & { now?: number; immune?: ImmuneSettings } = {},
 ): SelfSource[] {
   const allowed = new Set(rules.folderIds);
-  const pool = memories.filter((m) => allowed.has(m.folderId) && isLive(m, opts.now)).map((m) => ({ ...m, text: m.body }));
+  // Held back by the immune system until the owner approves: never a source.
+  const pool = memories.filter((m) => allowed.has(m.folderId) && isLive(m, opts.now) && !isHeld(m, opts.immune)).map((m) => ({ ...m, text: m.body }));
   const strict = hybridSearch(pool, question, { queryVector: opts.queryVector, vectors: opts.vectors, limit: rules.maxSources }).map((h) => h.item);
   const seen = new Set(strict.map((m) => m.id));
   const loose = looseSearch(pool, question).filter((m) => !seen.has(m.id));
@@ -210,7 +218,7 @@ function rankedSources(rules: SelfRules, memories: SelfMemory[], now?: number): 
 
 export type Asker = "owner" | "guest" | "legacy" | "public";
 
-export function buildSelfPrompt(rules: SelfRules, sources: SelfSource[], opts: { asker: Asker; profile?: string | null; context?: string | null }): string {
+export function buildSelfPrompt(rules: SelfRules, sources: SelfSource[], opts: { asker: Asker; profile?: string | null; context?: string | null; nonce?: string }): string {
   const lines = [
     `You are ${rules.name}: an AI that answers as the person who owns this memory vault, in the first person, as if you were them.`,
     opts.asker === "owner"
@@ -236,9 +244,10 @@ export function buildSelfPrompt(rules: SelfRules, sources: SelfSource[], opts: {
   if (opts.profile?.trim()) {
     lines.push("", "<profile>", opts.profile.trim().slice(0, 4000), "</profile>");
   }
-  lines.push("", "<memories>");
+  const nonce = opts.nonce ?? newNonce(randomBytes);
+  lines.push("", "<memories>", UNTRUSTED_NOTE);
   for (const s of sources) {
-    lines.push(`<memory n="${s.n}" title="${escapeAttr(s.title)}" folder="${escapeAttr(s.folder)}" edited="${s.editedAt.slice(0, 10)}">`, s.text, "</memory>");
+    lines.push(`<memory n="${s.n}" title="${escapeAttr(stripHidden(s.title))}" folder="${escapeAttr(s.folder)}" edited="${s.editedAt.slice(0, 10)}">`, wrapUntrusted(s.text, nonce).text, "</memory>");
   }
   lines.push("</memories>");
   return lines.join("\n");
@@ -281,6 +290,8 @@ export interface SelfAnswer {
   refused: RefusalReason | null;
   /** True when the model was called. */
   usedModel: boolean;
+  /** What the immune system held back or neutralised for this answer, when anything. */
+  caught?: ImmuneCatch;
 }
 
 export interface AnswerOptions {
@@ -298,6 +309,16 @@ export interface AnswerOptions {
   ranked?: boolean;
   /** More the AI self is told for this conversation, such as a booked session's house rules. */
   context?: string | null;
+  /** How strictly memories from outside are checked. The default level when not given. */
+  immune?: ImmuneSettings;
+  /** Told when memories were held back or had places neutralised, so the caller can put it on the record. */
+  onCaught?: (c: ImmuneCatch) => void;
+}
+
+export interface ImmuneCatch {
+  held: number;
+  neutralised: number;
+  ids: string[];
 }
 
 export const MAX_QUESTION = 2000;
@@ -308,11 +329,19 @@ export async function answerAsSelf(opts: AnswerOptions): Promise<SelfAnswer> {
   const screen = screenQuestion(opts.rules, question);
   if (!screen.ok) return { text: screen.reply, citations: [], refused: screen.reason, usedModel: false };
 
+  // The immune system: memories from outside that carry hidden instructions are held back until the owner approves them.
+  const immune = opts.immune ?? DEFAULT_IMMUNE;
+  const held = opts.memories.filter((m) => isHeld(m, immune));
+  const usable = held.length ? opts.memories.filter((m) => !held.includes(m)) : opts.memories;
   const sources = opts.ranked
-    ? rankedSources(opts.rules, opts.memories, opts.now)
-    : retrieve(opts.rules, opts.memories, question, { queryVector: opts.queryVector, vectors: opts.vectors, now: opts.now });
+    ? rankedSources(opts.rules, usable, opts.now)
+    : retrieve(opts.rules, usable, question, { queryVector: opts.queryVector, vectors: opts.vectors, now: opts.now, immune });
+  // What would still be neutralised in the prompt (below the hold level) counts as caught too.
+  const neutralised = sources.filter((s) => scanText(s.text).findings.some((f) => f.weight > 0)).length;
+  const caught: ImmuneCatch | undefined = held.length || neutralised ? { held: held.length, neutralised, ids: held.map((m) => m.id) } : undefined;
+  if (caught) opts.onCaught?.(caught);
   if (sources.length === 0 && !opts.profile?.trim()) {
-    return { text: opts.rules.unknownText, citations: [], refused: "unknown", usedModel: false };
+    return { text: opts.rules.unknownText, citations: [], refused: "unknown", usedModel: false, ...(caught ? { caught } : {}) };
   }
 
   const history: ModelMessage[] = (opts.history ?? []).slice(-4).flatMap((t) => [
@@ -324,12 +353,13 @@ export async function answerAsSelf(opts: AnswerOptions): Promise<SelfAnswer> {
     messages: [...history, { role: "user", content: question }],
   });
   const screened = screenAnswer(opts.rules, raw);
-  if (screened.blocked) return { text: screened.text, citations: [], refused: "never_say", usedModel: true };
+  if (screened.blocked) return { text: screened.text, citations: [], refused: "never_say", usedModel: true, ...(caught ? { caught } : {}) };
   const unknown = raw.trim() === opts.rules.unknownText.trim();
   return {
     text: raw,
     citations: unknown ? [] : citedSources(raw, sources).map((s) => ({ id: s.id, title: s.title, folder: s.folder })),
     refused: unknown ? "unknown" : null,
     usedModel: true,
+    ...(caught ? { caught } : {}),
   };
 }

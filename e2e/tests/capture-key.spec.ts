@@ -3,14 +3,14 @@
 // that device, and it lands in the inbox named by its key. Revoked, it stops.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, fitsPhone, installWallet, recordBodies } from "./helpers";
+import { createWithWallet, fitsPhone, installWallet, recordBodies, openTab } from "./helpers";
 
 const SAID = "Remember that I parked on level 3 CANARY-capture-e2e-9b";
 
 test("a capture key puts what a shortcut sends into the inbox, sealed on the sending device", async ({ page, context, browser }) => {
   await installWallet(context);
   await createWithWallet(page);
-  await page.getByRole("tab", { name: "Devices" }).click();
+  await openTab(page, "Devices");
   const form = page.getByRole("form", { name: "New capture key" });
   await form.getByLabel("Name", { exact: true }).fill("Phone shortcut");
   await form.getByRole("button", { name: "Make a capture key" }).click();
@@ -33,18 +33,18 @@ test("a capture key puts what a shortcut sends into the inbox, sealed on the sen
   expect(wire).not.toContain(key.split(".")[2]);
   await fitsPhone(phone, "The capture page, sent");
 
-  await page.getByRole("tab", { name: "Inbox" }).click();
+  await openTab(page, "Inbox");
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "Inbox" }).click();
+  await openTab(page, "Inbox");
   const card = page.getByTestId("proposal").first();
   await expect(card).toContainText("You, with Phone shortcut");
   await expect(card.getByLabel("Memory", { exact: true })).toHaveValue(SAID);
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.locator(".log-row", { hasText: "Sent something to your inbox" })).toContainText('Capture key "Phone shortcut"');
 
   // Revoked: the same link stops working on the next request.
-  await page.getByRole("tab", { name: "Devices" }).click();
+  await openTab(page, "Devices");
   await page.getByTestId("capture-key-row").getByRole("button", { name: "Revoke" }).click();
   await expect(page.getByTestId("capture-key-row")).toContainText("Revoked");
   const again = await phoneCtx.newPage();

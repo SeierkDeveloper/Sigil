@@ -340,6 +340,8 @@ export async function verifyDisclosure(d: Disclosure, opts: DisclosureVerifyOpti
   };
   await compare("published", opts.published, "seals this site publishes");
   await compare("chain", opts.onChain, "seals on chain");
+  // Roots taken from the proof itself prove nothing on their own: a proof may make up its own root.
+  if (roots.length && !opts.published && !opts.onChain) add("roots", false, "The roots were not compared with any published or on-chain seals, so the proofs only show the document agrees with itself.");
 
   return { ok: checks.every((x) => x.ok), claim: sigOk ? describeClaim(c) : null, attestedBy: claimAttestedBy(c), checks };
 }

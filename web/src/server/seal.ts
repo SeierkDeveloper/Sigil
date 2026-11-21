@@ -34,7 +34,10 @@ function toSeal(r: Row): SealRow {
 export function sealPending(db: Db, nowMs = Date.now()): SealRow[] {
   if (!serverConfig.sealsEnabled) return [];
   const current = hourOf(nowMs);
-  const hours = (db.prepare("SELECT DISTINCT hour FROM read_log WHERE sealed = 0 AND hour < ? ORDER BY hour").all(current) as Row[]).map((r) => Number(r.hour));
+  // Hours with unsealed reads, and hours with an immune record not yet sealed (an hour may have either or both).
+  const hours = (
+    db.prepare("SELECT hour FROM read_log WHERE sealed = 0 AND hour < ? UNION SELECT hour FROM immune_records WHERE sealed = 0 AND hour < ? ORDER BY hour").all(current, current) as Row[]
+  ).map((r) => Number(r.hour));
   const made: SealRow[] = [];
   for (const hour of hours) {
     const seal = tx(db, () => {
@@ -44,14 +47,17 @@ export function sealPending(db: Db, nowMs = Date.now()): SealRow[] {
         return null;
       }
       const rows = db.prepare("SELECT leaf FROM read_log WHERE hour = ? AND sealed = 0 ORDER BY at, id").all(hour) as Row[];
-      if (rows.length === 0) return null;
-      const leaves = rows.map((r) => String(r.leaf));
+      // The immune record of the hour comes last, after every read.
+      const immune = db.prepare("SELECT leaf FROM immune_records WHERE hour = ? AND sealed = 0").get(hour) as Row | undefined;
+      const leaves = [...rows.map((r) => String(r.leaf)), ...(immune ? [String(immune.leaf)] : [])];
+      if (leaves.length === 0) return null;
       const root = hex32(merkleRoot(leaves.map(fromHex32)));
       const sealedAt = new Date(nowMs).toISOString();
       db.prepare("INSERT INTO seals (hour, root, leaves, sealed_at) VALUES (?, ?, ?, ?)").run(hour, root, leaves.length, sealedAt);
       const ins = db.prepare("INSERT INTO seal_leaves (hour, idx, leaf) VALUES (?, ?, ?)");
       leaves.forEach((leaf, idx) => ins.run(hour, idx, leaf));
       db.prepare("UPDATE read_log SET sealed = 1 WHERE hour = ? AND sealed = 0").run(hour);
+      db.prepare("UPDATE immune_records SET sealed = 1 WHERE hour = ?").run(hour);
       return { hour, root, leaves: leaves.length, sealedAt, anchorTx: null, anchoredAt: null } satisfies SealRow;
     });
     if (seal) made.push(seal);

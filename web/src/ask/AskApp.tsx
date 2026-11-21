@@ -77,7 +77,7 @@ export function AskApp({ linkId }: { linkId: string }) {
           return;
         }
         const intro = await openIntro(fragment.introKey, linkId, info.intro);
-        if (alive) setPhase({ kind: "open", info, intro, session: newAskSession(linkId, info.publicKey) });
+        if (alive) setPhase({ kind: "open", info, intro, session: newAskSession(linkId, info.publicKey, fragment.introKey) });
       } catch (err) {
         if (alive) setPhase({ kind: "broken", message: err instanceof ApiError && err.status === 404 ? "This link does not exist. It may have been deleted." : "This link could not be opened. Ask the owner for it again." });
       }

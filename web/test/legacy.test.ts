@@ -4,7 +4,7 @@
 // the legacy key in readable form.
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { encodeBoxPublicKey, newBoxKeyPair, type ModelCaller } from "@sigil/core";
+import { encodeBoxPublicKey, encryptJson, newBoxKeyPair, type ModelCaller } from "@sigil/core";
 import { count, dumpDb, harness, signedUp, type Harness } from "./helpers";
 import * as ops from "../src/vault/ops";
 import * as legacy from "../src/vault/legacyOps";
@@ -160,6 +160,18 @@ describe("a release", () => {
     const kept = await legacy.openRelease(s.ana.b.api, s.ana.vault, s.ana.data.box!, ana);
     return { s, kept, ana };
   }
+
+  it("is never marked released by one trusted person alone, without enough shares combined", async () => {
+    const s = await setup();
+    away(91, ownerId());
+    const ana = (await load(s.ana)).trusted[0];
+    await legacy.requestRelease(s.ana.b.api, ana.planId);
+    // Ana holds one share of a plan that needs two, and claims she opened it anyway.
+    const kept = await encryptJson(s.ana.vault.key, { v: 1 }, `sigil:legacy-kept:${ana.planId}`);
+    await expect(s.ana.b.api.post(`legacy/plans/${ana.planId}/opened`, { kept, proof: "ab".repeat(32) })).rejects.toMatchObject({ status: 403 });
+    expect(count(h.db, "SELECT COUNT(*) AS n FROM legacy_plans WHERE released_at IS NOT NULL")).toBe(0);
+    await expect(s.ana.b.api.get(`legacy/plans/${ana.planId}/folders`)).rejects.toMatchObject({ status: 403 });
+  });
 
   it("combines shares in the browser and opens exactly the folders left to that person", async () => {
     const { s, kept } = await released();

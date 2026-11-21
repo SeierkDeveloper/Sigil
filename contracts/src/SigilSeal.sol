@@ -96,10 +96,19 @@ contract SigilSeal {
         return _seals[hour].root != bytes32(0);
     }
 
-    /// @notice True when `leaf` is part of the seal for `hour`.
+    /// @notice True when `leaf` (already hashed as sha256(0x00 || data)) is part of the seal for `hour`.
+    ///         The caller must hash the leaf itself: an inner node passed here also verifies. See verifyData.
     function verify(uint64 hour, bytes32 leaf, bytes32[] calldata proof) external view returns (bool) {
         bytes32 root = _seals[hour].root;
         return root != bytes32(0) && computeRoot(leaf, proof) == root;
+    }
+
+    /// @notice True when the entry `data` is part of the seal for `hour`. The leaf is hashed here,
+    ///         so an inner node of the tree (or the root itself) passed as a leaf never verifies.
+    ///         Prefer this to `verify`, which takes a leaf already hashed by the caller.
+    function verifyData(uint64 hour, bytes calldata data, bytes32[] calldata proof) external view returns (bool) {
+        bytes32 root = _seals[hour].root;
+        return root != bytes32(0) && computeRoot(sha256(abi.encodePacked(bytes1(0x00), data)), proof) == root;
     }
 
     function computeRoot(bytes32 leaf, bytes32[] calldata proof) public pure returns (bytes32 node) {

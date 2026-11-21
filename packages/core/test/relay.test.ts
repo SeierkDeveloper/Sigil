@@ -34,6 +34,16 @@ describe("the ask link relay", () => {
     expect(toBase64Url(newAskSession(link.id, link.publicKey).key)).not.toBe(toBase64Url(session.key));
   });
 
+  it("binds an ask link's conversations to the greeting key from its fragment", () => {
+    const link = newAskLink();
+    const guest = newAskSession(link.id, link.publicKey, link.introKey);
+    expect(toBase64Url(agentSessionKey(link.pair, link.id, guest.id, guest.publicKey, link.introKey))).toBe(toBase64Url(guest.key));
+    // Someone who knows only the link's id and public key (the server) makes a session the owner's side cannot open.
+    const server = newAskSession(link.id, link.publicKey);
+    expect(toBase64Url(agentSessionKey(link.pair, link.id, server.id, server.publicKey, link.introKey))).not.toBe(toBase64Url(server.key));
+    expect(() => agentSessionKey(link.pair, link.id, guest.id, guest.publicKey, new Uint8Array(16))).toThrow();
+  });
+
   it("round-trips a question and an answer, and the boxes show nothing readable", () => {
     const link = newAskLink();
     const s = newAskSession(link.id, link.publicKey);

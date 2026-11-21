@@ -12,10 +12,20 @@ pragma solidity 0.8.28;
 ///        - native value stays within the cap per transaction and per day
 ///        - an ERC-20 transfer or approve names an allowed recipient or spender and
 ///          stays within that token's caps; transferFrom and allowance increases are refused
+///        - on a token that has caps, transfer and approve are the only calls: any other
+///          function of it (transferAndCall, send, safeTransferFrom, ...) is refused, so
+///          nothing moves that token around its caps
+///      The caps count what the self key moves itself. An allowance the owner gave to
+///      an allowed contract (a router, say) is the owner's own decision: a call to that
+///      contract that spends it is not counted against the token's caps.
 ///      The self key can send a call itself, or sign it (EIP-712) for anyone to submit,
 ///      so it never needs gas of its own. Replacing the rules with `configure` starts a
-///      new rule set: nothing from the old one carries over. Spending per day is counted
-///      in whole UTC days and is not reset by new rules.
+///      new rule set: nothing from the old one carries over. A signed call is checked
+///      against the rules in force when it is sent, never those it was signed under; the
+///      owner can cancel every signed call not yet sent with `cancelSignedCalls`, and
+///      unfreezing cancels them too. Spending per day is counted
+///      per UTC calendar day (00:00 to 24:00 UTC), not over a rolling 24 hours, and is not
+///      reset by new rules.
 ///      The same EIP-712 digest is computed in packages/core/src/identity.ts.
 contract SigilSelfWallet {
     struct SelectorRule {
@@ -58,7 +68,7 @@ contract SigilSelfWallet {
     uint64 public expiresAt;
     /// @notice Starts at 1 and goes up with every `configure`; lists of an older rule set no longer count.
     uint256 public rulesVersion;
-    /// @notice Used by signed calls; goes up with every call the self key makes.
+    /// @notice Used by signed calls; goes up with every call the self key makes, and when the owner cancels signed calls.
     uint256 public nonce;
 
     Spend private _native;
@@ -79,6 +89,7 @@ contract SigilSelfWallet {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event Withdrawn(address indexed token, address indexed to, uint256 amount);
     event Received(address indexed from, uint256 amount);
+    event SignedCallsCancelled(uint256 nonce);
 
     error NotOwner();
     error NotSelf();
@@ -141,7 +152,14 @@ contract SigilSelfWallet {
 
     function unfreeze() external onlyOwner {
         frozen = false;
+        // A call signed before the freeze does not go through after it.
+        _cancelSigned();
         emit FrozenChanged(false, msg.sender);
+    }
+
+    /// @notice Cancels every call the self key signed and nobody has sent yet.
+    function cancelSignedCalls() external onlyOwner {
+        _cancelSigned();
     }
 
     /// @notice Replaces every rule at once: caps, expiry, allowed targets, selectors and token limits.
@@ -280,6 +298,7 @@ contract SigilSelfWallet {
             if (data.length < 4) revert SelectorNotAllowed(target, bytes4(0));
             selector = bytes4(data[0:4]);
             if (!_selectors[v][target][selector]) revert SelectorNotAllowed(target, selector);
+            if (_tokenLimits[v][target].perTx != 0 && selector != TRANSFER && selector != APPROVE) revert TokenMoveRefused(selector);
             if (selector == TRANSFER || selector == APPROVE) {
                 (tokenTo, tokenAmount) = abi.decode(data[4:], (address, uint256));
                 _spendToken(v, target, tokenTo, tokenAmount);
@@ -300,6 +319,12 @@ contract SigilSelfWallet {
         if (!ok) revert CallFailed(ret);
         emit Executed(n, target, value, selector, tokenTo, tokenAmount);
         return ret;
+    }
+
+    function _cancelSigned() private {
+        uint256 n = nonce + 1;
+        nonce = n;
+        emit SignedCallsCancelled(n);
     }
 
     function _spendToken(uint256 v, address token, address to, uint256 amount) private {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { cosine, embeddingText, hybridSearch, type AppKind, type Memory } from "@sigil/core";
+import { cosine, embeddingText, flagged, hybridSearch, levelFor, reasons, scanText, type AppKind, type Memory } from "@sigil/core";
 import { CheckIcon, CloseIcon, FolderIcon, InboxIcon, LockIcon } from "@/components/icons";
 import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
@@ -9,6 +9,8 @@ import { errorText, useVault } from "../context";
 import { AppMark, SourceMark } from "../marks";
 import { Empty, Notice } from "../ui";
 import { approveRequest, denyRequest, loadRequests, type AccessRequestView } from "../protectOps";
+import { approveHeld, reportCaught } from "../immuneOps";
+import { HeldForReview } from "./Held";
 import { PROTECT_LABELS, APPROVAL_MINUTES } from "@sigil/core";
 
 const NEW_FOLDER = "__new__";
@@ -41,6 +43,8 @@ export function InboxTab() {
           becomes a memory until you approve it.
         </p>
       </div>
+
+      <HeldForReview />
 
       <AccessRequests />
 
@@ -95,6 +99,12 @@ function ProposalCard({ proposal, appName, appKind, captureKey }: { proposal: op
   const p = proposal.payload;
   const [title, setTitle] = useState(p?.title ?? "");
   const [body, setBody] = useState(p?.body ?? "");
+  // The immune system reads a suggestion on this device before it can become a memory.
+  const check = useMemo(() => (p ? scanText(`${p.title}\n${p.body}`) : null), [p]);
+  const suspicious = !!check && flagged(check, levelFor(data.immune, proposal.payload?.via === "capture" ? "capture" : "app"));
+  useEffect(() => {
+    if (suspicious) reportCaught(api, "proposal", 1, proposal.id);
+  }, [api, suspicious, proposal.id]);
   const [tags, setTags] = useState(p?.tags.join(", ") ?? "");
   const suggested = p?.folder ? data.folders.find((f) => f.name.toLowerCase() === p.folder!.toLowerCase()) : undefined;
   const writable = data.folders.filter((f) => f.kind !== "profile");
@@ -175,7 +185,9 @@ function ProposalCard({ proposal, appName, appKind, captureKey }: { proposal: op
         created = true;
       }
       if (!folder) throw new Error("Choose a folder.");
-      const memory = await ops.approveProposal(api, folder, proposal, { title, body, tags: tagList }, appName ? { name: appName } : undefined);
+      const approved = await ops.approveProposal(api, folder, proposal, { title, body, tags: tagList }, appName ? { name: appName } : undefined);
+      // Kept after a warning: the owner saw what it holds, so it is let through as it is.
+      const memory = suspicious ? await approveHeld(api, data, approved) : approved;
       const f = folder;
       leave("approved", () => update((d) => ({ ...removeProposal(d), folders: created ? [...d.folders, f] : d.folders, memories: [memory, ...d.memories] })));
     });
@@ -233,6 +245,11 @@ function ProposalCard({ proposal, appName, appKind, captureKey }: { proposal: op
             ) : null}
           </div>
           {error ? <Notice kind="error">{error}</Notice> : null}
+          {suspicious && check ? (
+            <Notice kind="error">
+              <span data-testid="proposal-warning">This suggestion seems to carry instructions for an AI: {reasons(check).join("; ").toLowerCase()}. Read it before you keep it; rejecting it is safest.</span>
+            </Notice>
+          ) : null}
 
           {!p ? (
             <>
@@ -359,7 +376,7 @@ function ProposalCard({ proposal, appName, appKind, captureKey }: { proposal: op
                     </button>
                   ) : mode === "new" ? (
                     <button type="button" className="button button-primary" onClick={approve} disabled={!!busy || !title.trim() || !folderId}>
-                      {busy === "approve" ? "Saving" : "Approve"}
+                      {busy === "approve" ? "Saving" : suspicious ? "Approve anyway" : "Approve"}
                     </button>
                   ) : (
                     <button type="button" className="button button-primary" onClick={merge} disabled={!!busy || !targetMemory}>

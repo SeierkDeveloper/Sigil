@@ -7,6 +7,7 @@ import {
   bundleHash,
   bundleShapeError,
   buildMemory,
+  createApp,
   createBoxKey,
   createFolder,
   decodeBundle,
@@ -27,8 +28,12 @@ import {
   wrapVaultKey,
   newRecoveryPhrase,
   BUNDLE_PARTS,
+  macBundle,
+  gunzipLimited,
+  parseAppKey,
   type BundleBody,
 } from "../src/index";
+import { gzipSync } from "fflate";
 
 const ADDRESS = "0x000000000000000000000000000000000000dEaD";
 const SIGNATURE = `0x${"ab".repeat(65)}`;
@@ -139,10 +144,62 @@ describe("a vault bundle", () => {
     expect(await openBundle(bundle, v.raw)).toEqual({ folders: 1, memories: 2, settings: 1, unreadable: 0 });
     await expect(openBundle(bundle, newVaultKey())).rejects.toThrow(/another vault/);
 
-    // A memory moved onto another record's ciphertext does not open there.
-    const swapped = structuredClone(bundle);
-    swapped.body.memories[1] = { ...swapped.body.memories[1], body: swapped.body.memories[0].body };
-    expect((await openBundle(swapped, v.raw)).unreadable).toBe(1);
+    // A memory moved onto another record's ciphertext does not open there, even in a bundle signed after the move.
+    const swappedBody = structuredClone(v.body);
+    swappedBody.memories[1] = { ...swappedBody.memories[1], body: swappedBody.memories[0].body };
+    expect((await openBundle(sealBundle(swappedBody, v.signing), v.raw)).unreadable).toBe(1);
+  });
+
+  it("is refused at restore when anything changed on its way, or when its maker cannot be shown", async () => {
+    const v = await vault();
+    const bundle = sealBundle(v.body, v.signing);
+
+    // A memory left out, with the hash made again: the vault's signature no longer holds.
+    const dropped = structuredClone(bundle);
+    dropped.body.memories.pop();
+    dropped.hash = bundleHash(dropped.body);
+    await expect(openBundle(dropped, v.raw)).rejects.toThrow(/changed after it was made/);
+
+    // The same, relabelled as made by a connector and stripped of its signature: refused, there is no MAC.
+    const relabelled = structuredClone(bundle);
+    relabelled.body.madeBy = "connector";
+    relabelled.signature = null;
+    relabelled.hash = bundleHash(relabelled.body);
+    expect(verifyBundle(relabelled).ok).toBe(true);
+    await expect(openBundle(relabelled, v.raw)).rejects.toThrow(/changed after it was made/);
+
+    // A hash that does not cover the body.
+    await expect(openBundle({ ...bundle, hash: `0x${"00".repeat(32)}` }, v.raw)).rejects.toThrow(/changed after it was made/);
+  });
+
+  it("from a connector carries an HMAC from the app's secret, which only the vault can check", async () => {
+    const v = await vault();
+    const app = await createApp(v.key, { name: "Backup", kind: "other" }, []);
+    const { secret } = parseAppKey(app.appKey);
+    const body: BundleBody = structuredClone({ ...v.body, madeBy: "connector" });
+    (body.parts.apps as unknown as { table: string; row: Record<string, unknown> }[]).push({ table: "apps", row: { id: app.stored.id, secret: app.stored.secret, meta: app.stored.meta, user_id: "@vault" } });
+    const bundle = await macBundle(body, app.stored.id, secret);
+    expect(bundle.signature).toBeNull();
+    expect(await openBundle(bundle, v.raw)).toMatchObject({ memories: 2, unreadable: 0 });
+
+    // A capture key slipped in on the way: the HMAC no longer holds.
+    const planted = structuredClone(bundle);
+    (planted.body.parts.captureKeys as unknown as unknown[]).push({ table: "capture_keys", row: { id: "capture-001", token_hash: "aa".repeat(32), user_id: "@vault" } });
+    planted.hash = bundleHash(planted.body);
+    await expect(openBundle(planted, v.raw)).rejects.toThrow(/changed after it was made/);
+
+    // An HMAC made with another secret, or naming an app the bundle does not hold.
+    const other = await macBundle(body, app.stored.id, new Uint8Array(32).fill(7));
+    await expect(openBundle(other, v.raw)).rejects.toThrow(/changed after it was made/);
+    await expect(openBundle({ ...bundle, mac: { appId: "app-missing1", tag: bundle.mac!.tag } }, v.raw)).rejects.toThrow(/changed after it was made/);
+    await expect(openBundle({ ...bundle, mac: null }, v.raw)).rejects.toThrow(/changed after it was made/);
+  });
+
+  it("refuses a file that unpacks to more than a bundle can hold", () => {
+    const zeros = gzipSync(new Uint8Array(4 * 1024 * 1024));
+    expect(zeros.length).toBeLessThan(64 * 1024);
+    expect(() => gunzipLimited(zeros, 1024 * 1024)).toThrow();
+    expect(gunzipLimited(zeros, 8 * 1024 * 1024).length).toBe(4 * 1024 * 1024);
   });
 
   it("is restored with a statement signed for one node, for ten minutes", async () => {

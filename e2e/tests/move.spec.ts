@@ -4,7 +4,7 @@
 // link. The first node then sends the link on and turns sign-ins away.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, fitsPhone, installWallet, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { createWithWallet, fitsPhone, installWallet, recordBodies, setUpModel, writeMemory, openTab } from "./helpers";
 import { BASE_URL, SECOND_URL } from "../playwright.config";
 
 const CANARY = "CANARY-move-e2e-38c";
@@ -24,7 +24,7 @@ test("a vault moves to another node, and the old node sends its links on", async
   const askUrl = (await page.getByTestId("ask-url").innerText()).trim();
   expect(askUrl.startsWith(`${BASE_URL}/ask/`)).toBe(true);
 
-  await page.getByRole("tab", { name: "Storage" }).click();
+  await openTab(page, "Storage");
   const move = page.getByRole("form", { name: "Move to another node" });
   await move.getByLabel("Its address").fill(SECOND_URL);
   await move.getByLabel("Send links on for").selectOption({ label: "7 days" });
@@ -43,9 +43,9 @@ test("a vault moves to another node, and the old node sends its links on", async
   expect(page.url().startsWith(SECOND_URL)).toBe(true);
   await expect(page.getByTestId("node-list")).toContainText(BASE_URL);
   await expect(page.getByTestId("node-list")).toContainText("Came from");
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await expect(page.locator(".memory-item-title", { hasText: "The move" })).toBeVisible();
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.locator(".log-row", { hasText: "The vault arrived here from another node" })).toBeVisible();
   await expect(page.locator(".log-row", { hasText: "The old node confirmed the move" })).toBeVisible();
 

@@ -25,6 +25,7 @@ import {
   SYNC_INFO,
   sealSyncForApp,
   sealSyncState,
+  waitingForConnector,
   type Memory,
   type OpenFolder,
   type SyncFetch,
@@ -173,6 +174,28 @@ export async function connectSource(api: Api, vault: Unlocked, input: ConnectInp
   return { id, folderId: input.folder.id, state, ownerRev: 1, appId: null, appRev: 0, paused: false, lastSyncAt: null, createdAt: new Date().toISOString() };
 }
 
+/**
+ * The other way to connect, for a provider that wants a client secret at its
+ * token step (which a browser cannot keep): the source is made here without a
+ * sign-in, handed to a connector app, and the connector on the owner's computer
+ * signs in (`sigil-connector connect --source <id>`), keeps the secret in that
+ * computer's environment, and syncs it. Sigil's server still sees only
+ * envelopes.
+ */
+export async function prepareOnComputer(api: Api, vault: Unlocked, data: VaultData, input: { kind: SyncKind; clientId: string; folder: OpenFolder; app: Pick<AppView, "id" | "secret"> }): Promise<string> {
+  const id = randomId();
+  const state = waitingForConnector(input.kind, input.folder.id, input.clientId);
+  await api.post("sync", { id, folderId: input.folder.id, ownerBox: await sealSyncState(vault.key, id, state), rev: 1 });
+  const source: SyncSourceView = { id, folderId: input.folder.id, state, ownerRev: 1, appId: null, appRev: 0, paused: false, lastSyncAt: null, createdAt: new Date().toISOString() };
+  await allowBackground(api, vault, { ...data, folders: data.folders.some((f) => f.id === input.folder.id) ? data.folders : [...data.folders, input.folder] }, source, input.app);
+  return id;
+}
+
+/** The command that signs a source in on the owner's computer. */
+export function connectCommand(origin: string, sourceId: string): string {
+  return `SIGIL_URL=${origin} npx -y sigil-connector connect --source ${sourceId}`;
+}
+
 // ---------------------------------------------------------------- a pass, on this device
 
 /** Where a pass in the vault writes: on the memory that holds the same source and ref anywhere in the vault, otherwise into the source's folder. */
@@ -232,6 +255,7 @@ export async function syncNow(
   opts: { fetch?: SyncFetch; onSaved?: (m: Memory[], removed: string[]) => void } = {},
 ): Promise<{ source: SyncSourceView; report: PassReport }> {
   if (!source.state) throw new Error("This source could not be opened with your vault key.");
+  if (source.state.via === "connector") throw new Error("This source signs in on your computer, so your connector keeps it in sync. Run the connector with --watch.");
   const folder = data.folders.find((f) => f.id === source.folderId);
   if (!folder) throw new Error("The folder this source writes to is gone. Disconnect it and connect it again.");
   try {

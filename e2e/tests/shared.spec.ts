@@ -4,7 +4,7 @@
 // accepts, and reads the timeline, then downloads it as a document.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, fitsPhone, installWallet, recordBodies } from "./helpers";
+import { createWithWallet, fitsPhone, installWallet, recordBodies, openTab } from "./helpers";
 
 const STORY = "CANARY-family-e2e-summerhouse";
 // A one-pixel JPEG, for the photo of the story.
@@ -23,11 +23,11 @@ test("a family timeline outlives its owner: the heir becomes a member when the l
   const wire = recordBodies(owner);
 
   await createWithWallet(heir);
-  await heir.getByRole("tab", { name: "Folders" }).click();
+  await openTab(heir, "Folders");
   const code = (await heir.getByTestId("vault-code").innerText()).trim();
 
   await createWithWallet(owner);
-  await owner.getByRole("tab", { name: "Shared memory" }).click();
+  await openTab(owner, "Shared memory");
   const start = owner.getByRole("form", { name: "New shared memory" });
   await start.getByLabel("Name", { exact: true }).fill("The Rivers family");
   await start.getByLabel("Your name in it").fill("Sam");
@@ -58,7 +58,7 @@ test("a family timeline outlives its owner: the heir becomes a member when the l
   await fitsPhone(owner, "Shared memory, a story and an heir");
 
   // Sam's legacy plan names Ana too, and Sam goes away for the whole period.
-  await owner.getByRole("tab", { name: "Legacy" }).click();
+  await openTab(owner, "Legacy");
   const plan = owner.getByRole("form", { name: "Legacy plan" });
   await plan.getByLabel("Your name, as they will see it").fill("Sam");
   await plan.getByLabel("Release after this long without a sign of you").selectOption({ label: "3 months" });
@@ -73,14 +73,14 @@ test("a family timeline outlives its owner: the heir becomes a member when the l
   // Ana asks for the release and opens her share: the heir becomes a member of the family history.
   await heir.goto("/vault");
   await heir.getByTestId("method-wallet").click();
-  await heir.getByRole("tab", { name: "Legacy" }).click();
+  await openTab(heir, "Legacy");
   const release = heir.getByTestId("legacy-release");
   await release.getByRole("button", { name: "Ask for a release" }).click();
   await release.getByRole("button", { name: "Combine and open" }).click();
   await expect(heir.getByTestId("legacy-viewer")).toBeVisible();
   await heir.reload();
   await heir.getByTestId("method-wallet").click();
-  await heir.getByRole("tab", { name: "Shared memory" }).click();
+  await openTab(heir, "Shared memory");
   await heir.getByRole("button", { name: "Accept and open it" }).click();
   const hers = heir.getByTestId("story").first();
   await expect(hers).toContainText(`We built it in one summer. ${STORY}`);
@@ -88,7 +88,7 @@ test("a family timeline outlives its owner: the heir becomes a member when the l
   await expect(heir.getByRole("form", { name: "Add a story" })).toHaveCount(0);
   const [download] = await Promise.all([heir.waitForEvent("download"), heir.getByTestId("history-download").click()]);
   expect(download.suggestedFilename()).toBe("the-rivers-family.html");
-  await heir.getByRole("tab", { name: "Read log" }).click();
+  await openTab(heir, "Read log");
   await expect(heir.locator(".log-row", { hasText: "as an heir" })).toBeVisible();
   await fitsPhone(heir, "Shared memory, opened by the heir");
 

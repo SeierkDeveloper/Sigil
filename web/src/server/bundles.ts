@@ -10,7 +10,7 @@
 import {
   bundleShapeError,
   hex32,
-  merkleProof,
+  merkleTree,
   fromHex32,
   verifyBundle,
   verifyRestore,
@@ -52,11 +52,16 @@ function tagged(table: string, rows: Row[], userId: string): PartRow[] {
 /** Each entry's seal: the node, the root of its hour and its path, from this node's seals or from the bundle it came with. */
 function logWithSeals(db: Db, userId: string, origin: string): BundleLogEntry[] {
   const rows = all(db, "SELECT * FROM read_log WHERE user_id = ? ORDER BY at, id", userId);
-  const hours = new Map<number, { root: string; leaves: string[] } | null>();
+  // Each sealed hour's tree is built once, with a map from leaf to its place, for all of that hour's entries.
+  const hours = new Map<number, { root: string; at: Map<string, number>; tree: ReturnType<typeof merkleTree> } | null>();
   const sealOf = (hour: number) => {
     if (!hours.has(hour)) {
       const s = db.prepare("SELECT root FROM seals WHERE hour = ?").get(hour) as Row | undefined;
-      hours.set(hour, s ? { root: String(s.root), leaves: all(db, "SELECT leaf FROM seal_leaves WHERE hour = ? ORDER BY idx", hour).map((r) => String(r.leaf)) } : null);
+      if (!s) hours.set(hour, null);
+      else {
+        const leaves = all(db, "SELECT leaf FROM seal_leaves WHERE hour = ? ORDER BY idx", hour).map((r) => String(r.leaf));
+        hours.set(hour, { root: String(s.root), at: new Map(leaves.map((l, i) => [l, i])), tree: merkleTree(leaves.map(fromHex32)) });
+      }
     }
     return hours.get(hour)!;
   };
@@ -67,8 +72,8 @@ function logWithSeals(db: Db, userId: string, origin: string): BundleLogEntry[] 
       seal = c && "root" in c ? c : null;
     } else if (Number(r.sealed) === 1) {
       const s = sealOf(Number(r.hour));
-      const index = s ? s.leaves.indexOf(String(r.leaf)) : -1;
-      if (s && index >= 0) seal = { origin, periodSeconds: serverConfig.sealSeconds, root: s.root, index, proof: merkleProof(s.leaves.map(fromHex32), index).map(hex32) };
+      const index = s ? (s.at.get(String(r.leaf)) ?? -1) : -1;
+      if (s && index >= 0) seal = { origin, periodSeconds: serverConfig.sealSeconds, root: s.root, index, proof: s.tree.proof(index).map(hex32) };
     }
     return {
       id: String(r.id),
@@ -309,15 +314,16 @@ export function importBundle(db: Db, bundle: VaultBundle, origin: string, signIn
     }
 
     const rows = BUNDLE_PARTS.flatMap((p) => body.parts[p] as unknown as PartRow[]).filter((x) => x && typeof x.table === "string" && x.row && typeof x.row === "object");
-    const spaceSkipped = new Set<string>();
     const cols = new Map<string, Set<string>>();
+    // The ids of rows this import put in, by table: a row that points at a parent row may only point at one of these.
+    const placed = new Map<string, Set<string>>();
     for (const table of TABLE_ORDER) {
       if (!cols.has(table)) cols.set(table, columnsOf(db, table));
       const known = cols.get(table)!;
       for (const { row: raw } of rows.filter((x) => x.table === table)) {
         const row: Row = {};
         for (const [k, v] of Object.entries(raw)) if (known.has(k) && isPrimitive(v)) row[k] = v === OWNER ? userId : v;
-        if (!placeRow(db, table, row, userId, spaceSkipped)) {
+        if (!placeRow(db, table, row, userId, placed)) {
           count(left, table);
           continue;
         }
@@ -325,10 +331,13 @@ export function importBundle(db: Db, bundle: VaultBundle, origin: string, signIn
         try {
           db.prepare(`INSERT INTO ${table} (${keys.join(", ")}) VALUES (${keys.map(() => "?").join(", ")})`).run(...keys.map((k) => row[k] as string | number | null));
           count(taken, table);
+          if (row.id != null) {
+            if (!placed.has(table)) placed.set(table, new Set());
+            placed.get(table)!.add(String(row.id));
+          }
         } catch {
           // An id already in use here, or a row that points at something this node does not hold.
           count(left, table);
-          if (table === "spaces") spaceSkipped.add(String(row.id));
         }
       }
     }
@@ -337,15 +346,55 @@ export function importBundle(db: Db, bundle: VaultBundle, origin: string, signIn
   });
 }
 
+/**
+ * Rows that hang off another row of the bundle: the column that points at it
+ * and the table it is in. A restored vault brings its own apps, plans, public
+ * self, packs, sessions and spaces, so each such row must point at one this
+ * same import put in. Without this, a bundle anyone can make could hang rows
+ * off another vault's public self, pack, plan or space on this node.
+ */
+const PARENTS: Record<string, [column: string, table: string, nullable?: boolean][]> = {
+  grants: [["app_id", "apps"]],
+  app_inbox: [["app_id", "apps"]],
+  self_apps: [["app_id", "apps"]],
+  agents: [["app_id", "apps"]],
+  backup_apps: [["app_id", "apps"]],
+  legacy_people: [["plan_id", "legacy_plans"]],
+  ask_links: [["app_id", "apps", true]],
+  public_selves: [["app_id", "apps", true]],
+  public_items: [["self_id", "public_selves"]],
+  public_wall: [["self_id", "public_selves"]],
+  pack_versions: [["pack_id", "packs"]],
+  emergency_opens: [["card_id", "emergency_cards"]],
+  sync_sources: [["app_id", "apps", true]],
+  session_offers: [["self_id", "public_selves"]],
+  session_bookings: [["self_id", "public_selves"]],
+  session_turns: [["booking_id", "session_bookings"]],
+  session_blocks: [["self_id", "public_selves"]],
+  space_members: [
+    ["space_id", "spaces"],
+    ["app_id", "apps", true],
+  ],
+  space_memories: [["space_id", "spaces"]],
+  space_heirs: [["space_id", "spaces"]],
+};
+
 /** Adjusts one row for this node before it goes in. False leaves it out. */
-function placeRow(db: Db, table: string, row: Row, userId: string, spaceSkipped: Set<string>): boolean {
+function placeRow(db: Db, table: string, row: Row, userId: string, placed: Map<string, Set<string>>): boolean {
+  // Every account column is this vault's own (the bundle's "@vault") or empty. Any other account id is refused.
+  for (const c of ACCOUNT_COLUMNS) if (c in row && row[c] != null && row[c] !== userId) return false;
+  for (const [column, parent, nullable] of PARENTS[table] ?? []) {
+    const v = row[column];
+    if (v == null) {
+      if (nullable) continue;
+      return false;
+    }
+    if (!placed.get(parent)?.has(String(v))) return false;
+  }
   if (table === "legacy_people") {
     // A trusted person is found again by their vault's public key, if their vault is on this node.
     row.trustee_id = row.public_key ? userByBoxKey(db, String(row.public_key)) : null;
     row.invite_user = null;
-  }
-  if (table === "space_members" || table === "space_memories" || table === "space_heirs") {
-    if (spaceSkipped.has(String(row.space_id))) return false;
   }
   if (table === "space_members") {
     if (row.user_id === userId) return true;

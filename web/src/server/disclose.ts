@@ -8,7 +8,7 @@ import { DISCLOSE_APP, parseDisclosure, verifyDisclosure, type SealedEntry } fro
 import { tx, type Db } from "./db";
 import { HttpError, logEntry, logRead } from "./store";
 import { proofFor, sealPending } from "./seal";
-import { getSignKey } from "./life";
+import { getSignKey, rootsFor } from "./life";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -69,8 +69,11 @@ export async function publishDisclosure(db: Db, userId: string, id: string, text
   if (!row) throw new HttpError(404, "That proof was not found.", "no_proof");
   if (d.statement.signingKey !== getSignKey(db, userId)) throw new HttpError(400, "This proof was not made by this vault.", "invalid");
   if (!d.anchor || d.anchor.id !== String(row.entry_id)) throw new HttpError(400, "This proof is not sealed yet, or belongs to another entry.", "not_sealed");
-  const r = await verifyDisclosure(d);
-  if (!r.checks.filter((c) => c.name !== "published" && c.name !== "chain").every((c) => c.ok)) throw new HttpError(400, "This proof does not check out.", "invalid");
+  // The roots in the proof are compared with this node's own seals: a proof that made up its own roots is refused.
+  sealPending(db);
+  const published = async (hours: number[]) => new Map(Object.entries(rootsFor(db, hours)).map(([h, root]) => [Number(h), root]));
+  const r = await verifyDisclosure(d, { published });
+  if (!r.ok) throw new HttpError(400, "This proof does not check out against this node's seals.", "invalid");
   db.prepare("UPDATE disclosures SET published = ? WHERE id = ? AND user_id = ?").run(text, id, userId);
 }
 

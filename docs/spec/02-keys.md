@@ -89,8 +89,11 @@ The vault tags its public key for an app with HMAC-SHA256(tag key, `sigil-box-v1
 A link's X25519 key pair is made on the owner's device; its public half travels in the link after `#`. For the public AI self at `/@handle`, the public half is published by the server instead. The asker makes a fresh key pair A per conversation, and both sides derive
 
 ```
-key = HKDF-SHA256(ikm = X25519(a, L) = X25519(l, A), salt = A || L, info = "sigil:ask:v1:" + link id + ":" + session id)
+ask link (v2):    key = HKDF-SHA256(ikm = X25519(a, L) || G, salt = A || L, info = "sigil:ask:v2:" + link id + ":" + session id)
+public AI self:   key = HKDF-SHA256(ikm = X25519(a, L) = X25519(l, A), salt = A || L, info = "sigil:ask:v1:" + link id + ":" + session id)
 ```
+
+G is the link's 32-byte greeting key, which travels only after `#` and with the owner. Binding it in means only someone holding the whole link can start a conversation: the server knows a link's id and public key, but a session it made up itself does not open on the owner's side. The public AI self and booked sessions are open to anyone by design and keep v1. The `askKey` vector is the v1 key; `askKeyV2` adds the greeting key of `input`.
 
 Every question and answer is XChaCha20-Poly1305 under that key with a fresh 24-byte nonce and the AAD `sigil:ask-msg:v1:<link id>:<session id>:<message id>:<q|a>`, written `r1.<nonce>.<ciphertext>`. The `askKey` vector shows the key for the link secret of `input`. An answer of the public AI self is `{ v: 1, text, refused, sources: [{ id, title }] }`, the sources being items of the public copy.
 

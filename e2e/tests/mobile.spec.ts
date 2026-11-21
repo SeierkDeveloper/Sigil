@@ -2,7 +2,7 @@
 // screen and the device code, with no sideways scrolling anywhere.
 
 import { expect, test, type Page } from "@playwright/test";
-import { createWithWallet, installWallet, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, writeMemory, openTab } from "./helpers";
 
 const WIDTH = 375;
 
@@ -57,35 +57,35 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
     "Settings",
   ];
   for (const name of tabs) {
-    await page.getByRole("tab", { name }).click();
-    await expect(page.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
+    await openTab(page, name);
+    await expect(page.getByRole("tab", { name, exact: true })).toHaveAttribute("aria-selected", "true");
     await noSideScroll(page, name);
   }
 
   // The new forms, open.
-  await page.getByRole("tab", { name: "Agreements" }).click();
+  await openTab(page, "Agreements");
   await page.getByRole("button", { name: "Draft an agreement" }).click();
   await noSideScroll(page, "Agreement form");
-  await page.getByRole("tab", { name: "Identity" }).click();
+  await openTab(page, "Identity");
   await page.getByRole("button", { name: "Make the self's key" }).click();
   await page.getByRole("button", { name: "Add a recipient" }).click();
   await page.getByRole("button", { name: "Add a contract" }).click();
   await noSideScroll(page, "Identity with rules");
-  await page.getByRole("tab", { name: "Emergency" }).click();
+  await openTab(page, "Emergency");
   await page.getByRole("button", { name: "Add a person" }).click();
   await noSideScroll(page, "Emergency card form");
-  await page.getByRole("tab", { name: "Legacy" }).click();
+  await openTab(page, "Legacy");
   await page.getByRole("button", { name: "Add by invite link" }).click();
   await noSideScroll(page, "Legacy editor");
-  await page.getByRole("tab", { name: "Agents" }).click();
+  await openTab(page, "Agents");
   await page.getByRole("button", { name: "Make the first agent vault" }).click();
   await page.getByRole("button", { name: "New space" }).click();
   await noSideScroll(page, "Agents forms");
-  await page.getByRole("tab", { name: "Storage" }).click();
+  await openTab(page, "Storage");
   await page.getByRole("button", { name: "Add storage" }).click();
   await page.getByLabel("Kind").selectOption("arweave");
   await noSideScroll(page, "Storage with a target form");
-  await page.getByRole("tab", { name: "Devices" }).click();
+  await openTab(page, "Devices");
   await page.getByRole("button", { name: "Make a capture key" }).click();
   await expect(page.getByTestId("capture-made")).toBeVisible();
   for (const d of await page.locator(".shortcut-steps details").all()) await d.evaluate((el) => ((el as HTMLDetailsElement).open = true));

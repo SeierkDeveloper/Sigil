@@ -46,12 +46,16 @@ function messageText(m: ClaudeMessage): string {
       .join("\n\n");
   }
   if (!text && typeof m.text === "string") text = m.text.trim();
-  const names = [...(m.attachments ?? []), ...(m.files ?? [])]
+  const list = (v: unknown) => (Array.isArray(v) ? (v as { file_name?: string }[]) : []);
+  const names = [...list(m.attachments), ...list(m.files)]
     .map((a) => a?.file_name)
     .filter((n): n is string => typeof n === "string" && n.length > 0);
   if (names.length > 0) text += `${text ? "\n\n" : ""}[Attached: ${names.join(", ")}]`;
   return text;
 }
+
+const str = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+const ref = (v: unknown): string | undefined => (typeof v === "string" && v ? v.slice(0, 200) : undefined);
 
 export function parseClaudeConversations(list: unknown[]): { drafts: MemoryDraft[]; skipped: number } {
   const drafts: MemoryDraft[] = [];
@@ -61,27 +65,32 @@ export function parseClaudeConversations(list: unknown[]): { drafts: MemoryDraft
       skipped++;
       continue;
     }
-    const conv = raw as ClaudeConversation;
-    const lines: string[] = [];
-    for (const m of conv.chat_messages ?? []) {
-      if (m?.sender !== "human" && m?.sender !== "assistant") continue;
-      const text = messageText(m);
-      if (!text) continue;
-      lines.push(`### ${m.sender === "human" ? "You" : "Claude"}\n\n${text}`);
-    }
-    if (lines.length === 0) {
+    // One damaged conversation is skipped; it never stops the rest of the import.
+    try {
+      const conv = raw as ClaudeConversation;
+      const lines: string[] = [];
+      for (const m of Array.isArray(conv.chat_messages) ? conv.chat_messages : []) {
+        if (m?.sender !== "human" && m?.sender !== "assistant") continue;
+        const body = messageText(m);
+        if (!body) continue;
+        lines.push(`### ${m.sender === "human" ? "You" : "Claude"}\n\n${body}`);
+      }
+      if (lines.length === 0) {
+        skipped++;
+        continue;
+      }
+      const created = toIso(conv.created_at);
+      drafts.push({
+        title: str(conv.name) || "Untitled conversation",
+        body: lines.join("\n\n"),
+        tags: ["claude"],
+        source: { kind: "claude", ref: ref(conv.uuid) },
+        createdAt: created,
+        editedAt: toIso(conv.updated_at) ?? created,
+      });
+    } catch {
       skipped++;
-      continue;
     }
-    const created = toIso(conv.created_at);
-    drafts.push({
-      title: conv.name?.trim() || "Untitled conversation",
-      body: lines.join("\n\n"),
-      tags: ["claude"],
-      source: { kind: "claude", ref: conv.uuid },
-      createdAt: created,
-      editedAt: toIso(conv.updated_at) ?? created,
-    });
   }
   return { drafts, skipped };
 }
@@ -96,12 +105,13 @@ export function parseClaudeProjects(data: unknown): { drafts: MemoryDraft[]; ski
       continue;
     }
     const p = raw as ClaudeProject;
-    const name = p.name?.trim() || "Untitled project";
+    const name = str(p.name) || "Untitled project";
     const parts: string[] = [];
-    if (p.description?.trim()) parts.push(`### Description\n\n${p.description.trim()}`);
-    if (p.prompt_template?.trim()) parts.push(`### Instructions\n\n${p.prompt_template.trim()}`);
-    const docs = (p.docs ?? []).filter((d) => d && typeof d.content === "string" && d.content.trim());
-    if (docs.length > 0) parts.push(`### Documents\n\n${docs.map((d) => `- ${d.filename || "Untitled document"}`).join("\n")}`);
+    if (str(p.description)) parts.push(`### Description\n\n${str(p.description)}`);
+    if (str(p.prompt_template)) parts.push(`### Instructions\n\n${str(p.prompt_template)}`);
+    const docs = (Array.isArray(p.docs) ? p.docs : []).filter((d) => d && typeof d.content === "string" && d.content.trim());
+    const docName = (d: { filename?: unknown }) => str(d.filename) || "Untitled document";
+    if (docs.length > 0) parts.push(`### Documents\n\n${docs.map((d) => `- ${docName(d)}`).join("\n")}`);
     const tag = `project-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 32) || "untitled"}`;
     const created = toIso(p.created_at);
     if (parts.length > 0) {
@@ -109,7 +119,7 @@ export function parseClaudeProjects(data: unknown): { drafts: MemoryDraft[]; ski
         title: `Project: ${name}`,
         body: parts.join("\n\n"),
         tags: ["claude", "project", tag],
-        source: { kind: "claude", ref: p.uuid },
+        source: { kind: "claude", ref: ref(p.uuid) },
         createdAt: created,
         editedAt: toIso(p.updated_at) ?? created,
       });
@@ -119,10 +129,10 @@ export function parseClaudeProjects(data: unknown): { drafts: MemoryDraft[]; ski
     for (const d of docs) {
       const docCreated = toIso(d.created_at) ?? created;
       drafts.push({
-        title: `${name}: ${d.filename || "Untitled document"}`,
+        title: `${name}: ${docName(d)}`,
         body: (d.content as string).trim(),
         tags: ["claude", "document", tag],
-        source: { kind: "claude", ref: d.uuid },
+        source: { kind: "claude", ref: ref(d.uuid) },
         createdAt: docCreated,
         editedAt: docCreated,
       });

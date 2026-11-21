@@ -1,0 +1,25 @@
+# Sigil on Railway: one service built from the Dockerfile, with one volume.
+#
+# Region: EU West (Amsterdam). Pick it for the service and for its volume when
+# you create them; this file does not set it.
+#
+# Volume: mount one volume at /data (the image keeps its SQLite database and the
+# model files there, SIGIL_DATA_DIR=/data). One replica only: SQLite lives on
+# that one volume. Railway mounts volumes as root while the image runs as an
+# unprivileged user, so set RAILWAY_RUN_UID=0 on the service, or the node cannot
+# write its database (it says so in the log at start).
+#
+# Variables: see web/.env.example. SIGIL_ORIGIN, NEXT_PUBLIC_SITE_URL and
+# SIGIL_BACKUP_ORIGINS are also build arguments (the content security policy is
+# fixed at build time): Railway passes service variables to the Dockerfile's ARGs.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 120
+numReplicas = 1
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
