@@ -73,7 +73,7 @@ describe("the scanner leaves ordinary text alone", () => {
     "System: the nightly backup finished at 02:14 with 0 errors.",
     "Recipe: knead the dough, ignore the first rise if you are short on time, bake at 250 degrees.",
     "Meeting notes: we will send all the slides to the client next week and share the notes with the team.",
-    "Family photo 👨‍👩‍👧 at the lake, and a flag 🏳️‍🌈.",
+    "Family photo \u{1F468}\u200d\u{1F469}\u200d\u{1F467} at the lake, and a flag \u{1F3F3}\ufe0f\u200d\u{1F308}.",
     "Привет! Встреча в пятницу в 10 утра.",
     "def call_tool(name):\n    return registry[name]()  # the function we use in tests",
     "![chart](https://charts.example/render.png?w=640&h=480)",

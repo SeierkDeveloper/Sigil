@@ -22,7 +22,7 @@ export function rng(seed = FUZZ_SEED): Rng {
 export const int = (r: Rng, max: number) => Math.floor(r() * max);
 export const pick = <T>(r: Rng, list: readonly T[]): T => list[int(r, list.length)];
 
-const PIECES = ["", " ", "\n", "\r\n", "\t", "<", ">", "</", "<script>", "</script>", "<li", "&amp;", "&#x1F600;", "&constructor;", '"', "'", ":", ";", "=", ",", ".", "..", "/", "\\", "#", "@", "%", "%00", "\u0000", "‮", "\ud800", "😀", "é", "WEBVTT", "-->", "00:00:01.000", "BEGIN:VEVENT", "END:VEVENT", "From ", "Subject: ", "=?utf-8?B?", "?=", "---", "#tag", "__proto__", "constructor", "prototype", "a@b.co", "0x", "s1.", "v1.", "r1.", "m1."];
+const PIECES = ["", " ", "\n", "\r\n", "\t", "<", ">", "</", "<script>", "</script>", "<li", "&amp;", "&#x1F600;", "&constructor;", '"', "'", ":", ";", "=", ",", ".", "..", "/", "\\", "#", "@", "%", "%00", "\u0000", "‮", "\ud800", "\u{1F600}", "é", "WEBVTT", "-->", "00:00:01.000", "BEGIN:VEVENT", "END:VEVENT", "From ", "Subject: ", "=?utf-8?B?", "?=", "---", "#tag", "__proto__", "constructor", "prototype", "a@b.co", "0x", "s1.", "v1.", "r1.", "m1."];
 
 /** A string of odd pieces and random characters. */
 export function str(r: Rng, maxLen = 200): string {
