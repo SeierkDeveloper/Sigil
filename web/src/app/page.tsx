@@ -3,7 +3,6 @@ import { AppMakers } from "@/components/AppMakers";
 import { CodeBlock } from "@/components/CodeBlock";
 import { Engraving } from "@/components/art/Engraving";
 import { HeroArt } from "@/components/hero/HeroArt";
-import { HeroPanel } from "@/components/hero/HeroPanel";
 import { HeroVisual } from "@/components/hero/HeroVisual";
 import { LatestSeal } from "@/components/live/LatestSeal";
 import { LiveStats } from "@/components/live/LiveStats";
@@ -215,7 +214,6 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <HeroPanel />
         </div>
       </section>
 
