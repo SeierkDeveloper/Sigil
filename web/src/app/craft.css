@@ -755,10 +755,63 @@
 /* ------------------------------------------------------------------ round eight screens, in the same system */
 
 /*
-  The getting-started guide and the More index arrive with round eight
-  (round8.css, plain on purpose). The steps hang from rules like every other
-  sequence, the progress is a run of three lines, and a pin is a quiet tag.
+  Round eight (round8.css holds the layout): the main row with More, the
+  getting-started guide, Held for review and /immune. The steps hang from rules
+  like every other sequence, the progress is a run of three lines, a pin is a
+  quiet tag, a flagged place is marked in white, never in a colour.
 */
+.guide-title,
+.section-subtitle {
+  font-family: var(--font-display);
+  font-optical-sizing: none;
+  font-variation-settings: var(--display-cut);
+  font-size: 1.5rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.guide.subpanel {
+  border-top-color: var(--color-line-strong);
+}
+
+.tab[data-pinned="true"] {
+  font-style: normal;
+}
+
+.tab-more[aria-expanded="true"] {
+  background: none;
+}
+
+.tab-more[aria-expanded="true"]::after {
+  transform: scaleX(1);
+}
+
+/* What was held is quoted: three fine lines down its left edge, the flagged place on a white plate. */
+.held-excerpt {
+  padding-left: calc(7px + var(--space-3));
+  border-left: 0;
+  background: var(--ruled-edge-faint) left / 7px 100% no-repeat;
+}
+
+.held-mark {
+  padding: 0 3px;
+  outline: 0;
+  background: var(--color-accent-strong);
+  color: var(--color-accent-ink);
+}
+
+.phrase-check .field-error {
+  color: var(--color-text);
+}
+
+.immune-summary {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .guide-steps-list {
   gap: 0;
 }
