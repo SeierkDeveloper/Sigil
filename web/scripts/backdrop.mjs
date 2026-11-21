@@ -9,8 +9,8 @@ import path from "node:path";
 import { rng } from "./engrave/plate.mjs";
 
 // The shapes, as in groundShader.ts (LAND, GRASS, STRENGTH). Keep the two in step.
-const far = (x) => -52 - 30 * Math.sin(x * 0.0021 + 1.3) - 12 * Math.sin(x * 0.0057 + 4.0);
-const near = (x) => -20 - 22 * Math.sin(x * 0.003 + 3.6) - 7 * Math.sin(x * 0.0083 + 0.7);
+const near = (x) => -36 - 18 * Math.sin(x * 0.003 + 3.6) - 6 * Math.sin(x * 0.0083 + 0.7);
+const far = (x) => near(x) - 26 - 14 * Math.sin(x * 0.0021 + 1.3) - 6 * Math.sin(x * 0.0057 + 4.0);
 const field = (x) => 6 * Math.sin(x * 0.0024 + 2.2) + 3 * Math.sin(x * 0.0071);
 const GRASS = [
   [8, 4.5, 8],

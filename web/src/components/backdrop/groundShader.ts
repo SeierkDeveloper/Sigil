@@ -20,9 +20,10 @@ void main() {
 `;
 
 /** The far hill, the near hill and the edge of the field: height above the horizon line at x, in scene units. Shared with the still drawing. */
-export const LAND = {
-  far: (x: number) => -52 - 30 * Math.sin(x * 0.0021 + 1.3) - 12 * Math.sin(x * 0.0057 + 4.0),
-  near: (x: number) => -20 - 22 * Math.sin(x * 0.003 + 3.6) - 7 * Math.sin(x * 0.0083 + 0.7),
+export const LAND: Record<"near" | "far" | "field", (x: number) => number> = {
+  near: (x: number) => -36 - 18 * Math.sin(x * 0.003 + 3.6) - 6 * Math.sin(x * 0.0083 + 0.7),
+  // the far hill is measured from the near one, so it always stands behind it
+  far: (x: number) => LAND.near(x) - 26 - 14 * Math.sin(x * 0.0021 + 1.3) - 6 * Math.sin(x * 0.0057 + 4.0),
   field: (x: number) => 6 * Math.sin(x * 0.0024 + 2.2) + 3 * Math.sin(x * 0.0071),
 };
 
@@ -119,8 +120,8 @@ void main() {
   ground = mix(ground, 0.0157, smoothstep(0.55, 1.0, down));
   ground += 0.02 * grain(cell);
 
-  float far = -52.0 - 30.0 * sin(x * 0.0021 + 1.3) - 12.0 * sin(x * 0.0057 + 4.0);
-  float near = -20.0 - 22.0 * sin(x * 0.003 + 3.6) - 7.0 * sin(x * 0.0083 + 0.7);
+  float near = -36.0 - 18.0 * sin(x * 0.003 + 3.6) - 6.0 * sin(x * 0.0083 + 0.7);
+  float far = near - 26.0 - 14.0 * sin(x * 0.0021 + 1.3) - 6.0 * sin(x * 0.0057 + 4.0);
   float field = 6.0 * sin(x * 0.0024 + 2.2) + 3.0 * sin(x * 0.0071);
   // a slow light that crosses the land
   float light = 0.6 + 0.4 * sin(x * 0.0031 + y * 0.004 - u_clock.z);
