@@ -2,9 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report anything you find to **security@sigil.fun**.
-
-> This address is a placeholder until it is confirmed. Until then, open a GitHub security advisory on this repository (Security, Report a vulnerability), which only the maintainers can see.
+Please report anything you find privately through this repository on GitHub: open the Security tab and choose Report a vulnerability. Only the maintainers can see it. Do not open a public issue for a security problem.
 
 Please include what you found, how to reproduce it, and what someone could do with it. Do not test against vaults that are not yours, and do not read, change or delete anyone's data. Give us a reasonable time to fix it before you publish; we will tell you when it is fixed and, if you want, credit you in the changelog.
 

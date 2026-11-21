@@ -385,12 +385,11 @@ export default function Security() {
           <section id="report">
             <h2>Reporting a problem</h2>
             <p>
-              Please report a security issue privately to <strong>security@sigil.fun</strong> (a placeholder until it is confirmed; until then, use the private
-              security advisories of the{" "}
+              Please report a security issue privately through the{" "}
               <a href={site.githubUrl} target="_blank" rel="noopener noreferrer">
                 Sigil repository
-              </a>
-              ), not in a public issue. Say what you found, how to reproduce it and what someone could do with it. Do not test against vaults that are not yours. We
+              </a>{" "}
+              on GitHub (Security, Report a vulnerability), not in a public issue. Say what you found, how to reproduce it and what someone could do with it. Do not test against vaults that are not yours. We
               will tell you when it is fixed and, if you want, credit you. There is no bounty at present.
             </p>
           </section>
