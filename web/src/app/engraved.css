@@ -1,0 +1,492 @@
+/*
+  The engraved layer: nature, cut in fine lines.
+
+  The site is a plate printed in silver on black. Its pictures are engravings
+  of things that last and grow (an oak, its roots, a seed, the rings of a
+  trunk, a far range, a seal in wax), its ground is a landscape cut in line,
+  and its type is a book face. This file loads last. It holds the type, the
+  rules and ornaments, the plates (buttons, cards, panels), the hero tree and
+  the placing of the engravings. The crafted rules of craft.css still stand:
+  nothing glows, nothing is glossy, no disc or ring is used as a container,
+  and scrolling moves nothing but the page.
+
+  The pictures are cut by scripts/engravings.mjs into public/art; the ground
+  is components/backdrop.
+*/
+
+:root {
+  --font-display: var(--face-display), "Cormorant Garamond", Garamond, "Hoefler Text", "Iowan Old Style", Georgia, serif;
+  /* the book face has one cut; these names stay so older rules keep working */
+  --display-cut: normal;
+  --numeral-cut: normal;
+  --numeral-cut-small: normal;
+  --text-4xl: clamp(2.625rem, 5.4vw, 4.375rem);
+  /* an old book's double rule: one firm line and a fine one under it */
+  --rule-double: linear-gradient(var(--color-line-strong), var(--color-line-strong)) 0 0 / 100% 1px no-repeat,
+    linear-gradient(var(--color-line), var(--color-line)) 0 3px / 100% 1px no-repeat;
+  /* the fleuron: two small leaves and a point between them */
+  --fleuron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 14' fill='none' stroke='%23d8d8d8' stroke-width='0.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M23 7C18 1.6 10 1.8 3 7c7 5.2 15 5.4 20 0Z'/%3E%3Cpath d='M3 7h17M9 7 12 4.2M9 7l3 2.8M13.5 7l3-2.6M13.5 7l3 2.6'/%3E%3Cpath d='M33 7c5-5.4 13-5.2 20 0-7 5.2-15 5.4-20 0Z'/%3E%3Cpath d='M53 7H36M47 7l-3-2.8M47 7l-3 2.8M42.500 7l-3-2.600M42.500 7l-3 2.600'/%3E%3Ccircle cx='28' cy='7' r='1' fill='%23d8d8d8' stroke='none'/%3E%3C/svg%3E");
+  /* one leaf, for the end of a rule */
+  --leaf-mark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 26 14' fill='none' stroke='%23d8d8d8' stroke-width='0.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 7c5-5.400 13-5.200 20 0-7 5.200-15 5.400-20 0Z'/%3E%3Cpath d='M23 7H6M17 7l-3-2.800M17 7l-3 2.800M12.500 7l-3-2.600M12.500 7l-3 2.600'/%3E%3C/svg%3E");
+}
+
+/* ------------------------------------------------------------------ type */
+
+/* The display face is a Garamond: lower in contrast than a Didone, so it is set a size larger and a weight firmer. */
+h1,
+.section-title,
+.page-title,
+.hero-title {
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  font-feature-settings: "lnum", "kern", "liga";
+}
+
+.hero-title {
+  font-size: clamp(3rem, 6.1vw, 5.5rem);
+  line-height: 0.96;
+  letter-spacing: -0.02em;
+}
+
+.hero-title em {
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.section-title {
+  font-size: clamp(2.125rem, 3.5vw, 3.125rem);
+  line-height: 1.04;
+}
+
+/* Labels are lettered as on a plate: capitals of the book face, set wide. */
+.eyebrow,
+.works-with-label,
+.site-footer-label,
+.nav-panel-label,
+.site-menu-label,
+.stat-label {
+  font-family: var(--font-display);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-feature-settings: "lnum";
+}
+
+.eyebrow {
+  color: var(--color-text-muted);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+}
+
+/* Small titles are in the book face too. */
+.card-title,
+.step-title,
+.pillar-title,
+.import-flow-label,
+.page-link-title,
+.faq-item summary,
+.smart-list strong,
+.nav-panel-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.card-title,
+.step-title,
+.pillar-title,
+.import-flow-label {
+  font-size: 1.5rem;
+  line-height: 1.15;
+}
+
+.page-link-title,
+.smart-list strong {
+  font-size: 1.3125rem;
+  line-height: 1.2;
+}
+
+.faq-item summary {
+  font-size: 1.375rem;
+  line-height: 1.25;
+}
+
+.nav-panel-title {
+  font-size: 1.1875rem;
+  line-height: 1.2;
+}
+
+.site-menu-link,
+.logo-word {
+  font-weight: 500;
+}
+
+/* Numerals: the figures of the book face, a touch firmer than the titles. */
+.step::before,
+.import-flow-number,
+.plate-number,
+.stat-value {
+  font-weight: 500;
+  font-feature-settings: "lnum";
+}
+
+/* ------------------------------------------------------------------ rules and ornaments */
+
+/* A section opens with a double rule and a fleuron in its middle. */
+.section::before,
+.works-with::before {
+  height: 4px;
+  background: var(--rule-double);
+}
+
+.section::after,
+.container > .section::after,
+.cta-band.section::after {
+  top: -5px;
+  left: calc(50% - 40px);
+  width: 80px;
+  height: 14px;
+  transform: none;
+  transform-origin: center;
+  background: var(--fleuron) center / 56px 14px no-repeat, var(--color-bg);
+  clip-path: none;
+}
+
+[data-motion] .section:not([data-in])::after {
+  opacity: 0;
+  transform: scaleX(0.4);
+}
+
+/* A page header closes on the same rule, with one leaf where the text begins. */
+.page-header::before {
+  height: 4px;
+  background: var(--rule-double);
+}
+
+.page-header::after {
+  bottom: -6px;
+  left: 0;
+  width: 38px;
+  height: 14px;
+  background: var(--leaf-mark) left center / 26px 14px no-repeat, var(--color-bg);
+  clip-path: none;
+}
+
+/* Cards and steps hang from the double rule. */
+.card,
+.step {
+  background: linear-gradient(var(--color-line), var(--color-line)) 0 3px / 100% 1px no-repeat;
+}
+
+.card {
+  padding-top: calc(var(--space-5) + 4px);
+}
+
+.step {
+  padding-top: calc(var(--space-5) + 4px);
+}
+
+/* ------------------------------------------------------------------ plates */
+
+/* A button is a small plate: its edge, and a finer line inside it, as the mark a plate leaves in paper. */
+.button:not(.button-primary):not(.button-ghost):not(.text-button) {
+  box-shadow: inset 0 0 0 3px var(--color-bg), inset 0 0 0 4px rgba(255, 255, 255, 0.075);
+}
+
+.button-primary {
+  box-shadow: inset 0 0 0 3px #f4f4f4, inset 0 0 0 4px rgba(0, 0, 0, 0.16);
+  letter-spacing: 0.015em;
+}
+
+.button-primary:hover {
+  box-shadow: inset 0 0 0 3px #ffffff, inset 0 0 0 4px rgba(0, 0, 0, 0.26);
+}
+
+.button-small.button-primary {
+  box-shadow: inset 0 0 0 2px #f4f4f4, inset 0 0 0 3px rgba(0, 0, 0, 0.14);
+}
+
+/* Panels that show a thing (an app's permissions, a suggestion) carry a plate mark: a second fine frame a little outside the first. */
+.permission-card,
+.inbox-preview-card {
+  outline: 1px solid rgba(255, 255, 255, 0.06);
+  outline-offset: 6px;
+}
+
+/* ------------------------------------------------------------------ the hero */
+
+/*
+  The oak stands on the right of the first screen, on its own field, and the
+  words stand to its left on bare ground. The picture is white line on a clear
+  ground and runs out toward its edges, so no frame shows. On a phone it
+  stands under the words, the full width of the screen.
+*/
+.hero {
+  min-height: min(760px, calc(100svh - var(--header-height) - 72px));
+  padding: var(--space-8) 0 var(--space-9);
+}
+
+.hero-inner {
+  grid-template-columns: minmax(0, 640px);
+}
+
+.hero-lead {
+  max-width: 500px;
+}
+
+.hero-tree {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: clamp(940px, 84vw, 1560px);
+  aspect-ratio: 1652 / 724;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hero-tree-still,
+.hero-tree-live {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-tree-live {
+  visibility: hidden;
+}
+
+.hero-tree[data-live] .hero-tree-live {
+  visibility: visible;
+}
+
+.hero-tree[data-live] .hero-tree-still {
+  visibility: hidden;
+}
+
+[data-motion] .hero-tree {
+  animation: reveal 1800ms ease 200ms backwards;
+}
+
+@media (max-width: 860px) {
+  .hero {
+    padding: var(--space-6) 0 0;
+  }
+  .hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .hero-tree {
+    position: relative;
+    order: 2;
+    width: 160vw;
+    margin: var(--space-5) 0 0 -60vw;
+  }
+}
+
+/* The piece that was the hero has a section of its own. */
+.section-views .hero-visual {
+  max-width: 560px;
+  margin: 0 0 0 auto;
+}
+
+@media (max-width: 860px) {
+  .section-views .hero-visual {
+    margin: var(--space-4) auto 0;
+  }
+}
+
+/* ------------------------------------------------------------------ engravings */
+
+/*
+  A picture from public/art. With motion on it is uncovered once as it enters
+  the screen: the window over it slides one way and the picture the other, so
+  the picture stands still while it appears from the ground up (or, for roots,
+  from the ground down). Only transforms move.
+*/
+.engraving {
+  display: block;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.engraving-window {
+  display: block;
+  overflow: hidden;
+}
+
+.engraving img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+[data-motion] .engraving:not([data-grow="none"]) .engraving-window,
+[data-motion] .engraving:not([data-grow="none"]) img {
+  transition: transform 2200ms cubic-bezier(0.3, 0.6, 0.2, 1);
+}
+
+[data-motion] .engraving[data-grow="up"]:not([data-in]) .engraving-window {
+  transform: translateY(100%);
+}
+
+[data-motion] .engraving[data-grow="up"]:not([data-in]) img {
+  transform: translateY(-100%);
+}
+
+[data-motion] .engraving[data-grow="down"]:not([data-in]) .engraving-window {
+  transform: translateY(-100%);
+}
+
+[data-motion] .engraving[data-grow="down"]:not([data-in]) img {
+  transform: translateY(100%);
+}
+
+/* At the head of a page: to the right of the title on a wide screen, above it on a narrow one. */
+.page-header[data-art] {
+  max-width: none;
+}
+
+.page-header[data-art] > :is(.eyebrow, .page-title, .page-lead) {
+  max-width: min(800px, calc(100% - 300px));
+}
+
+.page-header-art {
+  position: absolute;
+  right: 0;
+  bottom: var(--space-6);
+  width: 230px;
+}
+
+.page-header-art[data-art="sapling"] {
+  width: 170px;
+}
+
+.page-header-art[data-art="oak"] {
+  width: 270px;
+  bottom: var(--space-5);
+}
+
+.page-header-art[data-art="sprig"] {
+  width: 280px;
+}
+
+.page-header-art[data-art="acorn"],
+.page-header-art[data-art="leaf"] {
+  width: 190px;
+}
+
+.page-header-art[data-art="seal"],
+.page-header-art[data-art="rings"] {
+  width: 210px;
+}
+
+@media (max-width: 900px) {
+  .page-header[data-art] {
+    display: flex;
+    flex-direction: column;
+  }
+  .page-header[data-art] > :is(.eyebrow, .page-title, .page-lead) {
+    max-width: none;
+  }
+  .page-header-art,
+  .page-header-art[data-art] {
+    position: static;
+    order: -1;
+    width: 112px;
+    margin: 0 0 var(--space-5);
+  }
+  .page-header-art[data-art="sprig"],
+  .page-header-art[data-art="oak"] {
+    width: 150px;
+  }
+}
+
+/* Under a section's text: the roots, as wide as the page. */
+.section:has(> .container > .section-art) {
+  overflow-x: clip;
+}
+
+.section-art {
+  margin-top: var(--space-8);
+}
+
+.section-art-roots {
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 640px) {
+  .section-art {
+    margin-top: var(--space-7);
+  }
+  /* on a phone the roots are drawn larger and run off both sides */
+  .section-art-roots {
+    width: 150vw;
+    max-width: none;
+    margin-left: calc(-25vw - var(--gutter));
+  }
+}
+
+/* The closing call stands before a far range and its river. */
+.cta-band {
+  overflow: clip;
+  padding-bottom: 0;
+}
+
+.cta-band > .container::before {
+  content: none;
+}
+
+.cta-band {
+  padding-top: var(--space-7);
+}
+
+/* the words begin on the near ground, where the plain runs out */
+.cta-band-art {
+  width: max(100%, 1100px);
+  max-width: 1600px;
+  margin: 0 0 -36px max(calc(50% - 800px), calc((100% - max(100%, 1100px)) / 2));
+}
+
+.cta-band > .container {
+  padding-bottom: var(--space-9);
+}
+
+@media (max-width: 640px) {
+  .cta-band-art {
+    width: 900px;
+    margin: 0 0 -24px calc(50% - 450px);
+  }
+}
+
+/* ------------------------------------------------------------------ the vault */
+
+/* The door of the vault keeps its plain ground; the band of lines behind it goes. */
+.vault:not([data-phase="open"])::before {
+  content: none;
+}
+
+/* Nothing here yet: a seed. With an icon, the icon stands alone over a short stroke of ground. */
+.empty-state:not(:has(.empty-state-icon))::before {
+  width: 84px;
+  height: 84px;
+  margin: 0 0 var(--space-3);
+  background: url("/art/acorn.svg") center / contain no-repeat;
+  clip-path: none;
+}
+
+.empty-state-icon {
+  width: 96px;
+  height: 52px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4) 30%, rgba(255, 255, 255, 0.4) 70%, transparent) 50% 100% / 96px 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16) 30%, rgba(255, 255, 255, 0.16) 70%, transparent) 50% calc(100% - 4px) / 64px 1px no-repeat;
+  clip-path: none;
+}

@@ -42,6 +42,7 @@ const REVEAL = [
   ".page-links",
   ".app-index",
   ".flow",
+  ".engraving",
 ].join(",");
 export function Motion() {
   const pathname = usePathname();

@@ -13,16 +13,17 @@ import "./round6.css";
 import "./round7.css";
 import "./round8.css";
 
-import "./craft.css"; // the crafted layer loads last
+import "./craft.css";
+import "./engraved.css"; // the engraved layer loads last
 // Self-hosted faces (the content security policy allows no third-party font hosts).
 const display = localFont({
   src: [
-    { path: "../fonts/display-roman.woff2", style: "normal", weight: "400 900" },
-    { path: "../fonts/display-italic.woff2", style: "italic", weight: "400 900" },
+    { path: "../fonts/display-roman.woff2", style: "normal", weight: "300 700" },
+    { path: "../fonts/display-italic.woff2", style: "italic", weight: "300 700" },
   ],
   variable: "--face-display",
   display: "swap",
-  fallback: ["Didot", "Georgia", "serif"],
+  fallback: ["Garamond", "Georgia", "serif"],
 });
 const sans = localFont({
   src: [

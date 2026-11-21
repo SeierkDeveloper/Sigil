@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { AppMakers } from "@/components/AppMakers";
 import { CodeBlock } from "@/components/CodeBlock";
+import { Engraving } from "@/components/art/Engraving";
+import { HeroTree } from "@/components/hero/HeroTree";
 import { HeroVisual } from "@/components/hero/HeroVisual";
 import { LatestSeal } from "@/components/live/LatestSeal";
 import { LiveStats } from "@/components/live/LiveStats";
@@ -192,6 +194,7 @@ export default function Home() {
   return (
     <>
       <section className="hero">
+        <HeroTree />
         <div className="container hero-inner">
           <div>
             <p className="eyebrow">A memory vault for every AI you use</p>
@@ -211,7 +214,6 @@ export default function Home() {
               </Link>
             </div>
           </div>
-          <HeroVisual />
         </div>
       </section>
 
@@ -219,6 +221,19 @@ export default function Home() {
         <div className="container">
           <p className="works-with-label">Reads into</p>
           <AppMakers />
+        </div>
+      </section>
+
+      <section className="section section-views">
+        <div className="container split">
+          <div>
+            <p className="eyebrow">One vault, five readers</p>
+            <h2 className="section-title">The same six lines, as each reader gets them</h2>
+            <p className="section-lead">
+              You read all of it. Sigil&apos;s server holds ciphertext. Each app opens only the folders you gave it, and the rest stays locked.
+            </p>
+          </div>
+          <HeroVisual />
         </div>
       </section>
 
@@ -367,6 +382,9 @@ export default function Home() {
               </Link>
             </div>
           </div>
+        </div>
+        <div className="container">
+          <Engraving name="roots" grow="down" className="section-art section-art-roots" />
         </div>
       </section>
 
@@ -710,6 +728,7 @@ export default function Home() {
       </section>
 
       <section className="section cta-band">
+        <Engraving name="range" className="cta-band-art" />
         <div className="container container-narrow">
           <h2 className="section-title">Start with what you already told your AI apps</h2>
           <p className="section-lead">Create a vault, import your history, and connect your first app in a few minutes.</p>
