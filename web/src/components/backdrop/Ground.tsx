@@ -6,31 +6,40 @@
 //
 // - the canvas is fixed behind the page and opaque, so it is its own layer and
 //   the browser only slides the page over it;
-// - it is drawn at one canvas pixel per CSS pixel at most, however dense the
-//   screen, and never more than about 1.8 million pixels;
-// - a frame is one draw call with a handful of numbers; nothing is allocated,
+// - it is drawn as sharp as the screen, twice the CSS size at most, with a
+//   whole number of canvas pixels per dot, and never more than about 3.4
+//   million pixels;
+// - a frame is one draw call with a dozen numbers; nothing is allocated,
 //   the layout is never read (the size arrives from a ResizeObserver) and
 //   nothing listens to scrolling or to the pointer;
-// - at most 60 frames a second, none while the tab is hidden or the canvas is
-//   not shown.
+// - what moves is slow, so it draws 30 frames a second at most, none while
+//   the tab is hidden or the canvas is not shown.
+//
+// The sky's cold light is for the public pages. In the vault it is put out, so
+// the working screens stay plain.
 //
 // It steps aside for the still drawing under it (the same land, in
 // Backdrop.tsx) when the visitor asked for less motion, when WebGL is missing
 // or only runs in software, when the context is lost, and when the first
 // frames show the graphics card cannot keep up.
 
+import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { fitDots } from "../art/dots";
 import { FRAGMENT, VERTEX, advance, layOut, makeUniforms } from "./groundShader";
 
-/** Shortest time between two frames, in ms: 60 a second on a 120 Hz screen, every frame on a 60 Hz one. */
-const FRAME_GAP = 13;
-const MAX_PIXELS = 1_800_000;
+/** Shortest time between two frames, in ms: 30 a second, whatever the screen. */
+const FRAME_GAP = 30;
+const MAX_PIXELS = 3_400_000;
 /** Frames timed per check. */
-const WINDOW = 48;
+const WINDOW = 36;
 /** A median above this (ms) is slow: first the canvas gets coarser, then it stops. */
-const SLOW = 25;
-const TOO_SLOW = 45;
-const COARSE = 0.66;
+const SLOW = 46;
+const TOO_SLOW = 80;
+const COARSE = 0.6;
+
+/** The sky's light is put out on the working screens of the vault. */
+const skyFor = (pathname: string | null) => (pathname && /^\/vault(\/|$)/.test(pathname) ? 0 : 1);
 
 function compile(gl: WebGLRenderingContext, type: number, source: string) {
   const shader = gl.createShader(type);
@@ -42,6 +51,11 @@ function compile(gl: WebGLRenderingContext, type: number, source: string) {
 
 export function Ground() {
   const ref = useRef<HTMLCanvasElement>(null);
+  const pathname = usePathname();
+  const sky = useRef(skyFor(pathname));
+  useEffect(() => {
+    sky.current = skyFor(pathname);
+  }, [pathname]);
 
   useEffect(() => {
     const canvas = ref.current;
@@ -100,7 +114,7 @@ export function Ground() {
 
     const at = {
       res: gl.getUniformLocation(program, "u_res"),
-      px: gl.getUniformLocation(program, "u_px"),
+      dots: gl.getUniformLocation(program, "u_dots"),
       scene: gl.getUniformLocation(program, "u_scene"),
       clock: gl.getUniformLocation(program, "u_clock"),
     };
@@ -111,19 +125,20 @@ export function Ground() {
     let cssHeight = 0;
     let quality = 1;
     let sized = false;
+    const dots = new Float32Array([5, 1, sky.current, 0]);
     const fit = () => {
       if (!cssWidth || !cssHeight) return;
-      let scale = Math.min(1, window.devicePixelRatio || 1) * quality;
-      scale *= Math.sqrt(Math.min(1, MAX_PIXELS / (cssWidth * cssHeight * scale * scale)));
-      const w = Math.max(1, Math.round(cssWidth * scale));
-      const h = Math.max(1, Math.round(cssHeight * scale));
+      const size = fitDots(cssWidth, cssHeight, window.devicePixelRatio || 1, MAX_PIXELS, quality);
+      const w = size.width;
+      const h = size.height;
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
       }
       gl.viewport(0, 0, w, h);
       gl.uniform2f(at.res, w, h);
-      gl.uniform1f(at.px, cssHeight / h);
+      dots[0] = size.step;
+      dots[1] = size.px;
       layOut(uniforms, cssWidth, cssHeight);
       gl.uniform4fv(at.scene, uniforms.scene);
       sized = true;
@@ -173,7 +188,7 @@ export function Ground() {
       if (!resumed) {
         seconds += gap / 1000;
         // The first second belongs to the page loading, not to the ground.
-        if (drawn > 60) {
+        if (drawn > 30) {
           times[timed++] = gap;
           if (timed === WINDOW) {
             timed = 0;
@@ -184,6 +199,9 @@ export function Ground() {
       }
       advance(uniforms, seconds);
       gl.uniform4fv(at.clock, uniforms.clock);
+      // the sky's light comes and goes over a second or so when the page changes
+      dots[2] += (sky.current - dots[2]) * 0.08;
+      gl.uniform4fv(at.dots, dots);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (++drawn === 2) holder.dataset.ground = "live";
     };

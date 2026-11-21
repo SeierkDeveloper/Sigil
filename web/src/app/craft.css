@@ -33,18 +33,19 @@
 /* ------------------------------------------------------------------ the page ground */
 
 /*
-  Black with a little grain, and an engraved landscape low on the screen: far
-  hills, a field and its grass.
+  Black with a little grain, and a landscape low on the screen, printed in
+  dots: far hills, a field and its grass, and a faint cold light in the sky.
 
-  In motion the land is drawn by one canvas on the graphics card
-  (.backdrop-live, components/backdrop/Ground.tsx). The canvas is opaque and
-  fixed, so it is one layer the page slides over; only its opacity is ever
-  animated, once, when it fades in. Nothing listens to scrolling.
+  In motion it is drawn by one canvas on the graphics card (.backdrop-live,
+  components/backdrop/Ground.tsx). The canvas is opaque and fixed, so it is
+  one layer the page slides over; only its opacity is ever animated, once,
+  when it fades in. Nothing listens to scrolling.
 
-  Under the canvas lies the still drawing: the same land in one picture. It is the
-  ground until the canvas runs, and stays the ground with reduced motion,
-  without WebGL or on a slow graphics card. Once the canvas covers it, it is
-  taken out of the picture so it costs nothing.
+  Under the canvas lies the still ground: the same land as one small tone
+  picture seen through a mask of dots (dotted.css). It is the ground until the
+  canvas runs, and stays the ground with reduced motion, without WebGL or on a
+  slow graphics card. Once the canvas covers it, it is taken out of the
+  picture so it costs nothing.
 
   The height is the large viewport, so a phone's address bar sliding away does
   not resize the ground.
@@ -82,32 +83,7 @@
   display: none;
 }
 
-/* The still land: its horizon lies where the ground in motion puts it (groundShader.ts, layOut). */
-.backdrop-land {
-  position: absolute;
-  left: 0;
-  top: calc(80vh - 110px);
-  top: calc(80lvh - 110px);
-  width: 2400px;
-  max-width: none;
-  height: 340px;
-  user-select: none;
-}
-
-/* Covered by the canvas: gone once the canvas has faded in. */
-.backdrop[data-ground="live"] .backdrop-land {
-  visibility: hidden;
-  transition: visibility 0s 1600ms;
-}
-
-@media (max-width: 640px) {
-  .backdrop-land {
-    top: calc(86vh - 79px);
-    top: calc(86lvh - 79px);
-    transform: scale(0.72);
-    transform-origin: 0 0;
-  }
-}
+/* The still ground (the land and the sky's light, standing still) is in dotted.css. */
 
 /* ------------------------------------------------------------------ chrome */
 
