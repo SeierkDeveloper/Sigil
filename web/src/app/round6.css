@@ -1209,6 +1209,11 @@ body:has(.emergency-page) .backdrop-ribbon {
   visibility: hidden;
 }
 
+/* Not shown at all, so the canvas stops drawing. */
+body:has(.emergency-page) .backdrop-live {
+  display: none;
+}
+
 body:has(.emergency-page) .site-header-inner {
   justify-content: center;
 }
