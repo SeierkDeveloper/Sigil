@@ -724,3 +724,28 @@
 .timeline-source {
   padding-left: var(--space-3);
 }
+
+/* ------------------------------------------------------------------ no empty cells */
+
+/* A grid of facts never ends on a hole: the last row shares the full width. */
+@media (min-width: 901px) {
+  .fact-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .fact-grid > * {
+    grid-column: span 2;
+  }
+  .fact-grid > :nth-last-child(2):nth-child(3n + 1),
+  .fact-grid > :last-child:nth-child(3n + 2) {
+    grid-column: span 3;
+  }
+  .fact-grid > :last-child:nth-child(3n + 1) {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 900px) {
+  .fact-grid > :last-child:nth-child(2n + 1) {
+    grid-column: 1 / -1;
+  }
+}
