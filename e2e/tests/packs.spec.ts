@@ -3,7 +3,7 @@
 // in the next version when their vault opens again.
 
 import { expect, test, type Page } from "@playwright/test";
-import { addFolder, createWithWallet, installWallet, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, installWallet, writeMemory, openTab } from "./helpers";
 
 async function unlock(page: Page) {
   await page.getByTestId("method-wallet").click();
@@ -21,7 +21,7 @@ test("a folder is published as a pack, followed from another vault, and updated 
   await createWithWallet(sam);
   await addFolder(sam, "Bread");
   await writeMemory(sam, { title: "Starter", body: "Feed it twice a day.", folder: "Bread" });
-  await sam.getByRole("tab", { name: "Packs" }).click();
+  await openTab(sam, "Packs");
   const publish = sam.getByRole("form", { name: "Publish a folder" });
   await publish.getByLabel("Folder").selectOption({ label: "Bread" });
   await publish.getByLabel("Title").fill("Bread at home");
@@ -45,7 +45,7 @@ test("a folder is published as a pack, followed from another vault, and updated 
 
   // Sam adds a memory and publishes the next version.
   await writeMemory(sam, { title: "Oven", body: "250 degrees.", folder: "Bread" });
-  await sam.getByRole("tab", { name: "Packs" }).click();
+  await openTab(sam, "Packs");
   await sam.getByRole("form", { name: "Publish a folder" }).getByLabel("Folder").selectOption({ label: "Bread" });
   await sam.getByRole("button", { name: "Publish version 2" }).click();
   await expect(sam.getByText("Version 2 is published.")).toBeVisible();
@@ -53,12 +53,12 @@ test("a folder is published as a pack, followed from another vault, and updated 
   // Robin's vault takes it in the next time it opens, checked against Sam's key.
   await robin.goto("/vault#packs");
   await unlock(robin);
-  await robin.getByRole("tab", { name: "Packs" }).click();
+  await openTab(robin, "Packs");
   await expect(robin.getByTestId("follow-row")).toContainText("Version 2", { timeout: 20_000 });
-  await robin.getByRole("tab", { name: "Memories" }).click();
+  await openTab(robin, "Memories");
   await expect(robin.locator(".memory-item-title", { hasText: "Oven" })).toBeVisible();
 
-  await robin.getByRole("tab", { name: "Read log" }).click();
+  await openTab(robin, "Read log");
   await expect(robin.getByText("Version 2 of the pack was taken in, checked against its publisher")).toBeVisible();
   await samCtx.close();
   await robinCtx.close();

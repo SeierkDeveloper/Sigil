@@ -2,7 +2,7 @@ import { test, type Browser, type Page } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { chatGptZip, claudeZip } from "../../packages/core/test/fixtures/exports";
-import { connectMcp, installWallet, ROOT } from "../tests/helpers";
+import { connectMcp, installWallet, ROOT, openTab, confirmPhrase } from "../tests/helpers";
 
 const OUT = path.join(ROOT, "docs/screenshots");
 mkdirSync(OUT, { recursive: true });
@@ -199,18 +199,18 @@ test("vault states", async ({ browser, baseURL }) => {
     await page.getByTestId("method-wallet").click();
     await page.getByTestId("recovery-phrase").waitFor();
     await shot("phrase");
-    await page.getByLabel("I have saved my recovery phrase somewhere safe.").check();
+    await confirmPhrase(page, (await page.getByTestId("recovery-phrase").locator("li").allInnerTexts()).map((w) => w.trim()).join(" "));
     await page.getByRole("button", { name: "Open my vault" }).click();
     await page.getByText("Your vault is empty").waitFor();
     await shot("memories-empty");
 
-    await page.getByRole("tab", { name: "Apps" }).click();
+    await openTab(page, "Apps");
     await shot("apps-empty");
-    await page.getByRole("tab", { name: "Read log" }).click();
+    await openTab(page, "Read log");
     await page.getByText("No app has read your vault yet").waitFor();
     await shot("log-empty");
 
-    await page.getByRole("tab", { name: "Import" }).click();
+    await openTab(page, "Import");
     await shot("import");
     await page.getByTestId("import-file").setInputFiles({ name: "chatgpt.zip", mimeType: "application/zip", buffer: Buffer.from(chatGptZip()) });
     await page.getByTestId("import-preview").waitFor();
@@ -223,7 +223,7 @@ test("vault states", async ({ browser, baseURL }) => {
     await page.getByRole("button", { name: /^Import \d/ }).click();
     await page.getByTestId("import-done").waitFor();
 
-    await page.getByRole("tab", { name: "Memories" }).click();
+    await openTab(page, "Memories");
     await page.getByRole("button", { name: "New memory" }).click();
     await page.getByLabel("Title").fill("How I like answers");
     await page.getByLabel("Memory", { exact: true }).fill("Short first, details after. Metric units. Examples in TypeScript when there is code.");
@@ -234,13 +234,13 @@ test("vault states", async ({ browser, baseURL }) => {
     await page.getByRole("button", { name: "New memory" }).click();
     await shot("memories-new");
 
-    await page.getByRole("tab", { name: "Folders" }).click();
+    await openTab(page, "Folders");
     await page.getByLabel("New folder").fill("Health");
     await page.getByRole("button", { name: "Add folder" }).click();
     await page.locator(".list-row", { hasText: "Health" }).waitFor();
     await shot("folders");
 
-    await page.getByRole("tab", { name: "Apps" }).click();
+    await openTab(page, "Apps");
     await page.getByRole("button", { name: "Connect your first app" }).click();
     await page.getByLabel("ChatGPT").check();
     await page.getByLabel("Notes").check();
@@ -261,7 +261,7 @@ test("vault states", async ({ browser, baseURL }) => {
     await mcp.callTool({ name: "search_memories", arguments: { query: "answers" } });
     await mcp.close();
 
-    await page.getByRole("tab", { name: "Read log" }).click();
+    await openTab(page, "Read log");
     await page.locator(".log-row").first().waitFor();
     await shot("log-waiting");
     // One-minute seal periods for the screenshots: wait for the minute to end.
@@ -272,7 +272,7 @@ test("vault states", async ({ browser, baseURL }) => {
     await page.getByTestId("verified").first().waitFor();
     await shot("log");
 
-    await page.getByRole("tab", { name: "Settings" }).click();
+    await openTab(page, "Settings");
     await shot("settings");
 
     await page.reload();

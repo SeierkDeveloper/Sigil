@@ -271,6 +271,7 @@ export function LogTab() {
           </button>
         </div>
       </div>
+      <p className="small muted screen-help">Every time an app, a link or a person reads from your vault, a line is added here. Each hour the lines are sealed, so nobody can change or remove them later. Use it to check what an app really read.</p>
 
       <Notice>
         Every request a connected app or agent makes, every memory it suggests, every time another vault opens a folder you share, every read of a protected folder and

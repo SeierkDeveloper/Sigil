@@ -10,6 +10,8 @@ import { PhraseScreen } from "../PhraseScreen";
 import { errorText, useVault } from "../context";
 import { download, Notice } from "../ui";
 import { clearVectorCache } from "../semantic";
+import { guideOpen, saveGuide } from "../guideOps";
+import { newGuide } from "@sigil/core";
 
 const CONFIRM_WORDS = "delete my vault";
 
@@ -218,6 +220,28 @@ export function SettingsTab({ onDeleted }: { onDeleted(): void }) {
           </button>
           <button type="button" className="button button-ghost" onClick={() => void signOut()}>
             Sign out
+          </button>
+        </div>
+      </section>
+
+      <section className="settings-section" aria-labelledby="s-guide">
+        <h2 id="s-guide" className="panel-title">
+          Getting started
+        </h2>
+        <p className="small muted">The short guide from the first day: your recovery phrase, your history, one AI app and its first answer. It keeps your place.</p>
+        <div className="row">
+          <button
+            type="button"
+            className="button"
+            disabled={busy === "guide" || guideOpen(data)}
+            onClick={() =>
+              void act("guide", async () => {
+                const next = await saveGuide(api, vault, data.guide ? { ...data.guide, dismissed: false } : newGuide(false));
+                update((d) => ({ ...d, guide: next }));
+              })
+            }
+          >
+            {guideOpen(data) ? "The guide is open above" : "Show the guide again"}
           </button>
         </div>
       </section>

@@ -4,7 +4,7 @@
 // by the owner, then taken down and issued again under a new code.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const ALLERGY = "CANARY-penicillin";
 
@@ -17,7 +17,7 @@ test("the emergency card opens from its link on a phone, is logged for the owner
   await addFolder(page, "Health");
   await writeMemory(page, { title: "Medical", body: `Blood type: O-\nAllergies: ${ALLERGY}\nEmergency contact: Robin Example, partner, +46 70 000 00 00`, folder: "Health" });
 
-  await page.getByRole("tab", { name: "Emergency" }).click();
+  await openTab(page, "Emergency");
   await page.getByLabel("Medical").check();
   await page.getByRole("button", { name: "Fill the card from these" }).click();
   const form = page.getByRole("form", { name: "Emergency card" });

@@ -4,7 +4,7 @@
 // marked as AI with its source, and the owner's log has the question.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory, openTab } from "./helpers";
 
 const TALK = "CANARY-talks-e2e I speak about memory and privacy.";
 const PRIVATE = "CANARY-private-e2e";
@@ -53,12 +53,12 @@ test("anyone can ask the public AI self, answered only from what was made public
   expect(ownerSent.join("\n")).not.toContain(PRIVATE);
 
   // The owner sees it in the log, and can hide it from the page.
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await page.getByRole("button", { name: "Refresh" }).click();
   const entry = page.locator(".log-row", { hasText: "Your public AI self answered a visitor" }).first();
   await entry.getByRole("button", { name: "Show the question and answer" }).click();
   await expect(entry.getByTestId("ask-note")).toContainText("What do you talk about?");
-  await page.getByRole("tab", { name: "AI self" }).click();
+  await openTab(page, "AI self");
   const wall = page.getByTestId("wall-row").first();
   await expect(wall).toContainText("What do you talk about?", { timeout: 20_000 });
   await wall.getByRole("button", { name: "Hide" }).click();

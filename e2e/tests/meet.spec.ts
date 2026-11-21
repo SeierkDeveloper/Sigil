@@ -4,7 +4,7 @@
 // both owners read the same transcript. The server relays only boxes.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { addFolder, createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory, openTab } from "./helpers";
 
 test("two AI selves talk after both said yes, end to end encrypted, and both owners get the transcript", async ({ browser, baseURL }) => {
   const samCtx = await browser.newContext();
@@ -18,7 +18,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
   const sent = [...recordBodies(sam), ...recordBodies(robin)];
 
   await createWithWallet(robin);
-  await robin.getByRole("tab", { name: "Folders" }).click();
+  await openTab(robin, "Folders");
   const robinCode = (await robin.getByTestId("vault-code").innerText()).trim();
   await setUpModel(robin, { name: "Robin's AI self" });
 
@@ -27,7 +27,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
   await writeMemory(sam, { title: "Dentist", body: "CANARY-dentist When: 2026-11-24 10:00 to 11:00", folder: "Calendar" });
   await setUpModel(sam, { name: "Sam's AI self" });
 
-  await sam.getByRole("tab", { name: "Meet" }).click();
+  await openTab(sam, "Meet");
   await sam.getByRole("button", { name: "Invite another self" }).click();
   const form = sam.getByRole("form", { name: "Invite another self" });
   await form.getByLabel("Their vault code").fill(robinCode);
@@ -39,7 +39,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
   await form.getByRole("button", { name: "Send invite" }).click();
   await expect(sam.getByTestId("meet-card")).toContainText("Waiting for a yes");
 
-  await robin.getByRole("tab", { name: "Meet" }).click();
+  await openTab(robin, "Meet");
   const invite = robin.getByTestId("meet-invite");
   await expect(invite).toContainText("Sam invites your AI self", { timeout: 20_000 });
   await expect(invite).toContainText("30 minutes next week");
@@ -64,7 +64,7 @@ test("two AI selves talk after both said yes, end to end encrypted, and both own
   for (const plain of ["Tuesday at 14:00", "CANARY-dentist", "30 minutes next week"]) expect(wire, plain).not.toContain(plain);
 
   // Both logs have it.
-  await robin.getByRole("tab", { name: "Read log" }).click();
+  await openTab(robin, "Read log");
   await expect(robin.getByText("The conversation ended after 2 turns")).toBeVisible();
   await samCtx.close();
   await robinCtx.close();

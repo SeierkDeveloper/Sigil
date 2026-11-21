@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const CANARY = "CANARY-cert-e2e-5e0a";
 
@@ -19,7 +19,7 @@ test("a life certificate is made from sealed presence, shared, and verified in a
 
   // Keep the vault open over a few seal periods.
   await page.waitForTimeout(11_000);
-  await page.getByRole("tab", { name: "Proof" }).click();
+  await openTab(page, "Proof");
   await page.getByRole("button", { name: "Make a certificate" }).click();
   const cert = page.getByTestId("certificate");
   await expect(cert).toHaveAttribute("data-ok", "true");

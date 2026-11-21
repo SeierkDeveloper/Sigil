@@ -128,6 +128,7 @@ export function MemoriesTab() {
 
   return (
     <div className="memories">
+      <p className="small muted screen-help">Everything your vault remembers. Search by words or by meaning, open a memory to read or change it, or write a new one. Only you and the apps you allow can read them.</p>
       <div className="toolbar">
         <div className="search">
           <SearchIcon />

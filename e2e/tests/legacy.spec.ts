@@ -5,7 +5,7 @@
 // in legacy mode. The owner comes back to a notice and a sealed log.
 
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const CANARY = "CANARY-legacy-e2e-81b2";
 const MODEL_KEY = "sk-ant-e2e-CANARY-legacy-key";
@@ -53,13 +53,13 @@ test("a legacy plan is sealed, released after the owner is away, opened by the t
 
   // Ana makes a vault and reads out her code.
   await createWithWallet(ana);
-  await ana.getByRole("tab", { name: "Folders" }).click();
+  await openTab(ana, "Folders");
   const code = (await ana.getByTestId("vault-code").innerText()).trim();
 
   // The owner writes a memory, sets up the AI self, and seals a plan that names Ana.
   await createWithWallet(owner);
   await writeMemory(owner, { title: "Summer house", body: `Bees every summer. ${CANARY}` });
-  await owner.getByRole("tab", { name: "AI self" }).click();
+  await openTab(owner, "AI self");
   const model = owner.getByRole("form", { name: "Model key" });
   await model.getByLabel("API key").fill(MODEL_KEY);
   await model.getByRole("button", { name: "Save key" }).click();
@@ -69,7 +69,7 @@ test("a legacy plan is sealed, released after the owner is away, opened by the t
   await rules.getByRole("button", { name: "Save rules" }).click();
   await expect(owner.getByText("Rules saved.")).toBeVisible();
 
-  await owner.getByRole("tab", { name: "Legacy" }).click();
+  await openTab(owner, "Legacy");
   const form = owner.getByRole("form", { name: "Legacy plan" });
   await form.getByLabel("Your name, as they will see it").fill("Sam");
   await form.getByLabel("Release after this long without a sign of you").selectOption({ label: "3 months" });
@@ -87,7 +87,7 @@ test("a legacy plan is sealed, released after the owner is away, opened by the t
 
   // Ana sees she is named, and that nothing can be opened while Sam is active.
   await unlock(ana);
-  await ana.getByRole("tab", { name: "Legacy" }).click();
+  await openTab(ana, "Legacy");
   await expect(ana.locator(".legacy-trusted-plan")).toContainText("Sam named you as Ana");
 
   // Sam goes away for the whole period.
@@ -95,7 +95,7 @@ test("a legacy plan is sealed, released after the owner is away, opened by the t
   await ana.waitForTimeout(3500);
 
   await unlock(ana);
-  await ana.getByRole("tab", { name: "Legacy" }).click();
+  await openTab(ana, "Legacy");
   const release = ana.getByTestId("legacy-release");
   await release.getByRole("button", { name: "Ask for a release" }).click();
   await expect(release).toContainText("1 of 1 in hand");
@@ -117,7 +117,7 @@ test("a legacy plan is sealed, released after the owner is away, opened by the t
   const ownerWire2 = recordBodies(owner);
   await unlock(owner);
   await expect(owner.getByText(/While you were away your legacy plan reached the end of its period/)).toBeVisible();
-  await owner.getByRole("tab", { name: "Read log" }).click();
+  await openTab(owner, "Read log");
   await expect(owner.locator(".log-row", { hasText: "A trusted person asked for a release" })).toContainText("Ana");
   await expect(owner.locator(".log-row", { hasText: "A trusted person combined the shares and opened their bundle" })).toContainText("Ana");
   const asked = owner.locator(".log-row", { hasText: "Your AI self answered a question in legacy mode" });

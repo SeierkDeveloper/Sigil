@@ -4,7 +4,7 @@
 // picks up, and writes into a team space it was added to.
 
 import { expect, test } from "@playwright/test";
-import { connectMcp, createWithWallet, installWallet, recordBodies, textOf, writeMemory } from "./helpers";
+import { connectMcp, createWithWallet, installWallet, recordBodies, textOf, writeMemory, openTab } from "./helpers";
 
 const CANARY = "CANARY-agent-e2e-77c0";
 
@@ -16,7 +16,7 @@ test("an agent vault: remember, recall, a handoff note and a team space, all in 
   await createWithWallet(page);
   await writeMemory(page, { title: "Style guide", body: "Tabs, not spaces." });
 
-  await page.getByRole("tab", { name: "Agents" }).click();
+  await openTab(page, "Agents");
   await page.getByRole("button", { name: "Make the first agent vault" }).click();
   const form = page.getByRole("form", { name: "Make an agent vault" });
   await form.getByLabel("Client").selectOption("cursor");
@@ -46,10 +46,10 @@ test("an agent vault: remember, recall, a handoff note and a team space, all in 
   // The owner sees what the agent remembered and the note it left.
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await page.locator(".memory-item", { hasText: "Parser state" }).click();
   await expect(page.getByLabel("Memory", { exact: true })).toHaveValue(`Half done. ${CANARY}`);
-  await page.getByRole("tab", { name: "Agents" }).click();
+  await openTab(page, "Agents");
   await page.locator(".agent-row").getByRole("button", { name: "Handoff notes" }).click();
   await expect(page.getByTestId("agent-notes")).toContainText("Next: wire the parser into the CLI.");
 
@@ -67,10 +67,10 @@ test("an agent vault: remember, recall, a handoff note and a team space, all in 
   await next.close();
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "Agents" }).click();
+  await openTab(page, "Agents");
   await expect(page.locator(".space-card", { hasText: "Launch" }).locator(".space-memories")).toContainText("Launch checklist");
 
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.locator(".log-row", { hasText: 'Remembered "Parser state"' })).toBeVisible();
   await expect(page.locator(".log-row", { hasText: "Left a handoff note" })).toBeVisible();
   await expect(page.locator(".log-row", { hasText: "Wrote 1 memory to the space Launch" })).toBeVisible();

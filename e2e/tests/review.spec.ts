@@ -2,7 +2,7 @@
 // disagree, expiry, and merging every duplicate group at once.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const CANARY = "CANARY-review-e2e-8a1c";
 
@@ -12,14 +12,14 @@ test("the weekly brief is written on the device and saved into Briefs", async ({
   await createWithWallet(page);
   await writeMemory(page, { title: `Garden ${CANARY}`, body: "Planted tomatoes by the south wall." });
 
-  await page.getByRole("tab", { name: "Review" }).click();
+  await openTab(page, "Review");
   await expect(page.getByText("No brief yet.")).toBeVisible();
   await page.getByRole("button", { name: "Make a brief now" }).click();
   const brief = page.getByTestId("brief-latest");
   await expect(brief).toContainText("Weekly brief,");
   await expect(brief).toContainText("## What is new");
   await expect(brief).toContainText(`Garden ${CANARY}`);
-  await page.getByRole("tab", { name: "Folders" }).click();
+  await openTab(page, "Folders");
   await expect(page.locator(".list-row-title", { hasText: "Briefs" })).toBeVisible();
   expect(sent.filter((b) => b.includes(baseURL!)).join("\n")).not.toContain(CANARY);
 });
@@ -30,13 +30,13 @@ test("memories that disagree are shown, and resolved by keeping one", async ({ p
   await writeMemory(page, { title: "Coffee", body: "I drink coffee every morning before work." });
   await writeMemory(page, { title: "Coffee rule", body: "I never drink coffee before work in the morning." });
   await writeMemory(page, { title: "Garden", body: "Tomatoes by the south wall." });
-  await page.getByRole("tab", { name: "Review" }).click();
+  await openTab(page, "Review");
   const pair = page.getByTestId("contradiction");
   await expect(pair).toHaveCount(1);
   await expect(pair).toContainText("One says no where the other says yes");
   await pair.getByRole("button", { name: 'Keep "Coffee rule"' }).click();
   await expect(page.getByText("No memories that disagree.")).toBeVisible();
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await expect(page.locator(".memory-item-title", { hasText: /^Coffee$/ })).toHaveCount(0);
 });
 
@@ -51,13 +51,13 @@ test("an expired memory leaves the list, waits in Expired, and can be kept", asy
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.locator(".memory-item-title", { hasText: "Door code" })).toHaveCount(0);
 
-  await page.getByRole("tab", { name: "Review" }).click();
+  await openTab(page, "Review");
   const row = page.getByTestId("expired-row");
   await expect(row).toContainText("Door code");
   await expect(row).toContainText("Deleted for real on");
   await row.getByRole("button", { name: "Keep it" }).click();
   await expect(page.getByText("Nothing has expired.")).toBeVisible();
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await expect(page.locator(".memory-item-title", { hasText: "Door code" })).toBeVisible();
 });
 

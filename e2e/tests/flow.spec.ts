@@ -4,7 +4,7 @@
 
 import { expect, test } from "@playwright/test";
 import { chatGptZip, claudeZip } from "../../packages/core/test/fixtures/exports";
-import { connectMcp, createWithWallet, installWallet, recordBodies, textOf } from "./helpers";
+import { connectMcp, createWithWallet, installWallet, recordBodies, textOf, openTab } from "./helpers";
 
 const CANARY = "CANARY-PLAINTEXT-e2e-91c4";
 
@@ -26,7 +26,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   await expect(page.locator(".memory-item-title", { hasText: "Private note" })).toBeVisible();
 
   // ---- import a ChatGPT export and a Claude export
-  await page.getByRole("tab", { name: "Import" }).click();
+  await openTab(page, "Import");
   await page.getByTestId("import-file").setInputFiles({ name: "chatgpt-export.zip", mimeType: "application/zip", buffer: Buffer.from(chatGptZip(CANARY)) });
   await expect(page.getByTestId("import-preview")).toContainText("ChatGPT export: 2 items found");
   await page.getByRole("button", { name: "Import 2 memories" }).click();
@@ -44,14 +44,14 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   await expect(page.getByTestId("import-preview")).toContainText("Everything in this file is already in your vault.");
 
   // ---- search in the dashboard (client side)
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await page.getByLabel("Search memories").fill("garden");
   await expect(page.locator(".memory-item-title")).toHaveText(["Planning a garden"]);
   await page.getByLabel("Search memories").fill("");
   await expect(page.locator(".memory-item")).toHaveCount(8);
 
   // ---- connect an app that may read only the ChatGPT folder
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await page.getByRole("button", { name: "Connect your first app" }).click();
   await page.getByLabel("ChatGPT").check();
   await expect(page.getByText("This app will be able to read ChatGPT. It will not see Notes and Claude.")).toBeVisible();
@@ -70,7 +70,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   // The AI self answers only for apps the owner allowed.
   const notAllowed = await mcp.callTool({ name: "ask_self", arguments: { question: "What do I grow?" } });
   expect(notAllowed.isError).toBe(true);
-  expect(textOf(notAllowed)).toContain("may not answer as the owner's AI self");
+  expect(textOf(notAllowed)).toContain("has not let this app answer as their AI self");
 
   expect(textOf(await mcp.callTool({ name: "list_folders", arguments: {} }))).toContain("- ChatGPT (2 memories)");
 
@@ -87,7 +87,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   expect(textOf(await mcp.callTool({ name: "search_memories", arguments: { query: "locker" } }))).toBe('No memories match "locker".');
 
   // ---- the read log shows it, and the seal verifies in the browser
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.locator(".log-row", { hasText: 'Read "Planning a garden"' })).toBeVisible();
   await expect(page.locator(".log-row")).toHaveCount(5);
   await expect(page.locator(".log-row").first()).toContainText("Claude Desktop");
@@ -101,7 +101,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   await expect(readRow.getByTestId("verified")).toContainText("Verified: part of the seal for");
 
   // ---- revoke, and the very next read fails
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await page.locator(".app-row", { hasText: "Claude Desktop" }).getByRole("button", { name: "Revoke" }).click();
   await page.getByRole("button", { name: "Revoke access" }).click();
   await expect(page.locator(".app-row", { hasText: "Claude Desktop" })).toContainText("Revoked");
@@ -119,11 +119,11 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   await page.getByTestId("method-wallet").click();
   await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Apps" })).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await expect(page.locator(".memory-item")).toHaveCount(8);
 
   // ---- export everything, decrypted on the device
-  await page.getByRole("tab", { name: "Settings" }).click();
+  await openTab(page, "Settings");
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download everything" }).click()]);
   const exported = JSON.parse(await (await download.createReadStream()).toArray().then((c) => Buffer.concat(c).toString("utf8")));
   expect(exported.format).toBe("sigil-export");
@@ -141,7 +141,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
 test("delete account removes the vault", async ({ page, context }) => {
   await installWallet(context);
   await createWithWallet(page);
-  await page.getByRole("tab", { name: "Settings" }).click();
+  await openTab(page, "Settings");
   await page.getByLabel('Type "delete my vault" to confirm').fill("delete my vault");
   await page.getByRole("button", { name: "Delete everything" }).click();
   await expect(page.getByRole("heading", { name: "Create your vault" })).toBeVisible();

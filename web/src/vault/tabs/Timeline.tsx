@@ -5,13 +5,12 @@ import { SOURCE_LABELS, sourceLabel, type Memory, type SourceKind } from "@sigil
 import { TimelineIcon } from "@/components/icons";
 import { formatDate, formatTime, plural } from "@/lib/format";
 import { useVault } from "../context";
+import { groupByMonth } from "../timelineGroups";
 import { SourceMark } from "../marks";
 import { Empty } from "../ui";
 
 type DateField = "createdAt" | "editedAt";
 
-const monthLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "long", year: "numeric" });
-const dayLabel = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
 const dayNumber = (iso: string) => new Date(iso).toLocaleDateString(undefined, { day: "numeric" });
 const weekday = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: "short" });
 
@@ -29,8 +28,6 @@ function bySource(items: Memory[]): { label: string; kind: SourceKind; items: Me
   }
   return groups;
 }
-const monthKey = (iso: string) => iso.slice(0, 7);
-const dayKey = (iso: string) => iso.slice(0, 10);
 
 /** Every memory on one line through time, by when it was written or last changed, and where it came from. */
 export function TimelineTab() {
@@ -44,27 +41,7 @@ export function TimelineTab() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
   }, [data.memories]);
 
-  const months = useMemo(() => {
-    const pool = (source === "all" ? data.memories : data.memories.filter((m) => m.source.kind === source)).slice();
-    pool.sort((a, b) => (a[field] < b[field] ? 1 : a[field] > b[field] ? -1 : 0));
-    const out: { key: string; label: string; days: { key: string; label: string; items: Memory[] }[]; count: number }[] = [];
-    for (const m of pool) {
-      const iso = m[field];
-      let month = out[out.length - 1];
-      if (!month || month.key !== monthKey(iso)) {
-        month = { key: monthKey(iso), label: monthLabel(iso), days: [], count: 0 };
-        out.push(month);
-      }
-      let day = month.days[month.days.length - 1];
-      if (!day || day.key !== dayKey(iso)) {
-        day = { key: dayKey(iso), label: dayLabel(iso), items: [] };
-        month.days.push(day);
-      }
-      day.items.push(m);
-      month.count++;
-    }
-    return out;
-  }, [data.memories, source, field]);
+  const months = useMemo(() => groupByMonth(data.memories, source, field), [data.memories, source, field]);
 
   const folderName = useMemo(() => new Map(data.folders.map((f) => [f.id, f.name])), [data.folders]);
   const span = useMemo(() => {
@@ -105,6 +82,7 @@ export function TimelineTab() {
           </select>
         </div>
       </div>
+      <p className="small muted screen-help">Your memories by date, newest first. Choose which date to go by: when something happened, when you wrote it down, or when you last changed it.</p>
 
       <div className="timeline-sources" role="group" aria-label="Source">
         <button type="button" className="timeline-source" aria-pressed={source === "all"} onClick={() => setSource("all")}>

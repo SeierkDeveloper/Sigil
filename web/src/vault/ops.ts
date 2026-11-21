@@ -3,6 +3,8 @@
 // carries ids, envelopes and hashes.
 
 import {
+  cleanGuide,
+  type GuideState,
   appBoxTag,
   buildMemory,
   buildProfileBody,
@@ -196,6 +198,8 @@ export interface VaultData {
   /** The AI self's rules. Null until the owner saves them. */
   self: SelfRules | null;
   thinking: ThinkingSettings;
+  /** The getting-started guide: null for a vault made before it existed, or when it could not be opened. */
+  guide: GuideState | null;
   askLinks: AskLinkView[];
   /** When the vault's first folder was made: the vault's age, for the first weekly brief. */
   createdAt: string | null;
@@ -664,6 +668,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   const booked = openSessions(pub.self, box, data.sessions);
   unreadable += booked.unreadable;
   const voice = await later(async () => (settings.voice ? (await openSetting<{ on?: boolean }>(vault.key, "voice", settings.voice)).on === true : false), false);
+  const guide = await later(async () => (settings.guide ? cleanGuide(await openSetting<unknown>(vault.key, "guide", settings.guide)) : null), null);
 
   return {
     access: data.access ?? [],
@@ -705,6 +710,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     model,
     self,
     thinking,
+    guide,
     askLinks,
     createdAt: data.folders.reduce<string | null>((min, f) => (!min || f.createdAt < min ? f.createdAt : min), null),
   };

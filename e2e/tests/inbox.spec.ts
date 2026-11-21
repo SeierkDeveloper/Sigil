@@ -4,7 +4,7 @@
 // get_profile. Nothing readable leaves the browser.
 
 import { expect, test } from "@playwright/test";
-import { connectApp, connectMcp, createWithWallet, installWallet, recordBodies, textOf, writeMemory } from "./helpers";
+import { connectApp, connectMcp, createWithWallet, installWallet, recordBodies, textOf, writeMemory, openTab } from "./helpers";
 
 const CANARY = "CANARY-inbox-e2e-5be0";
 
@@ -50,7 +50,7 @@ test("an app suggests a memory, the owner edits and approves it, the app reads i
   await card.getByRole("button", { name: "Approve" }).click();
   await expect(page.getByText("Nothing waiting")).toBeVisible();
 
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await page.locator(".memory-item-title", { hasText: "Tea" }).click();
   await expect(page.locator(".editor-meta")).toContainText("Suggested by Claude Desktop");
 
@@ -59,22 +59,22 @@ test("an app suggests a memory, the owner edits and approves it, the app reads i
   expect(found).toContain("Tea");
 
   // The suggestion is in the read log.
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.locator(".log-row", { hasText: "Suggested a memory to your inbox" })).toBeVisible();
 
   // A second suggestion is merged into an existing memory instead.
   await mcp.callTool({ name: "propose_memory", arguments: { title: "Coffee too", body: "A flat white on Fridays." } });
-  await page.getByRole("tab", { name: /Inbox/ }).click();
+  await openTab(page, /Inbox/);
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: /Inbox/ }).click();
+  await openTab(page, /Inbox/);
   const second = page.getByTestId("proposal");
   await second.getByRole("button", { name: "Merge into a memory" }).click();
   await second.getByLabel("Find the memory").fill("coffee");
   await second.getByRole("radio", { name: "Coffee", exact: true }).check();
   await second.getByRole("button", { name: "Merge", exact: true }).click();
   await expect(page.getByText("Nothing waiting")).toBeVisible();
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   await page.locator(".memory-item-title", { hasText: "Coffee" }).click();
   await expect(page.getByLabel("Memory", { exact: true })).toHaveValue(/Black, in the morning\.[\s\S]*A flat white on Fridays\./);
   await mcp.close();
@@ -87,7 +87,7 @@ test("an app suggests a memory, the owner edits and approves it, the app reads i
 test("the Self card is read first by an app that was given its folder", async ({ page, context, baseURL }) => {
   await installWallet(context);
   await createWithWallet(page);
-  await page.getByRole("tab", { name: "Self card" }).click();
+  await openTab(page, "Self card");
   await page.getByLabel("Who I am").fill(`A boat builder. ${CANARY}`);
   await page.getByLabel("How I like answers").fill("Short, with metric units.");
   await page.getByLabel("Current projects").fill("A wooden dinghy");
@@ -103,6 +103,6 @@ test("the Self card is read first by an app that was given its folder", async ({
   expect(card).toContain("## How I like answers\n\nShort, with metric units.");
   await mcp.close();
 
-  await page.getByRole("tab", { name: "Self card" }).click();
+  await openTab(page, "Self card");
   await expect(page.getByText("Readable by Cursor.")).toBeVisible();
 });

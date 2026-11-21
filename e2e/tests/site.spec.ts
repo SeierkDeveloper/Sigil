@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 import { chatGptZip } from "../../packages/core/test/fixtures/exports";
 import { navGroups } from "../../web/src/lib/site";
-import { connectMcp, createWithWallet, fitsPhone, installWallet, textOf } from "./helpers";
+import { connectMcp, createWithWallet, fitsPhone, installWallet, textOf, openTab } from "./helpers";
 
 const pages = navGroups.flatMap((g) => g.items);
 
@@ -92,7 +92,7 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
   await page.getByRole("button", { name: "Save memory" }).click();
   await expect(page.locator(".memory-item-title", { hasText: "Harbour notes" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await page.getByRole("button", { name: "Connect your first app" }).click();
   await page.getByLabel("Notes").check();
   await page.getByRole("button", { name: "Create app key" }).click();
@@ -104,7 +104,7 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
   expect(textOf(await mcp.callTool({ name: "search_memories", arguments: { query: "harbour" } }))).toContain("Harbour notes");
   await mcp.close();
 
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await page.waitForTimeout(5_000);
   await page.getByRole("button", { name: "Refresh" }).click();
   const row = page.locator(".log-row").first();

@@ -4,7 +4,7 @@
 
 import { expect, test } from "@playwright/test";
 import type { Server } from "node:http";
-import { createWithWallet, installWallet, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, writeMemory, openTab } from "./helpers";
 
 const EXAMPLE_PORT = 3211;
 let example: Server;
@@ -46,13 +46,13 @@ test("a web app asks, the owner allows one folder, the app reads it", async ({ p
   // The vault lists it as a web app, and its reads are on the record.
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await expect(page.locator(".app-row", { hasText: `Hello Sigil (127.0.0.1:${EXAMPLE_PORT})` })).toContainText("Web app");
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.locator(".log-row", { hasText: 'Read "Launch plan"' })).toContainText("Hello Sigil");
 
   // Revoke it, and the app's next read fails.
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   const row = page.locator(".app-row", { hasText: "Hello Sigil" });
   await row.getByRole("button", { name: "Revoke" }).click();
   await page.getByRole("button", { name: "Revoke access" }).click();
@@ -72,6 +72,6 @@ test("a denied request hands nothing over", async ({ page, context, baseURL }) =
   await expect(app.locator("#status")).toContainText("did not allow access");
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await expect(page.getByText("No apps connected yet")).toBeVisible();
 });

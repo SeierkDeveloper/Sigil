@@ -3,7 +3,7 @@
 // inbox from it, revoke it, and the installable app shell that works offline.
 
 import { expect, test, type Page } from "@playwright/test";
-import { createWithWallet, installWallet, recordBodies, writeMemory } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, writeMemory, openTab } from "./helpers";
 
 const CANARY = "CANARY-device-e2e-4410";
 
@@ -32,7 +32,7 @@ test("add a device by code, open the vault there, capture from it, and revoke it
   const phonePrint = (await phone.locator(".pair-new .fingerprint").innerText()).replace(/\s+/g, " ").trim();
 
   // The signed-in device types the code, compares the fingerprint and sends the vault.
-  await owner.getByRole("tab", { name: "Devices" }).click();
+  await openTab(owner, "Devices");
   await owner.getByLabel("Code on the new device").fill(code.toLowerCase());
   await owner.getByRole("button", { name: "Find the device" }).click();
   const confirm = owner.getByTestId("pair-confirm");
@@ -50,7 +50,7 @@ test("add a device by code, open the vault there, capture from it, and revoke it
   await phone.reload();
   await phone.getByTestId("method-device").click();
   await expect(phone.getByRole("heading", { name: "Your vault" })).toBeVisible();
-  await phone.getByRole("tab", { name: "Devices" }).click();
+  await openTab(phone, "Devices");
   await expect(phone.locator(".device-row[data-this='true']")).toContainText("Test phone");
 
   // Quick capture from the phone: sealed there, waiting in the inbox.
@@ -59,13 +59,13 @@ test("add a device by code, open the vault there, capture from it, and revoke it
   await phone.getByRole("button", { name: "Seal and send" }).click();
   await expect(phone.getByText("Sealed and in your inbox.")).toBeVisible();
   await unlock(owner);
-  await owner.getByRole("tab", { name: "Inbox" }).click();
+  await openTab(owner, "Inbox");
   const proposal = owner.getByTestId("proposal");
   await expect(proposal.locator(".proposal-from")).toContainText("You with quick capture");
   await expect(proposal.getByLabel("Memory")).toHaveValue(`Parked on level 3. ${CANARY}`);
 
   // Revoke: the phone's next sign-in fails, and it forgets its device key.
-  await owner.getByRole("tab", { name: "Devices" }).click();
+  await openTab(owner, "Devices");
   await owner.locator(".device-row").getByRole("button", { name: "Revoke" }).click();
   await owner.locator(".device-row").getByRole("button", { name: "Revoke" }).click();
   await expect(owner.locator(".device-row")).toHaveCount(0);
@@ -75,7 +75,7 @@ test("add a device by code, open the vault there, capture from it, and revoke it
   await phone.reload();
   await expect(phone.getByTestId("method-device")).toHaveCount(0);
 
-  await owner.getByRole("tab", { name: "Read log" }).click();
+  await openTab(owner, "Read log");
   await expect(owner.locator(".log-row", { hasText: "A device was revoked" })).toBeVisible();
   await expect(owner.locator(".log-row", { hasText: "A device was added by code" })).toBeVisible();
 
