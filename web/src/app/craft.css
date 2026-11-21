@@ -37,8 +37,8 @@
   dots: far hills, a field and its grass, and a faint cold light in the sky.
 
   In motion it is drawn by one canvas on the graphics card (.backdrop-live,
-  components/backdrop/Ground.tsx). The canvas is opaque and fixed, so it is
-  one layer the page slides over; only its opacity is ever animated, once,
+  components/backdrop/Ground.tsx). The canvas is opaque and sits behind the first
+  screen, scrolling away with the page; only its opacity is ever animated, once,
   when it fades in. Nothing listens to scrolling.
 
   Under the canvas lies the still ground: the same land as one small tone
@@ -51,7 +51,7 @@
   not resize the ground.
 */
 .backdrop {
-  position: fixed;
+  position: absolute; /* the first screen's ground: it scrolls away with the page instead of staying put */
   top: 0;
   left: 0;
   z-index: -1;
