@@ -27,6 +27,13 @@ from fontTools.varLib import instancer
 f = TTFont(sys.argv[1])
 if len(sys.argv) > 3:
     f = instancer.instantiateVariableFont(f, {a.split("=")[0]: float(a.split("=")[1]) for a in sys.argv[3:]})
+# The renderer finds a face by its family name, and reads a word such as Light in it as a weight: one plain name.
+if "Garamond" in str(f["name"].getDebugName(1)):
+    for record in f["name"].names:
+        if record.nameID in (1, 4, 16):
+            record.string = "Sigil Display"
+        elif record.nameID in (2, 17):
+            record.string = "Regular"
 f.flavor = None
 f.save(sys.argv[2])
 `;
@@ -102,9 +109,9 @@ const mark = await sharp(source)
 
 const mono = font("mono-400.woff2");
 const name = await text(`<span foreground="#c9c9c9" letter_spacing="${Math.round(22 * 0.2 * 1024)}">SIGIL</span>`, "DM Mono", mono, 22);
-const display = font("display-roman.woff2", "wght=400", "opsz=30");
+const display = font("display-roman.woff2", "wght=500");
 const tagline = [];
-for (const line of site.tagline.replace(/, /g, ",\n").split("\n")) tagline.push(await text(`<span foreground="#f4f4f4">${line}</span>`, "Bodoni Moda", display, 80));
+for (const line of site.tagline.replace(/, /g, ",\n").split("\n")) tagline.push(await text(`<span foreground="#f4f4f4">${line}</span>`, "Sigil Display", display, 88));
 const foot = await text(`<span foreground="#7b7b7b" letter_spacing="${Math.round(15 * 0.16 * 1024)}">ENCRYPTED ON YOUR DEVICE   OPEN SOURCE   OPEN STANDARD</span>`, "DM Mono", mono, 15);
 
 const TEXT_X = 520;
