@@ -68,11 +68,11 @@
   /* fixed behind the whole page: the oak and its sky stay in the background while the page scrolls over them */
   position: fixed;
   z-index: -1;
-  top: 0;
+  /* the same box the first screen's words sit in, so the oak's foot stays above the row of apps */
+  top: var(--header-height);
   left: 0;
   width: 100%;
-  height: 100vh;
-  height: 100lvh;
+  height: 760px;
   overflow: hidden;
   pointer-events: none;
   user-select: none;
