@@ -749,3 +749,54 @@
     grid-column: 1 / -1;
   }
 }
+
+/* ------------------------------------------------------------------ round eight screens, in the same system */
+
+/*
+  The getting-started guide and the More index arrive with round eight
+  (round8.css, plain on purpose). The steps hang from rules like every other
+  sequence, the progress is a run of three lines, and a pin is a quiet tag.
+*/
+.guide-steps-list {
+  gap: 0;
+}
+
+.guide-step {
+  padding: var(--space-4) 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
+  background: none;
+}
+
+.guide-step[data-current="true"] {
+  border-top-color: var(--color-text-muted);
+  background: none;
+}
+
+.guide-progress {
+  height: 5px;
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0 1px, transparent 1px 2px);
+}
+
+.guide-progress > span {
+  background: var(--cut-mark);
+}
+
+.guide-client {
+  border-radius: 0;
+}
+
+.guide-client[data-selected="true"] {
+  border-color: var(--color-text);
+}
+
+.pin-button {
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.pin-button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.16);
+}
