@@ -37,7 +37,9 @@
   slowly. Each ribbon is one still drawing on its own layer; only transform and
   opacity change, so the browser moves a finished picture and never repaints.
   Nothing listens to scrolling. The height is the large viewport, so a phone's
-  address bar sliding away does not resize it.
+  address bar sliding away does not resize it. A ribbon is only a little wider
+  than the screen (its lines fade out before its ends), which keeps its layer
+  small: about 12 MB on a laptop, 9 MB on a phone.
 */
 .backdrop {
   position: fixed;
@@ -56,11 +58,11 @@
 .backdrop-ribbon {
   position: absolute;
   left: 50%;
-  width: max(150vw, 1100px);
+  width: max(112vw, 1000px);
   max-width: none;
   height: auto;
   aspect-ratio: 2000 / 520;
-  margin-left: calc(max(150vw, 1100px) / -2);
+  margin-left: calc(max(112vw, 1000px) / -2);
   will-change: transform, opacity;
   backface-visibility: hidden;
   user-select: none;
