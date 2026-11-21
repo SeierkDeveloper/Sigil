@@ -55,4 +55,17 @@ describe("the node's container", () => {
     expect(res.headers.get("access-control-allow-origin")).toBe("*");
     expect(await res.json()).toMatchObject({ ok: true, node: { origin: "https://node.example", version: expect.any(String), spec: "1.3.0" } });
   });
+
+  it("runs on Railway from the same Dockerfile, with its health check and one replica on one volume", () => {
+    const railway = read("railway.toml");
+    expect(railway).toMatch(/^builder = "DOCKERFILE"$/m);
+    expect(railway).toMatch(/^dockerfilePath = "Dockerfile"$/m);
+    expect(railway).toMatch(/^healthcheckPath = "\/api\/health"$/m);
+    expect(railway).toMatch(/^numReplicas = 1$/m);
+    expect(railway).toContain("/data");
+    expect(railway).toContain("RAILWAY_RUN_UID=0");
+    // Every setting named in the example is one the site reads.
+    const example = read("web/.env.example");
+    for (const [, name] of example.matchAll(/^(SIGIL_[A-Z_]+)=/gm)) expect(config + read("web/src/server/anchor.ts") + read("web/src/server/models.ts"), name).toContain(name);
+  });
 });
