@@ -820,21 +820,20 @@ The server tests check that no plaintext ever reaches the database or leaves the
 
 ## Roadmap
 
-| | Stage | Status |
+Only what comes next. Everything already built is in the sections above and on the site's changelog.
+
+| | Stage | When |
 | --- | --- | --- |
-| 1 | **The vault**: passkey and wallet sign-in, client-side encryption, folders, ChatGPT and Claude import, export, real delete | Built |
-| 2 | **Every AI, one memory**: the MCP connector, per-app folder grants, revoke, the read log, hourly seals, the memory inbox, the browser extension, Sign in with Sigil, sharing between vaults | Built |
-| 3 | **Your whole digital life**: local imports, live sync from Gmail, Google Calendar, Google Drive and Slack, meeting transcripts and protected folders for health, money and legal are built; ask your life and more sources are next | Started |
-| 4 | **Memory that thinks**: search by meaning on the device, duplicates merged by group, a timeline, the Self card, a weekly brief, contradictions and expiry are built; timelines of people and projects, briefs before meetings and a fully local mode are next | Started |
-| 5 | **Your AI self**: version 1 is built: answers as you within your rules with your own model key, ask links end to end encrypted, `ask_self` in the connector, a public AI self at `/@you`, drafts in an approval queue that learn from your edits, its own key and signed identity, and voice with speech to text on the device; its wallet contract is written and tested, not deployed; a personal model is next | Version 1 |
-| 6 | **Agents get memory**: agent vaults with their own folder, rules per tool, remember, recall, forget and handoff notes, team spaces with roles, and shared family and team memory with heirs are built; a memory for a whole company is next | Core built |
-| 7 | **The memory economy**: knowledge packs others follow for free and proving a fact without showing it (version 1, selective disclosure) are built; zero-knowledge proofs and licensed packs are next | Started |
-| 8 | **Trust**: the open standard (1.2) with test vectors, and a privacy score per app from your own log, are built | Core built |
-| 9 | **Everywhere**: the installable app with an offline shell, devices added by QR code, quick capture, capture keys for phones, watches and shortcuts, legacy, the vault as one bundle kept in your own storage, your own node and moving between nodes are built; recovery through people you trust, native store apps and nodes that keep copies of each other's data are next | Started |
-| 10 | **Devices**: emergency medical access from the lock screen is built; wearables, car and home are next | Started |
-| 11 | **Your AI self in the world**: selves meet selves, version 1, and free sessions with experts' AI selves are built; paid work is an idea, not something built | Started |
-| 12 | **Proof of a real life**: a signed certificate of continuous sealed history and sealed agreements between two vaults are built; proof of human with zero-knowledge proofs is next | Started |
-| 13 | **Collective memory** | Planned |
+| 1 | **Ask your whole life**: one question answered from every memory, mail, meeting, note and file at once, each sentence linked to its source; living timelines of people, projects and places; a brief before every meeting; a fully local mode with a model on your own machine; unlock in under two seconds with 100,000 memories | Next |
+| 2 | **A model of you**: a personal model fine-tuned on your device from the folders you allow, weights encrypted in your vault; every lesson shown in plain words, one lesson or the whole model rolled back to a date; one model for every app through the connector | Next |
+| 3 | **A self that acts**: negotiates times, prices and terms within ranges you set; runs your inbox and calendar end to end with thresholds; its wallet goes live under your caps and allow-list; every action carries a receipt anyone can verify against the seals | Next |
+| 4 | **Proofs that show nothing**: zero-knowledge proofs of age, membership, history length and any field of a memory; proof of a real, continuous human from years of sealed history, with no biometrics; apps receive proofs, never data | Later |
+| 5 | **The network of selves**: private matching so two selves learn only what they share; reputation from sealed agreements kept and broken; rooms where many selves meet, end to end encrypted; introductions sent only with your yes | Later |
+| 6 | **Recovery and inheritance**: recovery through people you trust (any three of five); a legacy self that speaks in your voice to the people you chose; time capsules that open on a date, an age or an event; a last instruction set carried out by the network | Later |
+| 7 | **Memory for organisations**: a company memory with roles where every read is sealed; agent fleets sharing one memory with budgets and a full audit trail; data requests answered from the vault in one step | Later |
+| 8 | **Everywhere you are**: native apps for phones, computers and watches syncing directly between your own devices; glasses and wearables capturing hands-free; car and home | Vision |
+| 9 | **A network nobody can switch off**: nodes keeping encrypted, erasure-coded copies of each other's vaults, checked every hour; the protocol governed by the people who run and use it | Vision |
+| 10 | **The memory economy**: licensed knowledge packs and paid sessions with expert selves; your data offered at your price, revoked when you say; Sigil's own memory model trained only on what people chose to share; $SIGIL, the network token, paid for network fees and burned on use | Vision |
 
 Plans can change. Nothing in the roadmap is a promise or an offer.
 

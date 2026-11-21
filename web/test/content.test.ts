@@ -63,9 +63,13 @@ describe("copy rules", () => {
 
   it("keeps the token on the roadmap only, without percentages or promises", () => {
     const withToken = all.filter((f) => readFileSync(f, "utf8").includes("$SIGIL"));
-    expect(withToken.map((f) => path.relative(ROOT, f))).toEqual(["web/src/app/roadmap/page.tsx"]);
-    const roadmap = readFileSync(withToken[0], "utf8");
-    expect(roadmap).not.toMatch(/\d+\s?%/);
+    // The site's roadmap page and the README's roadmap section are the only places the token is named.
+    expect(withToken.map((f) => path.relative(ROOT, f)).sort()).toEqual(["README.md", "web/src/app/roadmap/page.tsx"]);
+    expect(readFileSync(path.join(ROOT, "web/src/app/roadmap/page.tsx"), "utf8")).not.toMatch(/\d+\s?%/);
+    const readme = readFileSync(path.join(ROOT, "README.md"), "utf8");
+    const roadmapSection = readme.slice(readme.indexOf("## Roadmap"));
+    expect(readme.indexOf("$SIGIL")).toBeGreaterThan(readme.indexOf("## Roadmap"));
+    expect(roadmapSection).not.toMatch(/\d+\s?%/);
   });
 
   it("contains no email addresses", () => {
