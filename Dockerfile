@@ -34,7 +34,6 @@ RUN useradd --system --uid 10001 --home-dir /data sigil && mkdir -p /data && cho
 COPY --from=build --chown=sigil:sigil /app /app
 USER sigil
 EXPOSE 3000
-VOLUME ["/data"]
 # The node's own health endpoint; it answers without touching any vault.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
