@@ -33,14 +33,15 @@
 /* ------------------------------------------------------------------ the page ground */
 
 /*
-  Black with a little grain, and ribbons of fine lines.
+  Black with a little grain, and an engraved landscape low on the screen: far
+  hills, a field and its grass.
 
-  In motion the ribbons are drawn by one canvas on the graphics card
+  In motion the land is drawn by one canvas on the graphics card
   (.backdrop-live, components/backdrop/Ground.tsx). The canvas is opaque and
   fixed, so it is one layer the page slides over; only its opacity is ever
   animated, once, when it fades in. Nothing listens to scrolling.
 
-  Under the canvas lies the still drawing: one picture placed twice. It is the
+  Under the canvas lies the still drawing: the same land in one picture. It is the
   ground until the canvas runs, and stays the ground with reduced motion,
   without WebGL or on a slow graphics card. Once the canvas covers it, it is
   taken out of the picture so it costs nothing.
@@ -81,41 +82,30 @@
   display: none;
 }
 
-.backdrop-ribbon {
+/* The still land: its horizon lies where the ground in motion puts it (groundShader.ts, layOut). */
+.backdrop-land {
   position: absolute;
-  left: 50%;
-  width: max(112vw, 1000px);
+  left: 0;
+  top: calc(80vh - 110px);
+  top: calc(80lvh - 110px);
+  width: 2400px;
   max-width: none;
-  height: auto;
-  aspect-ratio: 2000 / 520;
-  margin-left: calc(max(112vw, 1000px) / -2);
+  height: 340px;
   user-select: none;
 }
 
-.backdrop-ribbon[data-ribbon="a"] {
-  top: 6%;
-  opacity: 0.17;
-  transform: rotate(-7deg);
-}
-
-.backdrop-ribbon[data-ribbon="b"] {
-  top: 58%;
-  opacity: 0.09;
-  transform: scaleX(-1) rotate(-5deg);
-}
-
 /* Covered by the canvas: gone once the canvas has faded in. */
-.backdrop[data-ground="live"] .backdrop-ribbon {
+.backdrop[data-ground="live"] .backdrop-land {
   visibility: hidden;
   transition: visibility 0s 1600ms;
 }
 
 @media (max-width: 640px) {
-  .backdrop-ribbon[data-ribbon="a"] {
-    top: 8%;
-  }
-  .backdrop-ribbon[data-ribbon="b"] {
-    top: 60%;
+  .backdrop-land {
+    top: calc(86vh - 79px);
+    top: calc(86lvh - 79px);
+    transform: scale(0.72);
+    transform-origin: 0 0;
   }
 }
 

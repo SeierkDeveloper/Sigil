@@ -1205,7 +1205,7 @@ body:has(.emergency-page) :is(.site-nav, .site-actions, .site-menu-button, .site
   display: none;
 }
 
-body:has(.emergency-page) .backdrop-ribbon {
+body:has(.emergency-page) .backdrop-land {
   visibility: hidden;
 }
 

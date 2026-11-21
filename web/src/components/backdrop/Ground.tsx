@@ -14,7 +14,7 @@
 // - at most 60 frames a second, none while the tab is hidden or the canvas is
 //   not shown.
 //
-// It steps aside for the still drawing under it (the two ribbons in
+// It steps aside for the still drawing under it (the same land, in
 // Backdrop.tsx) when the visitor asked for less motion, when WebGL is missing
 // or only runs in software, when the context is lost, and when the first
 // frames show the graphics card cannot keep up.
@@ -101,10 +101,8 @@ export function Ground() {
     const at = {
       res: gl.getUniformLocation(program, "u_res"),
       px: gl.getUniformLocation(program, "u_px"),
-      a: gl.getUniformLocation(program, "u_a"),
-      b: gl.getUniformLocation(program, "u_b"),
-      c: gl.getUniformLocation(program, "u_c"),
-      d: gl.getUniformLocation(program, "u_d"),
+      scene: gl.getUniformLocation(program, "u_scene"),
+      clock: gl.getUniformLocation(program, "u_clock"),
     };
     const uniforms = makeUniforms();
 
@@ -127,8 +125,7 @@ export function Ground() {
       gl.uniform2f(at.res, w, h);
       gl.uniform1f(at.px, cssHeight / h);
       layOut(uniforms, cssWidth, cssHeight);
-      gl.uniform4fv(at.a, uniforms.a);
-      gl.uniform4fv(at.b, uniforms.b);
+      gl.uniform4fv(at.scene, uniforms.scene);
       sized = true;
     };
     const resize = new ResizeObserver((entries) => {
@@ -186,8 +183,7 @@ export function Ground() {
         }
       }
       advance(uniforms, seconds);
-      gl.uniform4fv(at.c, uniforms.c);
-      gl.uniform2fv(at.d, uniforms.d);
+      gl.uniform4fv(at.clock, uniforms.clock);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
       if (++drawn === 2) holder.dataset.ground = "live";
     };
