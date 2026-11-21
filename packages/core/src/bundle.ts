@@ -170,12 +170,14 @@ export function bundleHash(body: BundleBody): string {
 /** Seals the body made by the node: its hash, and the vault's signature when the owner's device holds the signing key. */
 export function sealBundle(body: BundleBody, key: SigningKey | null): VaultBundle {
   if (key && key.publicKey !== body.vault.signKey) throw new Error("This bundle belongs to another vault.");
+  // The message is made once: on a big vault it is tens of megabytes.
+  const message = bundleMessage(body);
   return {
     format: BUNDLE_FORMAT,
     version: BUNDLE_VERSION,
     body,
-    hash: bundleHash(body),
-    signature: key ? toBase64Url(ed25519.sign(bundleMessage(body), key.seed)) : null,
+    hash: hex32(sha256(message)),
+    signature: key ? toBase64Url(ed25519.sign(message, key.seed)) : null,
   };
 }
 
@@ -200,7 +202,8 @@ export async function macBundle(body: BundleBody, appId: string, appSecret: Uint
 
 /** A bundle as bytes: gzip of its JSON. */
 export function encodeBundle(bundle: VaultBundle): Uint8Array {
-  return gzipSync(utf8(JSON.stringify(bundle)), { level: 6, mtime: 0 });
+  // Level 1: the body is mostly ciphertext, which barely compresses whatever the level, and level 1 is several times faster.
+  return gzipSync(utf8(JSON.stringify(bundle)), { level: 1, mtime: 0 });
 }
 
 /** Reads a bundle file: gzip or plain JSON. Checks its form only; see verifyBundle. */

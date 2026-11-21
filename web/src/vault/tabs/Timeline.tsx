@@ -5,7 +5,7 @@ import { SOURCE_LABELS, sourceLabel, type Memory, type SourceKind } from "@sigil
 import { TimelineIcon } from "@/components/icons";
 import { formatDate, formatTime, plural } from "@/lib/format";
 import { useVault } from "../context";
-import { groupByMonth } from "../timelineGroups";
+import { groupByMonth, TIMELINE_STEP, windowMonths } from "../timelineGroups";
 import { SourceMark } from "../marks";
 import { Empty } from "../ui";
 
@@ -42,6 +42,8 @@ export function TimelineTab() {
   }, [data.memories]);
 
   const months = useMemo(() => groupByMonth(data.memories, source, field), [data.memories, source, field]);
+  const [limit, setLimit] = useState(TIMELINE_STEP);
+  const view = useMemo(() => windowMonths(months, limit), [months, limit]);
 
   const folderName = useMemo(() => new Map(data.folders.map((f) => [f.id, f.name])), [data.folders]);
   const span = useMemo(() => {
@@ -76,7 +78,7 @@ export function TimelineTab() {
           <label className="visually-hidden" htmlFor="timeline-field">
             Date
           </label>
-          <select id="timeline-field" className="select" value={field} onChange={(e) => setField(e.target.value as DateField)}>
+          <select id="timeline-field" className="select" value={field} onChange={(e) => (setField(e.target.value as DateField), setLimit(TIMELINE_STEP))}>
             <option value="createdAt">By date written</option>
             <option value="editedAt">By last change</option>
           </select>
@@ -85,12 +87,12 @@ export function TimelineTab() {
       <p className="small muted screen-help">Your memories by date, newest first. Choose which date to go by: when something happened, when you wrote it down, or when you last changed it.</p>
 
       <div className="timeline-sources" role="group" aria-label="Source">
-        <button type="button" className="timeline-source" aria-pressed={source === "all"} onClick={() => setSource("all")}>
+        <button type="button" className="timeline-source" aria-pressed={source === "all"} onClick={() => (setSource("all"), setLimit(TIMELINE_STEP))}>
           <span className="timeline-source-name">All sources</span>
           <span className="timeline-source-count">{data.memories.length}</span>
         </button>
         {sources.map(([k, n]) => (
-          <button key={k} type="button" className="timeline-source" data-source={k} aria-pressed={source === k} onClick={() => setSource(k)}>
+          <button key={k} type="button" className="timeline-source" data-source={k} aria-pressed={source === k} onClick={() => (setSource(k), setLimit(TIMELINE_STEP))}>
             <SourceMark kind={k} />
             <span className="timeline-source-name">{SOURCE_LABELS[k]}</span>
             <span className="timeline-source-count">{n}</span>
@@ -106,7 +108,7 @@ export function TimelineTab() {
       ) : null}
 
       <ol className="timeline-months">
-        {months.map((month) => (
+        {view.months.map((month) => (
           <li key={month.key} className="timeline-month">
             <h3 className="timeline-month-title">
               <span>{month.label}</span> <span className="timeline-month-count">{plural(month.count, "memory", "memories")}</span>
@@ -153,6 +155,13 @@ export function TimelineTab() {
           </li>
         ))}
       </ol>
+      {view.shown < view.total ? (
+        <div className="row timeline-more">
+          <button type="button" className="button button-small" onClick={() => setLimit((n) => n + TIMELINE_STEP)}>
+            Show earlier memories ({(view.total - view.shown).toLocaleString("en-US")} more)
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

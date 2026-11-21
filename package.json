@@ -20,7 +20,9 @@
     "dev": "npm run dev -w @sigil/web",
     "start": "npm run start -w @sigil/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint -w @sigil/web"
+    "lint": "npm run lint -w @sigil/web",
+    "perf": "nice npm run perf -w @sigil/web",
+    "seed": "nice npm run seed -w @sigil/web"
   },
   "engines": {
     "node": ">=22.13"

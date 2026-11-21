@@ -55,6 +55,28 @@ export function merkleProof(leaves: Uint8Array[], index: number): Uint8Array[] {
   return proof;
 }
 
+/**
+ * The tree built once, for many proofs: an hour with thousands of entries needs
+ * thousands of proofs, and building the tree again for each would be quadratic.
+ */
+export function merkleTree(leaves: Uint8Array[]): { root: Uint8Array; proof(index: number): Uint8Array[] } {
+  const all = leaves.length ? levels(leaves) : [[new Uint8Array(32)]];
+  return {
+    root: all[all.length - 1][0],
+    proof(index: number) {
+      if (index < 0 || index >= leaves.length) throw new Error("Leaf index out of range.");
+      const proof: Uint8Array[] = [];
+      let i = index;
+      for (const level of all.slice(0, -1)) {
+        const sibling = i % 2 === 0 ? i + 1 : i - 1;
+        if (sibling < level.length) proof.push(level[sibling]);
+        i = Math.floor(i / 2);
+      }
+      return proof;
+    },
+  };
+}
+
 export function verifyProof(root: Uint8Array, leaf: Uint8Array, proof: Uint8Array[]): boolean {
   let node = leaf;
   for (const sibling of proof) node = nodeHash(node, sibling);
@@ -99,6 +121,7 @@ export const fromHex32 = (hex: string) => {
  *   node       a step of moving the vault between nodes, or restoring it on one
  *   capture    a device's capture key sent something to the inbox, or the key was made or revoked
  *   session    a step of a session with the public AI self: booked, a turn answered, ended or blocked
+ *   injection  the immune system caught hidden instructions: memories held back or places neutralised before a model saw them
  */
 export type ReadKind =
   | "folders"
@@ -128,7 +151,8 @@ export type ReadKind =
   | "backup"
   | "node"
   | "capture"
-  | "session";
+  | "session"
+  | "injection";
 
 export const READ_KINDS: readonly ReadKind[] = [
   "folders",
@@ -159,6 +183,7 @@ export const READ_KINDS: readonly ReadKind[] = [
   "node",
   "capture",
   "session",
+  "injection",
 ];
 
 export interface ReadEntryFields {

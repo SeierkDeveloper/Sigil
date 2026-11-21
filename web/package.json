@@ -12,7 +12,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "seal": "node --experimental-strip-types scripts/seal.ts"
+    "seal": "node --experimental-strip-types scripts/seal.ts",
+    "perf": "vitest run --config vitest.perf.config.ts perf/vault.perf.ts",
+    "seed": "vitest run --config vitest.perf.config.ts perf/seed-db.perf.ts"
   },
   "dependencies": {
     "@huggingface/tokenizers": "^0.2.0",

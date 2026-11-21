@@ -38,3 +38,29 @@ export function groupByMonth(memories: Memory[], source: SourceKind | "all", fie
   }
   return out;
 }
+
+/** How many memories the timeline draws at first, and adds with each "Show more". */
+export const TIMELINE_STEP = 300;
+
+/**
+ * The first `limit` memories of the timeline, months and days kept whole up to
+ * there: a vault of a hundred thousand memories draws a few hundred rows, not
+ * all of them.
+ */
+export function windowMonths(months: TimelineMonth[], limit: number): { months: TimelineMonth[]; shown: number; total: number } {
+  const out: TimelineMonth[] = [];
+  let shown = 0;
+  const total = months.reduce((n, m) => n + m.count, 0);
+  for (const month of months) {
+    if (shown >= limit) break;
+    const days: TimelineMonth["days"] = [];
+    for (const day of month.days) {
+      if (shown >= limit) break;
+      const items = day.items.slice(0, limit - shown);
+      days.push(items.length === day.items.length ? day : { ...day, items });
+      shown += items.length;
+    }
+    out.push(days.length === month.days.length && days[days.length - 1] === month.days[month.days.length - 1] ? month : { ...month, days });
+  }
+  return { months: out, shown, total };
+}

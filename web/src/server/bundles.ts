@@ -10,7 +10,7 @@
 import {
   bundleShapeError,
   hex32,
-  merkleProof,
+  merkleTree,
   fromHex32,
   verifyBundle,
   verifyRestore,
@@ -52,11 +52,16 @@ function tagged(table: string, rows: Row[], userId: string): PartRow[] {
 /** Each entry's seal: the node, the root of its hour and its path, from this node's seals or from the bundle it came with. */
 function logWithSeals(db: Db, userId: string, origin: string): BundleLogEntry[] {
   const rows = all(db, "SELECT * FROM read_log WHERE user_id = ? ORDER BY at, id", userId);
-  const hours = new Map<number, { root: string; leaves: string[] } | null>();
+  // Each sealed hour's tree is built once, with a map from leaf to its place, for all of that hour's entries.
+  const hours = new Map<number, { root: string; at: Map<string, number>; tree: ReturnType<typeof merkleTree> } | null>();
   const sealOf = (hour: number) => {
     if (!hours.has(hour)) {
       const s = db.prepare("SELECT root FROM seals WHERE hour = ?").get(hour) as Row | undefined;
-      hours.set(hour, s ? { root: String(s.root), leaves: all(db, "SELECT leaf FROM seal_leaves WHERE hour = ? ORDER BY idx", hour).map((r) => String(r.leaf)) } : null);
+      if (!s) hours.set(hour, null);
+      else {
+        const leaves = all(db, "SELECT leaf FROM seal_leaves WHERE hour = ? ORDER BY idx", hour).map((r) => String(r.leaf));
+        hours.set(hour, { root: String(s.root), at: new Map(leaves.map((l, i) => [l, i])), tree: merkleTree(leaves.map(fromHex32)) });
+      }
     }
     return hours.get(hour)!;
   };
@@ -67,8 +72,8 @@ function logWithSeals(db: Db, userId: string, origin: string): BundleLogEntry[] 
       seal = c && "root" in c ? c : null;
     } else if (Number(r.sealed) === 1) {
       const s = sealOf(Number(r.hour));
-      const index = s ? s.leaves.indexOf(String(r.leaf)) : -1;
-      if (s && index >= 0) seal = { origin, periodSeconds: serverConfig.sealSeconds, root: s.root, index, proof: merkleProof(s.leaves.map(fromHex32), index).map(hex32) };
+      const index = s ? (s.at.get(String(r.leaf)) ?? -1) : -1;
+      if (s && index >= 0) seal = { origin, periodSeconds: serverConfig.sealSeconds, root: s.root, index, proof: s.tree.proof(index).map(hex32) };
     }
     return {
       id: String(r.id),
