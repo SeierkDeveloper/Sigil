@@ -54,7 +54,7 @@ export const McpIcon = (p: IconProps) => (
 
 function Line({ children, ...p }: IconProps & { children: React.ReactNode }) {
   return (
-    <Svg fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" {...p}>
+    <Svg fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" {...p}>
       {children}
     </Svg>
   );
