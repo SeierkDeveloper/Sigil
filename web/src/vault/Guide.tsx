@@ -1,5 +1,6 @@
 "use client";
 
+import { Engraving } from "@/components/art/Engraving";
 import { useEffect, useRef, useState } from "react";
 import { dedupeDrafts, parseExport, type AppKind, type GuideStep } from "@sigil/core";
 import { CodeBlock } from "@/components/CodeBlock";
@@ -56,6 +57,7 @@ export function Guide() {
   return (
     <section className="guide subpanel plate" aria-labelledby="guide-title" data-testid="guide">
       <header className="guide-head">
+        <Engraving name="sapling" grow="none" className="guide-art" />
         <div>
           <h2 id="guide-title" className="guide-title">
             {current ? "Getting started" : "You are set up"}

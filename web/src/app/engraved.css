@@ -32,6 +32,11 @@
 
 /* ------------------------------------------------------------------ type */
 
+/* Figures stand on the line everywhere: the book face's old-style 0 and 1 read as letters. */
+body {
+  font-variant-numeric: lining-nums;
+}
+
 /* The display face is a Garamond: lower in contrast than a Didone, so it is set a size larger and a weight firmer. */
 h1,
 .section-title,
@@ -489,4 +494,23 @@ h1,
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4) 30%, rgba(255, 255, 255, 0.4) 70%, transparent) 50% 100% / 96px 1px no-repeat,
     linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16) 30%, rgba(255, 255, 255, 0.16) 70%, transparent) 50% calc(100% - 4px) / 64px 1px no-repeat;
   clip-path: none;
+}
+
+/* The guide of the first five minutes opens beside a sapling: something just begun. */
+.guide-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.guide-art {
+  flex: none;
+  align-self: center;
+  width: 54px;
+  margin-right: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .guide-art {
+    display: none;
+  }
 }
