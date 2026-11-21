@@ -10,6 +10,22 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    date: "2026-11-21",
+    title: "Ready for people: a security review, a memory immune system and the first five minutes",
+    area: "Trust",
+    summary: "Every part reviewed before launch, with each fix tested; memories from outside checked for hidden instructions; a guide from the recovery phrase to the first answer; a simpler vault; a vault of 100,000 memories measured.",
+    items: [
+      "Twenty-nine findings fixed, each with a test: restores that could reach other vaults, ask links answered without the whole link, bundles changed on their way, a legacy release by one trusted person, sessions that outlived their sign-in, fetches into the node's own network, and more; the list is in docs/SECURITY-REVIEW.md",
+      "The memory immune system: mail, chats and imports with instructions for an AI are held for your review in the inbox, every memory a model sees is quoted as data, every catch is sealed in your log, and a public test runs every hour at /immune",
+      "A getting-started guide: the recovery phrase typed back, your ChatGPT or Claude history, one AI app with the exact steps, and its first answer from your memory; it keeps your place",
+      "Five main sections, everything else under More in its four groups, pins that keep a section in the row; every link to a section works as before",
+      "Plain help on every screen and plain words when something fails",
+      "Search, the timeline and bundles fast with 100,000 memories; the numbers are in docs/PERFORMANCE.md",
+      "Live sync can sign in on your computer, through the connector, for services that want a client secret",
+      "A railway.toml for one service with a volume; the open standard 1.3.0",
+    ],
+  },
+  {
     date: "2026-11-20",
     title: "Your whole vault in one encrypted bundle, kept where you choose",
     area: "Nodes",

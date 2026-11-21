@@ -230,6 +230,9 @@ describe("keys, links and codes", () => {
     expect(() => nodeOrigin("javascript:alert(1)")).toThrow();
     expect(() => nodeOrigin("file:///etc/passwd")).toThrow();
     expect(nodeOrigin("https://node.example/path?x")).toBe("https://node.example");
+    // Storage keys and signatures never travel over plain http, except to this machine.
+    expect(() => cleanTarget({ kind: "s3", id: "t-000001", label: "B", endpoint: "http://bucket.example", region: "x", bucket: "bucket-one", accessKeyId: "a", secretAccessKey: "s" })).toThrow();
+    expect(cleanTarget({ kind: "s3", id: "t-000001", label: "B", endpoint: "http://127.0.0.1:9000", region: "x", bucket: "bucket-one", accessKeyId: "a", secretAccessKey: "s" })).toMatchObject({ endpoint: "http://127.0.0.1:9000" });
   });
 });
 

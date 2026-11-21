@@ -74,6 +74,21 @@ const covered = [
       "Both are encrypted with your vault key before they leave your browser, and for an app you allow, with a key from that app's own secret. Model calls go from your browser or connector straight to the provider.",
   },
   {
+    threat: "Someone who only knows an ask link's address starts a conversation",
+    answer:
+      "The conversation key takes in a key that is only in the link's fragment (after the #) and with you. The server knows the link's id and public key, but a conversation it starts itself does not open on your side, so nobody without the whole link is answered.",
+  },
+  {
+    threat: "An email, chat or import carries instructions written for your AI",
+    answer:
+      "Every memory from outside is checked on your device as it arrives, for instruction overrides, fake system messages, requests to send memories or keys away, tool calls, payments and hiding tricks. What looks like that waits in your inbox, under Held for review, and reaches no app, AI self, link or public page until you let it through. Every memory any model sees is quoted as data, with flagged places removed, and every catch is in your read log. The rules catch common shapes, not every attack: the public test at /immune shows which strains get through.",
+  },
+  {
+    threat: "A bundle is changed where it is stored",
+    answer:
+      "Restoring checks, on your device, the vault's signature over the whole bundle, or for a connector's bundle an HMAC with a key only that app and your vault have. A memory left out, or an app or capture key slipped in, fails the check, and nothing is restored.",
+  },
+  {
     threat: "Someone asks your AI self about things it should not discuss",
     answer:
       "It uses only the folders a link's rules allow. Denied topics are refused before the model is asked, an answer with a phrase it must never say is replaced on the device, and when nothing matches it says it does not know. Each link has an expiry, a total and an hourly limit, and you can turn it off at once.",

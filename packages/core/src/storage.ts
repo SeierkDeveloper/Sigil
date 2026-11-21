@@ -96,6 +96,10 @@ const httpUrl = (v: unknown): string => {
 /** A target as typed by the owner, checked. Throws with a plain message when something needed is missing. */
 export function cleanTarget(value: unknown): BackupTarget {
   const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  for (const field of ["endpoint", "gateway"]) {
+    const given = clean(v[field], 500);
+    if (given && !httpUrl(given)) throw new Error("A storage address must start with https:// (plain http only for this machine).");
+  }
   const id = typeof v.id === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(v.id) ? v.id : randomId();
   const label = clean(v.label, 80);
   if (v.kind === "s3") {
