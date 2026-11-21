@@ -31,12 +31,12 @@
   --color-danger: #ffffff;
   --color-overlay: rgba(0, 0, 0, 0.6);
 
-  /* metal */
-  --metal: linear-gradient(180deg, #ffffff 0%, #ececec 50%, #cdcdcd 100%);
-  --metal-hover: linear-gradient(180deg, #ffffff 0%, #f8f8f8 50%, #e4e4e4 100%);
-  --metal-text: linear-gradient(100deg, #ffffff 0%, #b4b4b4 38%, #f3f3f3 62%, #9a9a9a 100%);
-  --hairline-fade: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.26) 22%, rgba(255, 255, 255, 0.26) 78%, transparent);
-  --plate: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.012));
+  /* the white plate, flat; these stay gradients in form only, because they sit in background lists */
+  --metal: linear-gradient(#f4f4f4, #f4f4f4);
+  --metal-hover: linear-gradient(#ffffff, #ffffff);
+  --metal-text: linear-gradient(#f4f4f4, #f4f4f4);
+  --hairline-fade: linear-gradient(var(--color-line-strong), var(--color-line-strong));
+  --plate: linear-gradient(transparent, transparent);
 
   /* type */
   --font-sans: var(--face-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -65,14 +65,14 @@
   --space-8: 4.5rem;
   --space-9: 7rem;
   --radius-sm: 2px;
-  --radius: 4px;
-  --radius-lg: 6px;
-  --radius-pill: 999px;
+  --radius: 2px;
+  --radius-lg: 2px;
+  --radius-pill: 2px;
   --container: 1160px;
   --container-narrow: 760px;
   --gutter: 32px;
   --header-height: 68px;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+  --shadow: 0 0 0 0 transparent;
   --transition: 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
 
   /* small drawings used as masks, so they take any grey */
@@ -476,9 +476,7 @@ svg {
   top: 0;
   z-index: 50;
   width: 100%;
-  background: color-mix(in srgb, var(--color-bg) 76%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(1.2);
-  backdrop-filter: blur(18px) saturate(1.2);
+  background: rgba(4, 4, 4, 0.96);
   border-bottom: 1px solid var(--color-line);
 }
 
@@ -583,7 +581,7 @@ svg {
   width: 40px;
   height: 40px;
   border: 1px solid transparent;
-  border-radius: 50%;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-muted);
   font-size: 18px;
@@ -697,26 +695,6 @@ svg {
   border-top: 1px solid var(--color-line);
   background: linear-gradient(180deg, #060606, #040404);
   overflow: hidden;
-}
-
-/* The name once more, cut as an outline and half below the edge. */
-.site-footer::after {
-  content: "Sigil";
-  display: block;
-  height: 0.6em;
-  margin-top: var(--space-5);
-  font-family: var(--font-display);
-  font-size: clamp(7.5rem, 27vw, 25rem);
-  font-weight: 400;
-  line-height: 0.86;
-  letter-spacing: -0.01em;
-  text-align: center;
-  color: transparent;
-  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.32);
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
-  mask-image: linear-gradient(180deg, #000 0%, transparent 96%);
-  pointer-events: none;
-  user-select: none;
 }
 
 .site-footer-inner {
@@ -852,7 +830,6 @@ svg {
   border-color: transparent;
   background: var(--metal);
   color: var(--color-accent-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 28px -12px rgba(255, 255, 255, 0.28);
 }
 
 .button-primary::after {
@@ -965,21 +942,6 @@ a.button:hover svg:last-child {
   transition: border-color 320ms ease, transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-/* A lit top edge, as on a plate of metal. */
-.card::before,
-.permission-card::before,
-.subpanel::before,
-.editor::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 12%;
-  right: 12%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-  pointer-events: none;
-}
-
 @media (hover: hover) {
   .card:hover {
     border-color: var(--color-line-strong);
@@ -995,12 +957,9 @@ a.button:hover svg:last-child {
   height: 44px;
   margin: 5px 5px var(--space-6);
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 4px;
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 20px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
 }
 
 .card-title {
@@ -1044,7 +1003,6 @@ a.button:hover svg:last-child {
   background: var(--metal);
   color: var(--color-accent-ink);
   font-weight: 500;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .chip {
@@ -1081,7 +1039,6 @@ a.button:hover svg:last-child {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(60% 70% at 74% 48%, rgba(255, 255, 255, 0.055), transparent 70%);
   pointer-events: none;
 }
 
@@ -1154,7 +1111,6 @@ a.button:hover svg:last-child {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow);
 }
 
 .film-plate::before {
@@ -1352,7 +1308,7 @@ a.button:hover svg:last-child {
   width: 40px;
   height: 40px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--color-surface);
   color: var(--color-text);
   font-size: 18px;
@@ -1489,7 +1445,7 @@ a.button:hover svg:last-child {
   width: 6px;
   height: 6px;
   border: 1px solid currentColor;
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .film-waiting {
@@ -2057,7 +2013,6 @@ a.button:hover svg:last-child {
     padding: var(--space-5) 0 var(--space-7);
   }
   .hero::before {
-    background: radial-gradient(90% 40% at 50% 22%, rgba(255, 255, 255, 0.06), transparent 70%);
   }
   .hero-inner {
     grid-template-columns: minmax(0, 1fr);
@@ -2189,10 +2144,7 @@ a.button:hover svg:last-child {
   width: 44px;
   height: 44px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 4px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-family: var(--font-mono);
   font-size: 0.8125rem;
@@ -2292,7 +2244,6 @@ a.button:hover svg:last-child {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow), 0 0 0 6px rgba(255, 255, 255, 0.015), 0 0 0 7px var(--color-line);
 }
 
 .permission-app {
@@ -2308,7 +2259,7 @@ a.button:hover svg:last-child {
   box-sizing: content-box;
   padding: 10px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   font-size: 22px;
 }
 
@@ -2435,15 +2386,6 @@ a.button:hover svg:last-child {
 .cta-band > .container::before {
   content: "";
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 1100px;
-  height: 1100px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: repeating-radial-gradient(circle at center, transparent 0 59px, rgba(255, 255, 255, 0.075) 59px 60px);
-  -webkit-mask-image: radial-gradient(circle at center, transparent 30%, #000 46%, transparent 70%);
-  mask-image: radial-gradient(circle at center, transparent 30%, #000 46%, transparent 70%);
   pointer-events: none;
 }
 
@@ -2476,14 +2418,6 @@ a.button:hover svg:last-child {
 .page::before {
   content: "";
   position: absolute;
-  top: -420px;
-  right: -420px;
-  width: 1000px;
-  height: 1000px;
-  border-radius: 50%;
-  background: repeating-radial-gradient(circle at center, transparent 0 49px, rgba(255, 255, 255, 0.07) 49px 50px);
-  -webkit-mask-image: radial-gradient(circle at center, #000 20%, transparent 68%);
-  mask-image: radial-gradient(circle at center, #000 20%, transparent 68%);
   pointer-events: none;
 }
 
@@ -3115,14 +3049,13 @@ a.button:hover svg:last-child {
   border-top: 0;
 }
 
-/* Each row is stamped with a small seal. */
+/* Each row carries a small cut of lines. */
 .seal-row::before {
   content: "";
   width: 14px;
   height: 14px;
   border: 1px solid var(--color-accent);
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--color-accent-strong) 0 2px, transparent 2.5px);
+  border-radius: 0;
 }
 
 .seal-hour {
@@ -3190,7 +3123,7 @@ a.button:hover svg:last-child {
   padding: var(--space-8) var(--space-5);
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
-  background: radial-gradient(60% 90% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 70%), var(--color-surface);
+  background: var(--color-surface);
   text-align: center;
   overflow: hidden;
 }
@@ -3204,10 +3137,7 @@ a.button:hover svg:last-child {
   height: 64px;
   margin: 9px 0 var(--space-4);
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px dashed var(--color-line-strong);
-  outline-offset: 8px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 26px;
 }
@@ -3268,7 +3198,7 @@ a.button:hover svg:last-child {
   height: 18px;
   border: 1px solid var(--color-line-strong);
   border-top-color: var(--color-text);
-  border-radius: 50%;
+  border-radius: 0;
   animation: spin 0.9s linear infinite;
 }
 
@@ -3372,7 +3302,7 @@ a.button:hover svg:last-child {
 .select:focus {
   outline: none;
   border-color: #fff;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+  box-shadow: none;
 }
 
 input[type="search"]::-webkit-search-cancel-button {
@@ -3467,15 +3397,6 @@ input[type="search"]::-webkit-search-cancel-button {
 .vault:not([data-phase="open"])::before {
   content: "";
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 1400px;
-  height: 1400px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: repeating-radial-gradient(circle at center, transparent 0 69px, rgba(255, 255, 255, 0.06) 69px 70px);
-  -webkit-mask-image: radial-gradient(circle at center, transparent 28%, #000 40%, transparent 68%);
-  mask-image: radial-gradient(circle at center, transparent 28%, #000 40%, transparent 68%);
   pointer-events: none;
 }
 
@@ -3495,17 +3416,6 @@ input[type="search"]::-webkit-search-cancel-button {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow), 0 0 0 6px rgba(4, 4, 4, 0.9), 0 0 0 7px var(--color-line);
-}
-
-.vault-gate::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: 12%;
-  right: 12%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
 }
 
 .vault-gate > :last-child {
@@ -3557,7 +3467,6 @@ input[type="search"]::-webkit-search-cancel-button {
 .segmented button[aria-pressed="true"] {
   background: var(--metal);
   color: var(--color-accent-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .method-list {
@@ -3610,9 +3519,8 @@ input[type="search"]::-webkit-search-cancel-button {
   height: 46px;
   padding: 11px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   color: var(--color-accent-strong);
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
 }
 
 .method-title {
@@ -3671,7 +3579,6 @@ input[type="search"]::-webkit-search-cancel-button {
   }
   .vault-gate {
     padding: var(--space-6) var(--space-4);
-    box-shadow: var(--shadow);
   }
   .segmented {
     margin-bottom: var(--space-6);
@@ -3991,10 +3898,7 @@ input[type="search"]::-webkit-search-cancel-button {
   width: 64px;
   height: 64px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px dashed var(--color-line-strong);
-  outline-offset: 8px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
+  border-radius: 0;
 }
 
 .editor-idle p {
@@ -4081,7 +3985,7 @@ input[type="search"]::-webkit-search-cancel-button {
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 0;
   border: 1px solid currentColor;
 }
 
@@ -4182,7 +4086,6 @@ input[type="search"]::-webkit-search-cancel-button {
   border: 1px solid var(--color-line-bright);
   border-radius: var(--radius-sm);
   background: #060606;
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.02), 0 0 0 6px var(--color-line);
   color: var(--color-accent-strong);
   font-family: var(--font-mono);
   font-size: var(--text-sm);
@@ -4199,7 +4102,7 @@ input[type="search"]::-webkit-search-cancel-button {
   padding: var(--space-8) var(--space-5);
   border: 1px dashed var(--color-line-bright);
   border-radius: var(--radius);
-  background: radial-gradient(60% 90% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 70%), var(--color-surface);
+  background: var(--color-surface);
   text-align: center;
   cursor: pointer;
   transition: border-color var(--transition), background-color var(--transition);
@@ -4383,238 +4286,13 @@ input[type="search"]::-webkit-search-cancel-button {
 
 /* ------------------------------------------------------------------ ground and light */
 
-/*
-  The ground behind every page (components/backdrop). Layered dark tones, the
-  engraved ribbons and their drifting light on a canvas, two etched rules at
-  the edges of the content, film grain and a vignette. Nothing here takes
-  pointer events, and the type above it keeps its full contrast.
-*/
+/* The ground behind every page (components/backdrop) is in craft.css. */
 html {
   background: #040404;
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  background:
-    radial-gradient(120% 70% at 50% -12%, #131313 0%, rgba(19, 19, 19, 0) 62%),
-    radial-gradient(70% 55% at 100% 104%, #0d0d0d 0%, rgba(13, 13, 13, 0) 70%),
-    radial-gradient(60% 50% at -4% 70%, #0a0a0a 0%, rgba(10, 10, 10, 0) 70%),
-    linear-gradient(180deg, #090909 0%, #060606 50%, #040404 100%);
-}
-
-.backdrop-canvas {
-  position: absolute;
-  top: 0;
-  left: 0;
-  opacity: 0;
-  transition: opacity 1800ms ease;
-}
-
-.backdrop-canvas[data-ready] {
-  opacity: 1;
-}
-
-.backdrop-rules {
-  position: absolute;
-  inset: 0;
-  display: none;
-  background:
-    linear-gradient(var(--color-line), var(--color-line)) calc(50% - var(--container) / 2 - 56px) 0 / 1px 100% no-repeat,
-    linear-gradient(var(--color-line), var(--color-line)) calc(50% + var(--container) / 2 + 56px) 0 / 1px 100% no-repeat;
-  -webkit-mask-image: linear-gradient(180deg, transparent 6%, #000 30%, #000 70%, transparent 96%);
-  mask-image: linear-gradient(180deg, transparent 6%, #000 30%, #000 70%, transparent 96%);
-}
-
-@media (min-width: 1360px) {
-  .backdrop-rules {
-    display: block;
-  }
-}
-
-.backdrop-grain {
-  position: absolute;
-  inset: 0;
-  background: var(--grain);
-  opacity: 1;
-}
-
-.backdrop::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(120% 95% at 50% 42%, transparent 48%, rgba(0, 0, 0, 0.62) 100%);
-}
-
-/* Each section catches a little light under its hairline. */
-.section,
-.works-with {
-  background: radial-gradient(46% 260px at 50% 0, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0) 100%) no-repeat;
-}
-
-.section:first-child {
-  background: none;
-}
-
-/* A highlight travels along the hairlines. */
-.section::before,
-.works-with::before {
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent) -30% 0 / 22% 100% no-repeat,
-    var(--hairline-fade);
-}
-
-.site-header::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 1px;
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent) -30% 0 / 22% 100% no-repeat;
-  pointer-events: none;
-}
-
-@keyframes glint {
-  0% {
-    background-position: -30% 0, 0 0;
-  }
-  55%,
-  100% {
-    background-position: 130% 0, 0 0;
-  }
-}
-
-/* Panels: dark glass with a lit rim, and a soft light under the pointer. */
-@property --spot-a {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0;
-}
-
-.card,
-.permission-card,
-.pillar,
-.vault-gate {
-  --spot: radial-gradient(360px circle at var(--mx, 50%) var(--my, 0px), rgba(255, 255, 255, calc(0.075 * var(--spot-a))), transparent 72%);
-}
-
-.card,
-.permission-card,
-.vault-gate {
-  background: var(--spot), var(--plate), var(--color-surface);
-}
-
-.pillar {
-  background: var(--spot), var(--plate);
-  transition: --spot-a 500ms ease;
-}
-
-.card {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), inset 0 0 48px rgba(255, 255, 255, 0.012), 0 30px 60px -44px #000;
-  transition: border-color 320ms ease, transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1), --spot-a 500ms ease;
-}
-
-.permission-card,
-.vault-gate {
-  transition: --spot-a 500ms ease;
-}
-
-@media (hover: hover) {
-  .card:hover,
-  .permission-card:hover,
-  .pillar:hover,
-  .vault-gate:hover {
-    --spot-a: 1;
-  }
-}
-
-/* The rings of the seal are turned metal: two bright quarters, two dark. */
-.page::before,
-.cta-band > .container::before,
-.vault:not([data-phase="open"])::before {
-  -webkit-mask-image:
-    conic-gradient(from 20deg, #000, rgba(0, 0, 0, 0.22) 25%, #000 50%, rgba(0, 0, 0, 0.22) 75%, #000),
-    radial-gradient(circle at center, var(--ring-in, transparent 30%), #000 var(--ring-mid, 46%), transparent var(--ring-out, 70%));
-  mask-image:
-    conic-gradient(from 20deg, #000, rgba(0, 0, 0, 0.22) 25%, #000 50%, rgba(0, 0, 0, 0.22) 75%, #000),
-    radial-gradient(circle at center, var(--ring-in, transparent 30%), #000 var(--ring-mid, 46%), transparent var(--ring-out, 70%));
-  -webkit-mask-composite: source-in;
-  mask-composite: intersect;
-}
-
-.page::before {
-  --ring-in: #000 0%;
-  --ring-mid: 20%;
-  --ring-out: 68%;
-  background: repeating-radial-gradient(circle at center, transparent 0 49px, rgba(255, 255, 255, 0.11) 49px 50px);
-}
-
-.cta-band > .container::before {
-  background: repeating-radial-gradient(circle at center, transparent 0 59px, rgba(255, 255, 255, 0.12) 59px 60px);
-}
-
-.vault:not([data-phase="open"])::before {
-  --ring-in: transparent 28%;
-  --ring-mid: 40%;
-  --ring-out: 68%;
-  background: repeating-radial-gradient(circle at center, transparent 0 69px, rgba(255, 255, 255, 0.1) 69px 70px);
-}
-
-.cta-band > .container::before {
-  top: calc(50% - 550px);
-  left: calc(50% - 550px);
-  transform: none;
-}
-
-.vault:not([data-phase="open"])::before {
-  top: calc(50% - 700px);
-  left: calc(50% - 700px);
-  transform: none;
-}
-
-@keyframes turn {
-  to {
-    rotate: 360deg;
-  }
-}
-
-/* The footer lets the ground through; its outlined name carries a slow sheen. */
 .site-footer {
-  background: linear-gradient(180deg, rgba(7, 7, 7, 0.55), rgba(3, 3, 3, 0.94));
-}
-
-.site-footer::after {
-  background: linear-gradient(100deg, transparent 42%, rgba(255, 255, 255, 0.2) 50%, transparent 58%) 100% 0 / 320% 100% no-repeat;
-  -webkit-background-clip: text;
-  background-clip: text;
-}
-
-@keyframes sheen {
-  0% {
-    background-position: 100% 0;
-  }
-  60%,
-  100% {
-    background-position: 0% 0;
-  }
-}
-
-@keyframes maker {
-  0%,
-  34%,
-  100% {
-    color: var(--color-text-muted);
-    opacity: 0.82;
-  }
-  14% {
-    color: var(--color-text);
-    opacity: 1;
-  }
+  background: rgba(4, 4, 4, 0.9);
 }
 
 @keyframes reveal {
@@ -4635,24 +4313,6 @@ html {
   Motion, only when the visitor has not asked for less of it (the switch is set
   before first paint by the script in the layout; see components/backdrop/Motion).
 */
-[data-motion] .section::before,
-[data-motion] .works-with::before {
-  animation: glint 12s ease-in-out infinite;
-  transition: transform 1500ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-[data-motion] .site-header::after {
-  animation: glint 16s ease-in-out -6s infinite;
-}
-
-[data-motion] .section:nth-of-type(2n)::before {
-  animation-delay: -5s;
-}
-
-[data-motion] .section:nth-of-type(3n)::before {
-  animation-delay: -8.5s;
-}
-
 /* Dividers draw in from the middle, then the diamond sets. */
 [data-motion] .section:not([data-in])::before,
 [data-motion] .works-with:not([data-in])::before {
@@ -4685,31 +4345,6 @@ html {
   animation: reveal 1000ms cubic-bezier(0.2, 0.7, 0.2, 1) 500ms backwards;
 }
 
-[data-motion] .site-footer:not([data-in])::after {
-  opacity: 0;
-}
-
-[data-motion] .site-footer[data-in]::after {
-  animation: reveal-word 1600ms cubic-bezier(0.2, 0.7, 0.2, 1) 150ms backwards, sheen 13s ease-in-out 1.5s infinite;
-}
-
-/* The apps in "Reads into" light up one after another. */
-[data-motion] .app-maker {
-  animation: maker 12s ease-in-out infinite;
-}
-
-[data-motion] .app-maker:nth-child(2) {
-  animation-delay: 3s;
-}
-
-[data-motion] .app-maker:nth-child(3) {
-  animation-delay: 6s;
-}
-
-[data-motion] .app-maker:nth-child(4) {
-  animation-delay: 9s;
-}
-
 /* Inner pages open with their header rising and its rule drawing in. */
 [data-motion] .page-header > * {
   animation: rise 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -4732,12 +4367,6 @@ html {
   from {
     transform: scaleX(0);
   }
-}
-
-[data-motion] .page::before,
-[data-motion] .cta-band > .container::before,
-[data-motion] .vault:not([data-phase="open"])::before {
-  animation: turn 90s linear infinite;
 }
 
 /* ------------------------------------------------------------------ header menus */
@@ -4798,7 +4427,6 @@ button.site-nav-link {
   border-top: 0;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   background: linear-gradient(180deg, rgba(10, 10, 10, 0.97), rgba(6, 6, 6, 0.98));
-  box-shadow: 0 40px 80px -30px #000, inset 0 1px 0 rgba(255, 255, 255, 0.04);
   overflow: hidden;
 }
 
@@ -4811,7 +4439,6 @@ button.site-nav-link {
   flex-direction: column;
   padding: var(--space-5);
   border-right: 1px solid var(--color-line);
-  background: radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.06), transparent 70%);
 }
 
 .nav-panel-label {
@@ -5067,7 +4694,6 @@ button.site-nav-link {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow);
 }
 
 .fact-grid {
@@ -5372,7 +4998,6 @@ button.site-nav-link {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow);
 }
 
 .import-flow-step {
@@ -5395,11 +5020,10 @@ button.site-nav-link {
   width: 44px;
   height: 44px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
 }
 
 /* A line joins the numbers, top to bottom. */
@@ -5444,7 +5068,6 @@ button.site-nav-link {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 
@@ -5661,7 +5284,6 @@ button.site-nav-link {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow), 0 0 0 6px rgba(255, 255, 255, 0.015), 0 0 0 7px var(--color-line);
 }
 
 .seal-card-head {
@@ -5780,7 +5402,7 @@ button.site-nav-link {
   padding-left: calc(var(--space-6) + 34px);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(60% 140% at 0% 0%, rgba(255, 255, 255, 0.07), transparent 70%), var(--color-surface);
+  background: var(--color-surface);
 }
 
 .status-banner::before {
@@ -6132,11 +5754,8 @@ button.site-nav-link {
   height: 60px;
   margin: 5px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 4px;
+  border-radius: 0;
   font-size: 26px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
 }
 
 .guide-count {
@@ -6200,7 +5819,7 @@ button.site-nav-link {
   width: 28px;
   height: 28px;
   border: 1px solid var(--color-line-strong);
-  border-radius: 50%;
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-family: var(--font-mono);
   font-size: 0.75rem;
@@ -6234,7 +5853,7 @@ button.site-nav-link {
   box-sizing: content-box;
   padding: 10px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   font-size: 22px;
 }
 
@@ -6667,8 +6286,7 @@ button.site-nav-link {
   padding: var(--space-6);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(60% 160% at 0% 0%, rgba(255, 255, 255, 0.07), transparent 70%), var(--color-surface);
-  box-shadow: var(--shadow);
+  background: var(--color-surface);
 }
 
 .repo-icon {
@@ -6678,7 +6296,7 @@ button.site-nav-link {
   width: 64px;
   height: 64px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   font-size: 30px;
 }
 
@@ -6808,7 +6426,7 @@ button.site-nav-link {
   padding: var(--space-8) var(--space-6);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(70% 120% at 50% 0%, rgba(255, 255, 255, 0.07), transparent 70%), var(--color-surface);
+  background: var(--color-surface);
   text-align: center;
 }
 
@@ -6953,9 +6571,8 @@ button.site-nav-link {
   content: "";
   width: 5px;
   height: 5px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--color-accent-strong);
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
 }
 
 .search-mode[data-state="failed"] svg {
@@ -7097,7 +6714,7 @@ button.site-nav-link {
   display: block;
   width: 18px;
   height: 18px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--color-text-faint);
   -webkit-mask: none;
   mask: none;
@@ -7122,10 +6739,8 @@ button.site-nav-link {
   width: 40px;
   height: 40px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 3px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%), #060606;
+  border-radius: 0;
+  background: #060606;
   color: var(--color-accent-strong);
   font-size: 18px;
 }
@@ -7201,8 +6816,7 @@ button.site-nav-link {
   padding: var(--space-6);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(520px 220px at 0% 0%, rgba(255, 255, 255, 0.05), transparent 70%), var(--plate), var(--color-surface);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 30px 60px -44px #000;
+  background: var(--plate), var(--color-surface);
   transition: border-color 320ms ease;
 }
 
@@ -7472,7 +7086,6 @@ button.site-nav-link {
   justify-content: center;
   gap: var(--space-4);
   border-radius: inherit;
-  background: radial-gradient(60% 60% at 50% 50%, rgba(4, 4, 4, 0.92), rgba(4, 4, 4, 0.72));
   pointer-events: none;
 }
 
@@ -7481,18 +7094,14 @@ button.site-nav-link {
   place-items: center;
   width: 72px;
   height: 72px;
-  border-radius: 50%;
-  outline: 1px solid var(--color-line-strong);
-  outline-offset: 8px;
+  border-radius: 0;
   background: var(--metal);
-  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 60px -10px rgba(255, 255, 255, 0.5);
   color: var(--color-accent-ink);
   font-size: 30px;
 }
 
 .proposal-stamp[data-outcome="rejected"] .proposal-stamp-mark {
   border: 1px dashed var(--color-line-bright);
-  outline-style: dashed;
   background: transparent;
   box-shadow: none;
   color: var(--color-text);
@@ -7724,7 +7333,6 @@ button.site-nav-link {
   border-color: transparent;
   background: var(--metal);
   color: var(--color-accent-ink);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .timeline-source[aria-pressed="true"] .mark {
@@ -8080,25 +7688,12 @@ button.site-nav-link {
   align-items: start;
 }
 
-/* One plate with a turned-metal edge: the card your apps are handed first. */
+/* The card your apps are handed first: one sheet with a firm outline. */
 .self-card {
-  --spot: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0px), rgba(255, 255, 255, calc(0.07 * var(--spot-a))), transparent 72%);
   position: relative;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background:
-    var(--spot) padding-box,
-    radial-gradient(120% 70% at 0% 0%, rgba(255, 255, 255, 0.07), transparent 60%) padding-box,
-    linear-gradient(180deg, #0c0c0c, #060606) padding-box,
-    linear-gradient(140deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.12) 30%, rgba(255, 255, 255, 0.08) 62%, rgba(255, 255, 255, 0.55)) border-box;
-  box-shadow: 0 0 0 6px rgba(4, 4, 4, 0.9), 0 0 0 7px var(--color-line), 0 50px 90px -50px #000;
-  transition: --spot-a 500ms ease;
-}
-
-@media (hover: hover) {
-  .self-card:hover {
-    --spot-a: 1;
-  }
+  border: 1px solid var(--color-line-bright);
+  border-radius: 0;
+  background: var(--color-surface);
 }
 
 .self-card-top {
@@ -8117,10 +7712,7 @@ button.site-nav-link {
   height: 44px;
   margin: 4px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 4px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), transparent 65%);
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 20px;
 }
@@ -8148,7 +7740,7 @@ button.site-nav-link {
   content: "";
   width: 6px;
   height: 6px;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
 }
 
@@ -8327,7 +7919,6 @@ button.site-nav-link {
 .self-reader .mark {
   width: 32px;
   height: 32px;
-  outline-offset: 2px;
   font-size: 15px;
 }
 
@@ -8458,7 +8049,7 @@ button.site-nav-link {
   width: 26px;
   height: 26px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 13px;
 }
@@ -8500,10 +8091,7 @@ button.site-nav-link {
   height: 44px;
   margin: 4px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 4px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%);
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 20px;
 }
@@ -8629,7 +8217,7 @@ button.site-nav-link {
   width: 36px;
   height: 36px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--color-surface);
   color: var(--color-accent-strong);
   font-size: 16px;
@@ -8699,10 +8287,8 @@ button.site-nav-link {
   height: 40px;
   margin-top: 2px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 3px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%), #060606;
+  border-radius: 0;
+  background: #060606;
   color: var(--color-accent-strong);
   font-size: 18px;
 }
@@ -8713,7 +8299,6 @@ button.site-nav-link {
 
 .shared-row[data-accepted="false"] .shared-row-mark {
   border-style: dashed;
-  outline-style: dashed;
 }
 
 .shared-row[data-accepted="false"] .badge {
@@ -8736,7 +8321,6 @@ button.site-nav-link {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: 0 0 0 6px rgba(4, 4, 4, 0.9), 0 0 0 7px var(--color-line);
 }
 
 .vault-code-side {
@@ -8945,10 +8529,8 @@ body:has(.vault[data-consent]) .site-header-inner {
   width: 56px;
   height: 56px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 5px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%), #060606;
+  border-radius: 0;
+  background: #060606;
   color: var(--color-accent-strong);
   font-size: 24px;
 }
@@ -8956,7 +8538,6 @@ body:has(.vault[data-consent]) .site-header-inner {
 .consent-party-vault {
   border-color: transparent;
   background: var(--metal);
-  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, 0.3);
   color: var(--color-accent-ink);
 }
 
@@ -9242,18 +8823,14 @@ body:has(.vault[data-consent]) .site-header-inner {
   width: 72px;
   height: 72px;
   margin: var(--space-4) 0 var(--space-6);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line-strong);
-  outline-offset: 8px;
+  border-radius: 0;
   background: var(--metal);
-  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 60px -10px rgba(255, 255, 255, 0.5);
   color: var(--color-accent-ink);
   font-size: 30px;
 }
 
 .consent[data-state="denied"] .consent-stamp {
   border: 1px dashed var(--color-line-bright);
-  outline-style: dashed;
   background: transparent;
   box-shadow: none;
   color: var(--color-text);
@@ -9368,8 +8945,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   padding: var(--space-6);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
-  background: radial-gradient(520px 220px at 0% 0%, rgba(255, 255, 255, 0.05), transparent 70%), var(--plate), var(--color-surface);
-  box-shadow: var(--shadow);
+  background: var(--plate), var(--color-surface);
   overflow: hidden;
 }
 
@@ -9508,7 +9084,6 @@ body:has(.vault[data-consent]) .site-header-inner {
 .inbox-preview-actions span[data-kind="approve"] {
   border-color: transparent;
   background: var(--metal);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.28);
   color: var(--color-accent-ink);
 }
 
@@ -9521,7 +9096,6 @@ body:has(.vault[data-consent]) .site-header-inner {
   align-items: center;
   justify-content: center;
   gap: var(--space-4);
-  background: radial-gradient(60% 60% at 50% 50%, rgba(4, 4, 4, 0.94), rgba(4, 4, 4, 0.78));
   color: var(--color-text);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -9537,11 +9111,8 @@ body:has(.vault[data-consent]) .site-header-inner {
   place-items: center;
   width: 72px;
   height: 72px;
-  border-radius: 50%;
-  outline: 1px solid var(--color-line-strong);
-  outline-offset: 8px;
+  border-radius: 0;
   background: var(--metal);
-  box-shadow: inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, 0.3), 0 0 60px -10px rgba(255, 255, 255, 0.5);
   color: var(--color-accent-ink);
   font-size: 30px;
 }
@@ -9634,10 +9205,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   height: 38px;
   margin: 4px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 3px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.12), transparent 65%);
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-family: var(--font-mono);
   font-size: 0.6875rem;
@@ -9800,8 +9368,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   width: 12px;
   height: 12px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  box-shadow: 0 0 0 3px #060606, 0 0 0 4px var(--color-line);
+  border-radius: 0;
 }
 
 .quiet .text-button {
@@ -9832,7 +9399,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   width: 9px;
   height: 9px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .self-status[data-state="serving"] .self-status-lamp,
@@ -9840,7 +9407,6 @@ body:has(.vault[data-consent]) .site-header-inner {
 .link-row[data-online="true"] .link-row-lamp {
   border-color: var(--color-accent-strong);
   background: var(--color-accent-strong);
-  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.08);
 }
 
 [data-motion] .self-status[data-state="serving"] .self-status-lamp,
@@ -10611,7 +10177,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   width: 10px;
   height: 10px;
   border: 1px dashed var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 /* The read log: one question and its answer, opened with the vault key. */
@@ -10719,7 +10285,6 @@ body:has(.vault[data-consent]) .site-header-inner {
 .import-source[data-selected="true"] {
   border-color: var(--color-line-bright);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015)), var(--color-surface-2);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .import-source[data-selected="true"]::after {
@@ -11015,18 +10580,13 @@ body:has(.vault[data-consent]) .site-header-inner {
   height: 56px;
   margin: 8px 0 var(--space-5);
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
-  outline: 1px solid var(--color-line);
-  outline-offset: 6px;
-  background: radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.14), transparent 65%);
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 24px;
 }
 
 .ask-card:not([data-state="active"]) .ask-seal {
   border-style: dashed;
-  outline-style: dashed;
-  outline-color: var(--color-line-strong);
   color: var(--color-text-faint);
 }
 
@@ -11484,7 +11044,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   width: 48px;
   height: 48px;
   border: 1px solid var(--color-line-bright);
-  border-radius: 50%;
+  border-radius: 0;
   color: var(--color-accent-strong);
   font-size: 22px;
 }
@@ -11496,7 +11056,7 @@ body:has(.vault[data-consent]) .site-header-inner {
   position: absolute;
   inset: 4px;
   border: 1px solid var(--color-line);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .legacy-intro-title,
@@ -11807,7 +11367,6 @@ body:has(.vault[data-consent]) .site-header-inner {
   border: 1px solid var(--color-line-bright);
   border-radius: var(--radius);
   background: #fff;
-  box-shadow: 0 0 0 6px rgba(4, 4, 4, 0.9), 0 0 0 7px var(--color-line-strong);
 }
 
 .qr {
@@ -11874,7 +11433,6 @@ body:has(.vault[data-consent]) .site-header-inner {
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius);
   background: var(--plate), var(--color-surface);
-  box-shadow: var(--shadow), 0 0 0 6px rgba(4, 4, 4, 0.9), 0 0 0 7px var(--color-line);
 }
 
 .capture-title {

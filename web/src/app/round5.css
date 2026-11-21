@@ -61,7 +61,7 @@
   width: 40px;
   height: 40px;
   border: 1px dashed var(--color-line-strong);
-  border-radius: 50%;
+  border-radius: 0;
 }
 
 .sync-row .list-row-main {
@@ -974,8 +974,6 @@ button.score-chip[aria-expanded="true"]::after {
 /* Offline: nothing is answering, so the seal, the status line and the field are all drawn dashed. */
 .public-card[data-online="false"] .ask-seal {
   border-style: dashed;
-  outline-style: dashed;
-  outline-color: var(--color-line-strong);
   color: var(--color-text-faint);
 }
 

@@ -22,12 +22,6 @@
   --ribbon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 480' fill='none' stroke='white' stroke-width='1'%3E%3Cpath d='M600 48H330A190 190 0 0 0 140 238V480' opacity='0.90'/%3E%3Cpath d='M600 54H330A184 184 0 0 0 146 238V480' opacity='0.73'/%3E%3Cpath d='M600 60H330A178 178 0 0 0 152 238V480' opacity='0.71'/%3E%3Cpath d='M600 66H330A172 172 0 0 0 158 238V480' opacity='0.69'/%3E%3Cpath d='M600 72H330A166 166 0 0 0 164 238V480' opacity='0.67'/%3E%3Cpath d='M600 78H330A160 160 0 0 0 170 238V480' opacity='0.65'/%3E%3Cpath d='M600 84H330A154 154 0 0 0 176 238V480' opacity='0.63'/%3E%3Cpath d='M600 90H330A148 148 0 0 0 182 238V480' opacity='0.61'/%3E%3Cpath d='M600 96H330A142 142 0 0 0 188 238V480' opacity='0.59'/%3E%3Cpath d='M600 102H330A136 136 0 0 0 194 238V480' opacity='0.57'/%3E%3Cpath d='M600 108H330A130 130 0 0 0 200 238V480' opacity='0.55'/%3E%3Cpath d='M600 114H330A124 124 0 0 0 206 238V480' opacity='0.53'/%3E%3Cpath d='M600 120H330A118 118 0 0 0 212 238V480' opacity='0.50'/%3E%3Cpath d='M600 126H330A112 112 0 0 0 218 238V480' opacity='0.48'/%3E%3Cpath d='M600 132H330A106 106 0 0 0 224 238V480' opacity='0.46'/%3E%3Cpath d='M600 138H330A100 100 0 0 0 230 238V480' opacity='0.44'/%3E%3Cpath d='M600 144H330A94 94 0 0 0 236 238V480' opacity='0.42'/%3E%3Cpath d='M600 150H330A88 88 0 0 0 242 238V480' opacity='0.40'/%3E%3Cpath d='M600 156H330A82 82 0 0 0 248 238V480' opacity='0.38'/%3E%3Cpath d='M600 162H330A76 76 0 0 0 254 238V480' opacity='0.36'/%3E%3Cpath d='M600 168H330A70 70 0 0 0 260 238V480' opacity='0.34'/%3E%3Cpath d='M600 174H330A64 64 0 0 0 266 238V480' opacity='0.90'/%3E%3C/svg%3E");
 }
 
-@property --hatch {
-  syntax: "<number>";
-  inherits: false;
-  initial-value: 0.26;
-}
-
 /* ------------------------------------------------------------------ focus */
 
 /* Focus is two fine parallel lines. */
@@ -134,7 +128,6 @@
 .button-primary {
   border-radius: 0;
   clip-path: var(--chamfer);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(0, 0, 0, 0.18);
 }
 
 .button-small.button-primary {
@@ -157,23 +150,6 @@
   border-radius: 0;
   clip-path: var(--chamfer);
   box-shadow: none;
-}
-
-/* ------------------------------------------------------------------ cards */
-
-/* Three short lines hatch the bottom right corner of a card, and brighten under the pointer. */
-.card {
-  --hatch-line: rgba(255, 255, 255, var(--hatch));
-  background:
-    linear-gradient(to bottom right, transparent 56%, var(--hatch-line) 56% 59.5%, transparent 59.5% 67%, var(--hatch-line) 67% 70.5%, transparent 70.5% 78%, var(--hatch-line) 78% 81.5%, transparent 81.5%) right 9px bottom 9px / 24px 24px no-repeat,
-    var(--spot), var(--plate), var(--color-surface);
-  transition: border-color 320ms ease, transform 320ms cubic-bezier(0.2, 0.7, 0.2, 1), --spot-a 500ms ease, --hatch 500ms ease;
-}
-
-@media (hover: hover) {
-  .card:hover {
-    --hatch: 0.8;
-  }
 }
 
 /* ------------------------------------------------------------------ the ribbon */
@@ -264,13 +240,6 @@
   width: min(calc(100% - 2 * var(--gutter)), var(--container));
   -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.5) 100%);
   mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.5) 100%);
-}
-
-/* None of these turn. */
-[data-motion] .page::before,
-[data-motion] .cta-band > .container::before,
-[data-motion] .vault:not([data-phase="open"])::before {
-  animation: none;
 }
 
 /* ------------------------------------------------------------------ empty states */
