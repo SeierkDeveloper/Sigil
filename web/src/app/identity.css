@@ -5,8 +5,9 @@
   black, with angled cuts at its ends. This file brings the same three things
   to the site, with restraint: bundles of fine parallel lines (--ruled), the
   angled cut (a parallelogram, or a chamfer on the top left and bottom right),
-  and one bend of a ribbon (--ribbon). It loads after globals.css and only
-  restyles what is already there; tokens stay in globals.css.
+  and the ribbon, which is the page ground (craft.css). It loads after
+  globals.css and only restyles what is already there; tokens stay in
+  globals.css. Icons, numbers, sequences and emblems follow craft.css.
 */
 
 :root {
@@ -19,7 +20,6 @@
   --lean: polygon(var(--cut) 0, 100% 0, calc(100% - var(--cut)) 100%, 0 100%);
   /* a plate with its top left and bottom right corners cut */
   --chamfer: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)), calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
-  --ribbon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 480' fill='none' stroke='white' stroke-width='1'%3E%3Cpath d='M600 48H330A190 190 0 0 0 140 238V480' opacity='0.90'/%3E%3Cpath d='M600 54H330A184 184 0 0 0 146 238V480' opacity='0.73'/%3E%3Cpath d='M600 60H330A178 178 0 0 0 152 238V480' opacity='0.71'/%3E%3Cpath d='M600 66H330A172 172 0 0 0 158 238V480' opacity='0.69'/%3E%3Cpath d='M600 72H330A166 166 0 0 0 164 238V480' opacity='0.67'/%3E%3Cpath d='M600 78H330A160 160 0 0 0 170 238V480' opacity='0.65'/%3E%3Cpath d='M600 84H330A154 154 0 0 0 176 238V480' opacity='0.63'/%3E%3Cpath d='M600 90H330A148 148 0 0 0 182 238V480' opacity='0.61'/%3E%3Cpath d='M600 96H330A142 142 0 0 0 188 238V480' opacity='0.59'/%3E%3Cpath d='M600 102H330A136 136 0 0 0 194 238V480' opacity='0.57'/%3E%3Cpath d='M600 108H330A130 130 0 0 0 200 238V480' opacity='0.55'/%3E%3Cpath d='M600 114H330A124 124 0 0 0 206 238V480' opacity='0.53'/%3E%3Cpath d='M600 120H330A118 118 0 0 0 212 238V480' opacity='0.50'/%3E%3Cpath d='M600 126H330A112 112 0 0 0 218 238V480' opacity='0.48'/%3E%3Cpath d='M600 132H330A106 106 0 0 0 224 238V480' opacity='0.46'/%3E%3Cpath d='M600 138H330A100 100 0 0 0 230 238V480' opacity='0.44'/%3E%3Cpath d='M600 144H330A94 94 0 0 0 236 238V480' opacity='0.42'/%3E%3Cpath d='M600 150H330A88 88 0 0 0 242 238V480' opacity='0.40'/%3E%3Cpath d='M600 156H330A82 82 0 0 0 248 238V480' opacity='0.38'/%3E%3Cpath d='M600 162H330A76 76 0 0 0 254 238V480' opacity='0.36'/%3E%3Cpath d='M600 168H330A70 70 0 0 0 260 238V480' opacity='0.34'/%3E%3Cpath d='M600 174H330A64 64 0 0 0 266 238V480' opacity='0.90'/%3E%3C/svg%3E");
 }
 
 /* ------------------------------------------------------------------ focus */
@@ -154,45 +154,12 @@
 
 /* ------------------------------------------------------------------ the ribbon */
 
-/* One bend of a ribbon in the corner of every inner page. */
-.page::before {
-  top: 0;
-  right: 0;
-  width: min(600px, 92vw);
-  height: auto;
-  aspect-ratio: 5 / 4;
-  border-radius: 0;
-  background: var(--ribbon) top right / 100% auto no-repeat;
-  -webkit-mask-image: linear-gradient(205deg, #000 8%, transparent 74%);
-  mask-image: linear-gradient(205deg, #000 8%, transparent 74%);
-  -webkit-mask-composite: source-over;
-  mask-composite: add;
-  opacity: 0.5;
-}
-
-/* The same bend, larger, behind the hero piece. */
-.hero::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: max(-120px, calc(50% - 50vw));
-  width: min(820px, 120vw);
-  aspect-ratio: 5 / 4;
-  background: var(--ribbon) top right / 100% auto no-repeat;
-  -webkit-mask-image: linear-gradient(200deg, #000 4%, transparent 70%);
-  mask-image: linear-gradient(200deg, #000 4%, transparent 70%);
-  opacity: 0.34;
-  pointer-events: none;
-}
-
+/* The ribbon itself is the page ground (components/backdrop, craft.css). */
 .hero-inner {
   z-index: 1;
 }
 
 @media (max-width: 900px) {
-  .hero::after {
-    opacity: 0.2;
-  }
   .hero .eyebrow:not(.section .eyebrow)::before {
     width: 18px;
   }

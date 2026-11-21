@@ -67,14 +67,14 @@
 }
 
 .backdrop-ribbon[data-ribbon="a"] {
-  top: 4%;
-  opacity: 0.2;
+  top: 6%;
+  opacity: 0.17;
   transform: rotate(-7deg);
 }
 
 .backdrop-ribbon[data-ribbon="b"] {
-  top: 54%;
-  opacity: 0.12;
+  top: 58%;
+  opacity: 0.09;
   transform: scaleX(-1) rotate(-5deg);
 }
 
@@ -109,16 +109,16 @@
     opacity: 0.13;
   }
   to {
-    opacity: 0.24;
+    opacity: 0.2;
   }
 }
 
 @keyframes ribbon-breathe-b {
   from {
-    opacity: 0.16;
+    opacity: 0.11;
   }
   to {
-    opacity: 0.08;
+    opacity: 0.06;
   }
 }
 
