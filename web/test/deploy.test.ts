@@ -20,7 +20,8 @@ describe("the node's container", () => {
     expect(froms.length).toBe(2);
     for (const [, major, minor] of froms) expect(Number(major) > 22 || (Number(major) === 22 && Number(minor) >= 13)).toBe(true);
     expect(dockerfile).toMatch(/^USER sigil$/m);
-    expect(dockerfile).toMatch(/^VOLUME \["\/data"\]$/m);
+    // No VOLUME line: Railway mounts its own volume at /data and compose mounts one.
+    expect(dockerfile).not.toMatch(/^VOLUME /m);
     expect(dockerfile).toMatch(/SIGIL_DATA_DIR=\/data/);
     expect(dockerfile).toMatch(/^EXPOSE 3000$/m);
     expect(dockerfile).toMatch(/^CMD \["npm", "run", "start", "-w", "@sigil\/web"\]$/m);
