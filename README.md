@@ -9,6 +9,7 @@
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
 [![Tests](https://img.shields.io/badge/tests-698%20%2B%2058%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
+[![X](https://img.shields.io/badge/X-@SigilVault-0d0e10?style=for-the-badge&labelColor=0b0c0e)](https://x.com/SigilVault)
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
 

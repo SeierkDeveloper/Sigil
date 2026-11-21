@@ -8,8 +8,8 @@ export const site = {
   description:
     "Sigil is a memory vault encrypted on your own device. Claude, ChatGPT, Cursor and other AI apps read it through one connector, only with the permissions you give, and every read goes on a log you can check.",
   githubUrl: "https://github.com/SeierkDeveloper/Sigil",
-  /** The X account. Fill in the handle when it exists. */
-  xUrl: "https://x.com/",
+  /** The X account. */
+  xUrl: "https://x.com/SigilVault",
   /** Path to the logo file (for example "/logo.svg"). While null, the header shows the text wordmark. */
   logoSrc: "/logo.png" as string | null,
   /** Set to true once the connector is published to npm; the docs then show the npx command. */
