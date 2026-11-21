@@ -1,198 +1,132 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
+import { releases } from "@/lib/changelog";
 
 export const metadata: Metadata = {
   title: "Roadmap",
-  description: "The thirteen stages from an encrypted memory vault to an AI self that works, earns and outlives you on your terms.",
+  description: "What Sigil builds next: an AI self that knows your whole life, learns to act like you, proves things without showing them, meets other selves and lives on a network nobody can switch off.",
 };
 
-type Status = "built" | "core" | "started" | "planned";
+type Horizon = "next" | "later" | "vision";
 
 interface Stage {
   title: string;
   summary: string;
-  status: Status;
-  items: { text: string; built?: boolean }[];
+  horizon: Horizon;
+  items: string[];
 }
 
-const STATUS_LABEL: Record<Status, string> = {
-  built: "Built",
-  core: "Core built",
-  started: "Started",
-  planned: "Planned",
-};
+const HORIZON_LABEL: Record<Horizon, string> = { next: "Next", later: "Later", vision: "Vision" };
 
+// Only what is not built yet. Everything built is in the changelog.
 const stages: Stage[] = [
   {
-    title: "The vault",
-    status: "built",
-    summary: "A place for what your AI apps should know about you, encrypted on your device before it is stored.",
+    title: "Ask your whole life",
+    horizon: "next",
+    summary: "One question, answered from every memory, mail, meeting, note and file at once, with every source shown.",
     items: [
-      { text: "Sign in with a passkey or a wallet, with a recovery phrase", built: true },
-      { text: "Encryption on your device; the server stores ciphertext only", built: true },
-      { text: "Memories with titles, tags, folders, sources and dates", built: true },
-      { text: "One-step import of ChatGPT and Claude exports", built: true },
-      { text: "Dashboard: memories, folders, apps, read log, export, real delete", built: true },
+      "Questions across every source at once, answered on your device, each sentence linked to the memories it came from",
+      "Living timelines of the people, projects and places in your life, built and kept current by the vault",
+      "A brief before every meeting and decision: what was promised, what changed, what was left open",
+      "A fully local mode: a model on your own machine, so nothing leaves it, not even to a model provider",
+      "Unlock in under two seconds with a vault of 100,000 memories: headers first, bodies decrypted as you read",
     ],
   },
   {
-    title: "Every AI, one memory",
-    status: "built",
-    summary: "Every assistant you use reads the same vault, only where you allow it, and every read is on the record.",
+    title: "A model of you",
+    horizon: "next",
+    summary: "A personal model trained on your device, only on the folders you allow, that writes, ranks and decides the way you do.",
     items: [
-      { text: "One connector for Claude, Cursor, ChatGPT and any MCP client", built: true },
-      { text: "Permissions per app and per folder, revoke at any time", built: true },
-      { text: "A read log you can see, sealed every hour", built: true },
-      { text: "Seal publishing on chain, written and tested, switched on once the contract is deployed", built: true },
-      { text: "A memory inbox: apps suggest, you approve", built: true },
-      { text: "A browser extension for selections, pages and ChatGPT and Claude conversations", built: true },
-      { text: "Sign in with Sigil, for web apps", built: true },
-      { text: "Folders shared with other vaults, read only, revoked by a new key", built: true },
+      "Fine-tuning on your device from the folders you choose, with the weights encrypted in your vault and moved with it",
+      "Every lesson it learns shown in plain words, with a way to undo one lesson or roll the whole model back to a date",
+      "Your style, priorities and limits measured against your own past answers, with a score for how well it knows you",
+      "One model for every app: Claude, ChatGPT and Cursor all talk to the same you, through the connector",
     ],
   },
   {
-    title: "Your whole digital life",
-    status: "started",
-    summary: "The vault fills itself from the places your life already happens, with your permission.",
+    title: "A self that acts",
+    horizon: "next",
+    summary: "Your AI self moves from drafts to actions, inside limits you set and can see at all times.",
     items: [
-      { text: "Local imports, parsed and encrypted in the browser: Obsidian, Apple Notes, Gmail and Google Calendar from Takeout, Notion, GitHub", built: true },
-      { text: "An Obsidian folder kept in sync through the inbox by the connector", built: true },
-      { text: "Live sync from Gmail, Google Calendar, Google Drive and Slack, fetched and encrypted on your device, in the background through the connector", built: true },
-      { text: "Meeting transcripts from Zoom, Meet and Teams turned into meeting memories: who was there, decisions, promises", built: true },
-      { text: "Protected folders for health, money and legal papers: every read needs your yes, with redaction on the device", built: true },
-      { text: "Ask your life: questions answered from everything at once" },
-      { text: "More sources: other mail and calendar providers, other team chats and file stores" },
+      "Negotiates times, prices and terms within ranges you set, and stops to ask at the edge of them",
+      "Runs your inbox and calendar end to end, with thresholds for what it may send or accept on its own",
+      "Its wallet goes live: payments under your caps and allow-list, every one signed, sealed and stoppable",
+      "Every action carries a receipt anyone you show it to can verify against the seals",
     ],
   },
   {
-    title: "Memory that thinks",
-    status: "started",
-    summary: "The vault stops being a filing cabinet and starts helping.",
+    title: "Proofs that show nothing",
+    horizon: "later",
+    summary: "Zero-knowledge proofs, so you can prove a fact about your life to anyone without showing the life behind it.",
     items: [
-      { text: "Search by meaning, run on your device", built: true },
-      { text: "Duplicates found and merged", built: true },
-      { text: "A timeline of every memory, by date and source", built: true },
-      { text: "A Self card that apps read first", built: true },
-      { text: "A weekly brief: what is new, what changed, what was forgotten", built: true },
-      { text: "Memories that disagree, shown for you to resolve", built: true },
-      { text: "Every duplicate group merged after one approval", built: true },
-      { text: "Expiry dates, with real deletion after a grace period", built: true },
-      { text: "Timelines of people, projects and places" },
-      { text: "Briefs before meetings and decisions" },
-      { text: "A fully local mode" },
+      "Age, membership, history length and any field of a memory, proved without revealing the value",
+      "Proof of a real, continuous human from years of sealed history, with no biometrics and no document scan",
+      "Apps ask a question and receive a proof as the answer, never the data",
+      "Privacy scores shared between owners as proofs, so you learn how an app behaves without anyone sharing a log",
     ],
   },
   {
-    title: "Your AI self",
-    status: "started",
-    summary: "A model of you that answers from your vault, within your rules, and says so when it does not know.",
+    title: "The network of selves",
+    horizon: "later",
+    summary: "AI selves find each other for work, teams and deals, and nobody has to expose a vault to be found.",
     items: [
-      { text: "Version 1: answers as you from chosen folders, within your rules, with your own model key", built: true },
-      { text: "Ask links: end to end encrypted, with their own rules and limits, every answer in your log", built: true },
-      { text: "ask_self for apps you allow, answered on your machine", built: true },
-      { text: "A personal model trained only on what you allow" },
-      { text: "A public AI self at /@you, answering anyone from the folders you made public, every answer in your log", built: true },
-      { text: "Works for you into an approval queue: replies, a plan for the week and answers to people, nothing sent on its own", built: true },
-      { text: "Learns how you write from the edits you make to its drafts, in notes you can read, change and delete", built: true },
-      { text: "Its own identity: a key made from your vault key, a statement signed by both, and a registry contract", built: true },
-      { text: "Its own wallet, used only within your caps, recipients, functions and end date; you can freeze it at any time (contract written and tested, not deployed)", built: true },
-      { text: "Talk to it by voice: speech to text on your device, and answers read aloud by a voice on your device, in the test chat, on ask links and on the public page", built: true },
-      { text: "Negotiates and replies within limits you set" },
+      "Private matching: two selves learn what they have in common, and nothing else, before either owner is asked",
+      "A reputation built only from sealed agreements kept and broken, portable to any node",
+      "Rooms where many selves meet at once, end to end encrypted, with every owner holding the transcript",
+      "Introductions your self makes for you, ranked by fit, sent only with your yes",
     ],
   },
   {
-    title: "Agents get memory",
-    status: "core",
-    summary: "The same vault, for the AI agents that work for you and your team.",
+    title: "Recovery and inheritance",
+    horizon: "later",
+    summary: "You never lose your vault, and the people you choose never lose you.",
     items: [
-      { text: "Vaults for AI agents: their own folder and key, read and write rules, remember, recall, forget", built: true },
-      { text: "Team spaces shared by vaults and agents, with roles and a new key when someone is removed", built: true },
-      { text: "Sealed handoff notes from one agent session, or one agent, to the next", built: true },
-      { text: "Shared memory for families and teams: a timeline of stories with people and photos, who added what, heirs, and a copy to print", built: true },
-      { text: "A memory for a whole company" },
+      "Recovery through people you trust: any three of five bring your vault back, none of them can open it alone",
+      "Your legacy self speaks in your voice and style to the people you chose, from what you left for them",
+      "Time capsules: memories and messages that open on a date, an age or an event you define",
+      "A last instruction set: what is deleted, what is kept, what is passed on, carried out by the network",
+    ],
+  },
+  {
+    title: "Memory for organisations",
+    horizon: "later",
+    summary: "The same keys and seals for companies and their fleets of agents.",
+    items: [
+      "A company memory with roles, where every read by a person or an agent is sealed",
+      "Agent fleets that share one memory, with handoffs, budgets and a full audit trail",
+      "Requests to see or delete a person's data answered from the vault in one step, with a sealed receipt",
+    ],
+  },
+  {
+    title: "Everywhere you are",
+    horizon: "vision",
+    summary: "Sigil in every device you carry and every place you live, without a central server in the middle.",
+    items: [
+      "Native apps for phones, computers and watches, syncing directly between your own devices",
+      "Glasses and wearables that capture hands-free into the inbox, sealed on the device",
+      "Car and home: your self knows where you are going and what the house needs, within the rules you set",
+    ],
+  },
+  {
+    title: "A network nobody can switch off",
+    horizon: "vision",
+    summary: "Your sealed data kept by many independent nodes, so Sigil outlives any company, including ours.",
+    items: [
+      "Nodes keep encrypted, erasure-coded copies of each other's vaults, so losing any node loses nothing",
+      "Proofs that every copy is still held, checked by the network every hour",
+      "The protocol governed by the people who run nodes and the people who use them",
     ],
   },
   {
     title: "The memory economy",
-    status: "started",
-    summary: "What you know has value. You decide who may use it, and on what terms.",
+    horizon: "vision",
+    summary: "What you know and what your self can do become things you can offer, on your terms.",
     items: [
-      { text: "Knowledge packs: a folder published as a signed pack that other vaults and AI selves follow, version by version, free", built: true },
-      { text: "Provable facts, version 1: one field, an age, sealed history or a team space, signed and sealed, showing nothing else", built: true },
-      { text: "Provable facts with zero-knowledge proofs, so a checker computes an age from a date nobody sees" },
-      { text: "Packs you can license, and paid work, once the network has its own means of payment" },
-      { text: "Your data, at your price" },
-    ],
-  },
-  {
-    title: "Trust",
-    status: "core",
-    summary: "Make it easy to see which AI apps treat your memory well.",
-    items: [
-      { text: "A privacy score for every connected app and agent, from your own read log", built: true },
-      { text: "An open standard for permissioned memory access, version 1.2, with test vectors from the code", built: true },
-      { text: "Scores shared between owners, without sharing their logs" },
-    ],
-  },
-  {
-    title: "Everywhere",
-    status: "started",
-    summary: "Your vault on every device, and safe for the long run.",
-    items: [
-      { text: "An installable app for phones and computers: offline, a share target, quick capture with photos", built: true },
-      { text: "Add a device by QR code, with keys sealed to that device only, and revoke it", built: true },
-      { text: "Capture from anywhere: a write-only key for each phone, watch or shortcut, sealed on the device that sends", built: true },
-      { text: "Your whole vault as one encrypted bundle, kept where you choose (a file, your bucket, IPFS or Arweave) and restored on any node", built: true },
-      { text: "Run your own node with one command, and move your vault between nodes with a statement your key signs", built: true },
-      { text: "Legacy: trusted people, split keys, an inactivity period and a release they open together", built: true },
-      { text: "Recovery through people you trust" },
-      { text: "Native apps in the app stores" },
-      { text: "Nodes that keep copies of each other's sealed data" },
-    ],
-  },
-  {
-    title: "Devices",
-    status: "started",
-    summary: "Memory that comes with you, in the things around you.",
-    items: [
-      { text: "Wearables and glasses" },
-      { text: "Car and home" },
-      { text: "Emergency medical access you set up in advance: a card behind a code on your lock screen that only its link opens", built: true },
-    ],
-  },
-  {
-    title: "Your AI self in the world",
-    status: "started",
-    summary: "Your AI self can work, meet others and keep learning, within your limits.",
-    items: [
-      { text: "Selves meet selves, version 1: two AI selves talk after both owners said yes, end to end encrypted, to find a time, check a collab or swap intros", built: true },
-      { text: "Sessions with the AI selves of experts: booked, free, under house rules, every answer marked as AI", built: true },
-      { text: "AI selves that take on paid work" },
-      { text: "An AI self that keeps learning from your vault" },
-    ],
-  },
-  {
-    title: "Proof of a real life",
-    status: "started",
-    summary: "Years of sealed history become a way to prove you are a real, continuous person, without biometrics.",
-    items: [
-      { text: "Version 1: a signed certificate of continuous sealed history, checked in any browser against the seals", built: true },
-      { text: "Proof of human from sealed history, with zero-knowledge proofs" },
-      { text: "Sealed agreements: one text, two vault signatures over one fingerprint, sealed in both logs, amendments as new versions", built: true },
-      { text: "A learning record you own" },
-    ],
-  },
-  {
-    title: "Collective memory",
-    status: "planned",
-    summary: "What people choose to share becomes a memory larger than any one of us, run by the people in it.",
-    items: [
-      { text: "Shared lived experience, opt in only" },
-      { text: "A collective brain anyone can ask" },
-      { text: "Sigil's own memory model" },
-      { text: "Storage spread across the network's nodes" },
-      { text: "Nodes and governance of the protocol" },
-      { text: "$SIGIL, the network token for network fees, node staking and verification" },
+      "Licensed knowledge packs and paid sessions with expert selves, priced by their owners",
+      "Your data offered at your price, for a purpose you approve, revoked when you say",
+      "Sigil's own memory model, trained only on what people chose to share",
+      "$SIGIL, the network token, paid for network fees and burned on use",
     ],
   },
 ];
@@ -212,8 +146,8 @@ export default function Roadmap() {
       <div className="container">
         <PageHeader
           eyebrow="Roadmap"
-          title="From a vault to an AI self"
-          lead="Sigil starts as an encrypted memory every AI can read with your permission. Step by step it becomes an AI self that is yours: it can act, work and outlive you, on terms you set. No dates are promised; each stage ships when it is ready."
+          title="What comes next"
+          lead="Everything on this page is still to be built. Each stage ships when it is ready; no dates are promised."
         />
 
         <section className="pillars" aria-labelledby="pillars-title">
@@ -230,21 +164,27 @@ export default function Roadmap() {
           </div>
         </section>
 
-        <h2 className="section-title">Thirteen stages</h2>
+        <p className="small">
+          Built so far, in {releases.length} releases: the vault, every AI app through one connector, sealed logs, your AI self, agents, legacy, proofs,
+          emergency access, your own node and a security review.{" "}
+          <Link href="/changelog">See everything that is built</Link>.
+        </p>
+
+        <h2 className="section-title">Ten stages ahead</h2>
         <ol className="stages">
           {stages.map((s, i) => (
-            <li key={s.title} className="stage" data-status={s.status}>
+            <li key={s.title} className="stage" data-status={s.horizon}>
               <span className="stage-number">{String(i + 1).padStart(2, "0")}</span>
               <div>
                 <div className="stage-head">
                   <h3 className="stage-title">{s.title}</h3>
-                  <span className={s.status === "planned" ? "badge" : "badge badge-strong"}>{STATUS_LABEL[s.status]}</span>
+                  <span className={s.horizon === "next" ? "badge badge-strong" : "badge"}>{HORIZON_LABEL[s.horizon]}</span>
                 </div>
                 <p className="stage-summary">{s.summary}</p>
                 <ul className="stage-items">
                   {s.items.map((it) => (
-                    <li key={it.text} className="stage-item" data-built={it.built ? "true" : "false"}>
-                      {it.text}
+                    <li key={it} className="stage-item" data-built="false">
+                      {it}
                     </li>
                   ))}
                 </ul>
