@@ -19,6 +19,7 @@ docs/readme
 packages/sdk
 packages/core/test
 web/test
+web/perf
 coverage
 test-results
 playwright-report
