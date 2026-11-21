@@ -69,8 +69,11 @@ describe("copy rules", () => {
   });
 
   it("contains no email addresses", () => {
-    // The test vectors hold a made-up address on purpose: the redaction rules must mask it.
-    const bad = all.filter((f) => !f.endsWith("vectors.json") && /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(readFileSync(f, "utf8").replace(/@[a-z0-9-]+\/[a-z0-9-]+/g, "")));
+    // The test vectors hold a made-up address on purpose: the redaction rules must mask it. The one address allowed
+    // is the project's own address for security reports (a role, not a person), marked as a placeholder until confirmed.
+    const bad = all.filter(
+      (f) => !f.endsWith("vectors.json") && /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(readFileSync(f, "utf8").replace(/@[a-z0-9-]+\/[a-z0-9-]+/g, "").replace(/security@sigil\.fun/g, "")),
+    );
     expect(bad).toEqual([]);
   });
 });

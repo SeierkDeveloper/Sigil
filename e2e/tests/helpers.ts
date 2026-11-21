@@ -90,13 +90,17 @@ export async function confirmPhrase(page: Page, phrase: string) {
  * there, otherwise through More. Every deep link still works the same.
  */
 export async function openTab(page: Page, name: string | RegExp) {
-  const tab = page.getByRole("tablist", { name: "Vault sections" }).getByRole("tab", { name });
+  // A tab's name may carry a count after it ("Inbox 1 waiting"); match the label at its start.
+  const label = typeof name === "string" ? new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`) : name;
+  const row = page.getByRole("tablist", { name: "Vault sections" });
+  await row.waitFor();
+  const tab = row.getByRole("tab", { name: label });
   if (await tab.count()) {
     await tab.first().click();
     return;
   }
   await page.getByTestId("tab-more").click();
-  await page.getByRole("navigation", { name: "More sections" }).getByRole("button", { name, exact: typeof name === "string" }).first().click();
+  await page.getByRole("navigation", { name: "More sections" }).getByRole("button", { name: label }).first().click();
 }
 
 /** Connects an app from the Apps tab and returns its key. Folders by name; suggestions on or off. */
