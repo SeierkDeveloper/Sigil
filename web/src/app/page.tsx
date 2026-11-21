@@ -651,8 +651,8 @@ export default function Home() {
             <p className="eyebrow">Where this goes</p>
             <h2 className="section-title">From a vault to an AI self</h2>
             <p className="section-lead">
-              The vault is the first stage, and the first version of your AI self is here: it answers as you, within your rules, with your own
-              model key, and it can outlive you on terms you set in advance. Over time it could work and earn for you.
+              Your AI self already answers as you, within your rules, and can outlive you on terms you set in advance. Next it learns to know
+              your whole life, think like you and act for you.
             </p>
             <div className="hero-actions">
               <Link href="/ai-self" className="button">
@@ -667,23 +667,22 @@ export default function Home() {
             <li>
               <CheckIcon />
               <span>
-                <strong>Built:</strong> the encrypted vault, imports, folders and the dashboard.
+                <strong>Built:</strong> the vault, one connector for every AI app, sealed logs, your AI self with ask links, voice and a public page,
+                live sync, agents and team spaces, legacy, proofs, emergency access, your own node and a full security review.
               </span>
             </li>
             <li>
               <CheckIcon />
               <span>
-                <strong>Built:</strong> one connector for every MCP client, per-app permissions, revoke, the read log and hourly seals, the memory
-                inbox, the browser extension, Sign in with Sigil and folders shared between vaults.
+                <strong>Next:</strong> ask your whole life in one question, a personal model of you trained on your device, and a self that acts
+                within limits you set.
               </span>
             </li>
             <li>
               <CheckIcon />
               <span>
-                <strong>Started:</strong> memory that thinks (search by meaning on your device, a timeline, duplicates, a Self card, a weekly brief,
-                memories that disagree, expiry), your whole digital life (local imports from notes, mail, calendar and code), your AI self, version
-                1, with ask links, legacy, the installable app with devices added by code, agent vaults with team spaces, and life certificates.{" "}
-                <strong>Next:</strong> seals published on chain, and live sync.
+                <strong>Later:</strong> proofs that show nothing, a network of selves, recovery through people you trust, and a network nobody can
+                switch off.
               </span>
             </li>
           </ul>
