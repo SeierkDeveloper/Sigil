@@ -33,6 +33,8 @@ const serverEnv = (port: number, dir: string) => ({
   SIGIL_SLACK_CLIENT_ID: "1234.5678",
   // The two nodes run on this machine and talk to each other over localhost.
   SIGIL_NODE_ALLOW_PRIVATE: "on",
+  // The immune system's public test, against the deterministic test model: no call leaves the node.
+  SIGIL_IMMUNE_MODEL: "stub",
   ...TEST_MODEL,
 });
 

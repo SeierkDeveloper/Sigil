@@ -13,10 +13,11 @@ import { AAD } from "./keys";
  * backup    where the vault's bundles are stored, with the owner's storage tokens, and how often
  * voice     whether the test chat listens and speaks
  * guide     how far the owner got in the getting-started guide
+ * immune    how strictly memories from outside are checked for hidden instructions
  */
-export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs" | "backup" | "voice" | "guide";
+export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs" | "backup" | "voice" | "guide" | "immune";
 
-export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs", "backup", "voice", "guide"];
+export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs", "backup", "voice", "guide", "immune"];
 
 export function isSettingName(value: string): value is SettingName {
   return (SETTING_NAMES as readonly string[]).includes(value);

@@ -8,7 +8,7 @@ import path from "node:path";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 8;
+const SCHEMA_VERSION = 9;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -787,6 +787,16 @@ CREATE TABLE IF NOT EXISTS space_heirs (
   UNIQUE (space_id, public_key)
 );
 
+-- The immune system's public test: one record per hour (each strain, how it
+-- varied, whether it was held and by what). Its leaf joins that hour's seal.
+CREATE TABLE IF NOT EXISTS immune_records (
+  hour INTEGER PRIMARY KEY,
+  record TEXT NOT NULL,
+  leaf TEXT NOT NULL,
+  sealed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+
 -- Public: one Merkle root per hour with reads in it.
 CREATE TABLE IF NOT EXISTS seals (
   hour INTEGER PRIMARY KEY,
@@ -821,7 +831,7 @@ CREATE TABLE IF NOT EXISTS read_log (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   app_id TEXT NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync', 'identity', 'work', 'disclose', 'emergency', 'agreement', 'pack', 'backup', 'node', 'capture', 'session')),
+  kind TEXT NOT NULL CHECK (kind IN ('folders', 'index', 'read', 'propose', 'shared', 'ask', 'legacy', 'device', 'presence', 'remember', 'forget', 'handoff', 'space', 'protected', 'approval', 'public', 'meet', 'sync', 'identity', 'work', 'disclose', 'emergency', 'agreement', 'pack', 'backup', 'node', 'capture', 'session', 'injection')),
   memory_id TEXT,
   count INTEGER NOT NULL,
   at TEXT NOT NULL,
@@ -841,7 +851,7 @@ CREATE INDEX IF NOT EXISTS read_log_by_kind ON read_log (user_id, kind, hour);
 /** Older versions allowed fewer kinds in the log and had no notes. Rebuild the table, keeping every row. */
 function migrateReadLog(db: Db): void {
   const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'read_log'").get() as { sql?: string } | undefined;
-  if (!row?.sql || row.sql.includes("'session'")) return;
+  if (!row?.sql || row.sql.includes("'injection'")) return;
   const hasNote = row.sql.includes("note TEXT");
   const hasCarried = row.sql.includes("carried TEXT");
   db.exec("BEGIN IMMEDIATE");

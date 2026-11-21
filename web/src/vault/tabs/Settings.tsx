@@ -11,6 +11,7 @@ import { errorText, useVault } from "../context";
 import { download, Notice } from "../ui";
 import { clearVectorCache } from "../semantic";
 import { guideOpen, saveGuide } from "../guideOps";
+import { ImmuneSettingsSection } from "./ImmuneSettings";
 import { newGuide } from "@sigil/core";
 
 const CONFIRM_WORDS = "delete my vault";
@@ -223,6 +224,8 @@ export function SettingsTab({ onDeleted }: { onDeleted(): void }) {
           </button>
         </div>
       </section>
+
+      <ImmuneSettingsSection />
 
       <section className="settings-section" aria-labelledby="s-guide">
         <h2 id="s-guide" className="panel-title">

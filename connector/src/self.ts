@@ -107,7 +107,7 @@ export class SelfAgent {
     const byId = new Map(ranked.map((h) => [h.id, h]));
     const memories: SelfMemory[] = full.map((m) => {
       const h = byId.get(m.id)!;
-      return { id: m.id, folderId: h.folderId, folder: m.folder, title: m.title, tags: m.tags, body: m.body, editedAt: m.editedAt };
+      return { id: m.id, folderId: h.folderId, folder: m.folder, title: m.title, tags: m.tags, body: m.body, editedAt: m.editedAt, ...(m.kind ? { source: { kind: m.kind } } : {}), ...(m.cleared ? { cleared: m.cleared } : {}) };
     });
     // Keep the ranking order from above.
     memories.sort((a, b) => ranked.findIndex((h) => h.id === a.id) - ranked.findIndex((h) => h.id === b.id));

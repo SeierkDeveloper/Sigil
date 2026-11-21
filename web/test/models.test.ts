@@ -95,11 +95,12 @@ describe("upgrading the database", () => {
     db.prepare("INSERT INTO read_log VALUES ('e5', 'u1', 'a1', 'protected', 'm1', 1, '2026-01-01T00:00:03.000Z', 'ff', '0x05', 5, 0, NULL, NULL)").run();
     db.prepare("INSERT INTO read_log VALUES ('e6', 'u1', 'vault', 'disclose', '0x06', 1, '2026-01-01T00:00:04.000Z', 'ff', '0x06', 5, 0, NULL, NULL)").run();
     db.prepare("INSERT INTO read_log VALUES ('e7', 'u1', 'vault', 'backup', '0x07', 1, '2026-01-01T00:00:05.000Z', 'ff', '0x07', 5, 1, NULL, '{\"origin\":\"https://old.example\",\"unsealed\":true}')").run();
-    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(8);
+    db.prepare("INSERT INTO read_log VALUES ('e8', 'u1', 'immune', 'injection', 'quarantine', 1, '2026-01-01T00:00:06.000Z', 'ff', '0x08', 5, 0, NULL, NULL)").run();
+    expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(9);
     db.close();
     // Opening again changes nothing.
     const again = openDb(file);
-    expect(again.prepare("SELECT COUNT(*) AS n FROM read_log").get()).toEqual({ n: 6 });
+    expect(again.prepare("SELECT COUNT(*) AS n FROM read_log").get()).toEqual({ n: 7 });
     again.close();
   });
 

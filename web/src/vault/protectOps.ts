@@ -9,7 +9,7 @@
 // way an app does, and marks the yes used when it reads, so the read log shows
 // the same record either way.
 
-import { cleanGuard, guardFolder, randomId, redactMemory, type FolderGuard, type OpenFolder, type SelfMemory, type SelfRules } from "@sigil/core";
+import { cleanGuard, clearedHash, guardFolder, randomId, redactMemory, type FolderGuard, type OpenFolder, type SelfMemory, type SelfRules } from "@sigil/core";
 import { retrieve } from "@sigil/core";
 import type { Api } from "./api";
 import type { VaultData } from "./ops";
@@ -67,7 +67,9 @@ export function guardedMemories(data: Pick<VaultData, "memories" | "folders">, o
     .map((m) => {
       const f = folders.get(m.folderId);
       const r = redactMemory({ title: m.title, body: m.body, tags: m.tags }, f?.redact);
-      return { id: m.id, folderId: m.folderId, folder: f?.name ?? "", title: r.title, tags: r.tags ?? [], body: r.body, editedAt: m.editedAt, expiresAt: m.expiresAt };
+      // An approval holds for the text the owner approved; redacting it does not undo the approval.
+      const cleared = m.cleared && m.cleared === clearedHash(m.body) ? clearedHash(r.body) : undefined;
+      return { id: m.id, folderId: m.folderId, folder: f?.name ?? "", title: r.title, tags: r.tags ?? [], body: r.body, editedAt: m.editedAt, expiresAt: m.expiresAt, source: { kind: m.source.kind }, ...(cleared ? { cleared } : {}) };
     });
 }
 

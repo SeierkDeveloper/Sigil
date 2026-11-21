@@ -168,7 +168,7 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
 test("the open standard reads as one document: its facts, numbered contents and every part, on a phone too", async ({ page }) => {
   await page.goto("/spec");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("The Sigil open standard");
-  await expect(page.locator(".spec-sheet")).toContainText("Version1.2.0");
+  await expect(page.locator(".spec-sheet")).toContainText("Version1.3.0");
   const contents = page.getByRole("navigation", { name: "Parts of the standard" });
   await expect(contents.locator(".spec-index > li")).toHaveCount(14);
   await expect(page.locator(".spec-part")).toHaveCount(13);

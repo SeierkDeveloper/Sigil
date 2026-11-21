@@ -16,6 +16,7 @@ import { formatDate, formatDateTime, plural } from "@/lib/format";
 import * as selfOps from "../selfOps";
 import type { AskLinkView } from "../ops";
 import { errorText, useVault } from "../context";
+import { reportCaught } from "../immuneOps";
 import { ChatGptIcon, ClaudeIcon, DeviceIcon } from "@/components/icons";
 import { AppMark } from "../marks";
 import { Band, CopyButton, Empty, Notice, PlateHead, Quiet } from "../ui";
@@ -434,6 +435,7 @@ function TestChat() {
         { embedQuery: semantic.embedQuery, vectors: semantic.vectors },
         open,
       );
+      if (answer.caught) reportCaught(api, "self", answer.caught.held + answer.caught.neutralised);
       setTurns((t) => [...t, { question: text.trim(), answer }]);
       setQuestion("");
     } catch (err) {

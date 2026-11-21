@@ -5,6 +5,7 @@
 // checking the vault vouched for that key. Nothing is cached between calls, so
 // a revoked key stops working on the very next request.
 
+import { clearedHash, flagged, isHeld, neutralise, reasons, scanMemory, scanText, stripHidden, TRUSTED_SOURCES } from "./immune";
 import { decodeBoxPublicKey, verifyAppBoxTag } from "./box";
 import { randomId, importKey } from "./crypto";
 import { cleanProposal, sealProposal, type ProposalDraft, type ProposalVia } from "./inbox";
@@ -22,6 +23,7 @@ import {
   type MemoryHead,
   type MemorySource,
   type OpenFolder,
+  type SourceKind,
 } from "./vault";
 
 export type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
@@ -113,6 +115,17 @@ export interface FullMemory {
   createdAt: string;
   editedAt: string;
   body: string;
+  /** Where it came from, for the immune system. */
+  kind?: SourceKind;
+  /** Set when the owner approved this memory after a hold. */
+  cleared?: string;
+}
+
+/** A memory the immune system held back for the owner's review: it never reaches the model. */
+export interface WithheldMemory {
+  id: string;
+  title: string;
+  reasons: string[];
 }
 
 export interface ClientOptions {
@@ -222,7 +235,9 @@ export class VaultClient {
       // An expired memory waits in the owner's Expired view and is not offered to apps.
       if (head.expiresAt && new Date(head.expiresAt).getTime() <= Date.now()) continue;
       const { body: _body, ...masked } = redactMemory({ ...head, body: "" }, folder.redact);
-      out.push({ ...masked, id: m.id, folderId: folder.id, folder: folder.name });
+      // What the heads show (title and first lines) is checked too; a held one is not offered at all.
+      if (!TRUSTED_SOURCES.includes(head.source.kind) && !head.cleared && flagged(scanText(`${head.title}\n${head.snippet}`), "normal")) continue;
+      out.push({ ...masked, title: stripHidden(masked.title), snippet: stripHidden(masked.snippet), id: m.id, folderId: folder.id, folder: folder.name });
     }
     return out;
   }
@@ -243,28 +258,52 @@ export class VaultClient {
    * read is written to the owner's read log. Memories in a protected folder
    * come back in `held` until the owner says yes for this read.
    */
-  async read(ids: string[]): Promise<{ memories: FullMemory[]; missing: string[]; held: HeldRead[] }> {
+  async read(ids: string[]): Promise<{ memories: FullMemory[]; missing: string[]; held: HeldRead[]; withheld: WithheldMemory[] }> {
     const r = await this.call<{ folders: WireFolder[]; memories: WireMemory[]; missing: string[]; held?: WireHeld[] }>("POST", "read", { ids });
     const folders = await this.openFolders(r.folders);
     const memories: FullMemory[] = [];
+    const withheld: WithheldMemory[] = [];
+    let neutralised = 0;
     for (const m of r.memories) {
       const folder = folders.get(m.folderId);
       if (!folder) continue;
-      const full = redactMemory(await decryptMemory(folder, m), folder.redact);
+      const opened = await decryptMemory(folder, m);
+      // The immune system, on this machine: a memory from outside with hidden instructions does not reach the model until the owner approves it in the vault.
+      if (isHeld(opened)) {
+        withheld.push({ id: opened.id, title: stripHidden(opened.title), reasons: reasons(scanMemory(opened)) });
+        continue;
+      }
+      const approved = !!opened.cleared && opened.cleared === clearedHash(opened.body);
+      const full = redactMemory(opened, folder.redact);
+      // Below the hold level, flagged places are still replaced before any model sees them.
+      const clean = approved || TRUSTED_SOURCES.includes(full.source.kind) ? { text: stripHidden(full.body), removed: 0 } : neutralise(full.body);
+      if (clean.removed) neutralised++;
       memories.push({
         id: full.id,
-        title: full.title,
+        title: stripHidden(full.title),
         folder: folder.name,
         tags: full.tags,
         source: sourceLabel(full.source),
         createdAt: full.createdAt,
         editedAt: full.editedAt,
-        body: full.body,
+        body: clean.text,
+        kind: full.source.kind,
+        ...(approved ? { cleared: clearedHash(clean.text) } : {}),
       });
     }
+    if (withheld.length || neutralised) void this.reportCaught(withheld.length + neutralised);
     const held = (r.held ?? []).map((h) => ({ folderId: h.folderId, folder: "a protected folder", memoryIds: h.memoryIds ?? [], requestId: h.requestId, state: h.state }));
     this.lastHeld = held;
-    return { memories, missing: r.missing, held };
+    return { memories, missing: r.missing, held, withheld };
+  }
+
+  /** Puts what the immune system caught on the owner's record: a count, never the text. */
+  protected async reportCaught(count: number): Promise<void> {
+    try {
+      await this.call("POST", "immune", { where: "connector", count: Math.min(count, 10_000) });
+    } catch {
+      // The record is best effort; the memory stays withheld either way.
+    }
   }
 
   /** The Self card, when this app may read its folder. Null when it may not, or none exists. */

@@ -155,6 +155,7 @@ import { assertNotMoved, cancelMove, fetchMove, fetchRemote, finishMove, health,
 import { captureByToken, captureInto, captureText, captureVaultKey, createCaptureKey, listCaptureKeys, revokeCaptureKey, type CaptureAuth } from "./captures";
 import { askInSession, book, closeSession, ownerSessions, publicOffer, saveOffer, sessionQuestionStatus, sessionStatus } from "./sessions";
 import { addHeir, leaveSpace, removeHeir } from "./spaces";
+import { immuneRounds } from "./immune";
 
 // ---------------------------------------------------------------- input shapes
 
@@ -1935,6 +1936,34 @@ route("POST", "sessions/:id/questions", async (ctx, [bookingId]) => {
 route("GET", "sessions/:id/questions/:qid", (ctx, [bookingId, questionId]) => {
   rateLimit(`session-poll:${clientIp(ctx.req)}`, 240, 60_000);
   return json(sessionQuestionStatus(ctx.db, bookingId, sessionBearer(ctx), questionId));
+});
+
+// ---- the immune system: what it caught goes on the record (counts only; the content never leaves the device)
+
+const caughtShape = z.object({ where: z.enum(["quarantine", "self", "link", "public", "session", "meet", "legacy", "connector", "proposal"]), count: z.number().int().min(1).max(10_000), ref: z.string().regex(/^[A-Za-z0-9_-]{0,64}$/).optional() });
+
+route("POST", "immune/caught", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`immune:${userId}`, 60, 60_000);
+  const body = parse(caughtShape, await readJson(ctx.req, 2 * KB));
+  logRead(ctx.db, { appId: "immune", userId }, "injection", body.ref ? `${body.where}-${body.ref}` : body.where, body.count);
+  return json({ ok: true }, 201);
+});
+
+route("POST", "connector/v1/immune", async (ctx) => {
+  const auth = appOf(ctx);
+  rateLimit(`immune:${auth.appId}`, 60, 60_000);
+  const body = parse(caughtShape, await readJson(ctx.req, 2 * KB));
+  logRead(ctx.db, auth, "injection", body.ref ? `${body.where}-${body.ref}` : body.where, body.count);
+  return json({ ok: true }, 201);
+});
+
+// The public record of the immune system's hourly test. Anyone may read it and check each round against its seal.
+route("GET", "immune", (ctx) => {
+  rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
+  sealPending(ctx.db);
+  const limit = Math.min(Math.max(Number(ctx.url.searchParams.get("limit")) || 24, 1), 168);
+  return json(immuneRounds(ctx.db, limit), 200, { "access-control-allow-origin": "*" });
 });
 
 // ---- voice: the speech model the page loads when someone turns voice on

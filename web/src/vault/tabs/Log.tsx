@@ -27,6 +27,19 @@ const LEGACY_STEPS: Record<string, string> = {
   read: "A trusted person read the folders you left them",
 };
 
+/** Where the immune system caught something, as the log names it. */
+const IMMUNE_WHERE: Record<string, string> = {
+  quarantine: "and held them for your review",
+  self: "and kept them from your AI self",
+  link: "and kept them from an ask link",
+  public: "and kept them from your public AI self",
+  session: "and kept them from a session",
+  meet: "and kept them from a meet",
+  legacy: "and kept them from legacy mode",
+  connector: "and kept them from a connected app",
+  proposal: "in a suggestion to your inbox",
+};
+
 export function LogTab() {
   const { api, data, goTo } = useVault();
   const [log, setLog] = useState<ops.LogData | null>(null);
@@ -215,6 +228,10 @@ export function LogTab() {
       if (step.startsWith("ended-")) return "You ended a session";
       if (step.startsWith("blocked-")) return "You ended a session and blocked its visitor";
       return "A step of a session";
+    }
+    if (e.kind === "injection") {
+      const where = IMMUNE_WHERE[step.split("-")[0]] ?? "before a model saw them";
+      return `Caught hidden instructions in ${plural(e.count, "memory", "memories")}, ${where}`;
     }
     if (e.kind === "sync") return step.startsWith("wrote-") ? `Wrote ${plural(e.count, "memory", "memories")} from live sync, in the background` : `Removed ${plural(e.count, "memory", "memories")} that are gone at the source`;
     if (e.kind === "propose") return "Suggested a memory to your inbox";

@@ -43,6 +43,7 @@ import {
   type ThinkingSettings,
 } from "@sigil/core";
 import type { Api } from "./api";
+import { reportCaught } from "./immuneOps";
 import { profileMemory, type AppView, type AskLinkView, type Unlocked, type VaultData } from "./ops";
 import { ASKED_TEXT, guardedMemories, protectedGate } from "./protectOps";
 
@@ -115,6 +116,7 @@ export async function askInVault(
     asker: "owner",
     queryVector,
     vectors: deps.vectors,
+    immune: data.immune,
   });
 }
 
@@ -287,6 +289,8 @@ export async function composeLinkAnswer(api: Api, data: VaultData, q: PendingQue
       asker: "guest",
       queryVector,
       vectors: deps.vectors,
+      immune: data.immune,
+      onCaught: (c) => reportCaught(api, "link", c.held + c.neutralised, q.linkId),
     });
     if (gate.extra.length) await gate.use(gate.extra.map((m) => m.id));
     const text = withoutCitations(a.text);

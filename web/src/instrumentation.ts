@@ -16,6 +16,7 @@ export async function register() {
   const { legacyTick } = await import("./server/legacy");
   const { moveTick } = await import("./server/nodes");
   const { heirsTick } = await import("./server/spaces");
+  const { immuneTick } = await import("./server/immune");
 
   // Clear words at start for the two mistakes that break a hosted node quietly.
   if (process.env.NODE_ENV === "production" && !serverConfig.origin) {
@@ -43,6 +44,8 @@ export async function register() {
       heirsTick(db);
       moveTick(db);
       db.prepare("DELETE FROM device_pairings WHERE expires_at < ?").run(Date.now());
+      // The immune system's public test, once an hour, when it is switched on.
+      await immuneTick(db).catch((err) => console.error("[sigil] immune round failed", err));
       if (anchorStatus().mode === "anchored") await anchorPending(db);
     } catch (err) {
       console.error("[sigil] seal job failed", err);

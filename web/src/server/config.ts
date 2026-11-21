@@ -119,5 +119,21 @@ export const serverConfig = {
     const n = Number(process.env.SIGIL_PROXY_HOPS);
     return process.env.SIGIL_PROXY_HOPS?.trim() && Number.isInteger(n) && n >= 0 && n <= 5 ? n : 1;
   },
+  /**
+   * The model the hourly public test of the immune system runs against. Unset:
+   * the test is off. "stub": a deterministic test model that follows every
+   * instruction it can read, so only Sigil's own defences can hold (no call
+   * leaves the node). A key (Anthropic or OpenAI): that model, called by the
+   * node once per strain each hour, at the cost of the key's owner.
+   */
+  get immuneModel(): { kind: "stub" } | { kind: "model"; provider: "anthropic" | "openai"; apiKey: string; model: string } | null {
+    const v = process.env.SIGIL_IMMUNE_MODEL?.trim() ?? "";
+    if (!v || v === "off") return null;
+    if (v === "stub") return { kind: "stub" };
+    const provider = v.startsWith("sk-ant-") ? "anthropic" : v.startsWith("sk-") ? "openai" : null;
+    if (!provider) return null;
+    const name = process.env.SIGIL_IMMUNE_MODEL_NAME?.trim();
+    return { kind: "model", provider, apiKey: v, model: name && /^[A-Za-z0-9._:/-]{1,100}$/.test(name) ? name : "" };
+  },
   sessionDays: 30,
 };

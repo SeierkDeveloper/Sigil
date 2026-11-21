@@ -4,7 +4,9 @@
 
 import {
   cleanGuide,
+  cleanImmune,
   type GuideState,
+  type ImmuneSettings,
   appBoxTag,
   buildMemory,
   buildProfileBody,
@@ -95,6 +97,9 @@ import { DEFAULT_WORK, type FollowedPack, type WalletRules, type WorkSettings } 
 
 // ---------------------------------------------------------------- types
 
+
+/** How many memories are opened at once when the vault loads. */
+const DECRYPT_BATCH = 256;
 export interface Unlocked {
   raw: Uint8Array;
   key: CryptoKey;
@@ -200,6 +205,8 @@ export interface VaultData {
   thinking: ThinkingSettings;
   /** The getting-started guide: null for a vault made before it existed, or when it could not be opened. */
   guide: GuideState | null;
+  /** How strictly memories from outside are checked for hidden instructions. */
+  immune: ImmuneSettings;
   askLinks: AskLinkView[];
   /** When the vault's first folder was made: the vault's age, for the first weekly brief. */
   createdAt: string | null;
@@ -499,14 +506,23 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     }
   }
   const byId = new Map(folders.map((f) => [f.id, f]));
+  // Decrypted in batches that run side by side: one memory after another would wait on each in turn.
   const memories: Memory[] = [];
-  for (const m of data.memories) {
-    const folder = byId.get(m.folderId);
-    try {
-      if (!folder) throw new Error("missing folder");
-      memories.push(await decryptMemory(folder, m));
-    } catch {
-      unreadable++;
+  for (let i = 0; i < data.memories.length; i += DECRYPT_BATCH) {
+    const opened = await Promise.all(
+      data.memories.slice(i, i + DECRYPT_BATCH).map(async (m) => {
+        const folder = byId.get(m.folderId);
+        try {
+          if (!folder) throw new Error("missing folder");
+          return await decryptMemory(folder, m);
+        } catch {
+          return null;
+        }
+      }),
+    );
+    for (const m of opened) {
+      if (m) memories.push(m);
+      else unreadable++;
     }
   }
   memories.sort((a, b) => (a.editedAt < b.editedAt ? 1 : a.editedAt > b.editedAt ? -1 : 0));
@@ -669,6 +685,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   unreadable += booked.unreadable;
   const voice = await later(async () => (settings.voice ? (await openSetting<{ on?: boolean }>(vault.key, "voice", settings.voice)).on === true : false), false);
   const guide = await later(async () => (settings.guide ? cleanGuide(await openSetting<unknown>(vault.key, "guide", settings.guide)) : null), null);
+  const immune = await later(async () => cleanImmune(settings.immune ? await openSetting<unknown>(vault.key, "immune", settings.immune) : null), cleanImmune(null));
 
   return {
     access: data.access ?? [],
@@ -711,6 +728,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     self,
     thinking,
     guide,
+    immune,
     askLinks,
     createdAt: data.folders.reduce<string | null>((min, f) => (!min || f.createdAt < min ? f.createdAt : min), null),
   };
@@ -783,6 +801,8 @@ export async function updateMemory(
   );
   const folder = folders.find((f) => f.id === next.folderId);
   if (!folder) throw new Error("That folder no longer exists.");
+  // An approval by the immune system's review stays while the text it approved stays.
+  if (memory.cleared && next.body === memory.body) next.cleared = memory.cleared;
   // Moving to another folder re-encrypts the memory under that folder's key.
   return saveMemory(api, folder, next, graceDays);
 }

@@ -42,6 +42,7 @@ For an answer of an AI self (`ask`, `public`) the entry also carries a note: the
 | `node` | A step of restoring or moving the vault (appId `vault`, or the new node's origin for steps the old node takes for it): `restored-<hash>`, `move-signed-<move id>`, `move-cancelled-<move id>`, `bundle-sent-<move id>`, `arrived-<move id>`, `moved-<move id>`, `confirmed-<move id>` (part 11) |
 | `capture` | A capture key (appId its id) sent something to the inbox (memoryId the proposal's id), or was made (`key-made`) or revoked (`key-revoked`) (part 12) |
 | `session` | A step of a session with the public AI self (appId the public self's id): `booked-<booking>`, `turn-<booking>-<n>` with the sources cited and a sealed note, `ended-<booking>`, `blocked-<booking>` (part 12) |
+| `injection` | The immune system caught hidden instructions (appId the app, or `immune` for the vault): where, as `quarantine`, `self`, `link`, `public`, `session`, `meet`, `legacy`, `connector` or `proposal`, with an optional `-<ref>`; count the memories held or neutralised (part 13) |
 
 A vault that joins a team space, by making it or by accepting it, writes `space` with appId `vault` and memoryId `joined-<space id>`; a proof of membership rests on that entry. An heir who becomes a member of a shared memory writes `heir-<space id>` (part 12).
 
