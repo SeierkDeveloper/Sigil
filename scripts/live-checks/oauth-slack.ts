@@ -35,7 +35,7 @@ for (const withSecret of secret ? [false, true] : [false]) {
   try {
     const r = await exchangeCode({ kind: "slack", clientId, redirectUri, code, verifier: pkce.verifier, clientSecret: withSecret ? secret : undefined });
     ok(withSecret ? "code exchange with the secret" : "code exchange with PKCE and no secret", `user token ${secretShape(r.tokens.access)}, refresh ${secretShape(r.tokens.refresh)}, workspace ${r.account}`);
-    const test = await fetch("https://slack.com/api/auth.test", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://sigil.fun" }, body: new URLSearchParams({ token: r.tokens.access }) });
+    const test = await fetch("https://slack.com/api/auth.test", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", origin: "https://sigilvault.fun" }, body: new URLSearchParams({ token: r.tokens.access }) });
     const t = (await test.json()) as { ok?: boolean; error?: string };
     t.ok ? ok("auth.test as a form post") : bad("auth.test", t.error);
     note(`allow-origin on a form post from a browser origin: ${test.headers.get("access-control-allow-origin") ?? "none"} (none means the browser cannot read Slack's answers: use the computer sign-in)`);

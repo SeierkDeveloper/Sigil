@@ -20,7 +20,7 @@ export async function register() {
 
   // Clear words at start for the two mistakes that break a hosted node quietly.
   if (process.env.NODE_ENV === "production" && !serverConfig.origin) {
-    console.warn("[sigil] SIGIL_ORIGIN is not set: passkeys and same-origin checks follow the request's Host header. Set it to the public address, such as https://sigil.fun.");
+    console.warn("[sigil] SIGIL_ORIGIN is not set: passkeys and same-origin checks follow the request's Host header. Set it to the public address, such as https://sigilvault.fun.");
   }
   try {
     const { dataFile } = await import("./server/db");

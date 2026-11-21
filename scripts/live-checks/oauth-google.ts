@@ -39,7 +39,7 @@ try {
   const api = kind === "gmail" ? "https://gmail.googleapis.com/gmail/v1/users/me/profile" : kind === "calendar" ? "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1" : "https://www.googleapis.com/drive/v3/files?pageSize=1";
   const read = await fetch(api, { headers: { authorization: `Bearer ${r.tokens.access}` } });
   read.ok ? ok("one read-only call", `${read.status}`) : bad("one read-only call", `${read.status}`);
-  const cors = await fetch("https://oauth2.googleapis.com/token", { method: "OPTIONS", headers: { origin: "https://sigil.fun", "access-control-request-method": "POST" } });
+  const cors = await fetch("https://oauth2.googleapis.com/token", { method: "OPTIONS", headers: { origin: "https://sigilvault.fun", "access-control-request-method": "POST" } });
   note(`token endpoint CORS preflight from a browser origin: ${cors.status}, allow-origin ${cors.headers.get("access-control-allow-origin") ?? "none"}`);
 } catch (err) {
   bad("code exchange", (err as Error).message);
