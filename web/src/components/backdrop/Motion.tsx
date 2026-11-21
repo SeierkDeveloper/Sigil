@@ -1,9 +1,8 @@
 "use client";
 
-// Page-wide motion, in one place:
-// - things rise in as they scroll into view (data-in on the element),
-// - small mono labels decode from ciphertext into their words,
-// - panels carry a soft light under the pointer (--mx / --my).
+// Page-wide motion, in one place: things rise in once as they scroll into
+// view (data-in on the element). An IntersectionObserver does the watching, so
+// no scroll handler runs and the layout is never read while scrolling.
 //
 // The <html data-motion="on"> switch is set before first paint by the inline
 // script in the layout, and only when the visitor has not asked for less
@@ -44,39 +43,6 @@ const REVEAL = [
   ".app-index",
   ".flow",
 ].join(",");
-const LABELS = ".eyebrow, .works-with-label";
-const LIT = ".card, .permission-card, .pillar, .vault-gate, .self-card";
-const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-function decode(el: HTMLElement) {
-  const node = el.firstChild;
-  if (!node || node.nodeType !== Node.TEXT_NODE || el.childNodes.length !== 1) return;
-  const text = node.nodeValue ?? "";
-  if (!text.trim()) return;
-  el.setAttribute("aria-label", text);
-  const start = performance.now();
-  const duration = Math.min(1100, 380 + text.length * 22);
-  let last = 0;
-  const step = (now: number) => {
-    if (!node.isConnected) return;
-    const p = Math.min(1, (now - start) / duration);
-    if (p >= 1) {
-      node.nodeValue = text;
-      el.removeAttribute("aria-label");
-      return;
-    }
-    if (now - last > 45) {
-      last = now;
-      const done = Math.floor(p * text.length);
-      let out = text.slice(0, done);
-      for (let i = done; i < text.length; i++) out += text[i] === " " ? " " : GLYPHS[(Math.random() * GLYPHS.length) | 0];
-      node.nodeValue = out;
-    }
-    requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
-
 export function Motion() {
   const pathname = usePathname();
 
@@ -95,10 +61,6 @@ export function Motion() {
           // Also anything already scrolled past, so a jump down the page leaves no holes above.
           if (!entry.isIntersecting && entry.boundingClientRect.bottom > 0) continue;
           io.unobserve(el);
-          if (el.matches(LABELS)) {
-            if (entry.isIntersecting) decode(el);
-            continue;
-          }
           const i = order.get(el.parentElement) ?? 0;
           order.set(el.parentElement, i + 1);
           if (i && entry.isIntersecting) el.style.setProperty("--i", String(Math.min(i, 6)));
@@ -109,7 +71,7 @@ export function Motion() {
     );
 
     const scan = () => {
-      for (const el of document.querySelectorAll<HTMLElement>(`${REVEAL},${LABELS}`)) {
+      for (const el of document.querySelectorAll<HTMLElement>(REVEAL)) {
         if (seen.has(el) || el.closest(".vault")) continue;
         seen.add(el);
         io.observe(el);
@@ -130,32 +92,6 @@ export function Motion() {
       cancelAnimationFrame(queued);
     };
   }, [pathname]);
-
-  // The light under the pointer, for devices that have one.
-  useEffect(() => {
-    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
-    let raf = 0;
-    let ev: PointerEvent | null = null;
-    const apply = () => {
-      raf = 0;
-      const target = ev?.target;
-      if (!(target instanceof Element)) return;
-      const el = target.closest<HTMLElement>(LIT);
-      if (!el || !ev) return;
-      const r = el.getBoundingClientRect();
-      el.style.setProperty("--mx", `${Math.round(ev.clientX - r.left)}px`);
-      el.style.setProperty("--my", `${Math.round(ev.clientY - r.top)}px`);
-    };
-    const onMove = (e: PointerEvent) => {
-      ev = e;
-      if (!raf) raf = requestAnimationFrame(apply);
-    };
-    window.addEventListener("pointermove", onMove, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      cancelAnimationFrame(raf);
-    };
-  }, []);
 
   return null;
 }

@@ -1,0 +1,104 @@
+/*
+  The crafted layer. It loads last. The page ground is here.
+*/
+
+/* ------------------------------------------------------------------ the page ground */
+
+/*
+  Black with a little grain, and two ribbons of fine lines that drift very
+  slowly. Each ribbon is one still drawing on its own layer; only transform and
+  opacity change, so the browser moves a finished picture and never repaints.
+  Nothing listens to scrolling. The height is the large viewport, so a phone's
+  address bar sliding away does not resize it.
+*/
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100vh;
+  height: 100lvh;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  background: var(--grain), linear-gradient(180deg, #080808 0%, #050505 55%, #040404 100%);
+}
+
+.backdrop-ribbon {
+  position: absolute;
+  left: 50%;
+  width: max(150vw, 1100px);
+  max-width: none;
+  height: auto;
+  aspect-ratio: 2000 / 520;
+  margin-left: calc(max(150vw, 1100px) / -2);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  user-select: none;
+}
+
+.backdrop-ribbon[data-ribbon="a"] {
+  top: 4%;
+  opacity: 0.2;
+  transform: rotate(-7deg);
+}
+
+.backdrop-ribbon[data-ribbon="b"] {
+  top: 54%;
+  opacity: 0.12;
+  transform: scaleX(-1) rotate(-5deg);
+}
+
+[data-motion] .backdrop-ribbon[data-ribbon="a"] {
+  animation: ribbon-a 96s ease-in-out infinite alternate, ribbon-breathe 31s ease-in-out infinite alternate;
+}
+
+[data-motion] .backdrop-ribbon[data-ribbon="b"] {
+  animation: ribbon-b 128s ease-in-out infinite alternate, ribbon-breathe-b 43s ease-in-out infinite alternate;
+}
+
+@keyframes ribbon-a {
+  from {
+    transform: translate3d(-2.5%, -5%, 0) rotate(-8.5deg);
+  }
+  to {
+    transform: translate3d(2.5%, 6%, 0) rotate(-5.5deg);
+  }
+}
+
+@keyframes ribbon-b {
+  from {
+    transform: translate3d(3%, 5%, 0) scaleX(-1) rotate(-6.5deg);
+  }
+  to {
+    transform: translate3d(-3%, -6%, 0) scaleX(-1) rotate(-3deg);
+  }
+}
+
+@keyframes ribbon-breathe {
+  from {
+    opacity: 0.13;
+  }
+  to {
+    opacity: 0.24;
+  }
+}
+
+@keyframes ribbon-breathe-b {
+  from {
+    opacity: 0.16;
+  }
+  to {
+    opacity: 0.08;
+  }
+}
+
+@media (max-width: 640px) {
+  .backdrop-ribbon[data-ribbon="a"] {
+    top: 8%;
+  }
+  .backdrop-ribbon[data-ribbon="b"] {
+    top: 60%;
+  }
+}

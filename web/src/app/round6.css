@@ -1205,7 +1205,7 @@ body:has(.emergency-page) :is(.site-nav, .site-actions, .site-menu-button, .site
   display: none;
 }
 
-body:has(.emergency-page) .backdrop-canvas {
+body:has(.emergency-page) .backdrop-ribbon {
   visibility: hidden;
 }
 
@@ -1259,7 +1259,7 @@ body:has(.emergency-page) .site-header-inner {
   width: 56px;
   height: 56px;
   border: 0;
-  border-radius: 50%;
+  border-radius: 0;
   background: #fff;
   color: #000;
   font-size: 34px;
