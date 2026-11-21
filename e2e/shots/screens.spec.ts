@@ -91,7 +91,7 @@ for (const vp of Object.keys(VIEWPORTS) as Vp[]) {
   });
 }
 
-// The page ground in motion: two ribbons of fine lines that drift very slowly.
+// The page ground in motion: ribbons of fine lines that wave, fold and catch the light.
 test("backdrop in motion", async ({ browser }) => {
   const { context, page } = await newPage(browser, "desktop");
   await page.goto("/security");
@@ -103,7 +103,7 @@ test("backdrop in motion", async ({ browser }) => {
   }
   await context.close();
 
-  // With reduced motion: the ribbons stand still.
+  // With reduced motion: the still drawing of two ribbons.
   const still = await browser.newContext({ viewport: { width: 1440, height: 900 }, reducedMotion: "reduce" });
   const stillPage = await still.newPage();
   await stillPage.goto("/security");

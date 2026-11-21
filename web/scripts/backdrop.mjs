@@ -1,8 +1,10 @@
-// Draws the ribbon of the page ground: public/backdrop-ribbon.svg.
+// Draws the still ribbon of the page ground: public/backdrop-ribbon.svg.
 // One ribbon of 24 fine parallel lines that leans, bends once and narrows where
 // it turns, as in the logo. One edge is brighter than the other, and the lines
 // fade out toward both ends, so the file needs no mask and no light on top.
-// The page only moves it (components/backdrop/Backdrop.tsx). Run: node scripts/backdrop.mjs
+// It is the still frame of the ground: what shows before the ground in motion
+// runs, and instead of it with reduced motion or without a graphics card
+// (components/backdrop/Backdrop.tsx). Run: node scripts/backdrop.mjs
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 
