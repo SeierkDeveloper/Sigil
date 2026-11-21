@@ -4,7 +4,7 @@
 // Run with: node scripts/icons.mjs (the output files are committed).
 
 import sharp from "sharp";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const web = path.resolve(import.meta.dirname, "..");
@@ -60,4 +60,22 @@ const jobs = [
 for (const [file, fill, size] of jobs) {
   await square(fill).resize(size, size).png().toFile(file);
   console.log(path.relative(web, file));
+}
+
+// favicon.ico for browsers that ask for it directly: 16, 32 and 48 pixel PNGs inside one ICO file.
+{
+  const sizes = [16, 32, 48];
+  const pngs = await Promise.all(sizes.map((n) => square(0.8).resize(n, n).ensureAlpha().png().toBuffer()));
+  const head = Buffer.alloc(6 + 16 * sizes.length);
+  head.writeUInt16LE(0, 0); head.writeUInt16LE(1, 2); head.writeUInt16LE(sizes.length, 4);
+  let offset = head.length;
+  sizes.forEach((n, i) => {
+    const e = 6 + 16 * i;
+    head.writeUInt8(n, e); head.writeUInt8(n, e + 1); head.writeUInt8(0, e + 2); head.writeUInt8(0, e + 3);
+    head.writeUInt16LE(1, e + 4); head.writeUInt16LE(32, e + 6);
+    head.writeUInt32LE(pngs[i].length, e + 8); head.writeUInt32LE(offset, e + 12);
+    offset += pngs[i].length;
+  });
+  writeFileSync(path.join(web, "src", "app", "favicon.ico"), Buffer.concat([head, ...pngs]));
+  console.log("src/app/favicon.ico");
 }
