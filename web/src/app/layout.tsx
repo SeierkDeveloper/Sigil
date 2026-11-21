@@ -14,7 +14,8 @@ import "./round7.css";
 import "./round8.css";
 
 import "./craft.css";
-import "./engraved.css"; // the engraved layer loads last
+import "./engraved.css";
+import "./dotted.css"; // the dotted layer loads last
 // Self-hosted faces (the content security policy allows no third-party font hosts).
 const display = localFont({
   src: [

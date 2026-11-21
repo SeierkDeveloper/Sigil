@@ -3,6 +3,10 @@
 // the ground up or, for roots, from the ground down: a window slides over the
 // picture while the picture stays where it is, so only transforms move
 // (engraved.css, "engravings").
+//
+// The two wide ones, the roots and the far range, are printed in dots like the
+// oak of the first screen: the page shows their tone (public/art/dots, made by
+// scripts/halftone.mjs) through the screen of dots (dotted.css).
 
 export const ART = {
   acorn: [260, 260],
@@ -18,13 +22,16 @@ export const ART = {
 
 export type ArtName = keyof typeof ART;
 
+/** Printed in dots. */
+const DOTTED: Partial<Record<ArtName, true>> = { roots: true, range: true };
+
 export function Engraving({ name, grow = "up", className }: { name: ArtName; grow?: "up" | "down" | "none"; className?: string }) {
   const [width, height] = ART[name];
   return (
-    <span className={`engraving${className ? ` ${className}` : ""}`} data-art={name} data-grow={grow} aria-hidden="true">
+    <span className={`engraving${className ? ` ${className}` : ""}`} data-art={name} data-grow={grow} data-dots={DOTTED[name]} aria-hidden="true">
       <span className="engraving-window">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={`/art/${name}.svg`} alt="" width={width} height={height} loading="lazy" decoding="async" />
+        <img src={DOTTED[name] ? `/art/dots/${name}.webp` : `/art/${name}.svg`} alt="" width={width} height={height} loading="lazy" decoding="async" />
       </span>
     </span>
   );

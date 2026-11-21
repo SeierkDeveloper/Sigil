@@ -2,7 +2,8 @@ import Link from "next/link";
 import { AppMakers } from "@/components/AppMakers";
 import { CodeBlock } from "@/components/CodeBlock";
 import { Engraving } from "@/components/art/Engraving";
-import { HeroTree } from "@/components/hero/HeroTree";
+import { HeroArt } from "@/components/hero/HeroArt";
+import { HeroPanel } from "@/components/hero/HeroPanel";
 import { HeroVisual } from "@/components/hero/HeroVisual";
 import { LatestSeal } from "@/components/live/LatestSeal";
 import { LiveStats } from "@/components/live/LiveStats";
@@ -194,7 +195,7 @@ export default function Home() {
   return (
     <>
       <section className="hero">
-        <HeroTree />
+        <HeroArt />
         <div className="container hero-inner">
           <div>
             <p className="eyebrow">A memory vault for every AI you use</p>
@@ -214,6 +215,7 @@ export default function Home() {
               </Link>
             </div>
           </div>
+          <HeroPanel />
         </div>
       </section>
 
@@ -728,6 +730,7 @@ export default function Home() {
       </section>
 
       <section className="section cta-band">
+        <span className="cta-band-sky" aria-hidden="true" />
         <Engraving name="range" className="cta-band-art" />
         <div className="container container-narrow">
           <h2 className="section-title">Start with what you already told your AI apps</h2>

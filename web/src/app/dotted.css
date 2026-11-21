@@ -1,0 +1,334 @@
+/*
+  The dotted layer: light, printed in dots.
+
+  The pictures of the site are halftones. One screen of round dots lies over
+  the page, the same everywhere, and a picture is only how large and how
+  bright each dot is: the oak of the first screen and the sky behind it, the
+  land of the page ground, the roots and the far range. The sky's cold blue
+  silver is the one colour of the site; everything else stays black, white
+  and grey.
+
+  Two things print dots. The page ground and the art of the first screen draw
+  theirs on the graphics card (components/backdrop, components/hero/HeroArt).
+  Everything that stands still is a small tone picture, or a gradient, seen
+  through a mask of dots (--dot-screen): painted once, never animated.
+
+  This file loads last. It holds the screen, the first screen's art and its
+  panel, the still page ground, the dotted pictures and the dotted rule. The
+  screens of the vault stay plain: no sky and no dotted picture there.
+*/
+
+:root {
+  /* from one dot to the next; components/art/dots.ts holds the same two numbers */
+  --dot-pitch: 5px;
+  /* the one colour: the cold blue silver of the sky */
+  --sky: 148, 168, 214;
+  --color-sky: rgb(var(--sky));
+  /* one dot, to repeat as a mask */
+  --dot-screen: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Ccircle cx='5' cy='5' r='3.1'/%3E%3C/svg%3E");
+  /* a double rule: one firm line and a line of dots under it */
+  --rule-double: linear-gradient(var(--color-line-strong), var(--color-line-strong)) 0 0 / 100% 1px no-repeat,
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0 0.7px, transparent 1.2px) 0 3px / var(--dot-pitch) 3px repeat-x;
+}
+
+@media (max-width: 699.98px) {
+  :root {
+    --dot-pitch: 4px;
+  }
+}
+
+/* Seen through the screen of dots. */
+.hero-art-still,
+.backdrop-land,
+.backdrop-sky,
+.cta-band-sky,
+.engraving[data-dots] img {
+  -webkit-mask: var(--dot-screen) 0 0 / var(--dot-pitch) var(--dot-pitch);
+  mask: var(--dot-screen) 0 0 / var(--dot-pitch) var(--dot-pitch);
+}
+
+/* ------------------------------------------------------------------ the rule */
+
+.section::before,
+.works-with::before,
+.page-header::before {
+  height: 6px;
+}
+
+/* ------------------------------------------------------------------ the first screen */
+
+/*
+  The art fills the first screen behind the words: the oak at its right foot,
+  the sky coming down from the upper right and running out to black at the
+  left and toward the ground, so the words stand on bare black. The still
+  picture is placed here exactly as heroArtShader.ts (layOutHero) places the
+  one in motion. On a phone the art lies under the words and the panel.
+*/
+.hero-art {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hero-art-still,
+.hero-art-live {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.hero-art-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom left, rgba(var(--sky), 0.95) 0%, rgba(var(--sky), 0.7) 12%, rgba(var(--sky), 0.36) 26%, rgba(var(--sky), 0.12) 37%, rgba(var(--sky), 0) 46%);
+}
+
+.hero-art-shade,
+.hero-art-light {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  display: block;
+  width: clamp(940px, 84vw, 1560px);
+  max-width: none;
+  height: auto;
+}
+
+.hero-art-live {
+  visibility: hidden;
+}
+
+.hero-art[data-live] .hero-art-live {
+  visibility: visible;
+}
+
+.hero-art[data-live] .hero-art-still {
+  visibility: hidden;
+}
+
+[data-motion] .hero-art {
+  animation: reveal 1800ms ease 200ms backwards;
+}
+
+/* The words on the left, the panel on the right, over the art. */
+.hero-inner {
+  grid-template-columns: minmax(0, 640px) minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+/*
+  The panel: the read log of a vault, floating over the art. A dark plate with
+  a hairline and a finer frame a little outside it, as the vault's own panels.
+  It is nearly opaque and nothing behind it is blurred.
+*/
+.hero-panel {
+  justify-self: end;
+  width: min(100%, 348px);
+  align-self: start;
+  margin: var(--space-4) 0 0;
+  background: rgba(7, 7, 8, 0.92);
+  border: 1px solid var(--color-line-strong);
+  outline: 1px solid rgba(255, 255, 255, 0.07);
+  outline-offset: 5px;
+}
+
+.hero-panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 13px var(--space-4);
+  border-bottom: 1px solid var(--color-line-strong);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.hero-panel-head span:first-child {
+  color: var(--color-accent);
+}
+
+.hero-panel-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hero-panel-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-line);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.hero-panel-row svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-accent);
+}
+
+.hero-panel-state {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* a read that waits for the owner: dashed, as every waiting state */
+.hero-panel-row[data-on="false"] .hero-panel-state {
+  padding: 2px 7px;
+  border: 1px dashed var(--color-line-bright);
+  color: var(--color-text);
+}
+
+.hero-panel-note {
+  padding: 11px var(--space-4) 12px;
+  color: var(--color-text-faint);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
+@media (max-width: 1100px) {
+  .hero-inner {
+    grid-template-columns: minmax(0, 560px) minmax(0, 1fr);
+    gap: var(--space-5);
+  }
+}
+
+@media (max-width: 860px) {
+  /* the art lies under the words: as tall as the oak, and a little more for the sky to rise in */
+  .hero {
+    padding-bottom: calc(70vw - 36px);
+  }
+  .hero-art {
+    top: auto;
+    bottom: 0;
+    height: calc(70vw + 290px);
+  }
+  .hero-art-sky {
+    background: linear-gradient(to bottom left, rgba(var(--sky), 0) 8%, rgba(var(--sky), 0.5) 24%, rgba(var(--sky), 0.62) 34%, rgba(var(--sky), 0.3) 48%, rgba(var(--sky), 0) 64%);
+  }
+  .hero-art-shade,
+  .hero-art-light {
+    right: auto;
+    left: -54.3vw;
+    width: 160vw;
+  }
+  .hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-6);
+  }
+  .hero-panel {
+    justify-self: stretch;
+    width: auto;
+    max-width: 420px;
+    margin: 0 5px;
+  }
+}
+
+/* ------------------------------------------------------------------ the still page ground */
+
+/*
+  The ground when nothing draws it on the graphics card: the land as one small
+  tone picture (public/art/dots/land.webp, printed by scripts/halftone.mjs
+  from the numbers of components/backdrop/land.ts) and the sky's light as a
+  gradient, both seen through the screen. The horizon lies where the ground in
+  motion puts it (groundShader.ts, layOut).
+*/
+.backdrop-land {
+  position: absolute;
+  left: 0;
+  top: calc(80vh - 110px);
+  top: calc(80lvh - 110px);
+  width: 2400px;
+  max-width: none;
+  height: 340px;
+  opacity: 0.3;
+  user-select: none;
+}
+
+.backdrop-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom left, rgba(var(--sky), 0.3) 0%, rgba(var(--sky), 0.15) 16%, rgba(var(--sky), 0.06) 30%, rgba(var(--sky), 0) 42%);
+}
+
+/* Covered by the canvas: gone once the canvas has faded in. */
+.backdrop[data-ground="live"] :is(.backdrop-land, .backdrop-sky) {
+  visibility: hidden;
+  transition: visibility 0s 1600ms;
+}
+
+/* The working screens of the vault stay plain: the land, and no light in the sky. */
+body:has(.vault) .backdrop-sky,
+body:has(.emergency-page) .backdrop-sky {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .backdrop-land {
+    top: calc(86vh - 79px);
+    top: calc(86lvh - 79px);
+    width: 1728px;
+    height: 245px;
+  }
+}
+
+/* ------------------------------------------------------------------ dotted pictures */
+
+/*
+  The two wide engravings of the home page, the roots and the far range, are
+  printed in dots like the oak: their tone (public/art/dots) seen through the
+  screen. The small engravings at the head of a page stay line.
+*/
+.engraving[data-dots] img {
+  opacity: 0.96;
+}
+
+/* The closing call: a cold light in the sky over the far range. It runs out on every side, so no edge shows. */
+.cta-band {
+  position: relative;
+}
+
+.cta-band-sky {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: min(34vw, 520px);
+  pointer-events: none;
+  background: radial-gradient(ellipse 46% 62% at 66% 44%, rgba(var(--sky), 0.72) 0%, rgba(var(--sky), 0.4) 38%, rgba(var(--sky), 0.12) 70%, rgba(var(--sky), 0) 100%);
+}
+
+.cta-band > :not(.cta-band-sky) {
+  position: relative;
+}
+
+@media (max-width: 640px) {
+  .cta-band-sky {
+    height: 300px;
+  }
+}
