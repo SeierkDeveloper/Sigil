@@ -241,7 +241,7 @@ Before adding anything, check it against "Flat and crafted" in the ground rules.
 
 ## The extension
 
-`extension/static/`: `popup.html`, `options.html` and one stylesheet, `extension.css`, with its own copy of the tokens. The build copies the three typefaces from `web/src/fonts` into `dist/fonts`, so nothing is fetched at run time.
+`extension/static/`: `popup.html`, `options.html` and one stylesheet, `extension.css`, with its own copy of the tokens. The build copies the three typefaces from `web/src/fonts` into `dist/fonts`, so nothing is fetched at run time. Since round eight it follows "Flat and crafted" too: a flat white plate, icons with nothing behind them, no glow.
 
 | Page | Classes | States |
 | --- | --- | --- |
@@ -255,4 +255,4 @@ Before adding anything, check it against "Flat and crafted" in the ground rules.
 
 ## Not yet designed
 
-- The extension popup and options page have the neutral colours and the flat plate (no discs, glows or metal gradients since round eight) but not yet the line details.
+- The extension popup and options page have the neutral colours but not yet the line details.
