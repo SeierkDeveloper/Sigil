@@ -2,7 +2,7 @@
 // vault, lock it, unlock it with the passkey, then open it with the recovery phrase.
 
 import { expect, test } from "@playwright/test";
-import { confirmPhrase } from "./helpers";
+import { confirmPhrase, openTab } from "./helpers";
 
 test("passkey sign-up, unlock and recovery phrase", async ({ page, context }) => {
   const cdp = await context.newCDPSession(page);

@@ -7,7 +7,7 @@ import { addFolder, createWithWallet, installWallet, writeMemory, openTab } from
 
 async function unlock(page: Page) {
   await page.getByTestId("method-wallet").click();
-  await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
 }
 
 test("a folder is published as a pack, followed from another vault, and updated to its next version", async ({ browser }) => {

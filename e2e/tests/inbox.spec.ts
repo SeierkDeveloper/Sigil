@@ -36,7 +36,7 @@ test("an app suggests a memory, the owner edits and approves it, the app reads i
   // The vault opens it with its own key.
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
   const inboxTab = page.getByRole("tab", { name: /Inbox/ });
   await expect(inboxTab).toContainText("1");
   await inboxTab.click();

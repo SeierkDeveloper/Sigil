@@ -13,7 +13,7 @@ const MODEL_KEY = "sk-ant-e2e-CANARY-legacy-key";
 async function unlock(page: Page) {
   await page.goto("/vault");
   await page.getByTestId("method-wallet").click();
-  await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
 }
 
 async function mockModel(page: Page) {

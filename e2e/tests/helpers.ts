@@ -68,7 +68,7 @@ export async function createWithWallet(page: Page, opts: { guide?: boolean } = {
   const phrase = (await phraseList.locator("li").allInnerTexts()).map((w) => w.trim()).join(" ");
   await confirmPhrase(page, phrase);
   await page.getByRole("button", { name: "Open my vault" }).click();
-  await page.getByRole("heading", { name: "Your vault" }).waitFor();
+  await page.getByRole("heading", { name: "Your vault", exact: true }).waitFor();
   if (!opts.guide) await page.getByRole("button", { name: "Skip the guide" }).click();
   return phrase;
 }

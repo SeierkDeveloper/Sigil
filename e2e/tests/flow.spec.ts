@@ -117,7 +117,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   await page.reload();
   await expect(page.getByRole("heading", { name: "Unlock your vault" })).toBeVisible();
   await page.getByTestId("method-wallet").click();
-  await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Apps" })).toHaveAttribute("aria-selected", "true");
   await openTab(page, "Memories");
   await expect(page.locator(".memory-item")).toHaveCount(8);

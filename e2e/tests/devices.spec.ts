@@ -10,7 +10,7 @@ const CANARY = "CANARY-device-e2e-4410";
 async function unlock(page: Page) {
   await page.goto("/vault");
   await page.getByTestId("method-wallet").click();
-  await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
 }
 
 test("add a device by code, open the vault there, capture from it, and revoke it", async ({ browser }) => {
@@ -43,13 +43,13 @@ test("add a device by code, open the vault there, capture from it, and revoke it
   await expect(owner.locator(".device-row")).toContainText("Test phone");
 
   // The phone opens the same vault.
-  await expect(phone.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(phone.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
   await expect(phone.locator(".memory-item-title", { hasText: "Bike lock" })).toBeVisible();
 
   // Next time it opens with its own device key.
   await phone.reload();
   await phone.getByTestId("method-device").click();
-  await expect(phone.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(phone.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
   await openTab(phone, "Devices");
   await expect(phone.locator(".device-row[data-this='true']")).toContainText("Test phone");
 

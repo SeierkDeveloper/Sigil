@@ -9,7 +9,7 @@ const CANARY = "CANARY-share-e2e-0c7d";
 async function unlock(page: Page) {
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await expect(page.getByRole("heading", { name: "Your vault" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
 }
 
 test("share a folder, accept it read only, see it in the log, stop sharing", async ({ browser }) => {
