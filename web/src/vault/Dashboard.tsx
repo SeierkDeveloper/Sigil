@@ -40,6 +40,8 @@ import { PacksTab } from "./tabs/Packs";
 import { StorageTab } from "./tabs/Storage";
 import { SharedTab } from "./tabs/Shared";
 import { lastBackupAt, runBackup } from "./storageOps";
+import { Guide } from "./Guide";
+import { guideOpen } from "./guideOps";
 import { backupDue } from "@sigil/core";
 
 // The sections of the vault, in the four groups the index shows them in. Tab ids never change.
@@ -92,6 +94,28 @@ const TAB_GROUPS: { label: string; tabs: { id: TabId; label: string }[] }[] = [
 
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
+/** The sections always in the main row. Every other one is under More, unless the owner pins it to the row. */
+const MAIN_TABS: TabId[] = ["memories", "inbox", "self", "apps", "settings"];
+const PIN_KEY = "sigil.vault.pinned";
+
+/** Pins are a convenience of this device; anything unreadable (private window, blocked storage) means none. */
+function readPins(): TabId[] {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(PIN_KEY) ?? "[]") as unknown;
+    return Array.isArray(v) ? (v.filter((x) => TABS.some((t) => t.id === x) && !MAIN_TABS.includes(x as TabId)) as TabId[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePins(pins: TabId[]): void {
+  try {
+    window.localStorage.setItem(PIN_KEY, JSON.stringify(pins));
+  } catch {
+    // Not kept on this device; the row still changes for now.
+  }
+}
+
 const NO_MEMORIES: ops.VaultData["memories"] = [];
 
 function tabFromHash(): TabId {
@@ -118,6 +142,16 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   const [data, setData] = useState<ops.VaultData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<TabId>(tabFromHash);
+  // The dashboard only renders in the browser, once the vault is open, so the pins can be read at once.
+  const [pins, setPins] = useState<TabId[]>(() => (typeof window === "undefined" ? [] : readPins()));
+  const [more, setMore] = useState(false);
+  const togglePin = useCallback((id: TabId) => {
+    setPins((p) => {
+      const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
+      writePins(next);
+      return next;
+    });
+  }, []);
 
   const reload = useCallback(async () => {
     try {
@@ -191,6 +225,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   const [focus, setFocus] = useState<string | null>(null);
   const goTo = useCallback((t: TabId) => {
     setFocus(null);
+    setMore(false);
     setTab(t);
     window.history.replaceState(null, "", `#${t}`);
   }, []);
@@ -289,6 +324,27 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   const activeApps = data.apps.filter((a) => !a.revokedAt).length;
   const waitingRequests = data.access.filter((r) => r.state === "pending").length;
 
+  // What waits for the owner, per section: shown on the tab, and summed on More for sections not in the row.
+  const waiting: Partial<Record<TabId, { n: number; label: string }>> = {
+    legacy: { n: data.trusted.filter((x) => x.state === "open" && !x.kept).length, label: "A plan that names you is open for release" },
+    inbox: { n: data.proposals.length + waitingRequests, label: `${data.proposals.length + waitingRequests} waiting` },
+    work: { n: data.drafts.filter((d) => d.state === "waiting").length, label: `${data.drafts.filter((d) => d.state === "waiting").length} drafts waiting` },
+    agreements: { n: data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length, label: "An agreement waits for your signature" },
+    shared: { n: data.spaces.filter((s) => s.kind !== "team" && !s.me.acceptedAt).length, label: "A shared memory waits for you to accept it" },
+    meet: { n: data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length, label: "An invite is waiting" },
+  };
+  const badge = (id: TabId) => {
+    const w = waiting[id];
+    return w && w.n > 0 ? (
+      <span className="tab-count" aria-label={w.label}>
+        {w.n}
+      </span>
+    ) : null;
+  };
+  const inRow = new Set<TabId>([...MAIN_TABS, ...pins, tab]);
+  const row = TABS.filter((t) => inRow.has(t.id)).sort((a, b) => Number(!MAIN_TABS.includes(a.id)) - Number(!MAIN_TABS.includes(b.id)) || MAIN_TABS.indexOf(a.id) - MAIN_TABS.indexOf(b.id));
+  const moreCount = TABS.filter((t) => !inRow.has(t.id)).reduce((n, t) => n + (waiting[t.id]?.n ?? 0), 0);
+
   return (
     <Ctx.Provider value={ctx}>
       <div className="dashboard">
@@ -322,63 +378,75 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           </Notice>
         ) : null}
 
-        <div className="tabs" role="tablist" aria-label="Vault sections">
-          {TAB_GROUPS.map((g) => (
-            <div key={g.label} className="tab-group" role="presentation">
-              <span className="tab-group-label" aria-hidden="true">
-                {g.label}
-              </span>
-              <div className="tab-group-tabs" role="presentation" data-count={g.tabs.length}>
-                {g.tabs.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    role="tab"
-                    id={`tab-${t.id}`}
-                    className="tab"
-                    aria-selected={tab === t.id}
-                    aria-controls={`panel-${t.id}`}
-                    onClick={() => goTo(t.id)}
-                  >
-                    {t.label}
-                    {t.id === "legacy" && data.trusted.some((x) => x.state === "open" && !x.kept) ? (
-                      <span className="tab-count" aria-label="A plan that names you is open for release">
-                        {data.trusted.filter((x) => x.state === "open" && !x.kept).length}
-                      </span>
-                    ) : null}
-                    {t.id === "inbox" && data.proposals.length + waitingRequests > 0 ? (
-                      <span className="tab-count" aria-label={`${data.proposals.length + waitingRequests} waiting`}>
-                        {data.proposals.length + waitingRequests}
-                      </span>
-                    ) : null}
-                    {t.id === "work" && data.drafts.some((d) => d.state === "waiting") ? (
-                      <span className="tab-count" aria-label={`${data.drafts.filter((d) => d.state === "waiting").length} drafts waiting`}>
-                        {data.drafts.filter((d) => d.state === "waiting").length}
-                      </span>
-                    ) : null}
-                    {t.id === "agreements" && data.agreements.some((a) => a.role === "to" && a.state === "proposed") ? (
-                      <span className="tab-count" aria-label="An agreement waits for your signature">
-                        {data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length}
-                      </span>
-                    ) : null}
-                    {t.id === "shared" && data.spaces.some((s) => s.kind !== "team" && !s.me.acceptedAt) ? (
-                      <span className="tab-count" aria-label="A shared memory waits for you to accept it">
-                        {data.spaces.filter((s) => s.kind !== "team" && !s.me.acceptedAt).length}
-                      </span>
-                    ) : null}
-                    {t.id === "meet" && data.meets.some((m) => m.role === "invitee" && m.state === "invited") ? (
-                      <span className="tab-count" aria-label="An invite is waiting">
-                        {data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length}
-                      </span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {guideOpen(data) ? <Guide /> : null}
+
+        <div className="tabs tabs-main" role="tablist" aria-label="Vault sections">
+          {row.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`tab-${t.id}`}
+              className="tab"
+              aria-selected={!more && tab === t.id}
+              aria-controls={`panel-${t.id}`}
+              data-pinned={pins.includes(t.id) ? "true" : undefined}
+              onClick={() => goTo(t.id)}
+            >
+              {t.label}
+              {badge(t.id)}
+            </button>
           ))}
+          <button type="button" className="tab tab-more" aria-expanded={more} aria-controls="vault-more" onClick={() => setMore((m) => !m)} data-testid="tab-more">
+            More
+            {moreCount > 0 ? (
+              <span className="tab-count" aria-label={`${moreCount} waiting in More`}>
+                {moreCount}
+              </span>
+            ) : null}
+          </button>
         </div>
 
-        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tab-panel">
+        {more ? (
+          <nav id="vault-more" className="vault-more" aria-label="More sections">
+            <p className="small muted vault-more-lead">
+              Every part of your vault, in four groups. Pin the ones you use often and they stay in the row above on this device.
+            </p>
+            <div className="tabs" role="presentation">
+              {TAB_GROUPS.map((g) => (
+                <div key={g.label} className="tab-group" role="presentation">
+                  <span className="tab-group-label" aria-hidden="true">
+                    {g.label}
+                  </span>
+                  <div className="tab-group-tabs" role="presentation" data-count={g.tabs.length}>
+                    {g.tabs.map((t) => (
+                      <span key={t.id} className="more-item" data-current={tab === t.id ? "true" : undefined}>
+                        <button type="button" className="tab" onClick={() => goTo(t.id)} data-testid={`more-${t.id}`}>
+                          {t.label}
+                          {badge(t.id)}
+                        </button>
+                        {MAIN_TABS.includes(t.id) ? null : (
+                          <button
+                            type="button"
+                            className="pin-button"
+                            aria-pressed={pins.includes(t.id)}
+                            aria-label={pins.includes(t.id) ? `Unpin ${t.label} from the row` : `Pin ${t.label} to the row`}
+                            title={pins.includes(t.id) ? "Unpin from the row" : "Pin to the row"}
+                            onClick={() => togglePin(t.id)}
+                          >
+                            {pins.includes(t.id) ? "Pinned" : "Pin"}
+                          </button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </nav>
+        ) : null}
+
+        <div role="tabpanel" id={`panel-${tab}`} hidden={more} aria-labelledby={`tab-${tab}`} className="tab-panel">
           {tab === "memories" ? <MemoriesTab /> : null}
           {tab === "inbox" ? <InboxTab /> : null}
           {tab === "self" ? <SelfTab /> : null}

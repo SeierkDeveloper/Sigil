@@ -59,22 +59,53 @@ export function textOf(result: unknown): string {
 }
 
 /** Creates a vault with the injected wallet and lands on the dashboard. Returns the recovery phrase. */
-export async function createWithWallet(page: Page): Promise<string> {
+export async function createWithWallet(page: Page, opts: { guide?: boolean } = {}): Promise<string> {
   await page.goto("/vault");
   await page.getByRole("button", { name: "Create a vault" }).waitFor();
   await page.getByTestId("method-wallet").click();
   const phraseList = page.getByTestId("recovery-phrase");
   await phraseList.waitFor();
   const phrase = (await phraseList.locator("li").allInnerTexts()).map((w) => w.trim()).join(" ");
-  await page.getByLabel("I have saved my recovery phrase somewhere safe.").check();
+  await confirmPhrase(page, phrase);
   await page.getByRole("button", { name: "Open my vault" }).click();
-  await page.getByRole("heading", { name: "Your vault" }).waitFor();
+  await page.getByRole("heading", { name: "Your vault", exact: true }).waitFor();
+  if (!opts.guide) await page.getByRole("button", { name: "Skip the guide" }).click();
   return phrase;
+}
+
+/** Ticks "saved" and types back the two words the phrase screen asks for. */
+export async function confirmPhrase(page: Page, phrase: string) {
+  await page.getByLabel("I have saved my recovery phrase somewhere safe.").check();
+  const words = phrase.split(" ");
+  const inputs = page.getByTestId("phrase-check").locator("input[data-word]");
+  await inputs.first().waitFor();
+  for (const input of await inputs.all()) {
+    const n = Number(await input.getAttribute("data-word"));
+    await input.fill(words[n - 1]);
+  }
+}
+
+/**
+ * Opens a section of the vault by its name: from the main row when it is
+ * there, otherwise through More. Every deep link still works the same.
+ */
+export async function openTab(page: Page, name: string | RegExp) {
+  // A tab's name may carry a count after it ("Inbox 1 waiting"); match the label at its start.
+  const label = typeof name === "string" ? new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(\\s|$)`) : name;
+  const row = page.getByRole("tablist", { name: "Vault sections" });
+  await row.waitFor();
+  const tab = row.getByRole("tab", { name: label });
+  if (await tab.count()) {
+    await tab.first().click();
+    return;
+  }
+  await page.getByTestId("tab-more").click();
+  await page.getByRole("navigation", { name: "More sections" }).getByRole("button", { name: label }).first().click();
 }
 
 /** Connects an app from the Apps tab and returns its key. Folders by name; suggestions on or off. */
 export async function connectApp(page: Page, opts: { name?: string; folders: string[]; suggest?: boolean; kind?: string }) {
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   const first = page.getByRole("button", { name: "Connect your first app" });
   if (await first.isVisible()) await first.click();
   else await page.getByRole("button", { name: "Connect an app" }).click();
@@ -91,7 +122,7 @@ export async function connectApp(page: Page, opts: { name?: string; folders: str
 }
 
 export async function writeMemory(page: Page, m: { title: string; body: string; tags?: string; folder?: string }) {
-  await page.getByRole("tab", { name: "Memories" }).click();
+  await openTab(page, "Memories");
   const empty = page.getByRole("button", { name: "Write a memory" });
   if (await empty.isVisible()) await empty.click();
   else await page.getByRole("button", { name: "New memory" }).click();
@@ -105,7 +136,7 @@ export async function writeMemory(page: Page, m: { title: string; body: string; 
 }
 
 export async function addFolder(page: Page, name: string) {
-  await page.getByRole("tab", { name: "Folders" }).click();
+  await openTab(page, "Folders");
   await page.getByLabel("New folder").fill(name);
   await page.getByRole("button", { name: "Add folder" }).click();
   await page.locator(".list-row-title", { hasText: name }).first().waitFor();
@@ -140,7 +171,7 @@ export async function mockModel(target: Page | BrowserContext, answer: (system: 
 
 /** Saves a model key and rules under AI self, so the vault's AI self can answer. */
 export async function setUpModel(page: Page, opts: { key?: string; name?: string; folders?: string[] } = {}) {
-  await page.getByRole("tab", { name: "AI self" }).click();
+  await openTab(page, "AI self");
   const model = page.getByRole("form", { name: "Model key" });
   await model.getByLabel("API key").fill(opts.key ?? "sk-ant-e2e-key-0001");
   await model.getByRole("button", { name: "Save key" }).click();

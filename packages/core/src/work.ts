@@ -14,6 +14,8 @@
 //
 // Every function here works without a model; the prompts are for when there is one.
 
+import { randomBytes } from "./crypto";
+import { newNonce, stripHidden, UNTRUSTED_NOTE, wrapUntrusted } from "./immune";
 import type { ModelMessage } from "./model";
 import type { SelfSource } from "./self";
 
@@ -126,7 +128,7 @@ export function styleHints(notes: { body: string; editedAt?: string }[]): StyleH
 }
 
 function firstName(from: string): string {
-  const name = from.replace(/<[^>]*>/g, "").replace(/["']/g, "").trim();
+  const name = from.replace(/<[^<>]*>/g, "").replace(/["']/g, "").trim();
   if (!name || name.includes("@")) return "";
   return name.split(/\s+/)[0];
 }
@@ -178,8 +180,9 @@ export function replyPrompt(i: ReplyPromptInput): { system: string; messages: Mo
   if (i.hints.greeting) lines.push(`- Open with the owner's own greeting: ${i.hints.greeting}`);
   if (i.hints.signoff) lines.push(`- Close with the owner's own sign-off: ${i.hints.signoff}`);
   if (i.hints.notes.length) lines.push("", "How the owner writes, learned from their own edits:", ...i.hints.notes.map((n) => `- ${n}`));
-  lines.push("", "<memories>");
-  for (const s of i.sources) lines.push(`<memory n="${s.n}" title="${s.title.replace(/"/g, "'")}">`, s.text, "</memory>");
+  const nonce = newNonce(randomBytes);
+  lines.push("", "<memories>", UNTRUSTED_NOTE);
+  for (const s of i.sources) lines.push(`<memory n="${s.n}" title="${stripHidden(s.title).replace(/"/g, "'")}">`, wrapUntrusted(s.text, nonce).text, "</memory>");
   lines.push("</memories>");
   return { system: lines.join("\n"), messages: [{ role: "user", content: `${i.from ? `From: ${i.from}\n` : ""}${i.message.slice(0, 12_000)}` }] };
 }

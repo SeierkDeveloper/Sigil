@@ -81,11 +81,13 @@ export interface StorageBackend {
 }
 
 const clean = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+/** A storage address: https, or plain http only on this machine (a local test bucket). Keys and signatures never travel in the clear. */
 const httpUrl = (v: unknown): string => {
   const s = clean(v, 500).replace(/\/+$/, "");
   try {
     const u = new URL(s);
-    return u.protocol === "https:" || u.protocol === "http:" ? s : "";
+    const local = u.hostname === "localhost" || u.hostname === "127.0.0.1" || u.hostname === "[::1]";
+    return u.protocol === "https:" || (u.protocol === "http:" && local) ? s : "";
   } catch {
     return "";
   }
@@ -94,6 +96,10 @@ const httpUrl = (v: unknown): string => {
 /** A target as typed by the owner, checked. Throws with a plain message when something needed is missing. */
 export function cleanTarget(value: unknown): BackupTarget {
   const v = (value && typeof value === "object" ? value : {}) as Record<string, unknown>;
+  for (const field of ["endpoint", "gateway"]) {
+    const given = clean(v[field], 500);
+    if (given && !httpUrl(given)) throw new Error("A storage address must start with https:// (plain http only for this machine).");
+  }
   const id = typeof v.id === "string" && /^[A-Za-z0-9_-]{8,64}$/.test(v.id) ? v.id : randomId();
   const label = clean(v.label, 80);
   if (v.kind === "s3") {

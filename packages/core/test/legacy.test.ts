@@ -8,6 +8,8 @@ import {
   importKey,
   inviteTag,
   legacyCheck,
+  legacyReleaseHash,
+  legacyReleaseProof,
   LegacyError,
   newBoxKeyPair,
   newInviteSecret,
@@ -47,6 +49,19 @@ async function setup() {
   const c = newBoxKeyPair();
   return { vaultKey, family: family.folder, work: work.folder, a, b, c };
 }
+
+describe("the release proof", () => {
+  it("comes only from the legacy key, and the node keeps only its hash", () => {
+    const key = new Uint8Array(32).fill(9);
+    const proof = legacyReleaseProof(key, "plan1", 2);
+    expect(proof).toMatch(/^[0-9a-f]{64}$/);
+    expect(legacyReleaseHash(proof)).not.toBe(proof);
+    expect(legacyReleaseProof(key, "plan1", 3)).not.toBe(proof);
+    expect(legacyReleaseProof(new Uint8Array(32).fill(8), "plan1", 2)).not.toBe(proof);
+    // The check value the trusted people hold says nothing about the proof.
+    expect(legacyCheck(key, "plan1", 2)).not.toBe(proof);
+  });
+});
 
 describe("Shamir split and combine", () => {
   it("gives the key back from any k of n shares and not from fewer", async () => {

@@ -24,6 +24,7 @@ import { decodeBoxPublicKey, encodeBoxPublicKey, openSealedJson, sealJson, type 
 import { DecryptError, randomBytes } from "./crypto";
 import { compareBytes, concatBytes, fromBase64Url, fromUtf8, toBase64Url, utf8 } from "./encoding";
 import type { ModelCaller, ModelMessage } from "./model";
+import { isHeld, newNonce, stripHidden, UNTRUSTED_NOTE, wrapUntrusted } from "./immune";
 import { isLive, REFUSAL_TEXT, retrieve, screenAnswer, screenQuestion, type SelfMemory, type SelfRules, type SelfSource } from "./self";
 
 export type MeetPurpose = "find_time" | "collab_fit" | "swap_intros";
@@ -208,8 +209,9 @@ export function buildMeetPrompt(input: Omit<MeetTurnInput, "model" | "memories">
   ];
   if (rules.denyTopics.length) lines.push(`- Never discuss: ${rules.denyTopics.join("; ")}.`);
   if (rules.neverSay.length) lines.push(`- Never say or reveal any of these: ${rules.neverSay.map((p) => `"${p}"`).join(", ")}.`);
-  lines.push("", "<memories>");
-  for (const s of input.sources) lines.push(`<memory n="${s.n}" title="${s.title.replace(/"/g, "'")}" edited="${s.editedAt.slice(0, 10)}">`, s.text, "</memory>");
+  const nonce = newNonce(randomBytes);
+  lines.push("", "<memories>", UNTRUSTED_NOTE);
+  for (const s of input.sources) lines.push(`<memory n="${s.n}" title="${stripHidden(s.title).replace(/"/g, "'")}" edited="${s.editedAt.slice(0, 10)}">`, wrapUntrusted(s.text, nonce).text, "</memory>");
   lines.push("</memories>");
   return lines.filter((l, i, all) => l !== "" || all[i - 1] !== "").join("\n");
 }
@@ -227,7 +229,7 @@ export async function meetTurn(input: MeetTurnInput): Promise<MeetTurnOutput> {
   const matched = retrieve(input.rules, input.memories, query, { now: input.now });
   const allowed = new Set(input.rules.folderIds);
   const rest = input.memories
-    .filter((m) => allowed.has(m.folderId) && isLive(m, input.now) && !matched.some((x) => x.id === m.id))
+    .filter((m) => allowed.has(m.folderId) && isLive(m, input.now) && !matched.some((x) => x.id === m.id) && !isHeld(m))
     .sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1))
     .slice(0, Math.max(0, input.rules.maxSources - matched.length));
   const sources: SelfSource[] = [

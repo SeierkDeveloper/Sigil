@@ -2,8 +2,8 @@
 // parsers share. Everything runs on the device: a zip is opened in memory,
 // read, and only the encrypted memories made from it leave the browser.
 
-import { unzipSync } from "fflate";
 import type { MemoryDraft, SourceKind } from "../vault";
+import { unzipLimited, ZipTooLarge } from "./util";
 
 export interface ImportFile {
   /** The path inside the folder or zip, with forward slashes. */
@@ -64,8 +64,9 @@ export function expandFiles(files: ImportFile[], depth = 0): ImportFile[] {
       if (depth > 1) continue;
       let entries: Record<string, Uint8Array>;
       try {
-        entries = unzipSync(f.bytes);
-      } catch {
+        entries = unzipLimited(f.bytes);
+      } catch (err) {
+        if (err instanceof ZipTooLarge) throw new LocalImportError(`${baseName(f.path)} opens to more than an import can hold. Import its folders one at a time.`);
         throw new LocalImportError(`${baseName(f.path)} could not be opened as a zip file.`);
       }
       const inner = Object.entries(entries)
@@ -100,23 +101,65 @@ export function decodeEntities(text: string): string {
       const n = code[1] === "x" || code[1] === "X" ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
       return Number.isFinite(n) && n > 0 && n < 0x110000 ? String.fromCodePoint(n) : all;
     }
-    return ENTITIES[code.toLowerCase()] ?? all;
+    const name = code.toLowerCase();
+    return Object.hasOwn(ENTITIES, name) ? ENTITIES[name] : all;
   });
+}
+
+/** The longest HTML read as text. Anything longer is cut first, so a huge message cannot stall an import or a sync. */
+export const MAX_HTML_CHARS = 4_000_000;
+
+/** Removes <script>, <style> and <head> blocks with plain searches (linear in the length, whatever the input). */
+function stripBlocks(html: string): string {
+  const lower = html.toLowerCase();
+  let out = "";
+  let at = 0;
+  for (;;) {
+    let start = -1;
+    let tag = "";
+    for (const t of ["script", "style", "head"]) {
+      const i = lower.indexOf(`<${t}`, at);
+      if (i >= 0 && (start < 0 || i < start)) {
+        start = i;
+        tag = t;
+      }
+    }
+    if (start < 0) return out + html.slice(at);
+    out += html.slice(at, start);
+    const end = lower.indexOf(`</${tag}`, start);
+    if (end < 0) return out;
+    const close = lower.indexOf(">", end);
+    if (close < 0) return out;
+    at = close + 1;
+  }
 }
 
 /** Readable text from HTML: block elements become line breaks, list items get a dash, scripts and styles are dropped. */
 export function htmlToText(html: string): string {
   return decodeEntities(
-    html
-      .replace(/<(script|style|head)[\s\S]*?<\/\1>/gi, "")
+    stripBlocks(html.length > MAX_HTML_CHARS ? html.slice(0, MAX_HTML_CHARS) : html)
       .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<li[^>]*>/gi, "\n- ")
+      .replace(/<li[^<>]*>/gi, "\n- ")
       .replace(/<\/li>/gi, "").replace(/<\/(p|div|h[1-6]|tr|blockquote|pre|ul|ol|table)>/gi, "\n")
-      .replace(/<[^>]+>/g, ""),
+      // A tag runs to the next ">" and never across another "<": linear, where [^>]+ would be quadratic on many stray "<".
+      .replace(/<[^<>]+>/g, ""),
   )
-    .replace(/[ \t ]+\n/g, "\n")
+    .split("\n")
+    .map(trimLineEnd)
+    .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+/** Spaces, tabs and no-break spaces at the end of a line, removed without a regex that would backtrack. */
+function trimLineEnd(line: string): string {
+  let end = line.length;
+  while (end > 0) {
+    const c = line.charCodeAt(end - 1);
+    if (c !== 32 && c !== 9 && c !== 0xa0) break;
+    end--;
+  }
+  return end === line.length ? line : line.slice(0, end);
 }
 
 export function cleanTagWord(tag: string): string {

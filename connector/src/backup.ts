@@ -4,8 +4,9 @@
 // the node is asked for the vault as a bundle (ciphertext, made by the node),
 // the bundle is written to each target from this machine, and a record of
 // where it went is sealed to the vault public key and logged. A connector never
-// holds the vault key, so its bundles are not signed; the owner's device checks
-// every part of one with the vault key when it restores it.
+// holds the vault key, so its bundles are not signed: each carries an HMAC with
+// a key from this app's own secret instead, which the owner's device checks
+// (with the app's secret, kept under the vault key) before it restores one.
 
 import {
   backupDue,
@@ -16,7 +17,7 @@ import {
   encodeBundle,
   openBackupForApp,
   randomId,
-  sealBundle,
+  macBundle,
   sealJson,
   type BackupPlace,
   type BackupRecord,
@@ -56,7 +57,7 @@ export class BackupWorker {
     if (!opts.force && !backupDue(settings.every, lastAt, opts.now)) return null;
     if (!settings.targets.length) throw new Error("No storage was chosen for backups. Add a bucket, IPFS or Arweave in the vault, under Storage.");
     const { body } = await this.reader.request<{ body: BundleBody }>("GET", "backup/bundle");
-    const bundle = sealBundle(body, null);
+    const bundle = await macBundle(body, this.reader.appId, this.reader.appSecret);
     const bytes = encodeBundle(bundle);
     const name = bundleName(bundle.hash);
     const places: BackupPlace[] = [];

@@ -37,6 +37,7 @@ import {
   type SelfRules,
 } from "@sigil/core";
 import type { Api } from "./api";
+import { reportCaught } from "./immuneOps";
 import type { Unlocked, VaultData } from "./ops";
 
 export interface WallEntry {
@@ -192,6 +193,8 @@ export const PUBLIC_ERROR_TEXT = "My AI self could not answer just now. Please t
 export interface ComposedPublic {
   reply: PublicReply;
   question: string;
+  /** Memories the immune system held back or neutralised for this answer. */
+  caught?: number;
 }
 
 function publicKeyFor(self: NonNullable<VaultData["publicSelf"]>, q: Pick<PendingPublic, "sessionId" | "askerKey">): Uint8Array {
@@ -217,8 +220,16 @@ export async function composePublicAnswer(data: Pick<VaultData, "publicSelf">, i
     // A booked session: its house rules, topic and intake go to the model too, the intake opened with the public self's key.
     const pair = linkPair({ secret: self.secret.secret, label: "", rules: null, introKey: "" });
     const context = q.booking ? contextForBooking(pair, self.id, q.booking) : null;
-    const a = await answerAsSelf({ question, history: opened.history, rules: self.secret.rules, memories: publicMemories(items), model, asker: "public", context });
-    return { reply: { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) }, question };
+    const a = await answerAsSelf({
+      question,
+      history: opened.history,
+      rules: self.secret.rules,
+      memories: publicMemories(items),
+      model,
+      asker: "public",
+      context,
+    });
+    return { reply: { v: 1, text: withoutCitations(a.text), refused: a.refused, sources: a.citations.map((c) => ({ id: c.id, title: c.title })) }, question, caught: a.caught ? a.caught.held + a.caught.neutralised : 0 };
   } catch {
     return { reply: { v: 1, text: PUBLIC_ERROR_TEXT, refused: "error", sources: [] }, question: question || "(the question could not be opened)" };
   }
@@ -267,6 +278,7 @@ export async function servePublicOnce(api: Api, data: Pick<VaultData, "publicSel
     if (deps.sessionsOnly && !q.booking) continue;
     const composed = await composePublicAnswer(data, items, q, deps.model);
     if (!composed) continue;
+    reportCaught(api, q.booking ? "session" : "public", composed.caught ?? 0);
     try {
       await sendPublicAnswer(api, data, q, composed);
       n++;

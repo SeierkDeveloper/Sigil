@@ -2,7 +2,7 @@
 // with the tiny model kept in the repository. Plus the Timeline and duplicates.
 
 import { expect, test } from "@playwright/test";
-import { connectApp, connectMcp, createWithWallet, installWallet, recordBodies, textOf, writeMemory } from "./helpers";
+import { connectApp, connectMcp, createWithWallet, installWallet, recordBodies, textOf, writeMemory, openTab } from "./helpers";
 
 test("finds by meaning in the browser and in the connector, and the query never leaves the device", async ({ page, context, baseURL }) => {
   await installWallet(context);
@@ -46,7 +46,7 @@ test("the timeline lists memories by day and source, and duplicates are found an
   await writeMemory(page, { title: "Allergy", body: "I am allergic to penicillin and must avoid it." });
   await writeMemory(page, { title: "Guitar", body: "Practice the new song." });
 
-  await page.getByRole("tab", { name: "Timeline" }).click();
+  await openTab(page, "Timeline");
   await expect(page.locator(".timeline-month")).toHaveCount(1);
   await expect(page.locator(".timeline-item")).toHaveCount(3);
   await expect(page.locator(".timeline-item").first()).toContainText("Written in Sigil");

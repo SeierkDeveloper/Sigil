@@ -6,6 +6,7 @@
 import {
   AAD,
   agentSessionKey,
+  linkGreetingKey,
   answerAsSelf,
   appSelfKey,
   askNoteContext,
@@ -42,6 +43,7 @@ import {
   type ThinkingSettings,
 } from "@sigil/core";
 import type { Api } from "./api";
+import { reportCaught } from "./immuneOps";
 import { profileMemory, type AppView, type AskLinkView, type Unlocked, type VaultData } from "./ops";
 import { ASKED_TEXT, guardedMemories, protectedGate } from "./protectOps";
 
@@ -114,6 +116,7 @@ export async function askInVault(
     asker: "owner",
     queryVector,
     vectors: deps.vectors,
+    immune: data.immune,
   });
 }
 
@@ -267,7 +270,7 @@ export async function composeLinkAnswer(api: Api, data: VaultData, q: PendingQue
   const link = data.askLinks.find((l) => l.id === q.linkId);
   if (!link?.secret) return null;
   const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
-  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey);
+  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey, linkGreetingKey(link.secret));
   const rules = cleanRules(link.secret.rules);
   let question = "";
   try {
@@ -286,6 +289,8 @@ export async function composeLinkAnswer(api: Api, data: VaultData, q: PendingQue
       asker: "guest",
       queryVector,
       vectors: deps.vectors,
+      immune: data.immune,
+      onCaught: (c) => reportCaught(api, "link", c.held + c.neutralised, q.linkId),
     });
     if (gate.extra.length) await gate.use(gate.extra.map((m) => m.id));
     const text = withoutCitations(a.text);
@@ -306,7 +311,7 @@ export async function sendLinkAnswer(
   const link = data.askLinks.find((l) => l.id === q.linkId);
   if (!link?.secret) throw new Error("That ask link is gone.");
   const ids = { linkId: q.linkId, sessionId: q.sessionId, messageId: q.id };
-  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey);
+  const key = agentSessionKey(linkPair(link.secret), q.linkId, q.sessionId, q.askerKey, linkGreetingKey(link.secret));
   const note: AskNote = { v: 1, via: "link", label: link.label, question: composed.question, answer: composed.reply.text, citations: composed.citations, refused: composed.reply.refused };
   await api.post(`self/questions/${q.id}/answer`, {
     sealed: sealAskMessage(key, ids, "a", composed.reply),

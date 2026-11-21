@@ -104,6 +104,12 @@ export function setSourceApp(db: Db, userId: string, id: string, input: { appId:
     const cur = own(db, userId, id);
     if (!input) {
       db.prepare("UPDATE sync_sources SET app_id = NULL, app_box = NULL, app_rev = 0 WHERE id = ?").run(id);
+      // The app no longer writes into the folder for this source: the write right it got for syncing goes back to read,
+      // unless another source still syncs into the same folder through it.
+      if (cur.appId) {
+        const still = db.prepare("SELECT 1 FROM sync_sources WHERE user_id = ? AND app_id = ? AND folder_id = ? AND id != ?").get(userId, cur.appId, cur.folderId, id);
+        if (!still) db.prepare("UPDATE grants SET mode = 'read' WHERE app_id = ? AND user_id = ? AND folder_id = ?").run(cur.appId, userId, cur.folderId);
+      }
       return;
     }
     const app = db.prepare("SELECT revoked_at FROM apps WHERE id = ? AND user_id = ?").get(input.appId, userId) as Row | undefined;

@@ -6,7 +6,7 @@
 // thing on its own: whether the owner has been inactive for the whole period.
 // Until then it hands out no share and no bundle.
 
-import { isBoxPublicKey, type StoredMemory } from "@sigil/core";
+import { isBoxPublicKey, legacyReleaseHash, type StoredMemory } from "@sigil/core";
 import { tx, type Db } from "./db";
 import { serverConfig } from "./config";
 import { HttpError, lastActive, logRead, touchActive } from "./store";
@@ -112,6 +112,8 @@ export interface PlanInput {
   threshold: number;
   periodDays: number;
   check: string;
+  /** The hash of the release proof only the combined legacy key gives. */
+  release: string;
   ownerBox: string;
   people: PersonInput[];
 }
@@ -150,23 +152,25 @@ export function savePlan(db: Db, userId: string, p: PlanInput): void {
       (db.prepare("SELECT id, invite_intro, invite_key, invite_tag, invite_user FROM legacy_people WHERE owner_id = ?").all(userId) as Row[]).map((r) => [String(r.id), r]),
     );
     if (old) {
-      db.prepare("UPDATE legacy_plans SET epoch = ?, threshold = ?, period_days = ?, check_value = ?, owner_box = ?, warned_stage = 0, warned_at = NULL, released_at = NULL, updated_at = ? WHERE id = ?").run(
+      db.prepare("UPDATE legacy_plans SET epoch = ?, threshold = ?, period_days = ?, check_value = ?, release_hash = ?, owner_box = ?, warned_stage = 0, warned_at = NULL, released_at = NULL, updated_at = ? WHERE id = ?").run(
         p.epoch,
         p.threshold,
         p.periodDays,
         p.check,
+        p.release,
         p.ownerBox,
         at,
         p.id,
       );
     } else {
-      db.prepare("INSERT INTO legacy_plans (id, user_id, epoch, threshold, period_days, check_value, owner_box, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+      db.prepare("INSERT INTO legacy_plans (id, user_id, epoch, threshold, period_days, check_value, release_hash, owner_box, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
         p.id,
         userId,
         p.epoch,
         p.threshold,
         p.periodDays,
         p.check,
+        p.release,
         p.ownerBox,
         at,
         at,
@@ -376,10 +380,14 @@ export function bundleFor(db: Db, userId: string, planId: string) {
 }
 
 /** The person opened their bundle in their browser and kept a copy under their own vault key. */
-export function markOpened(db: Db, userId: string, planId: string, kept: string): void {
+export function markOpened(db: Db, userId: string, planId: string, kept: string, proof: string): void {
   tx(db, () => {
     const { plan, person } = myPerson(db, userId, planId);
     needReleasable(db, plan);
+    // Only whoever combined enough shares holds the legacy key, and only the key gives this proof.
+    if (plan.release_hash == null || legacyReleaseHash(proof) !== String(plan.release_hash)) {
+      throw new HttpError(403, "This plan was not opened with enough shares. Ask the other trusted people to pass theirs.", "not_combined");
+    }
     const at = now();
     db.prepare("UPDATE legacy_people SET kept = ?, opened_at = COALESCE(opened_at, ?) WHERE id = ?").run(kept, at, String(person.id));
     if (!plan.released_at) {

@@ -3,7 +3,7 @@
 // inbox, the same call then works once, and the read log marks it.
 
 import { expect, test } from "@playwright/test";
-import { addFolder, connectApp, connectMcp, createWithWallet, fitsPhone, installWallet, mockModel, setUpModel, textOf, writeMemory } from "./helpers";
+import { addFolder, connectApp, connectMcp, createWithWallet, fitsPhone, installWallet, mockModel, setUpModel, textOf, writeMemory, openTab } from "./helpers";
 
 const HEALTH = "CANARY-blood-e2e-55";
 
@@ -14,7 +14,7 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
   await writeMemory(page, { title: "Blood test", body: `${HEALTH} results are fine. Call 0701234567.`, folder: "Health" });
 
   // Protect it, and mask phone numbers.
-  await page.getByRole("tab", { name: "Folders" }).click();
+  await openTab(page, "Folders");
   const row = page.locator(".list-row", { hasText: "Health" }).first();
   await row.getByRole("button", { name: "Protect" }).click();
   const form = page.getByRole("form", { name: "Protect Health" });
@@ -36,7 +36,7 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
     expect(held).toContain("asked in their Sigil inbox");
     expect(held).not.toContain(HEALTH);
 
-    await page.getByRole("tab", { name: "Inbox" }).click();
+    await openTab(page, "Inbox");
     const request = page.getByTestId("access-row").first();
     await expect(request).toContainText("Claude asks to read Health");
     await fitsPhone(page, "Inbox, a request to read a protected folder");
@@ -49,8 +49,8 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
 
     // Reading it is a read of its own: asked again, allowed again, then it comes, masked.
     expect(textOf(await client.callTool({ name: "read_memory", arguments: { id } }))).toContain("asked in their Sigil inbox");
-    await page.getByRole("tab", { name: "Memories" }).click();
-    await page.getByRole("tab", { name: "Inbox" }).click();
+    await openTab(page, "Memories");
+    await openTab(page, "Inbox");
     await expect(page.getByTestId("access-row").first()).toContainText('To read "Blood test"');
     await page.getByTestId("access-row").first().getByRole("button", { name: "Allow this read" }).click();
     const full = textOf(await client.callTool({ name: "read_memory", arguments: { id } }));
@@ -64,7 +64,7 @@ test("an app reads a protected folder only after the owner's yes, once, and the 
     await client.close();
   }
 
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.getByText('Read "Blood test" in a protected folder, after your yes')).toBeVisible();
   await expect(page.getByText("You allowed one read of a protected folder").first()).toBeVisible();
 });
@@ -75,7 +75,7 @@ test("the test chat asks before it uses a protected folder, for that one answer"
   await createWithWallet(page);
   await addFolder(page, "Health");
   await writeMemory(page, { title: "Blood test", body: `${HEALTH} blood test results are fine.`, folder: "Health" });
-  await page.getByRole("tab", { name: "Folders" }).click();
+  await openTab(page, "Folders");
   await page.locator(".list-row", { hasText: "Health" }).first().getByRole("button", { name: "Protect" }).click();
   const form = page.getByRole("form", { name: "Protect Health" });
   await form.getByLabel("Protection").selectOption({ label: "Protected: Health" });

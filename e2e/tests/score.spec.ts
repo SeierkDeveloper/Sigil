@@ -2,7 +2,7 @@
 // read log after a real connector read through MCP.
 
 import { expect, test } from "@playwright/test";
-import { connectApp, connectMcp, createWithWallet, fitsPhone, installWallet, textOf, writeMemory } from "./helpers";
+import { connectApp, connectMcp, createWithWallet, fitsPhone, installWallet, textOf, writeMemory, openTab } from "./helpers";
 
 test("each app shows a privacy score made from its reads, with where every point went", async ({ page, context, baseURL }) => {
   await installWallet(context);
@@ -11,7 +11,7 @@ test("each app shows a privacy score made from its reads, with where every point
   await writeMemory(page, { title: "Garden", body: "Plant tomatoes." });
   const appKey = await connectApp(page, { name: "Cursor", folders: ["Notes"] });
 
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await expect(page.getByTestId("privacy-score")).toContainText("Privacy score 100");
   await expect(page.getByTestId("privacy-score")).toContainText("Not active");
 
@@ -24,8 +24,8 @@ test("each app shows a privacy score made from its reads, with where every point
     await client.close();
   }
 
-  await page.getByRole("tab", { name: "Memories" }).click();
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Memories");
+  await openTab(page, "Apps");
   const score = page.getByTestId("privacy-score");
   // One of two memories read in full (15), one folder (5), one active day (1): 79.
   await expect(score).toContainText("Privacy score 79");

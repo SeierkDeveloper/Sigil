@@ -208,12 +208,17 @@ export function pendingHandoffs(db: Db, auth: AppAuth, spaceIds: string[]) {
   return [...own, ...inSpaces].map((r) => ({ id: String(r.id), fromApp: String(r.from_app), spaceId: r.space_id == null ? null : String(r.space_id), sealed: String(r.sealed), createdAt: String(r.created_at) }));
 }
 
-export function pickHandoffs(db: Db, auth: AppAuth, ids: string[]): void {
+export function pickHandoffs(db: Db, auth: AppAuth, ids: string[], spaceIds: string[]): void {
   tx(db, () => {
     const ins = db.prepare("INSERT OR IGNORE INTO handoff_picks (handoff_id, app_id, picked_at) VALUES (?, ?, ?)");
-    const exists = db.prepare("SELECT 1 FROM handoffs WHERE id = ?");
+    // Only notes this agent may see: its own, and those left in the spaces it is in. Any other id is passed over in silence.
+    const exists = db.prepare("SELECT space_id, from_app FROM handoffs WHERE id = ?");
+    const spaces = new Set(spaceIds);
     for (const id of ids) {
-      if (!exists.get(id)) continue;
+      const h = exists.get(id) as Row | undefined;
+      if (!h) continue;
+      const mine = h.space_id == null ? String(h.from_app) === auth.appId : spaces.has(String(h.space_id));
+      if (!mine) continue;
       if (Number(ins.run(id, auth.appId, now()).changes) > 0) logRead(db, auth, "handoff", `picked-${id}`, 1);
     }
   });

@@ -110,6 +110,15 @@ describe("a field claim", () => {
     expect(r.checks.find((x) => x.name === "claim")?.ok).toBe(false);
   });
 
+  it("does not count as checked when its roots were never compared with published or on-chain seals", async () => {
+    // A proof can make up its own roots: on its own it only agrees with itself.
+    const d = await made(fieldClaim(commitFields(memoryFields(passport)), 3));
+    const alone = await verifyDisclosure(d);
+    expect(alone.ok).toBe(false);
+    expect(alone.checks.find((x) => x.name === "roots")?.ok).toBe(false);
+    expect((await verifyDisclosure(d, { published: rootsOf(d) })).ok).toBe(true);
+  });
+
   it("fails when the statement is changed after signing", async () => {
     const d = await made(fieldClaim(commitFields(memoryFields(passport)), 1));
     const forged = { ...d, statement: { ...d.statement, issuedAt: "2020-01-01T00:00:00.000Z" } };

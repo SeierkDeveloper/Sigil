@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { obsidianFiles, takeoutZip } from "../../packages/core/test/fixtures/local";
-import { createWithWallet, installWallet, recordBodies } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, openTab } from "./helpers";
 
 const CANARY = "CANARY-local-import-e2e";
 
@@ -24,7 +24,7 @@ test("imports mail and calendar from Takeout, and an Obsidian folder, encrypted,
   await installWallet(context);
   const sent = recordBodies(page);
   await createWithWallet(page);
-  await page.getByRole("tab", { name: "Import" }).click();
+  await openTab(page, "Import");
 
   // Google Takeout.
   await page.getByText("Older Gmail and Calendar history", { exact: true }).click();

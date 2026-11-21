@@ -186,6 +186,10 @@ function Connect({ clients }: { clients: sync.SyncClients | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [onComputer, setOnComputer] = useState(false);
+  const [appId, setAppId] = useState("");
+  const [command, setCommand] = useState<string | null>(null);
+  const connectorApps = data.apps.filter((a) => !a.revokedAt && !data.agents.some((x) => x.appId === a.id) && a.kind !== "extension" && a.kind !== "web");
   const info = SYNC_INFO[kind];
   const provider = PROVIDER_INFO[info.provider];
   const clientId = clients ? clients[info.provider] : null;
@@ -193,10 +197,11 @@ function Connect({ clients }: { clients: sync.SyncClients | null }) {
 
   const connect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientId) return;
+    if (!clientId && !onComputer) return;
     setBusy(true);
     setError(null);
     setDone(null);
+    setCommand(null);
     try {
       let folder = target === NEW ? existing : data.folders.find((f) => f.id === target);
       if (!folder) {
@@ -204,6 +209,18 @@ function Connect({ clients }: { clients: sync.SyncClients | null }) {
         const made = folder;
         update((d) => ({ ...d, folders: [...d.folders, made] }));
       }
+      if (onComputer) {
+        const app = connectorApps.find((a) => a.id === appId) ?? connectorApps[0];
+        if (!app) throw new Error("Connect an app under Apps first (an MCP app is fine). Its connector signs in on your computer.");
+        const fresh = await ops.loadVault(api, vault);
+        const id = await sync.prepareOnComputer(api, vault, fresh, { kind, clientId: clientId ?? "", folder, app });
+        setCommand(sync.connectCommand(window.location.origin, id));
+        setDone(`${info.label} waits for your computer. Run the command below where ${app.name} is set up, sign in in the browser it opens, then keep it in sync with --watch.`);
+        const after = await ops.loadVault(api, vault);
+        update(() => after);
+        return;
+      }
+      if (!clientId) return;
       const source = await sync.connectSource(api, vault, { kind, clientId, folder, origin: window.location.origin });
       update((d) => ({ ...d, sync: [...d.sync, source] }));
       setDone(`${info.label} is connected. The first sync starts in a moment.`);
@@ -243,6 +260,29 @@ function Connect({ clients }: { clients: sync.SyncClients | null }) {
       ) : null}
       {error ? <Notice kind="error">{error}</Notice> : null}
       {done ? <Notice kind="success">{done}</Notice> : null}
+      {command ? <CodeBlock code={command} label="On your computer, with SIGIL_APP_KEY set as for your AI app" /> : null}
+      <label className="checkbox" htmlFor="sync-on-computer">
+        <input id="sync-on-computer" type="checkbox" checked={onComputer} onChange={(e) => setOnComputer(e.target.checked)} disabled={busy} />
+        <span>
+          Sign in on my computer instead. For a service that wants a client secret (Slack does): your connector signs in there with the secret from that computer, and keeps
+          the source in sync. Sigil never sees the secret or a token.
+        </span>
+      </label>
+      {onComputer ? (
+        <div className="field">
+          <label className="field-label" htmlFor="sync-app">
+            With the connector of
+          </label>
+          <select id="sync-app" className="select" value={appId} onChange={(e) => setAppId(e.target.value)} disabled={busy || connectorApps.length === 0}>
+            {connectorApps.length === 0 ? <option value="">Connect an app under Apps first</option> : null}
+            {connectorApps.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <div className="field">
         <label className="field-label" htmlFor="sync-folder">
           Into the folder
@@ -260,8 +300,8 @@ function Connect({ clients }: { clients: sync.SyncClients | null }) {
         <span className="field-hint">Read only: Sigil never sends, changes or deletes anything at {provider.label}. What it reads is: {info.reads}</span>
       </div>
       <div className="form-actions">
-        <button type="submit" className="button button-primary" disabled={busy || !clientId}>
-          <SyncIcon /> {busy ? "Connecting" : `Connect ${info.label}`}
+        <button type="submit" className="button button-primary" disabled={busy || (!clientId && !onComputer) || (onComputer && connectorApps.length === 0)}>
+          <SyncIcon /> {busy ? "Connecting" : onComputer ? `Prepare ${info.label} for my computer` : `Connect ${info.label}`}
         </button>
       </div>
     </form>

@@ -170,14 +170,18 @@ export interface LifeCertificate {
 }
 
 /** JSON with every object's keys in order, so the same body always gives the same bytes. */
-export function canonicalJson(value: unknown): string {
+/** The deepest nesting a signed document may have. Every Sigil document is far shallower. */
+export const MAX_JSON_DEPTH = 64;
+
+export function canonicalJson(value: unknown, depth = 0): string {
+  if (depth > MAX_JSON_DEPTH) throw new Error("This document is nested too deeply to be a Sigil document.");
   if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (Array.isArray(value)) return `[${value.map((v) => canonicalJson(v, depth + 1)).join(",")}]`;
   const obj = value as Record<string, unknown>;
   return `{${Object.keys(obj)
     .filter((k) => obj[k] !== undefined)
     .sort()
-    .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`)
+    .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k], depth + 1)}`)
     .join(",")}}`;
 }
 
@@ -310,6 +314,7 @@ export async function verifyCertificate(cert: LifeCertificate, opts: VerifyOptio
   };
   await compare("published", opts.published, "seals this site publishes");
   await compare("chain", opts.onChain, "seals on chain");
+  if (hours.length && !opts.published && !opts.onChain) add("roots", false, "The roots were not compared with any published or on-chain seals, so the proofs only show the document agrees with itself.");
 
   return { ok: checks.every((c) => c.ok), summary: summaryOk ? summary : null, checks };
 }

@@ -5,7 +5,7 @@
 // voice that runs on the device. No audio and no question reach Sigil.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory } from "./helpers";
+import { createWithWallet, fitsPhone, installWallet, mockModel, recordBodies, setUpModel, writeMemory, openTab } from "./helpers";
 
 test.use({ launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] }, permissions: ["microphone"] });
 
@@ -68,7 +68,7 @@ test("the test chat listens on the device and reads the answer aloud", async ({ 
   // The voice choice is kept, encrypted, for the next time the vault opens.
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "AI self" }).click();
+  await openTab(page, "AI self");
   await expect(page.locator(".self-chat").getByTestId("voice-mic")).toBeVisible({ timeout: 30_000 });
 
   // What was said never went to Sigil: only the model's public files came from it.

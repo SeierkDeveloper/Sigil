@@ -3,7 +3,7 @@
 // next draft follows it. Nothing is sent anywhere, and the server reads none of it.
 
 import { expect, test } from "@playwright/test";
-import { createWithWallet, installWallet, recordBodies } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, openTab } from "./helpers";
 
 test("a draft is approved with an edit, the self learns from it, and the next draft uses it", async ({ browser, baseURL }) => {
   const ctx = await browser.newContext();
@@ -13,7 +13,7 @@ test("a draft is approved with an edit, the self learns from it, and the next dr
   const wire = recordBodies(page);
   await createWithWallet(page);
 
-  await page.getByRole("tab", { name: "Work" }).click();
+  await openTab(page, "Work");
   const ask = page.getByRole("form", { name: "Ask for a draft" });
   await ask.getByLabel("The message").fill("Subject: The invoice\n\nCANARY-message Could you confirm when the invoice will be paid?");
   await ask.getByLabel("From").fill("Alex Example");
@@ -51,7 +51,7 @@ test("a draft is approved with an edit, the self learns from it, and the next dr
   await expect(page.getByTestId("lesson")).toHaveCount(0);
 
   // All of it is in the read log.
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await expect(page.getByText("Your edit became a note under How I write")).toBeVisible();
   await expect(page.getByText("You approved a reply")).toBeVisible();
 

@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-import { createWithWallet, installWallet, recordBodies } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, openTab } from "./helpers";
 
 const TEXT = "CANARY-terms Sam lends Robin the camera until 1 December. Robin returns it unharmed.";
 
@@ -19,11 +19,11 @@ test("an agreement is drafted in one vault, signed in another, sealed in both, a
   const wire = [...recordBodies(sam), ...recordBodies(robin)];
 
   await createWithWallet(robin);
-  await robin.getByRole("tab", { name: "Folders" }).click();
+  await openTab(robin, "Folders");
   const robinCode = (await robin.getByTestId("vault-code").innerText()).trim();
 
   await createWithWallet(sam);
-  await sam.getByRole("tab", { name: "Agreements" }).click();
+  await openTab(sam, "Agreements");
   await sam.getByRole("button", { name: "Draft an agreement" }).click();
   const form = sam.getByRole("form", { name: "Draft an agreement" });
   await form.getByLabel("Their vault code").fill(robinCode);
@@ -35,7 +35,7 @@ test("an agreement is drafted in one vault, signed in another, sealed in both, a
   const samCard = sam.getByTestId("agreement-card");
   await expect(samCard).toContainText("Waiting for a signature");
 
-  await robin.getByRole("tab", { name: "Agreements" }).click();
+  await openTab(robin, "Agreements");
   const robinCard = robin.getByTestId("agreement-card");
   await expect(robinCard).toContainText(TEXT, { timeout: 20_000 });
   await robinCard.getByRole("button", { name: "Sign it" }).click();
@@ -64,7 +64,7 @@ test("an agreement is drafted in one vault, signed in another, sealed in both, a
   await expect(result).toHaveAttribute("data-ok", "false");
 
   // Both logs have it.
-  await robin.getByRole("tab", { name: "Read log" }).click();
+  await openTab(robin, "Read log");
   await expect(robin.getByText("An agreement was signed by both: its fingerprint is sealed with this hour")).toBeVisible();
 
   const sent = wire.filter((b) => b.includes(baseURL!)).join("\n");

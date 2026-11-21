@@ -73,7 +73,8 @@ export function ibanValid(value: string): boolean {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const RULES: Record<RedactRule, (text: string, mask: string) => { text: string; n: number }> = {
-  email: (text, mask) => replaceAll(text, /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g, () => mask),
+  // Bounded parts (an address is at most 64 characters before the @, labels at most 63): linear on any text.
+  email: (text, mask) => replaceAll(text, /[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]{1,63}(?:\.[A-Za-z0-9-]{1,63}){0,8}\.[A-Za-z]{2,24}/g, () => mask),
   iban: (text, mask) => replaceAll(text, /\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,4})?\b/g, (m) => (ibanValid(m) ? mask : null)),
   card: (text, mask) =>
     replaceAll(text, /\b\d(?:[ -]?\d){11,18}\b/g, (m) => {

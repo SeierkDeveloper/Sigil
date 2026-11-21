@@ -92,15 +92,13 @@ export function MemoriesTab() {
   );
   // Expired memories wait in Review, under Expired, until they are restored or deleted.
   const all = useMemo<ListedMemory[]>(() => [...data.memories.filter((m) => !isExpired(m)), ...shared], [data.memories, shared]);
+  // Made once per change of the memories, not per keystroke: search keeps what it worked out for each of these objects.
+  const searchable = useMemo(() => all.map((m) => ({ ...m, text: m.body })), [all]);
   const results = useMemo(() => {
-    const pool = folder === "all" ? all : all.filter((m) => m.folderId === folder);
+    const pool = folder === "all" ? searchable : searchable.filter((m) => m.folderId === folder);
     const vector = queryVector && queryVector.query === query.trim() ? queryVector.vector : null;
-    return hybridSearch(
-      pool.map((m) => ({ ...m, text: m.body })),
-      query,
-      { queryVector: vector, vectors: semantic.vectors },
-    );
-  }, [all, folder, query, queryVector, semantic.vectors]);
+    return hybridSearch(pool, query, { queryVector: vector, vectors: semantic.vectors });
+  }, [searchable, folder, query, queryVector, semantic.vectors]);
 
   const current: ListedMemory | null = selected && selected !== "new" ? (all.find((m) => m.id === selected) ?? data.memories.find((m) => m.id === selected) ?? null) : null;
   const terms = useMemo(() => [...new Set(tokenize(query))], [query]);
@@ -128,6 +126,7 @@ export function MemoriesTab() {
 
   return (
     <div className="memories">
+      <p className="small muted screen-help">Everything your vault remembers. Search by words or by meaning, open a memory to read or change it, or write a new one. Only you and the apps you allow can read them.</p>
       <div className="toolbar">
         <div className="search">
           <SearchIcon />

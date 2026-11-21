@@ -56,6 +56,7 @@ export const navGroups: NavGroup[] = [
       { href: "/how-it-works", label: "How it works", text: "From sign-up to a sealed read, in plain words" },
       { href: "/security", label: "Security", text: "Keys, encryption and what the server holds" },
       { href: "/threat-model", label: "Threat model", text: "What Sigil protects against, and what it does not" },
+      { href: "/immune", label: "Immune system", text: "Hidden instructions caught, attacked every hour in public" },
       { href: "/privacy", label: "Privacy", text: "What is stored, and for how long" },
       { href: "/status", label: "Status", text: "Live health of the service and the seal job" },
     ],

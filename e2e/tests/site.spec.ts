@@ -5,7 +5,7 @@
 import { expect, test } from "@playwright/test";
 import { chatGptZip } from "../../packages/core/test/fixtures/exports";
 import { navGroups } from "../../web/src/lib/site";
-import { connectMcp, createWithWallet, fitsPhone, installWallet, textOf } from "./helpers";
+import { connectMcp, createWithWallet, fitsPhone, installWallet, textOf, openTab } from "./helpers";
 
 const pages = navGroups.flatMap((g) => g.items);
 
@@ -32,7 +32,7 @@ test("the header menus open and lead to every page", async ({ page }) => {
 test("every page in the menu answers with its own heading and no broken layout", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
-  expect(pages.length).toBe(26);
+  expect(pages.length).toBe(27);
   for (const item of pages) {
     const res = await page.goto(item.href);
     // A link to another part of the page already open loads nothing new, so the address is asked for directly.
@@ -92,7 +92,7 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
   await page.getByRole("button", { name: "Save memory" }).click();
   await expect(page.locator(".memory-item-title", { hasText: "Harbour notes" })).toBeVisible();
 
-  await page.getByRole("tab", { name: "Apps" }).click();
+  await openTab(page, "Apps");
   await page.getByRole("button", { name: "Connect your first app" }).click();
   await page.getByLabel("Notes").check();
   await page.getByRole("button", { name: "Create app key" }).click();
@@ -104,7 +104,7 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
   expect(textOf(await mcp.callTool({ name: "search_memories", arguments: { query: "harbour" } }))).toContain("Harbour notes");
   await mcp.close();
 
-  await page.getByRole("tab", { name: "Read log" }).click();
+  await openTab(page, "Read log");
   await page.waitForTimeout(5_000);
   await page.getByRole("button", { name: "Refresh" }).click();
   const row = page.locator(".log-row").first();
@@ -168,10 +168,10 @@ test("an entry copied from the read log verifies on the public pages", async ({ 
 test("the open standard reads as one document: its facts, numbered contents and every part, on a phone too", async ({ page }) => {
   await page.goto("/spec");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("The Sigil open standard");
-  await expect(page.locator(".spec-sheet")).toContainText("Version1.2.0");
+  await expect(page.locator(".spec-sheet")).toContainText("Version1.3.0");
   const contents = page.getByRole("navigation", { name: "Parts of the standard" });
-  await expect(contents.locator(".spec-index > li")).toHaveCount(14);
-  await expect(page.locator(".spec-part")).toHaveCount(13);
+  await expect(contents.locator(".spec-index > li")).toHaveCount(15);
+  await expect(page.locator(".spec-part")).toHaveCount(14);
   // A link in the contents and a link between parts both land on a heading of this page.
   await contents.getByRole("link", { name: "2. Keys, envelopes and sealed boxes" }).click();
   await expect(page).toHaveURL(/\/spec#keys$/);

@@ -44,6 +44,12 @@ export interface SyncState {
   /** Goes up with every change, so the newer of two copies wins. */
   rev: number;
   last: SyncRun | null;
+  /**
+   * "connector": the sign-in was made on the owner's computer by the connector
+   * (for a provider that needs a client secret, which a browser cannot keep), and
+   * only the connector syncs it. The vault never runs a pass for it.
+   */
+  via?: "connector";
 }
 
 export function cleanSyncState(value: unknown): SyncState | null {
@@ -62,7 +68,13 @@ export function cleanSyncState(value: unknown): SyncState | null {
     account: String(v.account ?? "").slice(0, 200),
     rev: Number.isInteger(v.rev) ? Number(v.rev) : 0,
     last: last ? { at: String(last.at), added: Number(last.added) || 0, updated: Number(last.updated) || 0, removed: Number(last.removed) || 0, error: last.error ? String(last.error) : null } : null,
+    ...(v.via === "connector" ? { via: "connector" as const } : {}),
   };
+}
+
+/** A source waiting for its sign-in on the owner's computer: no tokens yet, synced only by the connector. */
+export function waitingForConnector(kind: SyncKind, folderId: string, clientId: string): SyncState {
+  return { v: 1, kind, folderId, clientId, tokens: { access: "", refresh: null, expiresAt: null, scope: "" }, cursor: null, account: "", rev: 1, last: null, via: "connector" };
 }
 
 export async function sealSyncState(vaultKey: CryptoKey, sourceId: string, state: SyncState): Promise<string> {
@@ -132,6 +144,7 @@ const PROVIDERS: Record<SyncKind, (ctx: ProviderCtx) => Promise<SyncBatch>> = {
 };
 
 export async function runSyncPass(start: SyncState, opts: PassOptions): Promise<PassResult> {
+  if (!start.tokens.access) throw new SyncError("This source has not been signed in yet. Run the connect command on your computer.", "auth");
   const fetcher = opts.fetch ?? ((i, init) => fetch(i, init));
   const now = opts.now ?? Date.now();
   let state: SyncState = { ...start };

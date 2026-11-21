@@ -5,7 +5,7 @@
 
 import { expect, test } from "@playwright/test";
 import { parseIdentityStatement, verifyIdentityStatement } from "@sigil/core";
-import { createWithWallet, installWallet, recordBodies } from "./helpers";
+import { createWithWallet, installWallet, recordBodies, openTab } from "./helpers";
 
 test("the identity tab works off chain: key, signed statement, wallet rules", async ({ browser, baseURL }) => {
   const ctx = await browser.newContext();
@@ -14,7 +14,7 @@ test("the identity tab works off chain: key, signed statement, wallet rules", as
   const wire = recordBodies(page);
   await createWithWallet(page);
 
-  await page.getByRole("tab", { name: "Identity" }).click();
+  await openTab(page, "Identity");
   await expect(page.getByTestId("identity-offchain")).toContainText("no registry of AI selves on chain yet");
   await page.getByRole("button", { name: "Make the self's key" }).click();
   const address = (await page.getByTestId("self-address").innerText()).trim();
@@ -55,7 +55,7 @@ test("the identity tab works off chain: key, signed statement, wallet rules", as
   // After a reload the draft is back, opened on the device.
   await page.reload();
   await page.getByTestId("method-wallet").click();
-  await page.getByRole("tab", { name: "Identity" }).click();
+  await openTab(page, "Identity");
   await expect(page.getByRole("form", { name: "Wallet rules" }).getByLabel("Recipient 1 label")).toHaveValue("CANARY-friend");
   await expect(page.getByTestId("self-address")).toHaveText(address);
 

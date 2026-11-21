@@ -198,8 +198,10 @@ describe("request checks", () => {
     const { b } = await signedUp(h);
     const res = await h.raw("POST", "folders", { body: {}, headers: { cookie: `sigil_session=${b.cookie()}`, origin: "https://evil.example" } });
     expect(res.status).toBe(403);
+    // Signing out is a change too: it needs the site's own origin.
     const noOrigin = await h.raw("POST", "auth/logout", {});
-    expect(noOrigin.status).toBe(200);
+    expect(noOrigin.status).toBe(403);
+    expect((await h.raw("POST", "auth/logout", { headers: { origin: ORIGIN } })).status).toBe(200);
     expect((await h.raw("GET", "vault")).status).toBe(401);
   });
 
