@@ -13,7 +13,7 @@ export const site = {
   /** Path to the logo file (for example "/logo.svg"). While null, the header shows the text wordmark. */
   logoSrc: "/logo.png" as string | null,
   /** Set to true once the connector is published to npm; the docs then show the npx command. */
-  connectorPublished: false,
+  connectorPublished: true,
   connectorPackage: "sigil-connector",
 } as const;
 
