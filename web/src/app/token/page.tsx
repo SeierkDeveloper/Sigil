@@ -49,7 +49,7 @@ export default async function TokenPage() {
       <div className="container">
         <PageHeader
           eyebrow={live ? c.symbol : "Token"}
-          title="Bought back and burned, every half hour"
+          title="Bought back and burned, every 30 min"
           lead={`Sigil's token. Part of every trade's fee buys it back and burns it, so the supply only goes down. Nobody runs the burn by hand, and every burn is a transaction anyone can check.`}
         />
 
@@ -127,7 +127,7 @@ export default async function TokenPage() {
                     <dd className="stat-value">
                       <span className="stat-number">{num(s.burnCount)}</span>
                     </dd>
-                    <dd className="stat-text">{s.lastBurnAt ? `The last one ${when(s.lastBurnAt)}.` : "The first one comes half an hour after the first fees."}</dd>
+                    <dd className="stat-text">{s.lastBurnAt ? `The last one ${when(s.lastBurnAt)}.` : "The first one comes 30 min after the first fees."}</dd>
                   </div>
                   <div className="stat">
                     <dt className="stat-label">In the pot now</dt>
@@ -178,7 +178,7 @@ export default async function TokenPage() {
                   </table>
                 </div>
               ) : (
-                <p className="small">No burn yet. The first one comes half an hour after the first trading fees reach the pot.</p>
+                <p className="small">No burn yet. The first one comes 30 min after the first trading fees reach the pot.</p>
               )}
             </section>
           </>

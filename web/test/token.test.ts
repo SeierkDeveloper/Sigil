@@ -10,3 +10,12 @@ describe("the token page", () => {
     expect(tokenLive(tokenConfig({ ...base, SIGIL_TOKEN: "on", SIGIL_BURN_POT: "nope" }))).toBe(false);
   });
 });
+
+import { tokenNavLabel } from "../src/lib/site";
+describe("the token's menu label", () => {
+  it("says Token until the token is switched on, then the ticker", () => {
+    expect(tokenNavLabel({})).toBe("Token");
+    expect(tokenNavLabel({ NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL: "$TICKER" })).toBe("Token");
+    expect(tokenNavLabel({ NEXT_PUBLIC_SIGIL_TOKEN: "on", NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL: "$TICKER" })).toBe("$TICKER");
+  });
+});

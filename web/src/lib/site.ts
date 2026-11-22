@@ -1,5 +1,11 @@
 // Site-wide settings. Change links and switches here, nowhere else.
 
+/** The token's menu label: "Token" until launch, the ticker once the token is switched on at build time. */
+export function tokenNavLabel(env: { NEXT_PUBLIC_SIGIL_TOKEN?: string; NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL?: string }): string {
+  const symbol = (env.NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL || "").trim();
+  return env.NEXT_PUBLIC_SIGIL_TOKEN === "on" && symbol ? symbol : "Token";
+}
+
 export const site = {
   name: "Sigil",
   /** The public address of this site. Set NEXT_PUBLIC_SITE_URL when building for production. */
@@ -83,7 +89,7 @@ export const navGroups: NavGroup[] = [
       { href: "/roadmap", label: "Roadmap", text: "Ten stages ahead, from Next to Vision" },
       { href: "/changelog", label: "Changelog", text: "What has been built so far" },
       // The token's page: always in the menu. Its label is the ticker only once it is live (set at build time, see server/token.ts).
-      { href: "/token", label: (process.env.NEXT_PUBLIC_SIGIL_TOKEN === "on" && process.env.NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL) || "Token", text: "Bought back and burned, every half hour" },
+      { href: "/token", label: tokenNavLabel({ NEXT_PUBLIC_SIGIL_TOKEN: process.env.NEXT_PUBLIC_SIGIL_TOKEN, NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL: process.env.NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL }), text: "Bought back and burned, every 30 min" },
     ],
   },
 ];
