@@ -82,10 +82,8 @@ export const navGroups: NavGroup[] = [
       { href: "/ai-self", label: "The AI self", text: "The long-term idea, told as a story" },
       { href: "/roadmap", label: "Roadmap", text: "Ten stages ahead, from Next to Vision" },
       { href: "/changelog", label: "Changelog", text: "What has been built so far" },
-      // The network token's page: in the menu only once it is live (both set at build time, see server/token.ts).
-      ...(process.env.NEXT_PUBLIC_SIGIL_TOKEN === "on"
-        ? [{ href: "/token", label: process.env.NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL || "Token", text: "The contract, every burn and what the pot holds" }]
-        : []),
+      // The token's page: always in the menu. Its label is the ticker only once it is live (set at build time, see server/token.ts).
+      { href: "/token", label: (process.env.NEXT_PUBLIC_SIGIL_TOKEN === "on" && process.env.NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL) || "Token", text: "Bought back and burned, every half hour" },
     ],
   },
 ];

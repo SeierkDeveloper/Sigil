@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { CodeBlock } from "@/components/CodeBlock";
+import { site } from "@/lib/site";
 import { readToken, tokenConfig, tokenLive } from "@/server/token";
 
-// Read on every request (the numbers are cached for a minute on the server), and only while the token is live.
+// Always shown. Before the launch it explains the burn and says where the address will appear, without the ticker
+// (nobody can launch a copy under the right name ahead of it). Once live (see server/token.ts) it adds the contract
+// and the burns read from the chain, cached for a minute on the server.
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
   const c = tokenConfig();
-  if (!tokenLive(c)) return { title: "Not found" };
-  return { title: c.symbol, description: `${c.symbol}, the network token: bought back and burned by its contract at most every 30 minutes.` };
+  const live = tokenLive(c);
+  const name = live ? c.symbol : "Sigil's token";
+  return {
+    title: live ? c.symbol : "Token",
+    description: `${name}: part of every trade's fee buys it back and burns it, at most every 30 minutes, so the supply only goes down.`,
+  };
 }
 
 const short = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
@@ -19,8 +26,9 @@ const when = (t: number) => new Date(t).toLocaleString("en-GB", { day: "numeric"
 
 export default async function TokenPage() {
   const c = tokenConfig();
-  if (!tokenLive(c)) notFound();
-  const s = await readToken(c).catch(() => null);
+  const live = tokenLive(c);
+  const name = live ? c.symbol : "the token";
+  const s = live ? await readToken(c).catch(() => null) : null;
   const link = (path: string, label: string) =>
     c.explorer ? (
       <a href={`${c.explorer}/${path}`} target="_blank" rel="noopener noreferrer">
@@ -30,117 +38,185 @@ export default async function TokenPage() {
       label
     );
 
+  const steps = [
+    { title: "Every trade pays a fee", text: `Each buy or sell of ${name} pays a small fee, taken by its contracts as part of the trade.` },
+    { title: "The burn pot buys it back", text: `Part of that fee goes to the burn pot, a contract that at most every 30 minutes spends what it holds on ${name}.` },
+    { title: "The token's own burn destroys it", text: "Everything it buys is burned with the token's own burn, not parked at a dead address, so the total supply really goes down." },
+  ];
+
   return (
     <div className="page">
       <div className="container">
         <PageHeader
-          eyebrow={c.symbol}
+          eyebrow={live ? c.symbol : "Token"}
           title="Bought back and burned, every half hour"
-          lead={`Every trade of ${c.symbol} pays a small fee. Part of it goes to the burn pot, a contract that at most every 30 minutes spends what it holds on ${c.symbol} and burns all of it with the token's own burn, so the supply only goes down. Nobody runs it by hand.`}
+          lead={`Sigil's token. Part of every trade's fee buys it back and burns it, so the supply only goes down. Nobody runs the burn by hand, and every burn is a transaction anyone can check.`}
         />
 
         <section className="page-section" aria-labelledby="ca-title">
           <h2 id="ca-title" className="section-title">
             The contract
           </h2>
-          <CodeBlock code={c.token!} label={`${c.symbol} contract address`} />
-          <p className="small">
-            {link(`address/${c.token}`, "The token on the explorer")} · {link(`address/${c.pot}`, "The burn pot on the explorer")}
-            {c.tradeUrl ? (
-              <>
-                {" "}
-                ·{" "}
-                <a href={c.tradeUrl} target="_blank" rel="noopener noreferrer">
-                  Where it trades
-                </a>
-              </>
-            ) : null}
-          </p>
-        </section>
-
-        <section className="page-section" aria-labelledby="burn-title">
-          <h2 id="burn-title" className="section-title">
-            Burned so far
-          </h2>
-          {s ? (
-            <dl className="stats">
-              <div className="stat">
-                <dt className="stat-label">Burned</dt>
-                <dd className="stat-value">
-                  <span className="stat-number">{num(s.burnedTokens)}</span>
-                </dd>
-                <dd className="stat-text">{c.symbol} gone for good, read from the pot.</dd>
-              </div>
-              <div className="stat">
-                <dt className="stat-label">Supply left</dt>
-                <dd className="stat-value">
-                  <span className="stat-number">{num(s.supplyLeft)}</span>
-                </dd>
-                <dd className="stat-text">The token&apos;s own total supply, right now.</dd>
-              </div>
-              <div className="stat">
-                <dt className="stat-label">Burns</dt>
-                <dd className="stat-value">
-                  <span className="stat-number">{num(s.burnCount)}</span>
-                </dd>
-                <dd className="stat-text">{s.lastBurnAt ? `The last one ${when(s.lastBurnAt)}.` : "The first one comes half an hour after the first fees."}</dd>
-              </div>
-              <div className="stat">
-                <dt className="stat-label">In the pot now</dt>
-                <dd className="stat-value">
-                  <span className="stat-number">{num(s.potEth, 4)}</span>
-                </dd>
-                <dd className="stat-text">
-                  ETH waiting for the next burn{s.nextBurnAt ? `, from ${when(s.nextBurnAt)}` : ""}. Spent on burns so far: {num(s.ethSpent, 4)} ETH.
-                </dd>
-              </div>
-            </dl>
+          {live ? (
+            <>
+              <CodeBlock code={c.token!} label={`${c.symbol} contract address`} />
+              <p className="small">
+                {link(`address/${c.token}`, "The token on the explorer")} · {link(`address/${c.pot}`, "The burn pot on the explorer")}
+                {c.tradeUrl ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <a href={c.tradeUrl} target="_blank" rel="noopener noreferrer">
+                      Where it trades
+                    </a>
+                  </>
+                ) : null}
+              </p>
+            </>
           ) : (
             <p className="notice" role="status">
-              <span>The numbers could not be read from the chain right now. They come back by themselves; the contracts keep burning either way.</span>
+              <span>
+                Not live yet. The contract address appears here the moment the token is live, and is posted on{" "}
+                <a href={site.xUrl} target="_blank" rel="noopener noreferrer">
+                  Sigil&apos;s X
+                </a>{" "}
+                at the same time. Any address you see before that is not Sigil&apos;s.
+              </span>
             </p>
           )}
         </section>
 
-        <section className="page-section" aria-labelledby="burns-title">
-          <h2 id="burns-title" className="section-title">
-            Every burn
+        <section className="page-section" aria-labelledby="how-title">
+          <h2 id="how-title" className="section-title">
+            How the burn works
           </h2>
-          {s && s.burns.length ? (
-            <div className="table-wrap">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>No.</th>
-                    <th>When</th>
-                    <th>Spent</th>
-                    <th>Burned</th>
-                    <th>Transaction</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.burns.map((b) => (
-                    <tr key={b.tx + b.n}>
-                      <td>{b.n}</td>
-                      <td>{when(b.at)}</td>
-                      <td>{num(b.eth, 4)} ETH</td>
-                      <td>
-                        {num(b.tokens)} {c.symbol}
-                      </td>
-                      <td>{link(`tx/${b.tx}`, short(b.tx))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="small">No burn yet. The first one comes half an hour after the first trading fees reach the pot.</p>
-          )}
+          <ol className="steps steps-3">
+            {steps.map((x) => (
+              <li key={x.title} className="step">
+                <h3 className="step-title">{x.title}</h3>
+                <p className="step-text">{x.text}</p>
+              </li>
+            ))}
+          </ol>
         </section>
 
-        <p className="faint small">
-          {c.symbol} can lose all of its value. Holding it gives no claim on Sigil, its income or anything else, and no share of anything. Trade it at your own risk.
-        </p>
+        {live ? (
+          <>
+            <section className="page-section" aria-labelledby="burn-title">
+              <h2 id="burn-title" className="section-title">
+                Burned so far
+              </h2>
+              {s ? (
+                <dl className="stats">
+                  <div className="stat">
+                    <dt className="stat-label">Burned</dt>
+                    <dd className="stat-value">
+                      <span className="stat-number">{num(s.burnedTokens)}</span>
+                    </dd>
+                    <dd className="stat-text">{c.symbol} gone for good, read from the pot.</dd>
+                  </div>
+                  <div className="stat">
+                    <dt className="stat-label">Supply left</dt>
+                    <dd className="stat-value">
+                      <span className="stat-number">{num(s.supplyLeft)}</span>
+                    </dd>
+                    <dd className="stat-text">The token&apos;s own total supply, right now.</dd>
+                  </div>
+                  <div className="stat">
+                    <dt className="stat-label">Burns</dt>
+                    <dd className="stat-value">
+                      <span className="stat-number">{num(s.burnCount)}</span>
+                    </dd>
+                    <dd className="stat-text">{s.lastBurnAt ? `The last one ${when(s.lastBurnAt)}.` : "The first one comes half an hour after the first fees."}</dd>
+                  </div>
+                  <div className="stat">
+                    <dt className="stat-label">In the pot now</dt>
+                    <dd className="stat-value">
+                      <span className="stat-number">{num(s.potEth, 4)}</span>
+                    </dd>
+                    <dd className="stat-text">
+                      ETH waiting for the next burn{s.nextBurnAt ? `, from ${when(s.nextBurnAt)}` : ""}. Spent on burns so far: {num(s.ethSpent, 4)} ETH.
+                    </dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="notice" role="status">
+                  <span>The numbers could not be read from the chain right now. They come back by themselves; the contracts keep burning either way.</span>
+                </p>
+              )}
+            </section>
+
+            <section className="page-section" aria-labelledby="burns-title">
+              <h2 id="burns-title" className="section-title">
+                Every burn
+              </h2>
+              {s && s.burns.length ? (
+                <div className="table-wrap">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>No.</th>
+                        <th>When</th>
+                        <th>Spent</th>
+                        <th>Burned</th>
+                        <th>Transaction</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {s.burns.map((b) => (
+                        <tr key={b.tx + b.n}>
+                          <td>{b.n}</td>
+                          <td>{when(b.at)}</td>
+                          <td>{num(b.eth, 4)} ETH</td>
+                          <td>
+                            {num(b.tokens)} {c.symbol}
+                          </td>
+                          <td>{link(`tx/${b.tx}`, short(b.tx))}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="small">No burn yet. The first one comes half an hour after the first trading fees reach the pot.</p>
+              )}
+            </section>
+          </>
+        ) : null}
+
+        <section className="page-section" aria-labelledby="more-title">
+          <h2 id="more-title" className="section-title">
+            What it is, and what it is not
+          </h2>
+          <div className="grid grid-3">
+            <article className="card">
+              <span className="card-number">In the open</span>
+              <h3 className="card-title">Every burn on the chain</h3>
+              <p className="card-text">
+                Each burn is its own transaction. Once the token is live, this page reads them straight from the contracts, with a link to every one.
+              </p>
+            </article>
+            <article className="card">
+              <span className="card-number">Not needed</span>
+              <h3 className="card-title">Sigil works without it</h3>
+              <p className="card-text">Your vault, your AI self and every app that connects to it work the same whether you hold the token or not.</p>
+            </article>
+            <article className="card">
+              <span className="card-number">Later</span>
+              <h3 className="card-title">It pays for the network</h3>
+              <p className="card-text">
+                When the network arrives, its fees are paid in the token and burned on use. <Link href="/roadmap">See the roadmap</Link>.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section className="page-section">
+          <p className="faint small">
+          At your own risk. The token can lose all of its value. Holding it gives no claim on Sigil, its income or anything else, and no share of
+          anything. Not investment advice. Check every transaction in your own wallet before you sign it.
+          </p>
+        </section>
       </div>
     </div>
   );
