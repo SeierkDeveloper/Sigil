@@ -22,6 +22,8 @@ ARG SIGIL_ORIGIN=
 ARG SIGIL_BACKUP_ORIGINS=
 ARG SIGIL_CHAIN_READ_RPC=
 ARG SIGIL_IDENTITY_READ_RPC=
+ARG NEXT_PUBLIC_SIGIL_TOKEN=
+ARG NEXT_PUBLIC_SIGIL_TOKEN_SYMBOL=
 RUN npm run build -w @sigil/web && npm prune --omit=dev --workspace @sigil/web --workspace @sigil/core --include-workspace-root
 
 FROM node:22.13-bookworm-slim

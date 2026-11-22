@@ -833,7 +833,7 @@ Only what comes next. Everything already built is in the sections above and on t
 | 7 | **Memory for organisations**: a company memory with roles where every read is sealed; agent fleets sharing one memory with budgets and a full audit trail; data requests answered from the vault in one step | Later |
 | 8 | **Everywhere you are**: native apps for phones, computers and watches syncing directly between your own devices; glasses and wearables capturing hands-free; car and home | Vision |
 | 9 | **A network nobody can switch off**: nodes keeping encrypted, erasure-coded copies of each other's vaults, checked every hour; the protocol governed by the people who run and use it | Vision |
-| 10 | **The memory economy**: licensed knowledge packs and paid sessions with expert selves; your data offered at your price, revoked when you say; Sigil's own memory model trained only on what people chose to share; $SIGIL, the network token, paid for network fees and burned on use | Vision |
+| 10 | **The memory economy**: licensed knowledge packs and paid sessions with expert selves; your data offered at your price, revoked when you say; Sigil's own memory model trained only on what people chose to share; the network token, paid for network fees and burned on use | Vision |
 
 Plans can change. Nothing in the roadmap is a promise or an offer.
 

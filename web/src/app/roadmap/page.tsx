@@ -126,7 +126,7 @@ const stages: Stage[] = [
       "Licensed knowledge packs and paid sessions with expert selves, priced by their owners",
       "Your data offered at your price, for a purpose you approve, revoked when you say",
       "Sigil's own memory model, trained only on what people chose to share",
-      "$SIGIL, the network token, paid for network fees and burned on use",
+      "The network token, paid for network fees and burned on use",
     ],
   },
 ];
