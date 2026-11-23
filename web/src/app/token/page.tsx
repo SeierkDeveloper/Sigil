@@ -113,14 +113,14 @@ export default async function TokenPage() {
                     <dd className="stat-value">
                       <span className="stat-number">{num(s.burnedTokens)}</span>
                     </dd>
-                    <dd className="stat-text">{c.symbol} gone for good, read from the pot.</dd>
+                    <dd className="stat-text">{c.symbol} gone for good: every burn by the pot plus the dev wallet&apos;s own bag.</dd>
                   </div>
                   <div className="stat">
                     <dt className="stat-label">Supply left</dt>
                     <dd className="stat-value">
                       <span className="stat-number">{num(s.supplyLeft)}</span>
                     </dd>
-                    <dd className="stat-text">The token&apos;s own total supply, right now.</dd>
+                    <dd className="stat-text">Total supply minus everything burned, right now.</dd>
                   </div>
                   <div className="stat">
                     <dt className="stat-label">Burns</dt>
@@ -165,9 +165,9 @@ export default async function TokenPage() {
                     <tbody>
                       {s.burns.map((b) => (
                         <tr key={b.tx + b.n}>
-                          <td>{b.n}</td>
+                          <td>{b.dev ? "Dev" : b.n}</td>
                           <td>{when(b.at)}</td>
-                          <td>{num(b.eth, 4)} ETH</td>
+                          <td>{b.dev ? "Dev wallet bag" : `${num(b.eth, 4)} ETH`}</td>
                           <td>
                             {num(b.tokens)} {c.symbol}
                           </td>

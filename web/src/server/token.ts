@@ -10,6 +10,7 @@
 //   SIGIL_TOKEN_RPC                a public read-only RPC of the chain the token lives on
 //   SIGIL_TOKEN_EXPLORER           the explorer base address, for links to the contract and every burn
 //   SIGIL_TOKEN_TRADE_URL          where it trades
+//   SIGIL_DEV_BURN_TX              the dev wallet's burn of its own bag (sent to the dead address), shown as its own row
 import { createPublicClient, formatEther, http, parseAbi, parseAbiItem, type Address, type Hex } from "viem";
 
 export interface TokenConfig {
@@ -21,6 +22,7 @@ export interface TokenConfig {
   rpc: string;
   explorer: string;
   tradeUrl: string;
+  devBurnTx: Hex | null;
 }
 
 export function tokenConfig(env: Record<string, string | undefined> = process.env): TokenConfig {
@@ -34,6 +36,7 @@ export function tokenConfig(env: Record<string, string | undefined> = process.en
     rpc: (env.SIGIL_TOKEN_RPC || "").trim(),
     explorer: (env.SIGIL_TOKEN_EXPLORER || "").trim().replace(/\/$/, ""),
     tradeUrl: (env.SIGIL_TOKEN_TRADE_URL || "").trim(),
+    devBurnTx: /^0x[0-9a-fA-F]{64}$/.test((env.SIGIL_DEV_BURN_TX || "").trim()) ? (env.SIGIL_DEV_BURN_TX!.trim() as Hex) : null,
   };
 }
 
@@ -42,7 +45,7 @@ export function tokenLive(c: TokenConfig = tokenConfig()): boolean {
   return c.on && !!c.symbol && !!c.token && !!c.pot && !!c.rpc;
 }
 
-export interface Burn { n: number; at: number; eth: number; tokens: number; tx: Hex }
+export interface Burn { n: number; at: number; eth: number; tokens: number; tx: Hex; dev?: boolean }
 export interface TokenState {
   supplyLeft: number;
   burnedTokens: number;
@@ -62,7 +65,9 @@ const POT = parseAbi([
   "function lastBurnAt() view returns (uint256)",
   "function preview() view returns (uint256 amount, uint256 nextAt, bool ready, uint256 tokens)",
 ]);
-const TOKEN = parseAbi(["function totalSupply() view returns (uint256)"]);
+const TOKEN = parseAbi(["function totalSupply() view returns (uint256)", "function balanceOf(address) view returns (uint256)"]);
+// Tokens sent here can never move again; the token's burn() for holders sends them here, so they count as burned.
+const DEAD = "0x000000000000000000000000000000000000dEaD" as Address;
 const BURNED = parseAbiItem("event Burned(uint256 indexed n, address indexed caller, uint256 ethIn, uint256 tokensBurned, bool viaCurve)");
 const LOG_SPAN = 9_000n; // the chain's RPC caps how many blocks one log query may cover
 
@@ -74,7 +79,7 @@ export async function readToken(c: TokenConfig = tokenConfig()): Promise<TokenSt
   if (cache && Date.now() - cache.at < 60_000) return cache.state;
   const client = createPublicClient({ transport: http(c.rpc, { timeout: 15_000 }) });
   const pot = c.pot!, token = c.token!;
-  const [count, ethBurned, tokensBurned, last, preview, supply, potWei, head] = await Promise.all([
+  const [count, ethBurned, tokensBurned, last, preview, supply, potWei, head, deadWei] = await Promise.all([
     client.readContract({ address: pot, abi: POT, functionName: "burnCount" }),
     client.readContract({ address: pot, abi: POT, functionName: "totalEthBurned" }),
     client.readContract({ address: pot, abi: POT, functionName: "totalTokensBurned" }),
@@ -83,6 +88,7 @@ export async function readToken(c: TokenConfig = tokenConfig()): Promise<TokenSt
     client.readContract({ address: token, abi: TOKEN, functionName: "totalSupply" }),
     client.getBalance({ address: pot }),
     client.getBlockNumber(),
+    client.readContract({ address: token, abi: TOKEN, functionName: "balanceOf", args: [DEAD] }),
   ]);
   // The newest burns: walk back from the head in spans the RPC accepts, until 50 are found or the start is reached.
   const burns: Burn[] = [];
@@ -97,9 +103,18 @@ export async function readToken(c: TokenConfig = tokenConfig()): Promise<TokenSt
     }
     if (from === c.fromBlock) break;
   }
+  // the dev wallet's own burn: one row at the end (it came first), read from its transaction
+  if (c.devBurnTx) {
+    const r = await client.getTransactionReceipt({ hash: c.devBurnTx }).catch(() => null);
+    const log = r?.logs.find((l) => l.address.toLowerCase() === token.toLowerCase() && l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" && l.topics[2] && BigInt(l.topics[2]) === BigInt(DEAD));
+    if (r && log) {
+      const at = Number((await client.getBlock({ blockNumber: r.blockNumber })).timestamp) * 1000;
+      burns.push({ n: 0, at, eth: 0, tokens: Number(formatEther(BigInt(log.data))), tx: c.devBurnTx, dev: true });
+    }
+  }
   const state: TokenState = {
-    supplyLeft: Number(formatEther(supply)),
-    burnedTokens: Number(formatEther(tokensBurned)),
+    supplyLeft: Number(formatEther(supply - deadWei)),
+    burnedTokens: Number(formatEther(tokensBurned + deadWei)),
     burnCount: Number(count),
     ethSpent: Number(formatEther(ethBurned)),
     potEth: Number(formatEther(potWei)),
