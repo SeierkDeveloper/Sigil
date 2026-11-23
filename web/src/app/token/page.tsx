@@ -60,17 +60,15 @@ export default async function TokenPage() {
           {live ? (
             <>
               <CodeBlock code={c.token!} label={`${c.symbol} contract address`} />
+              {c.tradeUrl ? (
+                <p>
+                  <a className="button button-primary" href={c.tradeUrl} target="_blank" rel="noopener noreferrer">
+                    Open {c.symbol} on Pons
+                  </a>
+                </p>
+              ) : null}
               <p className="small">
                 {link(`address/${c.token}`, "The token on the explorer")} · {link(`address/${c.pot}`, "The burn pot on the explorer")}
-                {c.tradeUrl ? (
-                  <>
-                    {" "}
-                    ·{" "}
-                    <a href={c.tradeUrl} target="_blank" rel="noopener noreferrer">
-                      Where it trades
-                    </a>
-                  </>
-                ) : null}
               </p>
             </>
           ) : (
