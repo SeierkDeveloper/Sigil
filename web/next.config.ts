@@ -103,6 +103,12 @@ const nextConfig: NextConfig = {
           ...(isProd ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
         ],
       },
+      // Artwork, icons and the logo rarely change: browsers keep them a day and may show a cached copy for a week
+      // while they fetch a fresh one, so a returning visitor does not download the large engravings again.
+      ...["/art/:path*", "/icons/:path*", "/logo.png"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      })),
     ];
   },
 };

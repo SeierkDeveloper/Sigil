@@ -72,11 +72,29 @@ const BURNED = parseAbiItem("event Burned(uint256 indexed n, address indexed cal
 const LOG_SPAN = 9_000n; // the chain's RPC caps how many blocks one log query may cover
 
 let cache: { at: number; state: TokenState } | null = null;
+let refreshing: Promise<TokenState> | null = null;
+// Burns never change once mined, so they are read once: each refresh scans only the blocks after the last scan.
+const scanned = { to: -1n, burns: [] as Burn[] };
+const blockTimes = new Map<bigint, number>();
+let devBurn: Burn | null | undefined;
+const FRESH_MS = 60_000;
 
-/** The token's numbers and its burns, read from the chain at most once a minute. */
+/**
+ * The token's numbers and its burns. Visitors never wait on the chain once the page has been read once: a fresh
+ * reading (under a minute old) is served as is, an older one is served at once while a single refresh runs behind it.
+ */
 export async function readToken(c: TokenConfig = tokenConfig()): Promise<TokenState | null> {
   if (!tokenLive(c)) return null;
-  if (cache && Date.now() - cache.at < 60_000) return cache.state;
+  if (cache && Date.now() - cache.at < FRESH_MS) return cache.state;
+  const run = refreshing ?? (refreshing = refresh(c).finally(() => { refreshing = null; }));
+  if (cache) {
+    run.catch(() => {}); // stale reading served now; the refresh lands for the next visitor
+    return cache.state;
+  }
+  return run;
+}
+
+async function refresh(c: TokenConfig): Promise<TokenState> {
   const client = createPublicClient({ transport: http(c.rpc, { timeout: 15_000 }) });
   const pot = c.pot!, token = c.token!;
   const [count, ethBurned, tokensBurned, last, preview, supply, potWei, head, deadWei] = await Promise.all([
@@ -90,27 +108,31 @@ export async function readToken(c: TokenConfig = tokenConfig()): Promise<TokenSt
     client.getBlockNumber(),
     client.readContract({ address: token, abi: TOKEN, functionName: "balanceOf", args: [DEAD] }),
   ]);
-  // The newest burns: walk back from the head in spans the RPC accepts, until 50 are found or the start is reached.
-  const burns: Burn[] = [];
-  const times = new Map<bigint, number>();
-  for (let to = head; to >= c.fromBlock && burns.length < 50; to -= LOG_SPAN) {
-    const from = to - LOG_SPAN + 1n > c.fromBlock ? to - LOG_SPAN + 1n : c.fromBlock;
-    const logs = await client.getLogs({ address: pot, event: BURNED, fromBlock: from, toBlock: to });
-    for (const l of logs.reverse()) {
-      if (!times.has(l.blockNumber)) times.set(l.blockNumber, Number((await client.getBlock({ blockNumber: l.blockNumber })).timestamp) * 1000);
-      burns.push({ n: Number(l.args.n), at: times.get(l.blockNumber)!, eth: Number(formatEther(l.args.ethIn ?? 0n)), tokens: Number(formatEther(l.args.tokensBurned ?? 0n)), tx: l.transactionHash });
-      if (burns.length >= 50) break;
+  // New burns only: the blocks since the last scan, in spans the RPC accepts, four spans at a time.
+  const start = scanned.to >= c.fromBlock ? scanned.to + 1n : c.fromBlock;
+  if (head >= start) {
+    const spans: [bigint, bigint][] = [];
+    for (let from = start; from <= head; from += LOG_SPAN) spans.push([from, from + LOG_SPAN - 1n < head ? from + LOG_SPAN - 1n : head]);
+    const logs = [];
+    for (let i = 0; i < spans.length; i += 4) {
+      const batch = await Promise.all(spans.slice(i, i + 4).map(([fromBlock, toBlock]) => client.getLogs({ address: pot, event: BURNED, fromBlock, toBlock })));
+      logs.push(...batch.flat());
     }
-    if (from === c.fromBlock) break;
+    const missing = [...new Set(logs.map((l) => l.blockNumber))].filter((b) => !blockTimes.has(b));
+    const blocks = await Promise.all(missing.map((blockNumber) => client.getBlock({ blockNumber })));
+    blocks.forEach((b) => blockTimes.set(b.number, Number(b.timestamp) * 1000));
+    const fresh = logs.map((l) => ({ n: Number(l.args.n), at: blockTimes.get(l.blockNumber)!, eth: Number(formatEther(l.args.ethIn ?? 0n)), tokens: Number(formatEther(l.args.tokensBurned ?? 0n)), tx: l.transactionHash }));
+    scanned.burns = [...fresh.reverse(), ...scanned.burns].slice(0, 50);
+    scanned.to = head;
   }
-  // the dev wallet's own burn: one row at the end (it came first), read from its transaction
-  if (c.devBurnTx) {
+  // the dev wallet's own burn: read once from its transaction, one row at the end (it came first)
+  if (c.devBurnTx && devBurn === undefined) {
     const r = await client.getTransactionReceipt({ hash: c.devBurnTx }).catch(() => null);
     const log = r?.logs.find((l) => l.address.toLowerCase() === token.toLowerCase() && l.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" && l.topics[2] && BigInt(l.topics[2]) === BigInt(DEAD));
     if (r && log) {
       const at = Number((await client.getBlock({ blockNumber: r.blockNumber })).timestamp) * 1000;
-      burns.push({ n: 0, at, eth: 0, tokens: Number(formatEther(BigInt(log.data))), tx: c.devBurnTx, dev: true });
-    }
+      devBurn = { n: 0, at, eth: 0, tokens: Number(formatEther(BigInt(log.data))), tx: c.devBurnTx, dev: true };
+    } else if (r) devBurn = null; // read, and not a burn of this token: do not ask again
   }
   const state: TokenState = {
     supplyLeft: Number(formatEther(supply - deadWei)),
@@ -120,7 +142,7 @@ export async function readToken(c: TokenConfig = tokenConfig()): Promise<TokenSt
     potEth: Number(formatEther(potWei)),
     lastBurnAt: last > 0n ? Number(last) * 1000 : null,
     nextBurnAt: preview && preview[1] > 0n ? Number(preview[1]) * 1000 : null,
-    burns,
+    burns: devBurn ? [...scanned.burns, devBurn] : [...scanned.burns],
     asOf: Date.now(),
   };
   cache = { at: Date.now(), state };
