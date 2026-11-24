@@ -69,7 +69,20 @@ export function guardedMemories(data: Pick<VaultData, "memories" | "folders">, o
       const r = redactMemory({ title: m.title, body: m.body, tags: m.tags }, f?.redact);
       // An approval holds for the text the owner approved; redacting it does not undo the approval.
       const cleared = m.cleared && m.cleared === clearedHash(m.body) ? clearedHash(r.body) : undefined;
-      return { id: m.id, folderId: m.folderId, folder: f?.name ?? "", title: r.title, tags: r.tags ?? [], body: r.body, editedAt: m.editedAt, expiresAt: m.expiresAt, source: { kind: m.source.kind }, ...(cleared ? { cleared } : {}) };
+      return {
+        id: m.id,
+        folderId: m.folderId,
+        folder: f?.name ?? "",
+        title: r.title,
+        tags: r.tags ?? [],
+        body: r.body,
+        editedAt: m.editedAt,
+        createdAt: m.createdAt,
+        ...(m.when ? { when: m.when } : {}),
+        expiresAt: m.expiresAt,
+        source: { kind: m.source.kind },
+        ...(cleared ? { cleared } : {}),
+      };
     });
 }
 

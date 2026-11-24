@@ -1,16 +1,16 @@
-// A simpler vault: five sections in the main row, every other one under More
+// A simpler vault: six sections in the main row, every other one under More
 // in its four groups, pins that keep a section in the row on this device, and
 // every deep link (#agents, #emergency, ...) working as before.
 
 import { expect, test } from "@playwright/test";
 import { createWithWallet, installWallet } from "./helpers";
 
-test("five main sections, More with its groups, pinning, and deep links", async ({ page, context }) => {
+test("six main sections, More with its groups, pinning, and deep links", async ({ page, context }) => {
   await installWallet(context);
   await createWithWallet(page);
 
   const row = page.getByRole("tablist", { name: "Vault sections" });
-  await expect(row.getByRole("tab")).toHaveText(["Memories", "Inbox", "AI self", "Apps", "Settings"]);
+  await expect(row.getByRole("tab")).toHaveText(["Memories", "Ask", "Inbox", "AI self", "Apps", "Settings"]);
 
   // More shows the index in its four groups.
   await page.getByTestId("tab-more").click();

@@ -134,6 +134,10 @@ export interface SelfMemory {
   tags: string[];
   body: string;
   editedAt: string;
+  /** When it was made; for imports, when the mail, chat or note was written. */
+  createdAt?: string;
+  /** For a story in a shared memory: when it happened, as YYYY, YYYY-MM or YYYY-MM-DD. */
+  when?: string;
   expiresAt?: string;
   /** Where it came from: memories from outside are checked for hidden instructions before any model sees them. */
   source?: { kind: SourceKind };
@@ -181,7 +185,8 @@ export function retrieve(
   }));
 }
 
-const STOP = new Set(
+/** Words a question is made of that say nothing about what it asks for. */
+export const STOP_WORDS: ReadonlySet<string> = new Set(
   "a an and are as at be but by can did do does for from had has have how i if in is it its me my of on or our so than that the their them then there these they this to was we were what when where which who why will with would you your about tell know like".split(" "),
 );
 
@@ -191,7 +196,7 @@ const STOP = new Set(
  * weighing titles and tags above the text.
  */
 export function looseSearch<T extends { title: string; tags: string[]; text: string; editedAt: string }>(items: T[], query: string): T[] {
-  const terms = [...new Set(tokenize(query).filter((t) => t.length >= 3 && !STOP.has(t)))];
+  const terms = [...new Set(tokenize(query).filter((t) => t.length >= 3 && !STOP_WORDS.has(t)))];
   if (terms.length === 0) return [];
   const has = (words: string[], t: string) => words.some((w) => w === t || (t.length >= 4 && w.startsWith(t)) || (w.length >= 4 && t.startsWith(w)));
   const scored: { item: T; score: number }[] = [];
@@ -244,13 +249,23 @@ export function buildSelfPrompt(rules: SelfRules, sources: SelfSource[], opts: {
   if (opts.profile?.trim()) {
     lines.push("", "<profile>", opts.profile.trim().slice(0, 4000), "</profile>");
   }
-  const nonce = opts.nonce ?? newNonce(randomBytes);
-  lines.push("", "<memories>", UNTRUSTED_NOTE);
+  lines.push("", ...memoriesBlock(sources, opts.nonce ?? newNonce(randomBytes)));
+  return lines.join("\n");
+}
+
+/**
+ * The numbered memories a prompt quotes, each as untrusted data between
+ * delimiters with the prompt's own random code. `dated` names the date
+ * attribute: when it was edited, or (for questions about the owner's life)
+ * when it happened.
+ */
+export function memoriesBlock(sources: Pick<SelfSource, "n" | "title" | "folder" | "text" | "editedAt">[], nonce: string, dated: "edited" | "date" = "edited"): string[] {
+  const lines = ["<memories>", UNTRUSTED_NOTE];
   for (const s of sources) {
-    lines.push(`<memory n="${s.n}" title="${escapeAttr(stripHidden(s.title))}" folder="${escapeAttr(s.folder)}" edited="${s.editedAt.slice(0, 10)}">`, wrapUntrusted(s.text, nonce).text, "</memory>");
+    lines.push(`<memory n="${s.n}" title="${escapeAttr(stripHidden(s.title))}" folder="${escapeAttr(s.folder)}" ${dated}="${s.editedAt.slice(0, 10)}">`, wrapUntrusted(s.text, nonce).text, "</memory>");
   }
   lines.push("</memories>");
-  return lines.join("\n");
+  return lines;
 }
 
 function escapeAttr(s: string): string {

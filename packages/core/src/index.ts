@@ -14,6 +14,7 @@ export * from "./import/index";
 export * from "./settings";
 export * from "./model";
 export * from "./self";
+export * from "./ask";
 export * from "./relay";
 export * from "./thinks";
 export * from "./legacy";

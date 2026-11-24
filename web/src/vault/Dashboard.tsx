@@ -7,6 +7,7 @@ import { Ctx, errorText, type TabId, type VaultCtx } from "./context";
 import { Notice, Spinner } from "./ui";
 import { formatBytes, plural } from "@/lib/format";
 import { MemoriesTab } from "./tabs/Memories";
+import { AskTab } from "./tabs/Ask";
 import { FoldersTab } from "./tabs/Folders";
 import { AppsTab } from "./tabs/Apps";
 import { LogTab } from "./tabs/Log";
@@ -50,6 +51,7 @@ const TAB_GROUPS: { label: string; tabs: { id: TabId; label: string }[] }[] = [
     label: "Vault",
     tabs: [
       { id: "memories", label: "Memories" },
+      { id: "ask", label: "Ask" },
       { id: "inbox", label: "Inbox" },
       { id: "timeline", label: "Timeline" },
       { id: "review", label: "Review" },
@@ -95,7 +97,7 @@ const TAB_GROUPS: { label: string; tabs: { id: TabId; label: string }[] }[] = [
 const TABS = TAB_GROUPS.flatMap((g) => g.tabs);
 
 /** The sections always in the main row. Every other one is under More, unless the owner pins it to the row. */
-const MAIN_TABS: TabId[] = ["memories", "inbox", "self", "apps", "settings"];
+const MAIN_TABS: TabId[] = ["memories", "ask", "inbox", "self", "apps", "settings"];
 const PIN_KEY = "sigil.vault.pinned";
 
 /** Pins are a convenience of this device; anything unreadable (private window, blocked storage) means none. */
@@ -448,6 +450,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
 
         <div role="tabpanel" id={`panel-${tab}`} hidden={more} aria-labelledby={`tab-${tab}`} className="tab-panel">
           {tab === "memories" ? <MemoriesTab /> : null}
+          {tab === "ask" ? <AskTab /> : null}
           {tab === "inbox" ? <InboxTab /> : null}
           {tab === "self" ? <SelfTab /> : null}
           {tab === "work" ? <WorkTab /> : null}

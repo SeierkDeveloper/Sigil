@@ -32,6 +32,7 @@ export interface VaultCtx {
 
 export type TabId =
   | "memories"
+  | "ask"
   | "inbox"
   | "self"
   | "work"

@@ -7,11 +7,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
-import { encodeBundle, hybridSearch, randomId, runSyncPass, search, sealBundle, vaultSigningKey, type Memory } from "@sigil/core";
+import { encodeBundle, findEvidence, hybridSearch, randomId, runSyncPass, search, sealBundle, vaultSigningKey, type Memory } from "@sigil/core";
 import { harness, type Harness } from "../test/helpers";
 import * as ops from "../src/vault/ops";
 import * as sync from "../src/vault/syncOps";
 import { groupByMonth } from "../src/vault/timelineGroups";
+import { askPool } from "../src/vault/askOps";
 import { sealPending, proofFor } from "../src/server/seal";
 import { listLog, logEntry, logRead } from "../src/server/store";
 import { bundleBody } from "../src/server/bundles";
@@ -26,6 +27,9 @@ const BUDGET = {
   keyword: 250,
   keywordCold: 6000,
   semantic: 1000,
+  askPool: 500,
+  askCold: 6000,
+  ask: 1000,
   timeline: 500,
   syncPass: 2000,
   sealHour: 1000,
@@ -101,6 +105,30 @@ describe(`a vault of ${N.toLocaleString("en-US")} memories`, () => {
     const hits = time("semantic", () => hybridSearch(items, "garden", { queryVector: q, vectors, minSimilarity: 0.1, limit: 50 }));
     expect(hits.length).toBeGreaterThan(0);
     within("semantic");
+  });
+
+  it("asks the whole vault one question, by words, meaning and time", () => {
+    const dim = 384;
+    const vectors = new Map<string, Float32Array>();
+    let seed = 7;
+    const r = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) - 0.5;
+    for (const m of data.memories) {
+      const v = new Float32Array(dim);
+      for (let i = 0; i < dim; i++) v[i] = r();
+      vectors.set(m.id, v);
+    }
+    const q = new Float32Array(dim).map(() => r());
+    // Made once per change of the vault, as the Ask tab does.
+    const pool = time("askPool", () => askPool(data));
+    // The first question builds the word index, as the first search does.
+    const first = time("askCold", () => findEvidence({ question: "What did I write about the harbour invoice last year?", memories: pool, queryVector: q, vectors }));
+    const next = time("ask", () => findEvidence({ question: "Where did the garden plans end up in 2024?", memories: pool, queryVector: q, vectors }));
+    results.askSources = next.sources.length;
+    expect(first.sources.length).toBeGreaterThan(0);
+    expect(next.sources.length).toBeGreaterThan(0);
+    within("askPool");
+    within("askCold");
+    within("ask");
   });
 
   it("lays out the timeline", () => {

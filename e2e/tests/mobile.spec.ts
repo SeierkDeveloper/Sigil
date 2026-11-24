@@ -32,6 +32,7 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
 
   const tabs = [
     "Memories",
+    "Ask",
     "Inbox",
     "AI self",
     "Work",
@@ -63,6 +64,14 @@ test("every vault screen fits a 375 pixel phone", async ({ browser }) => {
   }
 
   // The new forms, open.
+  await openTab(page, "Ask");
+  await page.getByRole("button", { name: /All folders/ }).click();
+  await page.getByLabel("Time").selectOption("custom");
+  await page.getByLabel("Your question").fill("What is the long title about?");
+  await page.getByRole("button", { name: "Ask", exact: true }).click();
+  await expect(page.getByTestId("ask-evidence")).toBeVisible();
+  await page.locator(".ask-group .memory-item").first().click();
+  await noSideScroll(page, "Ask with folders, dates and an answer");
   await openTab(page, "Agreements");
   await page.getByRole("button", { name: "Draft an agreement" }).click();
   await noSideScroll(page, "Agreement form");
