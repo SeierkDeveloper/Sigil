@@ -25,7 +25,8 @@ import {
   MOVE_MAX_DAYS,
   type VaultBundle,
 } from "@sigil/core";
-import { getDb, tx, type Db } from "./db";
+import { dataFile, getDb, tx, vaultStamp, type Db } from "./db";
+import { snapshotStatus } from "./snapshots";
 import { serverConfig } from "./config";
 import {
   addKeyslot,
@@ -361,7 +362,7 @@ route("GET", "status", (ctx) => {
 });
 
 // A node's health, for a load balancer, a container's health check, or another node.
-route("GET", "health", (ctx) => json(health(siteOrigin(ctx.req)), 200, { "access-control-allow-origin": "*" }));
+route("GET", "health", (ctx) => json({ ...health(siteOrigin(ctx.req)), backup: snapshotStatus(dataFile()) }, 200, { "access-control-allow-origin": "*" }));
 
 route("GET", "stats", (ctx) => {
   rateLimit(`public:${clientIp(ctx.req)}`, 240, 60_000);
@@ -567,6 +568,16 @@ route("DELETE", "keyslots/:id", (ctx, [slotId]) => {
 });
 
 // ---- the vault
+
+// Asked by an open vault every half minute: has anything changed? It reads two
+// numbers, writes nothing, and on purpose does not count as the owner being
+// active, so a tab left open never keeps a legacy plan from starting.
+route("GET", "vault/changes", (ctx) => {
+  const userId = sessionUser(ctx.db, getCookie(ctx.req, SESSION_COOKIE));
+  if (!userId) throw new HttpError(401, "Please sign in to your vault.", "signed_out");
+  assertNotCrossSite(ctx.req);
+  return json(vaultStamp(ctx.db, userId), 200, { "cache-control": "no-store" });
+});
 
 route("GET", "vault", (ctx) => {
   const userId = userOf(ctx);

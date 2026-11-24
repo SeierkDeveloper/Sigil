@@ -58,6 +58,20 @@ Changes in this round: every query is compiled once and the compiled statement r
 | App: read | 4.26 ms | 2.72 ms |
 | Server time per request, all 1,400 | 3.38 ms | 2.48 ms |
 
+## Upkeep: backups, restarts and a vault that stays current
+
+`npm run perf:infra` (in `web/`) fills a real database file to the size of a 100,000 memory vault (about 1.7 KB of ciphertext a memory, two read-log lines each) and times the nightly backup and an open vault's change check. Timings go to `web/perf/last-infra.json` (not committed).
+
+- **Nightly backups.** From 02:00 UTC the node copies its whole database into a new file beside it (SQLite `VACUUM INTO`, one consistent copy made while the node keeps answering), opens the copy on its own, runs SQLite's check on it and counts its rows. A copy that fails is deleted, never kept. The last seven nights are kept, in `snapshots/` beside the database, and `/api/health` says the day, size and result of the last one. The copies are ciphertext like the database. They sit on the same disk, so they protect against a damaged file or a bad update, not against losing the disk.
+- **Clean restarts.** The container runs the server as its own process (before, npm and a shell sat in between and could keep the stop signal from it). On an update the server stops taking requests, answers the ones already running, folds the write-ahead log back and closes the database, and Railway gives it 20 seconds for that before stopping it (before: none).
+- **A vault that keeps itself current.** Every half minute while the vault is in view, and whenever the owner comes back to it, the vault asks `GET /api/vault/changes`: two numbers kept by the database itself (a per-vault counter moved by triggers on memories, folders, suggestions, apps and agents, and the newest read-log line). Only when the counter moved is the vault loaded and decrypted again; when only the log moved, the read log refreshes. Nothing reloads while the owner is typing, and above 20,000 memories the vault does not decrypt everything again on its own (the read log stays live). The check writes nothing and does not count as the owner being active, so a tab left open never holds back a legacy plan.
+
+| 100,000 memories | Result |
+|---|---|
+| Nightly backup: copy and check | 1.5 s, 247 MB, all 100,000 memories in the copy |
+| Change check, server time (median of 200) | 0.018 ms, 57 bytes |
+| Whole vault again, server time (median of 5) | 1.29 s, 178 MB |
+
 ## Budgets
 
 The budgets above are for a laptop at 100,000 memories. They scale with the number of memories (the check divides by 100,000). A phone is held to four times the laptop budget. That factor is an assumption, not a measurement: check it on a real phone (docs/GO-LIVE-CHECKS.md) before relying on it. At 10,000 memories the laptop unlock was 3 seconds, so a phone would be held to 12.

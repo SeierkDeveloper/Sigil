@@ -24,7 +24,10 @@ describe("the node's container", () => {
     expect(dockerfile).not.toMatch(/^VOLUME /m);
     expect(dockerfile).toMatch(/SIGIL_DATA_DIR=\/data/);
     expect(dockerfile).toMatch(/^EXPOSE 3000$/m);
-    expect(dockerfile).toMatch(/^CMD \["npm", "run", "start", "-w", "@sigil\/web"\]$/m);
+    // The server is the container's own process (no npm or shell in between), so a stop signal reaches it.
+    expect(dockerfile).toMatch(/^WORKDIR \/app\/web$/m);
+    expect(dockerfile).toMatch(/^STOPSIGNAL SIGTERM$/m);
+    expect(dockerfile).toMatch(/^CMD \["node", "\.\.\/node_modules\/next\/dist\/bin\/next", "start"\]$/m);
     expect(dockerfile).toContain("/api/health");
     // What the content security policy is built from must reach the build.
     for (const arg of ["NEXT_PUBLIC_SITE_URL", "SIGIL_BACKUP_ORIGINS", "SIGIL_CHAIN_READ_RPC", "SIGIL_IDENTITY_READ_RPC"]) expect(dockerfile).toMatch(new RegExp(`^ARG ${arg}=`, "m"));

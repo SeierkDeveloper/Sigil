@@ -11,6 +11,20 @@ export interface Release {
 export const releases: Release[] = [
   {
     date: "2026-11-24",
+    title: "Nightly backups, clean restarts and a vault that keeps itself current",
+    area: "Nodes",
+    summary: "The node copies and checks its whole database every night, updates no longer cut off requests or leave the database open, and an open vault shows what agents and apps did without a reload.",
+    items: [
+      "Every night a full copy of the node's database, made while it keeps answering, opened and checked before it is kept; seven nights kept, and the health check shows the last one. 1.5 seconds for a database the size of a 100,000 memory vault",
+      "The copies are ciphertext, exactly like the database: vaults are encrypted on their owners' devices",
+      "Updates stop the server cleanly: it stops taking requests, answers the ones already running, then closes the database, with 20 seconds for it where before there were none",
+      "An open vault asks every half minute whether anything changed: 57 bytes and a fraction of a millisecond, instead of reloading the whole vault",
+      "Memories your agents and apps write, and suggestions in your inbox, appear by themselves; new reads appear in the read log without pressing Refresh",
+      "Nothing reloads while you type, and the check never counts as you being active, so a tab left open does not hold back a legacy plan",
+    ],
+  },
+  {
+    date: "2026-11-24",
     title: "Raeto: every model with one key",
     area: "AI self",
     summary: "Raeto is now a model choice next to Anthropic and OpenAI. One key reaches 400+ models, raeto/auto picks the cheapest one that can write each answer, and every answer under Ask shows the model it used and what it cost.",

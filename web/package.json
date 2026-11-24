@@ -15,7 +15,8 @@
     "seal": "node --experimental-strip-types scripts/seal.ts",
     "perf": "vitest run --config vitest.perf.config.ts perf/vault.perf.ts",
     "perf:engine": "vitest run --config vitest.perf.config.ts perf/engine.perf.ts",
-    "seed": "vitest run --config vitest.perf.config.ts perf/seed-db.perf.ts"
+    "seed": "vitest run --config vitest.perf.config.ts perf/seed-db.perf.ts",
+    "perf:infra": "vitest run --config vitest.perf.config.ts perf/infra.perf.ts"
   },
   "dependencies": {
     "@huggingface/tokenizers": "^0.2.0",

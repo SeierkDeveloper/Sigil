@@ -951,6 +951,7 @@ export function openDb(file: string): Db {
   migrateKeyslots(db);
   db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
   migrateAgreements(db);
+  trackChanges(db);
   addColumn(db, "memories", "delete_after", "TEXT");
   // The last sign-in or vault action of the owner: the legacy plan's heartbeat.
   addColumn(db, "users", "last_active_at", "TEXT");
@@ -972,6 +973,50 @@ export function openDb(file: string): Db {
   // Fresh planner statistics for the tables that changed since the last start.
   db.exec("PRAGMA optimize = 0x10002;");
   return db;
+}
+
+/**
+ * A counter per vault that moves whenever something an open vault shows is
+ * written by anyone: memories and folders (an agent remembering, an app
+ * writing, another device), inbox suggestions, apps and agents. Kept by the
+ * database itself (triggers), so no write path can forget it. An open vault
+ * asks for it every half minute and reloads only when it moved.
+ */
+function trackChanges(db: Db): void {
+  db.exec("CREATE TABLE IF NOT EXISTS vault_changes (user_id TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0) WITHOUT ROWID;");
+  const bump = (who: string) => `INSERT INTO vault_changes (user_id, n) VALUES (${who}.user_id, 1) ON CONFLICT (user_id) DO UPDATE SET n = n + 1;`;
+  const watch: [string, string, string][] = [
+    ["memories", "INSERT", "NEW"],
+    ["memories", "UPDATE", "NEW"],
+    ["memories", "DELETE", "OLD"],
+    ["folders", "INSERT", "NEW"],
+    ["folders", "UPDATE", "NEW"],
+    ["folders", "DELETE", "OLD"],
+    ["proposals", "INSERT", "NEW"],
+    ["proposals", "DELETE", "OLD"],
+    ["agents", "INSERT", "NEW"],
+    ["agents", "UPDATE", "NEW"],
+    ["agents", "DELETE", "OLD"],
+    ["apps", "INSERT", "NEW"],
+    // An app's last use is written on every call; only what the vault shows of it counts.
+    ["apps", "UPDATE OF meta, revoked_at", "NEW"],
+    ["apps", "DELETE", "OLD"],
+  ];
+  for (const [table, event, row] of watch) {
+    const name = `changes_${table}_${event.split(" ")[0].toLowerCase()}`;
+    db.exec(`CREATE TRIGGER IF NOT EXISTS ${name} AFTER ${event} ON ${table} BEGIN ${bump(row)} END;`);
+  }
+}
+
+/**
+ * What an open vault compares to see whether anything changed: the vault's
+ * counter and the newest line of its read log. Two indexed lookups; it writes
+ * nothing, and it does not count as the owner being active.
+ */
+export function vaultStamp(db: Db, userId: string): { vault: number; log: string } {
+  const v = db.prepare("SELECT n FROM vault_changes WHERE user_id = ?").get(userId) as { n: number } | undefined;
+  const l = db.prepare("SELECT at, id FROM read_log WHERE user_id = ? ORDER BY at DESC LIMIT 1").get(userId) as { at: string; id: string } | undefined;
+  return { vault: Number(v?.n ?? 0), log: l ? `${l.at}/${l.id}` : "" };
 }
 
 /** How many compiled statements one database keeps. The queries in the code are far fewer; the limit only matters for SQL built at run time. */
@@ -1004,6 +1049,7 @@ function cacheStatements(db: Db): void {
 export function housekeeping(db: Db, at = Date.now()): { sessions: number; challenges: number } {
   const sessions = Number(db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(at).changes);
   const challenges = Number(db.prepare("DELETE FROM challenges WHERE expires_at < ?").run(at).changes);
+  db.prepare("DELETE FROM vault_changes WHERE user_id NOT IN (SELECT id FROM users)").run();
   db.exec("PRAGMA optimize;");
   db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
   return { sessions, challenges };

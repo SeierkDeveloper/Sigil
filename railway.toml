@@ -23,3 +23,7 @@ healthcheckTimeout = 120
 numReplicas = 1
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
+# On an update the old server gets this long after the stop signal to answer
+# the requests it is already handling and close its database, before it is
+# stopped for good (the default is no time at all).
+drainingSeconds = 20

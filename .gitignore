@@ -19,4 +19,5 @@ next-env.d.ts
 web/public/vendor/
 web/perf/last-run.json
 web/perf/last-engine.json
+web/perf/last-infra.json
 web/.data-seed

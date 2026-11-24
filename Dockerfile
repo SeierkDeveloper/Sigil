@@ -39,4 +39,10 @@ EXPOSE 3000
 # The node's own health endpoint; it answers without touching any vault.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
-CMD ["npm", "run", "start", "-w", "@sigil/web"]
+# The server runs as the container's own process, not under npm and a shell, so
+# a stop signal (an update, a restart) reaches it: it stops taking requests,
+# answers the ones already running and closes the database cleanly. The port
+# comes from PORT. The working folder is the site's, as with npm start.
+WORKDIR /app/web
+STOPSIGNAL SIGTERM
+CMD ["node", "../node_modules/next/dist/bin/next", "start"]

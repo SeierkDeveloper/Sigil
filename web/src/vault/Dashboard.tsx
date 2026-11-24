@@ -25,6 +25,7 @@ import { ProofTab } from "./tabs/Proof";
 import { SyncTab } from "./tabs/Sync";
 import { MeetTab } from "./tabs/Meet";
 import { useLiveSync } from "./useLiveSync";
+import { useLiveVault } from "./useLiveVault";
 import { sendPresence } from "./lifeOps";
 import { saveOfflineCopy } from "./offline";
 import { flushCaptures, pinVaultKey } from "./deviceOps";
@@ -248,6 +249,8 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   const semantic = useSemanticIndex(api, vault, indexed);
   const agent = useSelfAgent(api, vault, data, semantic, updateData);
   const liveSync = useLiveSync(api, vault, data, setData);
+  // What agents, apps and other devices change shows up by itself; the read log refreshes on logTick.
+  const logTick = useLiveVault(api, !!data, data?.memories.length ?? 0, reload);
 
   // Knowledge packs this vault follows: new versions are checked and taken in once per opening.
   const packsTried = useRef(false);
@@ -299,11 +302,12 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
             semantic,
             agent,
             liveSync,
+            logTick,
             lock: onLock,
             signOut: onSignOut,
           }
         : null,
-    [api, vault, data, updateData, reload, goTo, openMemory, focus, semantic, agent, liveSync, onLock, onSignOut],
+    [api, vault, data, updateData, reload, goTo, openMemory, focus, semantic, agent, liveSync, logTick, onLock, onSignOut],
   );
 
   if (error && !data) {

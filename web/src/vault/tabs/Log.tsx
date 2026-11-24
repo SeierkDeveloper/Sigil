@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SealIcon } from "@/components/icons";
 import { formatDateTime, formatSealPeriod, formatTime, plural, shortHash } from "@/lib/format";
 import * as ops from "../ops";
@@ -41,7 +41,7 @@ const IMMUNE_WHERE: Record<string, string> = {
 };
 
 export function LogTab() {
-  const { api, data, goTo } = useVault();
+  const { api, data, goTo, logTick } = useVault();
   const [log, setLog] = useState<ops.LogData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [app, setApp] = useState("all");
@@ -61,6 +61,17 @@ export function LogTab() {
       setRefreshing(false);
     }
   }, [api]);
+
+  // New lines (an agent reading, an app searching) arrive by themselves while the vault is open.
+  const seenTick = useRef(logTick);
+  useEffect(() => {
+    if (logTick === seenTick.current) return;
+    seenTick.current = logTick;
+    ops
+      .loadLog(api)
+      .then((l) => setLog(l))
+      .catch(() => undefined);
+  }, [api, logTick]);
 
   useEffect(() => {
     let alive = true;

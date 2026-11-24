@@ -26,6 +26,8 @@ export interface VaultCtx {
   agent: AgentState;
   /** Live sync running in this open vault. */
   liveSync: SyncAgentState;
+  /** Grows each time the read log has new lines (checked every half minute while the vault is open). */
+  logTick: number;
   lock(): void;
   signOut(): Promise<void>;
 }
