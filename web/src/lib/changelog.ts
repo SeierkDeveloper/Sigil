@@ -10,6 +10,23 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    date: "2026-11-24",
+    title: "Ask your whole life: one question, answered from every folder at once",
+    area: "Search",
+    summary: "A new Ask section in the vault. One question searches every folder by words, by meaning and by plain time words, on your device, and every sentence of the answer links to the memory it came from.",
+    items: [
+      "Every folder at once, and folders shared with you, searched by words and by meaning on this device; choose folders and a time range when you want fewer",
+      "Plain time words read as a period: last spring, in March, 2025, last week, three weeks ago, since May. When nothing from that time matches, it says so and shows the closest from other times",
+      "With your model key, a written answer to you about your life, in the third person about your vault: every sentence carries the memories it came from, and a sentence the model could not link is left out, never shown as fact",
+      "Without a key, the memories that answer best, grouped by folder and date, with the passage that answers marked; useful from the first minute",
+      "Click a sentence or a source to read the memory behind it in place",
+      "Every source is checked by the immune system first: held memories are left out and hidden instructions are removed before any model reads them",
+      "Protected folders still need your yes, for one answer; when a model reads them the yes goes in your read log",
+      "Save an answer, with its sources, as a new encrypted memory in the folder you pick. Ask never uses saved answers as a source",
+      "The server learns nothing new: no question, no answer, no new request. The model call goes from your browser straight to the provider with your own key",
+    ],
+  },
+  {
     date: "2026-11-21",
     title: "Ready for people: a security review, a memory immune system and the first five minutes",
     area: "Trust",

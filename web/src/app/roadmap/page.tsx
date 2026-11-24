@@ -24,9 +24,8 @@ const stages: Stage[] = [
   {
     title: "Ask your whole life",
     horizon: "next",
-    summary: "One question, answered from every memory, mail, meeting, note and file at once, with every source shown.",
+    summary: "Your whole life within reach of one question: the people, projects and places in it, a brief before every meeting, and all of it on your own machine.",
     items: [
-      "Questions across every source at once, answered on your device, each sentence linked to the memories it came from",
       "Living timelines of the people, projects and places in your life, built and kept current by the vault",
       "A brief before every meeting and decision: what was promised, what changed, what was left open",
       "A fully local mode: a model on your own machine, so nothing leaves it, not even to a model provider",

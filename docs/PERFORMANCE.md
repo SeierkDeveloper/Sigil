@@ -20,6 +20,9 @@ Sigil does its work where the plaintext is: the owner's browser decrypts, search
 | Search by words, first search (builds the word index) | 201 ms | 2.3 s | 5.3 s | 6 s |
 | Search by words, each keystroke after that | 214 ms | 1.9 s | 201 ms | 250 ms |
 | Search by meaning (words plus 100,000 vectors) | 206 ms | 2.5 s | 860 ms | 1 s |
+| Ask: every memory made ready for one question (once per change of the vault) | | | 149 ms | 500 ms |
+| Ask: the first question (builds the word index, like the first search) | | | 4.5 s | 6 s |
+| Ask: each question after that (all words, each word, meaning over 100,000 vectors, time words, immune check of the picks) | | | 763 ms | 1 s |
 | Timeline layout (grouping by month and day) | 11 ms | 109 ms | 98 ms | 500 ms |
 | Timeline rows drawn | every memory | every memory | 300, more on request | 300 |
 | A live sync pass into the vault | 15 ms | 133 ms | 145 ms | 2 s |
@@ -35,6 +38,7 @@ What changed:
 - **Search.** Every keystroke split every memory's text into words again. From 2,000 memories on, search builds a word index once per change of the memories and answers each keystroke from it, with the same hits and scores (a test compares them). The Memories screen keeps the same list of items between keystrokes, so the index is reused. 1.9 s to 201 ms a keystroke; the first search pays for the index.
 - **Timeline.** It drew a row for every memory; it now draws the newest 300 and adds 300 with "Show earlier memories". Its dates are formatted with one formatter instead of one per row.
 - **Unlock.** Memories were decrypted one after another; they are now opened in batches of 256 that run side by side, so the browser's crypto can overlap them. The first 100,000 run already includes this; in Node the gain was small, and it was not measured in a browser.
+- **Ask.** Measured from its first version (24 November). A question searches the same array of memories every time, so the word index built by the first question is reused; the folders and the time range chosen filter the hits rather than the array, and the immune system checks only the memories picked, not the whole vault.
 - **Linear parsing.** The backtracking patterns removed for security (see SECURITY-REVIEW.md) also removed multi-second stalls on long mail.
 
 ## The server engine

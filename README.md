@@ -13,7 +13,7 @@
 
 **One memory for every AI you use. Encrypted on your device. Read only where you allow it. Every read on the record.**
 
-[How it works](#how-it-works) · [First five minutes](#the-first-five-minutes) · [Immune system](#the-memory-immune-system) · [Security review](#security-review-and-performance) · [Encryption](#the-encryption-model) · [Connector](#the-connector) · [AI self](#your-ai-self) · [Ask links](#ask-links) · [Inbox](#the-memory-inbox) · [Meaning](#search-by-meaning) · [Thinking](#memory-that-thinks) · [Imports](#your-whole-digital-life) · [Live sync](#live-sync) · [Protected folders](#protected-folders) · [Public AI self](#a-public-ai-self) · [Selves meet](#selves-meet-selves) · [Work](#your-ai-self-at-work) · [Identity](#an-identity-and-a-wallet-for-the-ai-self) · [Prove a fact](#prove-a-fact-without-showing-it) · [Emergency](#emergency-access) · [Agreements](#sealed-agreements) · [Packs](#knowledge-packs) · [Bundles](#your-vault-in-one-bundle-kept-where-you-choose) · [Nodes](#run-your-own-node) · [Moving](#moving-between-nodes) · [Voice](#talk-to-your-ai-self) · [Capture keys](#capture-from-anywhere) · [Sessions](#sessions-with-an-experts-ai-self) · [Shared memory](#shared-family-and-team-memory) · [Open standard](#an-open-standard-and-a-privacy-score) · [Extension](#the-browser-extension) · [Sign in with Sigil](#sign-in-with-sigil) · [Sharing](#sharing-a-folder) · [Legacy](#legacy) · [Devices](#your-phone-and-every-device) · [Agents](#agents-get-their-own-memory) · [Proof](#proof-of-a-real-life) · [Threat model](#threat-model) · [Run it](#run-it) · [Roadmap](#roadmap)
+[How it works](#how-it-works) · [First five minutes](#the-first-five-minutes) · [Immune system](#the-memory-immune-system) · [Security review](#security-review-and-performance) · [Encryption](#the-encryption-model) · [Connector](#the-connector) · [AI self](#your-ai-self) · [Ask your whole life](#ask-your-whole-life) · [Ask links](#ask-links) · [Inbox](#the-memory-inbox) · [Meaning](#search-by-meaning) · [Thinking](#memory-that-thinks) · [Imports](#your-whole-digital-life) · [Live sync](#live-sync) · [Protected folders](#protected-folders) · [Public AI self](#a-public-ai-self) · [Selves meet](#selves-meet-selves) · [Work](#your-ai-self-at-work) · [Identity](#an-identity-and-a-wallet-for-the-ai-self) · [Prove a fact](#prove-a-fact-without-showing-it) · [Emergency](#emergency-access) · [Agreements](#sealed-agreements) · [Packs](#knowledge-packs) · [Bundles](#your-vault-in-one-bundle-kept-where-you-choose) · [Nodes](#run-your-own-node) · [Moving](#moving-between-nodes) · [Voice](#talk-to-your-ai-self) · [Capture keys](#capture-from-anywhere) · [Sessions](#sessions-with-an-experts-ai-self) · [Shared memory](#shared-family-and-team-memory) · [Open standard](#an-open-standard-and-a-privacy-score) · [Extension](#the-browser-extension) · [Sign in with Sigil](#sign-in-with-sigil) · [Sharing](#sharing-a-folder) · [Legacy](#legacy) · [Devices](#your-phone-and-every-device) · [Agents](#agents-get-their-own-memory) · [Proof](#proof-of-a-real-life) · [Threat model](#threat-model) · [Run it](#run-it) · [Roadmap](#roadmap)
 
 </div>
 
@@ -33,6 +33,7 @@ Every AI app keeps its own memory of you, locked inside that app, readable by th
 - **Save from the browser.** The extension saves a selection, a page or a ChatGPT or Claude conversation to your inbox.
 - **Sign in with Sigil.** Web apps ask for the folders they need; you choose, and you can revoke.
 - **Share with people.** Share a folder with another vault, read only, and take it back with a new key.
+- **Ask your whole life.** One question answered from every folder at once on your device, by words, meaning and plain time words like "last spring", each sentence linked to the memory it came from; written by your own model, or shown as the best matching memories without one.
 - **Your AI self.** An AI that answers as you, from the folders you choose and within rules you write, with your own model key, run in your browser or in the connector. Share it with a link: questions and answers are end to end encrypted, and every one is in your log.
 - **Memory that thinks.** A weekly brief, memories that disagree, every duplicate group merged at once, and expiry dates with real deletion.
 - **Bring your history.** Import ChatGPT, Claude, Obsidian, Apple Notes, Gmail and Google Calendar, Notion, GitHub and meeting transcripts. Parsed and encrypted in the browser, with no app approvals.
@@ -266,6 +267,17 @@ Under **AI self** in the vault you set up an AI that answers as you.
 - **A test chat** shows each answer with the memories it came from.
 - **Apps that answer as you.** For an app you allow, the vault wraps the rules, your model key and the vault public key under a key derived from that app's secret. The connector then offers `ask_self` and can answer your links.
 
+## Ask your whole life
+
+Under **Ask** in the vault, one question searches every folder at once and answers it on your device.
+
+- **Every folder, by words and by meaning.** Your own folders and the ones shared with you, through the same word index and sentence model as search. A folder's name counts too, so "at work" finds what is kept in Work. Choose folders or a time range to narrow it.
+- **Time words.** "Last spring", "in March", "2025", "last week", "three weeks ago" and "since May" are read as a period and matched against when each memory happened (an import keeps the date of the original mail, chat or note). When nothing from that time matches, the answer says so and uses the closest from other times.
+- **Every sentence has a source.** With your model key, the model is asked to answer you about your life, in the third person about your vault, and to end every sentence with the numbers of the memories it used. The answer is split into sentences on your device; a sentence without a valid source is dropped and counted, never shown. Click a sentence to read the memory behind it.
+- **Useful without a model.** Without a key, Ask shows the memories that answer best, grouped by folder and date, with the passage that answers marked.
+- **Checked first.** Held memories are left out, and every source goes to the model as quoted data with hidden instructions removed, as for the AI self. Protected folders still ask for your yes, for one answer.
+- **Nothing new on the server.** No question, no answer and no new endpoint. **Save answer** keeps an answer and its sources as an ordinary encrypted memory in the folder you pick; Ask never uses saved answers as a source.
+
 ## Ask links
 
 An ask link lets anyone who has it ask your AI self, within that link's own rules (folders and topics), until it expires, runs out of questions or you turn it off. Each link has an hourly limit too.
@@ -414,7 +426,7 @@ To restore, open `/vault/restore` on any Sigil node, give the file, a link, an I
 
 A new vault opens on a short guide: the recovery phrase, saved and two of its words typed back; a ChatGPT or Claude export brought in (or skipped); one AI app connected, with a key and the exact file or command for Claude Desktop, Claude Code, Cursor or ChatGPT; and the first answer that app draws from your memory, seen in the read log, which finishes the guide by itself. Where you are is kept as an encrypted setting, so it resumes on any device; each step can be skipped, and Settings shows it again.
 
-The vault shows five sections in its main row (Memories, Inbox, AI self, Apps, Settings) and everything else under **More**, in the four groups Vault, Self, Access and Others. Pin a section and it stays in the row on that device. Every link to a section (`/vault#agents`, `/vault#emergency`) works as before.
+The vault shows six sections in its main row (Memories, Ask, Inbox, AI self, Apps, Settings) and everything else under **More**, in the four groups Vault, Self, Access and Others. Pin a section and it stays in the row on that device. Every link to a section (`/vault#agents`, `/vault#emergency`) works as before.
 
 ## The memory immune system
 
@@ -824,7 +836,7 @@ Only what comes next. Everything already built is in the sections above and on t
 
 | | Stage | When |
 | --- | --- | --- |
-| 1 | **Ask your whole life**: one question answered from every memory, mail, meeting, note and file at once, each sentence linked to its source; living timelines of people, projects and places; a brief before every meeting; a fully local mode with a model on your own machine; unlock in under two seconds with 100,000 memories | Next |
+| 1 | **Ask your whole life**: living timelines of people, projects and places; a brief before every meeting; a fully local mode with a model on your own machine; unlock in under two seconds with 100,000 memories | Next |
 | 2 | **A model of you**: a personal model fine-tuned on your device from the folders you allow, weights encrypted in your vault; every lesson shown in plain words, one lesson or the whole model rolled back to a date; one model for every app through the connector | Next |
 | 3 | **A self that acts**: negotiates times, prices and terms within ranges you set; runs your inbox and calendar end to end with thresholds; its wallet goes live under your caps and allow-list; every action carries a receipt anyone can verify against the seals | Next |
 | 4 | **Proofs that show nothing**: zero-knowledge proofs of age, membership, history length and any field of a memory; proof of a real, continuous human from years of sealed history, with no biometrics; apps receive proofs, never data | Later |

@@ -8,7 +8,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Docs",
   description:
-    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the AI self at work, its identity and wallet, proving a fact, the emergency card, agreements and knowledge packs, voice, capture keys, sessions, shared memory, backups and restoring, running your own node and moving between nodes, the open standard, the API and the encryption model.",
+    "Set up the Sigil connector for Claude Desktop, Claude Code, Cursor and ChatGPT, your AI self and ask links, the memory inbox, search by meaning, asking your whole vault one question, memory that thinks, local imports, live sync, meeting transcripts, protected folders, the public AI self, selves meet, the privacy score, the browser extension, Sign in with Sigil, sharing, legacy, your phone and other devices, agent vaults and team spaces, proof of a real life, the AI self at work, its identity and wallet, proving a fact, the emergency card, agreements and knowledge packs, voice, capture keys, sessions, shared memory, backups and restoring, running your own node and moving between nodes, the open standard, the API and the encryption model.",
 };
 
 const KEY = "sigil_app.<app id>.<secret>";
@@ -29,6 +29,7 @@ const toc = [
   ["ask-links", "Ask links"],
   ["inbox", "Memory inbox"],
   ["meaning", "Search by meaning"],
+  ["ask", "Ask your whole life"],
   ["self-card", "Self card"],
   ["thinking", "Memory that thinks"],
   ["extension", "Browser extension"],
@@ -427,6 +428,54 @@ export default function Docs() {
               The server fetches the model files once from the public model hub and keeps them in its data folder; set{" "}
               <code>SIGIL_MODEL_FETCH=off</code> and put the files in <code>SIGIL_MODEL_DIR</code> yourself to keep it offline, or{" "}
               <code>SIGIL_SEMANTIC=off</code> to search by words only.
+            </p>
+          </section>
+
+          <section id="ask" className="doc-section">
+            <h2>Ask your whole life</h2>
+            <p>
+              Under <strong>Ask</strong> in the vault you ask one question and it is answered from every folder at once: your notes, imported mail,
+              chats, meetings and files, and folders other vaults shared with you. Everything happens on your device.
+            </p>
+            <ol>
+              <li>
+                <strong>Search.</strong> Your vault is searched by words (every word of the question, and each word on its own) and, once the sentence
+                model is ready, by meaning. A folder&apos;s name counts as a word of every memory in it, so &quot;at work&quot; finds what is kept in Work.
+                Choose folders or a time range to ask fewer.
+              </li>
+              <li>
+                <strong>Time words.</strong> &quot;Last spring&quot;, &quot;in March&quot;, &quot;2025&quot;, &quot;last week&quot;, &quot;three weeks
+                ago&quot;, &quot;the past 30 days&quot; and &quot;since May&quot; become a period, matched against when each memory happened: a
+                story&apos;s own date, or when the original was written for an import. When nothing from that period matches, the answer says so and
+                uses the closest memories from other times.
+              </li>
+              <li>
+                <strong>Checked first.</strong> Each memory picked goes through the immune system before anything uses it. Memories held for review are
+                left out, and hidden instructions are removed before a model reads the rest, which it receives as quoted data, the same way as the AI
+                self.
+              </li>
+              <li>
+                <strong>The answer.</strong> With a model key under AI self, your model is asked to answer you about your life, in the third person
+                about your vault, using only the memories given and ending every sentence with their numbers. Your browser splits the answer into
+                sentences and links each one to its memories; a sentence without a valid source is dropped, and the answer says how many were.
+                Click a sentence or a source to read the memory behind it. Without a key, Ask shows the memories that answer best, grouped by folder
+                and date, with the passage that answers marked. When nothing answers the question, it says your vault has nothing on it.
+              </li>
+              <li>
+                <strong>Protected folders.</strong> When the answer would use a protected folder, Ask asks first, for that one answer. With a model, the
+                yes is recorded the same way as in the AI self&apos;s test chat, and each protected memory the model reads is in your read log. Without
+                one, the memories are only shown on your screen.
+              </li>
+              <li>
+                <strong>Save answer.</strong> Keeps the question, the answer and its sources (title, folder, date and id) as a new memory, encrypted on
+                your device, in the folder you pick. An answer that used a protected folder can only be kept in a protected folder. Ask never uses
+                saved answers as a source.
+              </li>
+            </ol>
+            <p>
+              What stays on your device: the question, the search, the vectors, the answer and the links between them. Sigil&apos;s server learns
+              nothing new: Ask has no endpoint of its own and sends no request while it searches. The only call is to your model provider, from
+              your browser, with your own key, and it holds the question and the memories picked for it.
             </p>
           </section>
 
