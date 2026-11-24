@@ -37,6 +37,23 @@ What changed:
 - **Unlock.** Memories were decrypted one after another; they are now opened in batches of 256 that run side by side, so the browser's crypto can overlap them. The first 100,000 run already includes this; in Node the gain was small, and it was not measured in a browser.
 - **Linear parsing.** The backtracking patterns removed for security (see SECURITY-REVIEW.md) also removed multi-second stalls on long mail.
 
+## The server engine
+
+`npm run perf:engine` (in `web/`) keeps a 20,000 memory vault in a real database file, as a node does, and times what the server itself spends on the requests people and AI apps make most: the owner's session, devices, usage and inbox, and an app's folder list, index and reads. 200 rounds, 1,400 requests; the app's own decryption is not counted. Timings go to `web/perf/last-engine.json` (not committed).
+
+Changes in this round: every query is compiled once and the compiled statement reused; the file is memory-mapped with a 32 MB page cache and temporary data in memory; an app's read is logged in one write instead of one per memory; and once an hour expired sessions and login challenges are deleted, the planner's statistics refreshed and the write-ahead log folded back into the file. Durability is unchanged (every commit reaches the disk before the answer).
+
+| Request (median) | Before | After |
+|---|---|---|
+| Owner: session | 0.22 ms | 0.16 ms |
+| Owner: devices | 0.27 ms | 0.17 ms |
+| Owner: usage | 2.84 ms | 0.82 ms |
+| Owner: inbox | 0.26 ms | 0.15 ms |
+| App: folders | 1.63 ms | 1.21 ms |
+| App: index | 13.4 ms | 11.2 ms |
+| App: read | 4.26 ms | 2.72 ms |
+| Server time per request, all 1,400 | 3.38 ms | 2.48 ms |
+
 ## Budgets
 
 The budgets above are for a laptop at 100,000 memories. They scale with the number of memories (the check divides by 100,000). A phone is held to four times the laptop budget. That factor is an assumption, not a measurement: check it on a real phone (docs/GO-LIVE-CHECKS.md) before relying on it. At 10,000 memories the laptop unlock was 3 seconds, so a phone would be held to 12.

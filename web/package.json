@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "seal": "node --experimental-strip-types scripts/seal.ts",
     "perf": "vitest run --config vitest.perf.config.ts perf/vault.perf.ts",
+    "perf:engine": "vitest run --config vitest.perf.config.ts perf/engine.perf.ts",
     "seed": "vitest run --config vitest.perf.config.ts perf/seed-db.perf.ts"
   },
   "dependencies": {

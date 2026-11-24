@@ -2,7 +2,7 @@
 // column that holds user content holds ciphertext (see the privacy page for the
 // full list of what is and is not encrypted).
 
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -939,7 +939,14 @@ export function openDb(file: string): Db {
   if (file !== ":memory:") {
     db.exec("PRAGMA journal_mode = WAL;");
     db.exec("PRAGMA busy_timeout = 5000;");
+    // Reads come from memory where they can: the file is mapped (256 MB) and the
+    // page cache holds 32 MB. Durability is unchanged: every commit still
+    // reaches the disk before the request is answered (synchronous stays FULL).
+    db.exec("PRAGMA mmap_size = 268435456;");
   }
+  db.exec("PRAGMA cache_size = -32768;");
+  db.exec("PRAGMA temp_store = MEMORY;");
+  cacheStatements(db);
   migrateReadLog(db);
   migrateKeyslots(db);
   db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
@@ -962,7 +969,44 @@ export function openDb(file: string): Db {
   addColumn(db, "legacy_plans", "release_hash", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS memories_to_delete ON memories (delete_after) WHERE delete_after IS NOT NULL;");
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
+  // Fresh planner statistics for the tables that changed since the last start.
+  db.exec("PRAGMA optimize = 0x10002;");
   return db;
+}
+
+/** How many compiled statements one database keeps. The queries in the code are far fewer; the limit only matters for SQL built at run time. */
+const STATEMENTS_KEPT = 512;
+
+/**
+ * Every query is compiled once and the compiled statement is reused, instead
+ * of being compiled again on every request. Statements run synchronously, so
+ * one is never in use twice at the same time.
+ */
+function cacheStatements(db: Db): void {
+  const compile = db.prepare.bind(db);
+  const kept = new Map<string, StatementSync>();
+  db.prepare = ((sql: string) => {
+    let st = kept.get(sql);
+    if (!st) {
+      st = compile(sql);
+      if (kept.size >= STATEMENTS_KEPT) kept.delete(kept.keys().next().value as string);
+      kept.set(sql, st);
+    }
+    return st;
+  }) as Db["prepare"];
+}
+
+/**
+ * Hourly upkeep: sign-in sessions and login challenges that ran out are
+ * deleted, the planner's statistics are refreshed, and the write-ahead log is
+ * folded back into the database file so it does not keep growing.
+ */
+export function housekeeping(db: Db, at = Date.now()): { sessions: number; challenges: number } {
+  const sessions = Number(db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(at).changes);
+  const challenges = Number(db.prepare("DELETE FROM challenges WHERE expires_at < ?").run(at).changes);
+  db.exec("PRAGMA optimize;");
+  db.exec("PRAGMA wal_checkpoint(TRUNCATE);");
+  return { sessions, challenges };
 }
 
 let shared: Db | null = null;

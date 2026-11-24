@@ -18,4 +18,5 @@ contracts/broadcast/
 next-env.d.ts
 web/public/vendor/
 web/perf/last-run.json
+web/perf/last-engine.json
 web/.data-seed

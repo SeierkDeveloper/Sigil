@@ -3,7 +3,8 @@
 // period is over, writes the legacy warning stages the owners reached, and
 // publishes seals on chain only when anchoring is on. It also makes heirs of
 // shared memories members once a plan released, and deletes vaults that moved
-// to another node once their period of sending links on is over.
+// to another node once their period of sending links on is over. Once an
+// hour it tidies the database: expired sessions out, the write-ahead log folded back.
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -32,6 +33,8 @@ export async function register() {
     console.error(`[sigil] The data folder cannot be written (${(err as Error).message}). On Railway, set RAILWAY_RUN_UID=0 so the volume at /data is writable.`);
   }
 
+  const { housekeeping } = await import("./server/db");
+  let lastUpkeep = 0;
   const tick = async () => {
     try {
       const db = getDb();
@@ -44,6 +47,11 @@ export async function register() {
       heirsTick(db);
       moveTick(db);
       db.prepare("DELETE FROM device_pairings WHERE expires_at < ?").run(Date.now());
+      // Once an hour: expired sessions and challenges out, planner statistics fresh, the write-ahead log folded back.
+      if (Date.now() - lastUpkeep >= 3_600_000) {
+        lastUpkeep = Date.now();
+        housekeeping(db);
+      }
       // The immune system's public test, once an hour, when it is switched on.
       await immuneTick(db).catch((err) => console.error("[sigil] immune round failed", err));
       if (anchorStatus().mode === "anchored") await anchorPending(db);

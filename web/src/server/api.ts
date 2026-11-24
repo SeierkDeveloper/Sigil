@@ -25,7 +25,7 @@ import {
   MOVE_MAX_DAYS,
   type VaultBundle,
 } from "@sigil/core";
-import { getDb, type Db } from "./db";
+import { getDb, tx, type Db } from "./db";
 import { serverConfig } from "./config";
 import {
   addKeyslot,
@@ -899,8 +899,11 @@ route("POST", "connector/v1/read", async (ctx) => {
   const { found, missing } = appRead(ctx.db, auth, unique);
   // Memories in protected folders are handed over only with the owner's yes for this read.
   const { open, protectedRead, held } = gateRead(ctx.db, auth, found);
-  for (const m of open) logRead(ctx.db, auth, "read", m.id, 1);
-  for (const m of protectedRead) logRead(ctx.db, auth, "protected", m.id, 1);
+  // One write for the whole read, not one per memory.
+  tx(ctx.db, () => {
+    for (const m of open) logRead(ctx.db, auth, "read", m.id, 1);
+    for (const m of protectedRead) logRead(ctx.db, auth, "protected", m.id, 1);
+  });
   const memories = [...open, ...protectedRead];
   const folders = appFolders(ctx.db, auth).filter((f) => memories.some((m) => m.folderId === f.id));
   return json({ appId: auth.appId, folders, memories, missing, held });
