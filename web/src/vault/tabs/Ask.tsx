@@ -288,7 +288,7 @@ export function AskTab() {
           </p>
         </div>
       ) : shown ? (
-        <Result shown={shown} reading={reading} onRead={setReading} onOpenInMemories={openMemory} onAddModel={() => goTo("self")} onSaved={(m) => update((d) => ({ ...d, memories: [m, ...d.memories] }))} />
+        <Result shown={shown} reading={reading} onRead={setReading} onOpenInMemories={openMemory} onAddModel={hasModel ? undefined : () => goTo("self")} onSaved={(m) => update((d) => ({ ...d, memories: [m, ...d.memories] }))} />
       ) : !gate ? (
         <section className="subpanel plate ask-start" aria-labelledby="ask-start-title">
           <h3 id="ask-start-title" className="plate-title">
@@ -344,7 +344,8 @@ function Result({
   reading: string | null;
   onRead(id: string | null): void;
   onOpenInMemories(id: string): void;
-  onAddModel(): void;
+  /** Only when no model key is set: the note under memories-only results points to AI self. */
+  onAddModel?: () => void;
   onSaved(m: Memory): void;
 }) {
   const { answer } = shown;
@@ -475,7 +476,7 @@ function Result({
                 </ul>
               </section>
             ))}
-            {!answer.usedModel ? (
+            {!answer.usedModel && onAddModel ? (
               <p className="small muted ask-mode-note">
                 These are the memories that answer best.{" "}
                 <button type="button" className="text-button" onClick={onAddModel}>
