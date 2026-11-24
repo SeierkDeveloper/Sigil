@@ -8,22 +8,25 @@ export const metadata: Metadata = {
   description: "What Sigil builds next: an AI self that knows your whole life, learns to act like you, proves things without showing them, meets other selves and lives on a network nobody can switch off.",
 };
 
-type Horizon = "next" | "later" | "vision";
+type Horizon = "now" | "next" | "later" | "vision";
 
 interface Stage {
   title: string;
   summary: string;
   horizon: Horizon;
+  /** What of this stage is already live; shown first, with a filled mark. */
+  built?: string[];
   items: string[];
 }
 
-const HORIZON_LABEL: Record<Horizon, string> = { next: "Next", later: "Later", vision: "Vision" };
+const HORIZON_LABEL: Record<Horizon, string> = { now: "In progress", next: "Next", later: "Later", vision: "Vision" };
 
-// Only what is not built yet. Everything built is in the changelog.
+// What is not built yet, and for the stage in progress what of it is already live. Everything built is in the changelog.
 const stages: Stage[] = [
   {
     title: "Ask your whole life",
-    horizon: "next",
+    horizon: "now",
+    built: ["Ask: one question answered from every folder at once, every sentence linked to the memories it came from (live 24 Nov)"],
     summary: "Your whole life within reach of one question: the people, projects and places in it, a brief before every meeting, and all of it on your own machine.",
     items: [
       "Living timelines of the people, projects and places in your life, built and kept current by the vault",
@@ -146,7 +149,7 @@ export default function Roadmap() {
         <PageHeader
           eyebrow="Roadmap"
           title="What comes next"
-          lead="Everything on this page is still to be built. Each stage ships when it is ready; no dates are promised."
+          lead="What Sigil builds next. A filled mark is already live; everything else is still to be built. Each stage ships when it is ready; no dates are promised."
         />
 
         <section className="pillars" aria-labelledby="pillars-title">
@@ -177,10 +180,15 @@ export default function Roadmap() {
               <div>
                 <div className="stage-head">
                   <h3 className="stage-title">{s.title}</h3>
-                  <span className={s.horizon === "next" ? "badge badge-strong" : "badge"}>{HORIZON_LABEL[s.horizon]}</span>
+                  <span className={s.horizon === "now" || s.horizon === "next" ? "badge badge-strong" : "badge"}>{HORIZON_LABEL[s.horizon]}</span>
                 </div>
                 <p className="stage-summary">{s.summary}</p>
                 <ul className="stage-items">
+                  {(s.built ?? []).map((it) => (
+                    <li key={it} className="stage-item" data-built="true">
+                      {it}
+                    </li>
+                  ))}
                   {s.items.map((it) => (
                     <li key={it} className="stage-item" data-built="false">
                       {it}
