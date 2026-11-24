@@ -20,7 +20,7 @@ import { search, tokenize } from "./search";
 import { isLive, memoriesBlock, MAX_QUESTION, STOP_WORDS, type ImmuneCatch, type SelfMemory } from "./self";
 import { DEFAULT_IMMUNE, isHeld, neutralise, newNonce, scanText, type ImmuneSettings } from "./immune";
 import { randomBytes } from "./crypto";
-import type { ModelCaller } from "./model";
+import type { ModelCaller, ModelRoute } from "./model";
 
 /** A memory as Ask reads it. `text` is the body when not given. */
 export type AskMemory = SelfMemory & { text?: string };
@@ -601,6 +601,8 @@ export interface LifeAnswer {
   usedModel: boolean;
   /** The model asked, when one was. */
   model?: string;
+  /** When the model is a router (Raeto): the model it picked for this answer and what it cost. */
+  route?: ModelRoute;
   caught?: ImmuneCatch;
 }
 
@@ -626,7 +628,8 @@ export async function askLife(opts: AskLifeOptions): Promise<LifeAnswer> {
     messages: [{ role: "user", content: ev.question }],
     maxTokens: 1500,
   });
-  const used = { usedModel: true, model: opts.model.model };
+  const route = opts.model.lastRoute ?? null;
+  const used = { usedModel: true, model: opts.model.model, ...(route ? { route } : {}) };
   if (raw.trim().replace(/[.!]$/, "").toUpperCase() === NOTHING_MARK) return { ...base, ...used, kind: "nothing", sentences: [], sources: [] };
   const { sentences, dropped } = citedSentences(raw, ev.sources);
   // Nothing it wrote could be linked to a memory: show the memories instead of an answer without sources.

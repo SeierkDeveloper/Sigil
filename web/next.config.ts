@@ -69,7 +69,7 @@ const csp = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self'",
-  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.github.com ${SYNC_ORIGINS.join(" ")} ${backupOrigins}${chainRead}${identityRead}${isProd ? "" : " ws: wss:"}`,
+  `connect-src 'self' https://api.anthropic.com https://api.openai.com https://api.raeto.cc https://api.github.com ${SYNC_ORIGINS.join(" ")} ${backupOrigins}${chainRead}${identityRead}${isProd ? "" : " ws: wss:"}`,
   "media-src 'self' blob:",
   "manifest-src 'self'",
   "frame-ancestors 'none'",

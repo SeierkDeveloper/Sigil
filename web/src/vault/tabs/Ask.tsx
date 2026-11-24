@@ -10,6 +10,9 @@ import type { Unlocked } from "../ops";
 import { errorText, useVault } from "../context";
 import { Empty, Notice } from "../ui";
 
+/** A model call's cost: small amounts keep enough digits to read. */
+const usd = (n: number) => (n === 0 ? "$0" : n < 0.0001 ? `$${n.toFixed(6)}` : n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
+
 /** Questions to start from, for any vault. Each runs as soon as it is chosen. */
 const STARTERS = ["What did I promise someone recently?", "What happened last week?", "What was I reading this year?", "Where did I go last spring?"];
 
@@ -246,7 +249,12 @@ export function AskTab() {
           <DeviceIcon />
           <span>
             {semantic.status.state === "ready" ? "Searched by words and by meaning on this device" : "Searched by words on this device"}
-            {useModel ? `, written by ${data.model!.model} with your own key` : ""}. Sigil&apos;s server never sees the question or the answer.
+            {useModel
+              ? data.model!.provider === "raeto"
+                ? `, written through Raeto (${data.model!.model}) with your own key`
+                : `, written by ${data.model!.model} with your own key`
+              : ""}
+            . Sigil&apos;s server never sees the question or the answer.
           </span>
         </p>
         </div>
@@ -366,7 +374,9 @@ function Result({
 
   const meta =
     answer.kind === "answer"
-      ? `Written by ${answer.model} from ${plural(answer.sources.length, "memory", "memories")}`
+      ? answer.route
+        ? `Written by ${answer.route.model} through Raeto${answer.route.costUsd !== null ? `, ${usd(answer.route.costUsd)}` : ""}, from ${plural(answer.sources.length, "memory", "memories")}`
+        : `Written by ${answer.model} from ${plural(answer.sources.length, "memory", "memories")}`
       : answer.kind === "evidence"
         ? answer.sources.length === 1
           ? "1 memory that answers best"

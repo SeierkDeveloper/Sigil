@@ -7,6 +7,7 @@ import {
   DEFAULT_RULES,
   maskKey,
   PROVIDER_NAMES,
+  RAETO_MODELS,
   splitList,
   type ModelProvider,
   type SelfAnswer,
@@ -17,7 +18,7 @@ import * as selfOps from "../selfOps";
 import type { AskLinkView } from "../ops";
 import { errorText, useVault } from "../context";
 import { reportCaught } from "../immuneOps";
-import { ChatGptIcon, ClaudeIcon, DeviceIcon } from "@/components/icons";
+import { ChatGptIcon, ClaudeIcon, DeviceIcon, RaetoIcon } from "@/components/icons";
 import { AppMark } from "../marks";
 import { Band, CopyButton, Empty, Notice, PlateHead, Quiet } from "../ui";
 import { PublicSelfSection } from "./PublicSelf";
@@ -136,7 +137,7 @@ function ModelSection() {
         <>
           <div className="self-model">
             <span className="mark" aria-hidden="true">
-              {data.model.provider === "openai" ? <ChatGptIcon /> : <ClaudeIcon />}
+              {data.model.provider === "openai" ? <ChatGptIcon /> : data.model.provider === "raeto" ? <RaetoIcon /> : <ClaudeIcon />}
             </span>
             <p className="self-model-line">
               {PROVIDER_NAMES[data.model.provider]}, <span className="mono">{data.model.model}</span>, key <span className="mono">{maskKey(data.model.apiKey)}</span>
@@ -174,15 +175,44 @@ function ModelSection() {
               >
                 <option value="anthropic">Anthropic</option>
                 <option value="openai">OpenAI</option>
+                <option value="raeto">Raeto (400+ models, one key)</option>
               </select>
             </div>
             <div className="field">
               <label className="field-label" htmlFor="self-model-id">
                 Model
               </label>
-              <input id="self-model-id" className="input mono" value={model} onChange={(e) => setModel(e.target.value)} autoComplete="off" spellCheck={false} />
+              <input
+                id="self-model-id"
+                className="input mono"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+                list={provider === "raeto" ? "self-raeto-models" : undefined}
+              />
+              {provider === "raeto" ? (
+                <datalist id="self-raeto-models">
+                  {RAETO_MODELS.map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              ) : null}
             </div>
           </div>
+          {provider === "raeto" ? (
+            <p className="device-line" data-testid="raeto-note">
+              <RaetoIcon />
+              <span>
+                Raeto gives one key for 400+ models. <span className="mono">raeto/auto</span> picks the cheapest model that can write each answer, and every
+                answer shows which model wrote it and what it cost. Get a key and top it up with USDG or a card at{" "}
+                <a href="https://raeto.cc" target="_blank" rel="noopener noreferrer">
+                  raeto.cc
+                </a>
+                .
+              </span>
+            </p>
+          ) : null}
           <div className="field">
             <label className="field-label" htmlFor="self-key">
               API key

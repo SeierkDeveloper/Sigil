@@ -26,6 +26,7 @@ const toc = [
   ["other-clients", "Other MCP clients"],
   ["tools", "Tools"],
   ["ai-self", "Your AI self"],
+  ["raeto", "Raeto: every model, one key"],
   ["ask-links", "Ask links"],
   ["inbox", "Memory inbox"],
   ["meaning", "Search by meaning"],
@@ -322,8 +323,8 @@ export default function Docs() {
             </p>
             <ol>
               <li>
-                <strong>Model.</strong> Choose Anthropic (the default) or OpenAI, a model, and paste your own API key. The key is encrypted with your
-                vault key in your browser before it is saved. Calls go from your browser straight to the provider and are billed to your key.
+                <strong>Model.</strong> Choose Anthropic (the default), OpenAI or Raeto, a model, and paste your own API key. The key is encrypted with
+                your vault key in your browser before it is saved. Calls go from your browser straight to the provider and are billed to your key.
               </li>
               <li>
                 <strong>Rules.</strong> The folders it may use (nothing else is ever given to the model), topics it may and may not discuss, things it
@@ -341,6 +342,36 @@ export default function Docs() {
               </li>
             </ol>
             <p>The rules and the key are saved as encrypted settings. Changing them updates every app you allowed.</p>
+          </section>
+
+          <section id="raeto" className="doc-section">
+            <h2>Raeto: every model with one key</h2>
+            <p>
+              <a href="https://raeto.cc" target="_blank" rel="noopener noreferrer">
+                Raeto
+              </a>{" "}
+              is one key for more than 400 models, topped up with USDG on Robinhood Chain or by card. Choose Raeto under AI self, Model, paste a Raeto key,
+              and Ask, your AI self, briefs, drafts and apps that answer as you all write through it.
+            </p>
+            <ul>
+              <li>
+                <strong>The model picks itself.</strong> With <code>raeto/auto</code> (the default) Raeto chooses the cheapest model that can write each
+                answer. <code>raeto/auto:cheap</code>, <code>:fast</code>, <code>:reason</code> and <code>:long</code> lean one way, and any model id Raeto
+                lists works too.
+              </li>
+              <li>
+                <strong>Every answer says what it used.</strong> An answer under Ask shows the model Raeto picked and what that answer cost, as Raeto
+                reports it.
+              </li>
+              <li>
+                <strong>Same privacy as any key.</strong> The key is encrypted in your vault, and the call goes from your browser (or the connector on your
+                computer) straight to Raeto. Sigil&apos;s server never sees the key, the question or the answer. Memories reach Raeto only when an answer
+                needs them, after the immune system has checked them, exactly as with Anthropic or OpenAI.
+              </li>
+              <li>
+                <strong>When the balance runs out,</strong> Ask says so. Top it up at raeto.cc, or switch Ask to Memories only, which needs no model.
+              </li>
+            </ul>
           </section>
 
           <section id="ask-links" className="doc-section">

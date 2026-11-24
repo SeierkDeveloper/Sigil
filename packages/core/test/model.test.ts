@@ -82,3 +82,57 @@ describe("the owner's model, called from the device", () => {
     expect(maskKey(KEY)).not.toContain("0123456789");
   });
 });
+
+describe("Raeto, one key for every model", () => {
+  const RKEY = "rk_test_0123456789abcdef";
+  function raeto(status: number, body: unknown, headers: Record<string, string> = {}) {
+    const calls: { url: string; headers: Headers; body: Record<string, unknown> }[] = [];
+    const fetch = async (input: string | URL | Request, init?: RequestInit) => {
+      calls.push({ url: String(input), headers: new Headers(init?.headers), body: JSON.parse(String(init?.body ?? "{}")) });
+      return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...headers } });
+    };
+    return { calls, fetch };
+  }
+  const reply = (text: string) => ({ choices: [{ message: { role: "assistant", content: text } }] });
+
+  it("calls Raeto with the owner's key and reads the model it picked and the cost", async () => {
+    const p = raeto(200, reply("Hello through Raeto."), { "x-raeto-model": "deepseek/deepseek-v4", "x-raeto-cost": "0.000412" });
+    const caller = createModelCaller({ provider: "raeto", model: "raeto/auto", apiKey: RKEY }, { fetch: p.fetch });
+    expect(caller.lastRoute ?? null).toBeNull();
+    const text = await caller.complete({ system: "Be brief.", messages: [{ role: "user", content: "Hi" }], maxTokens: 500 });
+    expect(text).toBe("Hello through Raeto.");
+    expect(p.calls[0].url).toBe("https://api.raeto.cc/v1/chat/completions");
+    expect(p.calls[0].headers.get("authorization")).toBe(`Bearer ${RKEY}`);
+    expect(p.calls[0].body).toMatchObject({ model: "raeto/auto", max_tokens: 500, messages: [{ role: "system", content: "Be brief." }, { role: "user", content: "Hi" }] });
+    expect(p.calls[0].body.max_completion_tokens).toBeUndefined();
+    expect(caller.lastRoute).toEqual({ model: "deepseek/deepseek-v4", costUsd: 0.000412 });
+  });
+
+  it("falls back to the body, then to the model asked, when headers are missing", async () => {
+    const fromBody = createModelCaller({ provider: "raeto", model: "raeto/auto", apiKey: RKEY }, { fetch: raeto(200, { ...reply("ok"), raeto: { model: "qwen/qwen3", cost_usd: 0.0002 } }).fetch });
+    await fromBody.complete({ system: "s", messages: [{ role: "user", content: "q" }] });
+    expect(fromBody.lastRoute).toEqual({ model: "qwen/qwen3", costUsd: 0.0002 });
+    const bare = createModelCaller({ provider: "raeto", model: "raeto/auto:cheap", apiKey: RKEY }, { fetch: raeto(200, reply("ok")).fetch });
+    await bare.complete({ system: "s", messages: [{ role: "user", content: "q" }] });
+    expect(bare.lastRoute).toEqual({ model: "raeto/auto:cheap", costUsd: null });
+  });
+
+  it("says plainly when the Raeto balance is used up or the key is wrong", async () => {
+    const run = (status: number) =>
+      createModelCaller({ provider: "raeto", model: "raeto/auto", apiKey: RKEY }, { fetch: raeto(status, { error: { message: "x" } }).fetch }).complete({ system: "s", messages: [{ role: "user", content: "q" }] });
+    await expect(run(402)).rejects.toMatchObject({ code: "balance" });
+    await expect(run(401)).rejects.toMatchObject({ code: "auth" });
+    await expect(run(429)).rejects.toMatchObject({ code: "rate" });
+  });
+
+  it("keeps Raeto settings and defaults to raeto/auto", () => {
+    expect(cleanModelSettings({ provider: "raeto", apiKey: ` ${RKEY} ` })).toEqual({ provider: "raeto", model: "raeto/auto", apiKey: RKEY });
+    expect(cleanModelSettings({ provider: "raeto", model: "raeto/auto:reason", apiKey: RKEY })?.model).toBe("raeto/auto:reason");
+  });
+
+  it("leaves OpenAI and Anthropic calls without a route", async () => {
+    const caller = createModelCaller({ provider: "openai", model: "gpt-5", apiKey: "sk-test-0123456789abcdef" }, { fetch: raeto(200, reply("ok"), { "x-raeto-model": "nope" }).fetch });
+    await caller.complete({ system: "s", messages: [{ role: "user", content: "q" }] });
+    expect(caller.lastRoute ?? null).toBeNull();
+  });
+});

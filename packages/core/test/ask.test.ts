@@ -204,6 +204,22 @@ describe("asking", () => {
     expect(calls[0].messages).toEqual([{ role: "user", content: "What did Ada and I do last spring?" }]);
   });
 
+  it("carries the model a router picked, and its cost, with the answer", async () => {
+    const routed: ModelCaller = {
+      provider: "raeto",
+      model: "raeto/auto",
+      lastRoute: null,
+      async complete() {
+        (this as { lastRoute: unknown }).lastRoute = { model: "deepseek/deepseek-v4", costUsd: 0.0004 };
+        return "You walked the coast path with Ada in April [1].";
+      },
+    };
+    const a = await askLife({ question: "What did Ada and I do last spring?", memories: vault, model: routed, now: NOW });
+    expect(a).toMatchObject({ kind: "answer", model: "raeto/auto", route: { model: "deepseek/deepseek-v4", costUsd: 0.0004 } });
+    const { model } = fakeModel(() => "You walked the coast path with Ada in April [1].");
+    expect((await askLife({ question: "What did Ada and I do last spring?", memories: vault, model, now: NOW })).route).toBeUndefined();
+  });
+
   it("says plainly that the vault has nothing, without calling the model", async () => {
     const { model, calls } = fakeModel(() => "should not be asked");
     const a = await askLife({ question: "What is my blood type?", memories: vault, model, now: NOW });

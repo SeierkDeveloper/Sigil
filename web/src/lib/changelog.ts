@@ -11,6 +11,19 @@ export interface Release {
 export const releases: Release[] = [
   {
     date: "2026-11-24",
+    title: "Raeto: every model with one key",
+    area: "AI self",
+    summary: "Raeto is now a model choice next to Anthropic and OpenAI. One key reaches 400+ models, raeto/auto picks the cheapest one that can write each answer, and every answer under Ask shows the model it used and what it cost.",
+    items: [
+      "Choose Raeto under AI self, Model, and paste a Raeto key; Ask, the AI self, briefs, drafts and apps that answer as you all write through it",
+      "raeto/auto by default, raeto/auto:cheap, :fast, :reason and :long to lean one way, or any model Raeto lists",
+      "Each Ask answer shows the model Raeto picked and the cost Raeto reports for it",
+      "Top up with USDG on Robinhood Chain or by card at raeto.cc; when the balance is used up Ask says so in plain words",
+      "Same privacy as any key: encrypted in your vault, called from your browser or the connector straight to Raeto, never through Sigil's server",
+    ],
+  },
+  {
+    date: "2026-11-24",
     title: "Ask your whole life: one question, answered from every folder at once",
     area: "Search",
     summary: "A new Ask section in the vault. One question searches every folder by words, by meaning and by plain time words, on your device, and every sentence of the answer links to the memory it came from.",

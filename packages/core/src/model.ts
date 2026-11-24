@@ -4,10 +4,15 @@
 // vault (see settings.ts) and opened only in the owner's browser or in the
 // connector on the owner's machine. Calls go from there straight to the
 // provider. The fetch function is injectable so tests never reach a network.
+//
+// Raeto (raeto.cc) is a third choice: one key for 400+ models, topped up with
+// USDG on Robinhood Chain or by card. Its raeto/auto routes pick the cheapest
+// model that can do each call, and every answer says which model wrote it and
+// what it cost.
 
 import Anthropic from "@anthropic-ai/sdk";
 
-export type ModelProvider = "anthropic" | "openai";
+export type ModelProvider = "anthropic" | "openai" | "raeto";
 
 export interface ModelSettings {
   provider: ModelProvider;
@@ -19,15 +24,22 @@ export interface ModelSettings {
 export const DEFAULT_MODELS: Record<ModelProvider, string> = {
   anthropic: "claude-opus-5-5",
   openai: "gpt-5",
+  raeto: "raeto/auto",
 };
 
 export const PROVIDER_NAMES: Record<ModelProvider, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
+  raeto: "Raeto",
 };
 
+/** Raeto's own routes: each picks the cheapest model that can do the call. Any model id Raeto lists works too. */
+export const RAETO_MODELS = ["raeto/auto", "raeto/auto:cheap", "raeto/auto:fast", "raeto/auto:reason", "raeto/auto:long"] as const;
+
+export const RAETO_BASE_URL = "https://api.raeto.cc/v1";
+
 /** The addresses a model call goes to. The site's content security policy allows exactly these. */
-export const MODEL_ORIGINS = ["https://api.anthropic.com", "https://api.openai.com"] as const;
+export const MODEL_ORIGINS = ["https://api.anthropic.com", "https://api.openai.com", "https://api.raeto.cc"] as const;
 
 export interface ModelMessage {
   role: "user" | "assistant";
@@ -40,13 +52,21 @@ export interface ModelRequest {
   maxTokens?: number;
 }
 
+/** Which model a router actually used for the last answer, and what it cost in dollars when the router says. */
+export interface ModelRoute {
+  model: string;
+  costUsd: number | null;
+}
+
 export interface ModelCaller {
   readonly provider: ModelProvider;
   readonly model: string;
   complete(req: ModelRequest): Promise<string>;
+  /** Set after each answer by a router (Raeto): the model it picked and the cost. Null for a direct provider. */
+  readonly lastRoute?: ModelRoute | null;
 }
 
-export type ModelErrorCode = "auth" | "rate" | "refused" | "network" | "provider" | "empty";
+export type ModelErrorCode = "auth" | "rate" | "refused" | "network" | "provider" | "empty" | "balance";
 
 export class ModelError extends Error {
   constructor(
@@ -67,7 +87,7 @@ export interface CallerOptions {
 export function cleanModelSettings(value: unknown): ModelSettings | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  const provider = v.provider === "openai" ? "openai" : v.provider === "anthropic" ? "anthropic" : null;
+  const provider = v.provider === "openai" ? "openai" : v.provider === "anthropic" ? "anthropic" : v.provider === "raeto" ? "raeto" : null;
   const apiKey = typeof v.apiKey === "string" ? v.apiKey.trim() : "";
   if (!provider || !apiKey) return null;
   const model = typeof v.model === "string" && /^[A-Za-z0-9._:/-]{1,100}$/.test(v.model.trim()) ? v.model.trim() : DEFAULT_MODELS[provider];
@@ -126,20 +146,27 @@ function anthropicCaller(settings: ModelSettings, opts: CallerOptions): ModelCal
   };
 }
 
-function openaiCaller(settings: ModelSettings, opts: CallerOptions): ModelCaller {
+type ChatReply = { choices?: { message?: { content?: string; refusal?: string | null } }[]; raeto?: { model?: unknown; cost_usd?: unknown } } | null;
+
+/** OpenAI and Raeto speak the same chat format; Raeto adds the model it picked and the cost. */
+function chatCaller(settings: ModelSettings, opts: CallerOptions): ModelCaller {
   const doFetch: FetchLike = opts.fetch ?? ((i, init) => fetch(i, init));
-  return {
-    provider: "openai",
+  const raeto = settings.provider === "raeto";
+  const url = raeto ? `${RAETO_BASE_URL}/chat/completions` : "https://api.openai.com/v1/chat/completions";
+  const caller = {
+    provider: settings.provider,
     model: settings.model,
-    async complete(req) {
+    lastRoute: null as ModelRoute | null,
+    async complete(req: ModelRequest): Promise<string> {
+      caller.lastRoute = null;
       let res: Response;
       try {
-        res = await doFetch("https://api.openai.com/v1/chat/completions", {
+        res = await doFetch(url, {
           method: "POST",
           headers: { "content-type": "application/json", authorization: `Bearer ${settings.apiKey}` },
           body: JSON.stringify({
             model: settings.model,
-            max_completion_tokens: req.maxTokens ?? MAX_TOKENS,
+            ...(raeto ? { max_tokens: req.maxTokens ?? MAX_TOKENS } : { max_completion_tokens: req.maxTokens ?? MAX_TOKENS }),
             messages: [{ role: "system", content: req.system }, ...req.messages],
           }),
         });
@@ -147,18 +174,25 @@ function openaiCaller(settings: ModelSettings, opts: CallerOptions): ModelCaller
         throw new ModelError("The model provider could not be reached.", "network");
       }
       if (res.status === 401 || res.status === 403) throw new ModelError("The model key was not accepted. Check it under AI self, Model.", "auth");
+      if (raeto && res.status === 402) throw new ModelError("Your Raeto balance is used up. Top it up at raeto.cc and ask again.", "balance");
       if (res.status === 429) throw new ModelError("The model provider is busy or your key is over its limit. Try again in a moment.", "rate");
       if (!res.ok) throw new ModelError(`The model provider answered ${res.status}.`, "provider");
-      const data = (await res.json().catch(() => null)) as { choices?: { message?: { content?: string; refusal?: string | null } }[] } | null;
+      const data = (await res.json().catch(() => null)) as ChatReply;
       const choice = data?.choices?.[0]?.message;
       if (choice?.refusal) throw new ModelError("The model declined to answer.", "refused");
       const text = (choice?.content ?? "").trim();
       if (!text) throw new ModelError("The model gave an empty answer.", "empty");
+      if (raeto) {
+        const picked = res.headers.get("x-raeto-model")?.trim() || (typeof data?.raeto?.model === "string" ? data.raeto.model : "") || settings.model;
+        const cost = Number(res.headers.get("x-raeto-cost") ?? data?.raeto?.cost_usd ?? NaN);
+        caller.lastRoute = { model: picked.slice(0, 100), costUsd: Number.isFinite(cost) && cost >= 0 ? cost : null };
+      }
       return text;
     },
   };
+  return caller;
 }
 
 export function createModelCaller(settings: ModelSettings, opts: CallerOptions = {}): ModelCaller {
-  return settings.provider === "openai" ? openaiCaller(settings, opts) : anthropicCaller(settings, opts);
+  return settings.provider === "anthropic" ? anthropicCaller(settings, opts) : chatCaller(settings, opts);
 }
