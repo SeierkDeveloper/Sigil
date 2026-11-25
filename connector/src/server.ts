@@ -9,7 +9,7 @@ import type { FolderInfo, FullMemory, SearchResult } from "./reader";
 import { ReaderError } from "./reader";
 import type { AgentTools, PickedNote, RecallHit } from "./agent";
 
-export const CONNECTOR_VERSION = "0.4.0";
+export const CONNECTOR_VERSION = "0.5.0";
 
 /** What the server needs from a reader. VaultReader implements it; tests pass a stub. */
 export interface Reader {

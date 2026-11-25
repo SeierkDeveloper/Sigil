@@ -1,6 +1,6 @@
 {
   "name": "sigil-connector",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Lets Claude, ChatGPT, Cursor and other MCP clients search and read your Sigil vault, and suggest memories to its inbox, with the permissions you grant. Decrypts and encrypts on your machine.",
   "keywords": [
     "mcp",

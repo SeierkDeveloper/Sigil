@@ -26,7 +26,7 @@ Build `dist/index.js` with `npm run build -w sigil-connector` from the repositor
 
 ## Tools
 
-- `get_profile`: the Self card, when this app may read its folder.
+- `get_profile`: the Self card, and the lessons of a model of you when the owner shares them, when this app may read the Self card folder.
 - `list_folders`: the folders this app may read.
 - `search_memories`: search by meaning and by the words in titles, tags and first lines, locally. Arguments: `query`, optional `folder` and `limit`.
 - `read_memory`: the full text of one memory by `id`.
@@ -37,13 +37,15 @@ No tool above changes or deletes a memory, and every request shows up in the vau
 
 ## Agent keys
 
-When the key belongs to an agent (made under Agents in the vault), the connector checks that at start and adds five tools. The server enforces the switch the owner set for each, and which folders the agent may write.
+When the key belongs to an agent (made under Agents in the vault), the connector checks that at start and adds seven tools. The server enforces the switch the owner set for each, and which folders the agent may write.
 
 - `remember`: write a memory (`title`, `body`, optional `tags` and `folder`) to the agent's own folder, or to a folder or team space it may write. Encrypted here.
 - `recall`: search what it may read, its team spaces included, by meaning and words here, and return the best matches in full (`query`, optional `limit`).
 - `forget`: delete memories by `ids`, for good, only where it may write. Off unless the owner allows it.
 - `leave_handoff`: an encrypted note (`text`) for its next session, or (`space`, optional `to`) for the agents in a team space.
 - `pick_up_handoffs`: the notes waiting for it, marked as picked up.
+- `pin_memory`: pins the agent's own folder exactly as it is now and returns a pointer (node, vault, folder, version, fingerprint) to keep, for example in a checkpoint.
+- `restore_memory`: brings the folder back exactly as it was at a pinned version (`pointer`, or just its `version`), checked against its fingerprint on this machine.
 
 Claude Code, for every project:
 
