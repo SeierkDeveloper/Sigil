@@ -519,10 +519,16 @@ function TestChat() {
         number="03"
         id="self-chat"
         title="Test chat"
-        lead="Ask what others would ask. It answers exactly as it would for them, and shows you the memories it used. Nothing here is logged or sent to Sigil."
+        lead={
+          data.model || !holderOps.includedAvailable(data)
+            ? "Ask what others would ask. It answers exactly as it would for them, and shows you the memories it used. Nothing here is logged or sent to Sigil."
+            : "Ask what others would ask. It answers exactly as it would for them, and shows you the memories it used. It writes with your included answers, which pass through Sigil's server to the model and are not kept."
+        }
       />
       {!ready ? (
-        <Notice>{!data.model ? "Add your model key above to try it." : "Save rules with at least one folder to try it."}</Notice>
+        <Notice>
+          {!data.model && !holderOps.includedAvailable(data) ? "Add your model key above, or link a holder wallet under Holder, to try it." : "Save rules with at least one folder to try it."}
+        </Notice>
       ) : (
         <>
           {turns.length || busy ? (
