@@ -547,3 +547,12 @@
     grid-template-columns: 1fr auto;
   }
 }
+
+/* A checkbox's hint sits on its own line under the label (Model of you, Sigil Pass). */
+.you .checkbox .field-hint,
+.holder .checkbox .field-hint {
+  display: block;
+  max-width: 72ch;
+  margin-top: 2px;
+  font-weight: 400;
+}
