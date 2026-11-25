@@ -680,7 +680,9 @@ route("POST", "memories/delete-after", async (ctx) => {
 route("PUT", "settings/:name", async (ctx, [name]) => {
   const userId = userOf(ctx);
   if (!isSettingName(name)) throw new HttpError(404, "There is no such setting.", "not_found");
-  const body = parse(z.object({ value: envelope(64 * KB) }), await readJson(ctx.req, 80 * KB));
+  // A model of you keeps its history and choices, so it may be larger than the other settings.
+  const max = name === "you" ? 768 * KB : 64 * KB;
+  const body = parse(z.object({ value: envelope(max) }), await readJson(ctx.req, max + 16 * KB));
   putSetting(ctx.db, userId, name, body.value);
   // The self wallet's rules are part of its identity's history: each saved draft is a line in the log.
   if (name === "wallet") logRead(ctx.db, { appId: "self", userId }, "identity", "rules-saved", 1);

@@ -53,7 +53,7 @@ export const PUBLIC_MAX_ITEMS = 2000;
 export function publicCopy(memories: Memory[], folders: Pick<OpenFolder, "id" | "redact" | "protect">[], publicIds: string[], now = Date.now()): PublicItem[] {
   const allowed = new Map(folders.filter((f) => publicIds.includes(f.id) && !f.protect).map((f) => [f.id, f]));
   return memories
-    .filter((m) => allowed.has(m.folderId) && isLive(m, now) && m.source.kind !== "profile" && m.source.kind !== "brief")
+    .filter((m) => allowed.has(m.folderId) && isLive(m, now) && m.source.kind !== "profile" && m.source.kind !== "model" && m.source.kind !== "brief")
     .slice(0, PUBLIC_MAX_ITEMS)
     .map((m) => {
       const r = redactMemory({ title: m.title, body: m.body, tags: m.tags }, allowed.get(m.folderId)!.redact);

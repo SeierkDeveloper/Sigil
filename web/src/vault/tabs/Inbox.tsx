@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { cosine, embeddingText, flagged, hybridSearch, levelFor, reasons, scanText, type AppKind, type Memory } from "@sigil/core";
+import { cosine, embeddingText, flagged, hybridSearch, levelFor, reasons, scanText, rankLikeYou, type AppKind, type Memory } from "@sigil/core";
 import { CheckIcon, CloseIcon, FolderIcon, InboxIcon, LockIcon } from "@/components/icons";
 import { formatDateTime, plural } from "@/lib/format";
 import * as ops from "../ops";
@@ -77,14 +77,14 @@ export function InboxTab() {
         <>
           <div className="inbox-summary">
             <p className="inbox-summary-count" aria-live="polite">
-              {plural(data.proposals.length, "suggestion")} waiting, newest first.
+              {plural(data.proposals.length, "suggestion")} waiting, {data.you.ranker ? "the ones most like you first" : "newest first"}.
             </p>
             <p className="inbox-summary-note">
               <LockIcon /> Opened with your vault key, on this device
             </p>
           </div>
           <ul className="proposal-list">
-            {data.proposals.map((p) => (
+            {inboxOrder(data).map((p) => (
               <ProposalCard key={p.id} proposal={p} appName={appName.get(p.appId)} appKind={appKind.get(p.appId)} captureKey={data.captureKeys.find((k) => k.id === p.appId)?.name} />
             ))}
           </ul>
@@ -92,6 +92,13 @@ export function InboxTab() {
       )}
     </div>
   );
+}
+
+/** Newest first, or, once a model of you is trained, the suggestions it ranks highest first. */
+function inboxOrder(data: ops.VaultData): ops.ProposalView[] {
+  if (!data.you.ranker) return data.proposals;
+  const items = data.proposals.map((p) => ({ id: p.id, title: p.payload?.title ?? "", tags: p.payload?.tags ?? [], body: p.payload?.body ?? "", p }));
+  return rankLikeYou(data.you, items).map((x) => x.p);
 }
 
 function ProposalCard({ proposal, appName, appKind, captureKey }: { proposal: ops.ProposalView; appName?: string; appKind?: AppKind; captureKey?: string }) {

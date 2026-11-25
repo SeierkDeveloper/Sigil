@@ -62,7 +62,7 @@ export async function denyRequest(api: Api, id: string): Promise<AccessRequestVi
 export function guardedMemories(data: Pick<VaultData, "memories" | "folders">, open: Set<string> = new Set(), now = Date.now()): SelfMemory[] {
   const folders = new Map(data.folders.map((f) => [f.id, f]));
   return data.memories
-    .filter((m) => (!m.expiresAt || Date.parse(m.expiresAt) > now) && m.source.kind !== "profile" && m.source.kind !== "brief")
+    .filter((m) => (!m.expiresAt || Date.parse(m.expiresAt) > now) && m.source.kind !== "profile" && m.source.kind !== "model" && m.source.kind !== "brief")
     .filter((m) => !folders.get(m.folderId)?.protect || open.has(m.folderId))
     .map((m) => {
       const f = folders.get(m.folderId);

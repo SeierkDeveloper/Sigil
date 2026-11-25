@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "What Sigil builds next: an AI self that knows your whole life, learns to act like you, proves things without showing them, meets other selves and lives on a network nobody can switch off.",
 };
 
-type Horizon = "now" | "next" | "later" | "vision";
+type Horizon = "built" | "now" | "next" | "later" | "vision";
 
 interface Stage {
   title: string;
@@ -19,7 +19,7 @@ interface Stage {
   items: string[];
 }
 
-const HORIZON_LABEL: Record<Horizon, string> = { now: "In progress", next: "Next", later: "Later", vision: "Vision" };
+const HORIZON_LABEL: Record<Horizon, string> = { built: "Built", now: "In progress", next: "Next", later: "Later", vision: "Vision" };
 
 // What is not built yet, and for the stage in progress what of it is already live. Everything built is in the changelog.
 const stages: Stage[] = [
@@ -37,14 +37,16 @@ const stages: Stage[] = [
   },
   {
     title: "A model of you",
-    horizon: "next",
-    summary: "A personal model trained on your device, only on the folders you allow, that writes, ranks and decides the way you do.",
-    items: [
-      "Fine-tuning on your device from the folders you choose, with the weights encrypted in your vault and moved with it",
-      "Every lesson it learns shown in plain words, with a way to undo one lesson or roll the whole model back to a date",
-      "Your style, priorities and limits measured against your own past answers, with a score for how well it knows you",
-      "One model for every app: Claude, ChatGPT and Cursor all talk to the same you, through the connector",
+    horizon: "built",
+    summary: "A model of you, learned on your device from only the folders you allow, that writes, ranks and decides the way you do.",
+    built: [
+      "Lessons in plain words from the folders you choose: how you write, what matters most to you and your limits, each linked to the memories it came from (live 25 Nov)",
+      "A small model trained on your device from your own choices, its weights encrypted in your vault and moved with it",
+      "Remove any lesson, or roll the whole model back to a date",
+      "A score for how well it knows you, measured on choices it did not train on",
+      "One model of you for every app: Claude, ChatGPT and Cursor read the same lessons through the connector",
     ],
+    items: [],
   },
   {
     title: "A self that acts",
@@ -180,7 +182,7 @@ export default function Roadmap() {
               <div>
                 <div className="stage-head">
                   <h3 className="stage-title">{s.title}</h3>
-                  <span className={s.horizon === "now" || s.horizon === "next" ? "badge badge-strong" : "badge"}>{HORIZON_LABEL[s.horizon]}</span>
+                  <span className={s.horizon === "built" || s.horizon === "now" || s.horizon === "next" ? "badge badge-strong" : "badge"}>{HORIZON_LABEL[s.horizon]}</span>
                 </div>
                 <p className="stage-summary">{s.summary}</p>
                 <ul className="stage-items">

@@ -315,6 +315,15 @@ export class VaultClient {
     return memories[0] ?? null;
   }
 
+  /** The lessons of a model of you, when the owner shares them and this app may read the Self card's folder. */
+  async lessons(): Promise<FullMemory | null> {
+    const heads = await this.heads();
+    const it = heads.filter((h) => h.source.kind === "model").sort((a, b) => (a.editedAt < b.editedAt ? 1 : -1))[0];
+    if (!it) return null;
+    const { memories } = await this.read([it.id]);
+    return memories[0] ?? null;
+  }
+
   /**
    * The vault public key, checked against the tag the vault made with this app's
    * own secret. A key the server made up fails the check and nothing is sealed.

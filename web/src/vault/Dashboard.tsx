@@ -12,6 +12,7 @@ import { FoldersTab } from "./tabs/Folders";
 import { AppsTab } from "./tabs/Apps";
 import { LogTab } from "./tabs/Log";
 import { HolderTab } from "./tabs/Holder";
+import { YouTab } from "./tabs/You";
 import { ImportTab } from "./tabs/Import";
 import { SettingsTab } from "./tabs/Settings";
 import { InboxTab } from "./tabs/Inbox";
@@ -67,6 +68,7 @@ const TAB_GROUPS: { label: string; tabs: { id: TabId; label: string }[] }[] = [
     tabs: [
       { id: "self", label: "AI self" },
       { id: "profile", label: "Self card" },
+      { id: "you", label: "Model of you" },
       { id: "work", label: "Work" },
       { id: "identity", label: "Identity" },
       { id: "meet", label: "Meet" },
@@ -479,6 +481,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "sync" ? <SyncTab /> : null}
           {tab === "storage" ? <StorageTab /> : null}
           {tab === "holder" ? <HolderTab /> : null}
+          {tab === "you" ? <YouTab /> : null}
           {tab === "shared" ? <SharedTab /> : null}
           {tab === "settings" ? <SettingsTab onDeleted={onDeleted} /> : null}
         </div>

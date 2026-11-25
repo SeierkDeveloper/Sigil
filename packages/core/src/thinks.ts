@@ -45,7 +45,7 @@ export function briefFacts(memories: BriefMemory[], now = new Date(), opts: Brie
   const limit = opts.limit ?? 8;
   const since = now.getTime() - days * DAY;
   const stale = now.getTime() - (opts.forgottenDays ?? 120) * DAY;
-  const pool = memories.filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile");
+  const pool = memories.filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile" && m.source.kind !== "model");
   const t = (iso: string) => new Date(iso).getTime();
   const newest = (a: BriefMemory, b: BriefMemory) => t(b.editedAt) - t(a.editedAt);
   return {

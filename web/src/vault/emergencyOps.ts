@@ -56,7 +56,7 @@ export async function openEmergency(vault: Unlocked, server: ServerEmergency | u
 export function healthMemories(data: Pick<VaultData, "memories" | "folders">): { memory: Memory; health: boolean }[] {
   const health = new Set(data.folders.filter((f) => f.protect === "health").map((f) => f.id));
   return data.memories
-    .filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile")
+    .filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile" && m.source.kind !== "model")
     .map((m) => ({ memory: m, health: health.has(m.folderId) }))
     .sort((a, b) => Number(b.health) - Number(a.health));
 }

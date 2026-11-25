@@ -40,7 +40,7 @@ export function briefs(data: Pick<VaultData, "memories">): Memory[] {
  * (a new vault has no week to look back on yet; Make a brief now works at once).
  */
 export function shouldMakeBrief(data: Pick<VaultData, "memories" | "thinking" | "createdAt">, now = new Date()): boolean {
-  const own = data.memories.filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile");
+  const own = data.memories.filter((m) => m.source.kind !== "brief" && m.source.kind !== "profile" && m.source.kind !== "model");
   const weekOld = !!data.createdAt && now.getTime() - new Date(data.createdAt).getTime() >= 7 * 86_400_000;
   return data.thinking.weeklyBrief && weekOld && own.length > 0 && briefDue(data.memories, now);
 }
@@ -95,7 +95,7 @@ export async function applyGrace(api: Api, data: VaultData, graceDays: number): 
 export const CONTRADICTIONS_DISMISSED = "sigil-contradictions-dismissed";
 
 export function contradictions(data: Pick<VaultData, "memories">, vectors?: Map<string, Float32Array>, now = Date.now()): ContradictionCandidate<Memory & { text: string }>[] {
-  const pool = data.memories.filter((m) => !isExpired(m, now) && m.source.kind !== "brief" && m.source.kind !== "profile").map((m) => ({ ...m, text: m.body }));
+  const pool = data.memories.filter((m) => !isExpired(m, now) && m.source.kind !== "brief" && m.source.kind !== "profile" && m.source.kind !== "model").map((m) => ({ ...m, text: m.body }));
   return findContradictions(pool, { vectors });
 }
 
@@ -107,7 +107,7 @@ export async function keepOne(api: Api, drop: Memory): Promise<void> {
 // ---------------------------------------------------------------- duplicate groups
 
 export function duplicateGroups(data: Pick<VaultData, "memories">, vectors?: Map<string, Float32Array>, dismissed: Set<string> = new Set()) {
-  const items = data.memories.filter((m) => m.source.kind !== "profile" && m.source.kind !== "brief").map((m) => ({ ...m, text: m.body }));
+  const items = data.memories.filter((m) => m.source.kind !== "profile" && m.source.kind !== "model" && m.source.kind !== "brief").map((m) => ({ ...m, text: m.body }));
   const key = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
   return groupDuplicates(findDuplicates(items, { vectors }).filter((p) => !dismissed.has(key(p.a.id, p.b.id))));
 }

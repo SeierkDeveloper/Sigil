@@ -72,6 +72,9 @@ import {
   type ModelSettings,
   type SelfRules,
   type ThinkingSettings,
+  cleanYou,
+  emptyYou,
+  type YouState,
 } from "@sigil/core";
 import type { Api } from "./api";
 import { openLegacyState, openTrusted, type LegacyState, type ServerLegacy, type ServerTrusted, type TrustedView } from "./legacyOps";
@@ -246,6 +249,8 @@ export interface VaultData {
   agreements: AgreementView[];
   /** The holder tier: the linked wallet, its tier and today's included answers. */
   holder: HolderView | null;
+  /** A model of you: lessons, choices and the ranker trained on them, opened on this device. */
+  you: YouState;
   /** Knowledge packs this vault publishes. */
   packs: PackRow[];
   /** Knowledge packs this vault follows. */
@@ -703,6 +708,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   const voice = await later(async () => (settings.voice ? (await openSetting<{ on?: boolean }>(vault.key, "voice", settings.voice)).on === true : false), false);
   const guide = await later(async () => (settings.guide ? cleanGuide(await openSetting<unknown>(vault.key, "guide", settings.guide)) : null), null);
   const immune = await later(async () => cleanImmune(settings.immune ? await openSetting<unknown>(vault.key, "immune", settings.immune) : null), cleanImmune(null));
+  const you = await later(async () => cleanYou(settings.you ? await openSetting<unknown>(vault.key, "you", settings.you) : null), emptyYou());
 
   return {
     access: data.access ?? [],
@@ -718,6 +724,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     emergency: em.emergency,
     agreements: agreed.agreements,
     holder: data.holder ?? null,
+    you,
     packs: data.packs ?? [],
     follows,
     backups: backed.backups,

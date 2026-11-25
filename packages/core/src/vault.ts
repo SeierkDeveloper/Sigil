@@ -33,7 +33,8 @@ export type SourceKind =
   | "plan"
   | "pack"
   | "story"
-  | "person";
+  | "person"
+  | "model";
 
 export interface MemorySource {
   kind: SourceKind;
@@ -65,6 +66,7 @@ export const SOURCE_LABELS: Record<SourceKind, string> = {
   pack: "From a knowledge pack",
   story: "A story in a shared memory",
   person: "A person in a shared memory",
+  model: "A model of you",
 };
 
 export function sourceLabel(source: MemorySource): string {

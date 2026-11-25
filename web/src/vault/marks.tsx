@@ -62,6 +62,7 @@ const SOURCE_ICONS: Record<SourceKind, typeof ClaudeIcon> = {
   pack: PackIcon,
   story: StoryIcon,
   person: PersonIcon,
+  model: StyleIcon,
 };
 
 export function AppMark({ kind, className = "" }: { kind?: AppKind; className?: string }) {

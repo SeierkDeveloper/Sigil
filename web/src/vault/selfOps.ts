@@ -30,6 +30,8 @@ import {
   sealSetting,
   toBase64Url,
   withoutCitations,
+  lessonsText,
+  type YouState,
   type AskLinkSecret,
   type AskNote,
   type AskReply,
@@ -44,7 +46,7 @@ import {
 } from "@sigil/core";
 import type { Api } from "./api";
 import { reportCaught } from "./immuneOps";
-import { profileMemory, type AppView, type AskLinkView, type Unlocked, type VaultData } from "./ops";
+import { profileFolder, profileMemory, type AppView, type AskLinkView, type Unlocked, type VaultData } from "./ops";
 import { ASKED_TEXT, guardedMemories, protectedGate } from "./protectOps";
 
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -82,12 +84,15 @@ export function selfMemories(data: Pick<VaultData, "memories" | "folders">, now 
   return guardedMemories(data, open, now);
 }
 
-/** The Self card's text, when the rules allow its folder. */
-export function selfProfile(data: Pick<VaultData, "memories" | "folders">, rules: SelfRules): string | null {
+/** The Self card's text and the lessons of a model of you, when the rules allow the Self card's folder. */
+export function selfProfile(data: Pick<VaultData, "memories" | "folders"> & { you?: YouState }, rules: SelfRules): string | null {
+  const folder = profileFolder(data);
+  if (!folder || !rules.folderIds.includes(folder.id)) return null;
   const card = profileMemory(data);
-  if (!card || !rules.folderIds.includes(card.folderId)) return null;
-  const p = parseProfileBody(card.body);
-  return [p.who && `Who I am: ${p.who}`, p.answers && `How I like answers: ${p.answers}`, p.projects && `Current projects: ${p.projects}`].filter(Boolean).join("\n");
+  const p = card ? parseProfileBody(card.body) : null;
+  const lessons = data.you?.lessons.length ? `What I learned about how I write and decide:\n${lessonsText(data.you.lessons)}` : "";
+  const out = [p?.who && `Who I am: ${p.who}`, p?.answers && `How I like answers: ${p.answers}`, p?.projects && `Current projects: ${p.projects}`, lessons].filter(Boolean).join("\n");
+  return out || null;
 }
 
 export interface MeaningDeps {

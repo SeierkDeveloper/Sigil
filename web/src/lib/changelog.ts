@@ -11,6 +11,21 @@ export interface Release {
 export const releases: Release[] = [
   {
     date: "2026-11-25",
+    title: "A model of you",
+    area: "AI self",
+    summary: "Sigil now learns who you are, on your own device and only from the folders you choose: lessons in plain words, a model trained on your own choices, a score for how well it knows you, and one you in every app.",
+    items: [
+      "Lessons in plain words: how you write, what matters most to you and your limits, each linked to the memories it came from",
+      "Which matters more to you? Each choice trains a small model in your browser, so it ranks things the way you do; its weights are encrypted in your vault",
+      "How well it knows you: a score from 0 to 100, measured on choices it did not train on",
+      "Remove any lesson for good, or roll the whole model back to any point in its history",
+      "Share the lessons and Claude, ChatGPT, Cursor and every app with your Self card folder read the same you; your AI self uses them too",
+      "Your inbox shows the suggestions most like you first",
+      "Stage 02 of the roadmap is built",
+    ],
+  },
+  {
+    date: "2026-11-25",
     title: "Sigil Pass: your holder tier works outside Sigil too",
     area: "Vault",
     summary: "Any app, site or agent can now check a holder's tier with one call, so other projects can give Sigil holders perks of their own.",

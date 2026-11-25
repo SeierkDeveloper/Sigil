@@ -265,7 +265,7 @@ export function reasons(result: ScanResult): string[] {
 // ---------------------------------------------------------------- what is checked, and how strictly
 
 /** Written in the vault by its owner: not checked. Everything else came from outside. */
-export const TRUSTED_SOURCES: readonly SourceKind[] = ["note", "profile", "brief", "style", "plan"];
+export const TRUSTED_SOURCES: readonly SourceKind[] = ["note", "profile", "brief", "style", "plan", "model"];
 
 export interface ImmuneSettings {
   v: 1;

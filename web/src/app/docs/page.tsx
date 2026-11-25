@@ -34,6 +34,7 @@ const toc = [
   ["meaning", "Search by meaning"],
   ["ask", "Ask your whole life"],
   ["self-card", "Self card"],
+  ["model-of-you", "A model of you"],
   ["thinking", "Memory that thinks"],
   ["extension", "Browser extension"],
   ["sign-in-with-sigil", "Sign in with Sigil"],
@@ -631,6 +632,40 @@ if (r.rank >= 2) {
               <strong>Self card</strong> in your vault. It is a memory like any other, encrypted the same way, in a folder of its own, so an app reads
               it only if you give it that folder. Apps read it with <code>get_profile</code>, and the connector tells them to read it first.
             </p>
+          </section>
+
+          <section id="model-of-you" className="doc-section">
+            <h2>A model of you</h2>
+            <p>
+              Under <strong>Model of you</strong> in the vault, Sigil learns how you write, what matters most to you and where your limits are, only from the folders you
+              choose. Everything it learns is kept in one setting encrypted under your vault key; the server stores an envelope it cannot read.
+            </p>
+            <ul>
+              <li>
+                <strong>Lessons.</strong> A model reads up to 60 of the newest memories in the chosen folders and writes plain sentences about you, in three kinds:
+                how you write, what matters most to you, and your limits. Each lesson names the memories it came from. The model is your own key or, for holders,
+                an included answer; the memories pass through for that one answer and are not kept. Protected folders and memories the immune system holds back are
+                never read here.
+              </li>
+              <li>
+                <strong>A model trained on your device.</strong> Sigil shows two of your memories and asks which matters more to you. Each choice trains a small
+                ranker in your browser (a few kilobytes of weights, trained again every ten choices or when you ask). The weights are encrypted in your vault and move
+                with it. Your inbox then shows the suggestions most like you first.
+              </li>
+              <li>
+                <strong>How well it knows you.</strong> Before training, every fifth choice is held back; the ranker trained on the rest predicts them, and the share it
+                gets right is the score, from 0 to 100.
+              </li>
+              <li>
+                <strong>Undo.</strong> Remove any lesson and it never comes back, even when you learn again. Every change is kept in the history, and you can roll the
+                whole model back to any point in it.
+              </li>
+              <li>
+                <strong>One you in every app.</strong> When you share the lessons, they are written as one memory in your Self card folder and kept in step. Claude,
+                ChatGPT, Cursor and any app you gave that folder read them with <code>get_profile</code>. Your AI self uses them whenever its rules let it read the Self
+                card. Turn sharing off and the memory is deleted.
+              </li>
+            </ul>
           </section>
 
           <section id="thinking" className="doc-section">
