@@ -27,6 +27,7 @@ import {
 } from "@sigil/core";
 import { dataFile, getDb, tx, vaultStamp, type Db } from "./db";
 import { snapshotStatus } from "./snapshots";
+import { currentVersion, pinVersion, pinsOf, versionFor } from "./versions";
 import { serverConfig } from "./config";
 import {
   addKeyslot,
@@ -1112,6 +1113,7 @@ route("PUT", "agents/:id", async (ctx, [appId]) => {
 });
 
 route("GET", "agents/:id/handoffs", (ctx, [appId]) => json({ handoffs: ownerHandoffs(ctx.db, userOf(ctx), appId) }));
+route("GET", "agents/:id/pins", (ctx, [appId]) => json({ pins: pinsOf(ctx.db, userOf(ctx), appId) }));
 
 // ---- team spaces
 
@@ -1210,6 +1212,21 @@ route("DELETE", "certificates/:id", (ctx, [certId]) => {
 route("GET", "connector/v1/agent", (ctx) => {
   const auth = appOf(ctx);
   return json(agentProfile(ctx.db, auth));
+});
+
+// Pinned versions of the agent's own folder: the version now, a pin (the pointer
+// to keep, in a checkpoint for example), and the folder exactly as it was at a version.
+route("GET", "connector/v1/version", (ctx) => json(currentVersion(ctx.db, appOf(ctx))));
+
+route("POST", "connector/v1/pins", (ctx) => {
+  const auth = appOf(ctx);
+  return json(pinVersion(ctx.db, auth, serverConfig.origin || siteOrigin(ctx.req)), 201);
+});
+
+route("GET", "connector/v1/version/:v", (ctx, [v]) => {
+  const auth = appOf(ctx);
+  if (!/^\d{1,12}$/.test(v)) throw new HttpError(400, "A version is a whole number.", "bad_version");
+  return json(versionFor(ctx.db, auth, Number(v)));
 });
 
 route("POST", "connector/v1/remember", async (ctx) => {

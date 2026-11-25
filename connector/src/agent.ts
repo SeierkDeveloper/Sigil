@@ -22,6 +22,8 @@ import {
   randomId,
   sealHandoff,
   spaceHandoffKey,
+  versionHash,
+  type MemoryPointer,
   type AgentRules,
   type HandoffNote,
   type Memory,
@@ -69,6 +71,22 @@ export interface RecallHit {
   tags: string[];
 }
 
+/** A pinned version of the agent's own folder: the pointer to keep, and the same as one string. */
+export interface PinnedVersion extends MemoryPointer {
+  pinnedAt: string;
+  pointer: string;
+}
+
+/** The agent's folder as it was at a version, opened on this machine and checked against its fingerprint. */
+export interface RestoredVersion {
+  version: number;
+  newest: number;
+  hash: string;
+  /** The fingerprint of what arrived, computed here, matched the server's (and the pinned one, when given). */
+  verified: boolean;
+  memories: RecallHit[];
+}
+
 export interface PickedNote extends HandoffNote {
   id: string;
   space: string | null;
@@ -81,6 +99,8 @@ export interface AgentTools {
   forget(ids: string[]): Promise<{ deleted: string[]; refused: string[] }>;
   leaveHandoff(input: { text: string; space?: string; to?: string }): Promise<{ id: string; where: string }>;
   pickUpHandoffs(): Promise<PickedNote[]>;
+  pin(): Promise<PinnedVersion>;
+  restore(version: number, expectHash?: string): Promise<RestoredVersion>;
 }
 
 export class AgentMemory implements AgentTools {
@@ -251,5 +271,37 @@ export class AgentMemory implements AgentTools {
     }
     if (out.length) await this.reader.request("POST", "handoffs/picked", { ids: out.map((n) => n.id) });
     return out;
+  }
+
+  /** Pins the agent's own folder as it is now. Keep the pointer (in a checkpoint, say) to restore exactly this later. */
+  async pin(): Promise<PinnedVersion> {
+    const p = await this.reader.request<MemoryPointer & { pinnedAt: string }>("POST", "pins");
+    const host = new URL(p.node).host;
+    return { ...p, pointer: `sigil://${host}/${p.folder}@${p.version}#${p.hash}` };
+  }
+
+  /**
+   * The agent's own folder exactly as it was at a version. The encrypted
+   * memories are hashed here and compared with the server's fingerprint, and
+   * with the pinned one when it is given, before they are opened.
+   */
+  async restore(version: number, expectHash?: string): Promise<RestoredVersion> {
+    const r = await this.reader.request<{ folder: string; version: number; newest: number; hash: string; memories: { id: string; folderId: string; head: string; body: string; updatedAt: string }[] }>(
+      "GET",
+      `version/${version}`,
+    );
+    const computed = versionHash(r.memories);
+    const verified = computed === r.hash && (!expectHash || expectHash === computed);
+    if (expectHash && expectHash !== computed) {
+      throw new ClientError(`Version ${version} does not match the pinned fingerprint. Expected ${expectHash}, got ${computed}.`, 409, "version_mismatch");
+    }
+    const home = (await this.folders()).find((f) => f.folder.id === r.folder)?.folder;
+    if (!home) throw new ClientError("This agent's own folder is not available.", 403, "read_only");
+    const memories: RecallHit[] = [];
+    for (const m of r.memories) {
+      const open = await decryptMemory(home, m);
+      memories.push({ id: open.id, title: open.title, where: home.name, body: open.body, editedAt: open.editedAt, tags: open.tags });
+    }
+    return { version: r.version, newest: r.newest, hash: computed, verified, memories };
   }
 }

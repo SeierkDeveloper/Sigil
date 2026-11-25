@@ -145,6 +145,8 @@ describe("agent tools", () => {
     forget: async (ids: string[]) => ({ deleted: ids.slice(0, 1), refused: ids.slice(1) }),
     leaveHandoff: async (input: { space?: string }) => ({ id: "handoff-1", where: input.space ? `the space ${input.space}` : "this agent's next session" }),
     pickUpHandoffs: async () => [{ v: 1 as const, id: "handoff-1", from: "cursor", text: "Finish the parser.", to: null, createdAt: "2026-11-20T00:00:00.000Z", space: null }],
+    pin: async () => ({ node: "https://sigilvault.fun", vault: "ABCD1234", folder: "folderAAAAAAAA", version: 7, hash: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", pinnedAt: "2026-11-25T00:00:00.000Z", pointer: "sigil://sigilvault.fun/folderAAAAAAAA@7#sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }),
+    restore: async (version: number, expect?: string) => ({ version, newest: 9, hash: expect ?? "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", verified: true, memories: [{ id: "mem-agent-1", title: "Parser state", where: "Cursor memory", body: "Half done.", editedAt: "2026-11-20T00:00:00.000Z", tags: [] }] }),
   };
 
   async function connectAgent() {
@@ -161,7 +163,7 @@ describe("agent tools", () => {
     const client = await connectAgent();
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(
-      ["ask_self", "forget", "get_profile", "leave_handoff", "list_folders", "pick_up_handoffs", "propose_memory", "read_memory", "recall", "remember", "search_memories"].sort(),
+      ["ask_self", "forget", "get_profile", "leave_handoff", "list_folders", "pick_up_handoffs", "pin_memory", "propose_memory", "read_memory", "recall", "remember", "restore_memory", "search_memories"].sort(),
     );
     expect(tools.find((t) => t.name === "forget")!.annotations).toMatchObject({ destructiveHint: true });
     expect(tools.find((t) => t.name === "recall")!.annotations).toMatchObject({ readOnlyHint: true });
@@ -177,6 +179,19 @@ describe("agent tools", () => {
     expect(textOf(await client.callTool({ name: "forget", arguments: { ids: ["mem-agent-1", "mem-other-2"] } }))).toBe("Forgot 1 memory. Not allowed or not found: mem-other-2.");
     expect(textOf(await client.callTool({ name: "leave_handoff", arguments: { text: "Next.", space: "Launch" } }))).toBe("Left a note for the space Launch.");
     expect(textOf(await client.callTool({ name: "pick_up_handoffs", arguments: {} }))).toContain("From cursor");
+  });
+
+  it("pins a version and restores it by number or by pointer", async () => {
+    const client = await connectAgent();
+    const pinned = textOf(await client.callTool({ name: "pin_memory", arguments: {} }));
+    expect(pinned).toContain("Pinned version 7");
+    expect(pinned).toContain("sigil://sigilvault.fun/folderAAAAAAAA@7#sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+    const byNumber = textOf(await client.callTool({ name: "restore_memory", arguments: { version: 7 } }));
+    expect(byNumber).toContain("Version 7 of 9");
+    expect(byNumber).toContain("Half done.");
+    const byPointer = textOf(await client.callTool({ name: "restore_memory", arguments: { pointer: "sigil://sigilvault.fun/folderAAAAAAAA@7#sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } }));
+    expect(byPointer).toContain("checked");
+    expect(textOf(await client.callTool({ name: "restore_memory", arguments: { pointer: "nope" } }))).toContain("not a Sigil memory pointer");
   });
 
   it("formats empty results plainly", () => {

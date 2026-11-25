@@ -734,7 +734,7 @@ export default function Docs() {
                     <td>
                       <code>forget</code>
                     </td>
-                    <td>Deletes memories for good, only where it may write. Off until you turn it on</td>
+                    <td>Deletes memories, only where it may write; a version of its own folder pinned earlier keeps them. Off until you turn it on</td>
                     <td>Forgot, with the memory id</td>
                   </tr>
                   <tr>
@@ -751,6 +751,20 @@ export default function Docs() {
                     <td>Returns the notes waiting for it and marks them picked up</td>
                     <td>Picked up a handoff note</td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>pin_memory</code>
+                    </td>
+                    <td>Pins its own folder exactly as it is now and returns a pointer to keep</td>
+                    <td>Nothing is read</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>restore_memory</code>
+                    </td>
+                    <td>Brings its own folder back exactly as it was at a pinned version, checked against the pointer&apos;s fingerprint</td>
+                    <td>Read, with the number of memories</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -758,6 +772,36 @@ export default function Docs() {
               The server enforces each switch and each folder&apos;s read or write mode on every call. Notes for the next session are encrypted with a
               key derived from the agent&apos;s secret; you hold that secret under your vault key, so you can read them under Agents.
             </p>
+            <h3 id="pinned-versions">Pinned versions</h3>
+            <p>
+              Every change to an agent&apos;s own folder (a memory remembered, changed or forgotten) gives the folder its next version number, and the
+              folder exactly as it was at any version can be brought back, even after the agent writes more. This is for agent frameworks that keep
+              checkpoints of an agent&apos;s state: put a Sigil pointer in the checkpoint, and a restore of that state gets the exact memory that belonged
+              to it.
+            </p>
+            <ul>
+              <li>
+                <strong>The pointer.</strong> <code>pin_memory</code> (or <code>POST /api/connector/v1/pins</code> with the agent key) returns{" "}
+                <code>{"{ node, vault, folder, version, hash }"}</code> and the same as one string:{" "}
+                <code>sigil://sigilvault.fun/&lt;folder&gt;@&lt;version&gt;#sha256:&lt;64 hex&gt;</code>. <code>vault</code> is the vault&apos;s
+                public fingerprint.
+              </li>
+              <li>
+                <strong>The fingerprint.</strong> <code>hash</code> is sha256 over the folder&apos;s encrypted memories at that version: for each memory in
+                id order, <code>id:sha256(head + &quot;\n&quot; + body)</code>, joined with newlines. It is computed over ciphertext, so the server can
+                give it without reading anything, and the agent&apos;s machine computes it again over what arrives.
+              </li>
+              <li>
+                <strong>The restore.</strong> <code>restore_memory</code> with a version or a whole pointer (or{" "}
+                <code>GET /api/connector/v1/version/&lt;version&gt;</code>) returns the folder at that version. The connector checks the fingerprint
+                before it opens anything and refuses a version that does not match the pointer. <code>GET /api/connector/v1/version</code> gives the
+                version and fingerprint now.
+              </li>
+              <li>
+                <strong>What is kept.</strong> Only agents&apos; own folders are versioned, as ciphertext like everything else. Removing the agent, or
+                deleting the vault, deletes every version with it. Each restore is in your read log.
+              </li>
+            </ul>
             <h3>Setting it up</h3>
             <p>Make the agent in your vault, copy its key once, and add the connector to the client with it.</p>
             <p>

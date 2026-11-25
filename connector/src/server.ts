@@ -42,7 +42,8 @@ const AGENT_INSTRUCTIONS = [
   "This key belongs to an agent with its own memory in the user's Sigil vault.",
   "At the start of a session call pick_up_handoffs for notes an earlier session or another agent left.",
   "Use recall before you start on something you may have worked on before, remember for what the next session should know, and leave_handoff before you stop.",
-  "forget deletes memories for good, only in folders this agent may write.",
+  "forget deletes memories, only in folders this agent may write; a version pinned earlier keeps what it had.",
+  "pin_memory returns a pointer to this agent's own folder exactly as it is now; keep it (in a checkpoint, say) and restore_memory brings that version back.",
 ].join(" ");
 
 function text(value: string) {
@@ -330,6 +331,58 @@ export function createServer(reader: Reader, self?: SelfAsker, agent?: AgentTool
 
 function registerAgentTools(server: McpServer, agent: AgentTools): void {
   server.registerTool(
+    "pin_memory",
+    {
+      title: "Pin this agent's memory",
+      description:
+        "Pins this agent's own folder in the user's Sigil vault exactly as it is now and returns a pointer (node, vault, folder, version, fingerprint) to keep, for example in a checkpoint. restore_memory brings that version back later, even after more is remembered or forgotten.",
+      inputSchema: {},
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async () => {
+      try {
+        const p = await agent.pin();
+        return text(`Pinned version ${p.version} of this agent's memory.\nPointer: ${p.pointer}\n${JSON.stringify({ node: p.node, vault: p.vault, folder: p.folder, version: p.version, hash: p.hash }, null, 2)}`);
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "restore_memory",
+    {
+      title: "Restore a pinned memory version",
+      description:
+        "Brings back this agent's own folder exactly as it was at a version (from pin_memory), checks it against its fingerprint on this machine, and returns its memories in full. The read is in the user's read log.",
+      inputSchema: {
+        version: z.number().int().min(0).optional().describe("The version number from a pointer."),
+        pointer: z.string().max(300).optional().describe("A whole pointer, sigil://node/folder@version#sha256:..., instead of version."),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async ({ version, pointer }) => {
+      try {
+        let v = version;
+        let expect: string | undefined;
+        if (pointer) {
+          const m = /@(\d+)#(sha256:[0-9a-f]{64})$/.exec(pointer.trim());
+          if (!m) throw new Error("That is not a Sigil memory pointer. It looks like sigil://node/folder@version#sha256:...");
+          v = Number(m[1]);
+          expect = m[2];
+        }
+        if (v === undefined) throw new Error("Give a version or a pointer.");
+        const r = await agent.restore(v, expect);
+        const head = `Version ${r.version} of ${r.newest}, fingerprint ${r.hash}${r.verified ? ", checked" : ""}. ${r.memories.length} ${r.memories.length === 1 ? "memory" : "memories"}.`;
+        return text([head, ...r.memories.map((m) => `- ${m.title} (id ${m.id}, ${m.editedAt})\n${m.body}`)].join("\n\n"));
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+
+  server.registerTool(
     "remember",
     {
       title: "Remember in Sigil",
@@ -378,7 +431,8 @@ function registerAgentTools(server: McpServer, agent: AgentTools): void {
     "forget",
     {
       title: "Forget in Sigil",
-      description: "Deletes memories by id, for good, only in folders and spaces this agent may write, and only if the user allowed this agent to forget.",
+      description:
+        "Deletes memories by id, only in folders and spaces this agent may write, and only if the user allowed this agent to forget. A version of its own folder pinned earlier keeps what it had.",
       inputSchema: { ids: z.array(z.string().regex(/^[A-Za-z0-9_-]{8,64}$/)).min(1).max(50).describe("Memory ids from recall.") },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     },
