@@ -139,7 +139,7 @@ function standInCaller(): ModelCaller | null {
       if (!hit) return "NOTHING";
       // [Title] becomes the number the prompt gave that memory.
       return hit[1].replace(/\[([^\]]+)\]/g, (whole, title: string) => {
-        const m = new RegExp(`<memory n="(\\d+)" title="${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`, "i").exec(req.system);
+        const m = new RegExp(`<memory n="(\\d+)" title="${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`, "i").exec(`${req.system}\n${req.messages.map((x) => x.content).join("\n")}`);
         return m ? `[${m[1]}]` : whole;
       });
     },
