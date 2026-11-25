@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SealIcon } from "@/components/icons";
 import { formatDateTime, formatSealPeriod, formatTime, plural, shortHash } from "@/lib/format";
 import * as ops from "../ops";
+import * as holderOps from "../holderOps";
 import { openAskNote } from "../selfOps";
 import { openLegacyAskNote } from "../legacyOps";
 import { errorText, useVault } from "../context";
@@ -48,6 +49,7 @@ export function LogTab() {
   const [checks, setChecks] = useState<Record<string, Verify>>({});
   const [copied, setCopied] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [shown, setShown] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -296,6 +298,30 @@ export function LogTab() {
           ) : null}
           <button type="button" className="button button-small" onClick={() => void refresh()} disabled={refreshing}>
             {refreshing ? "Refreshing" : "Refresh"}
+          </button>
+          <button
+            type="button"
+            className="button button-small button-ghost"
+            disabled={exporting}
+            onClick={() => {
+              setExporting(true);
+              holderOps
+                .exportLog(api)
+                .then((blob) => {
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `sigil-read-log-${new Date().toISOString().slice(0, 10)}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  a.remove();
+                  setTimeout(() => URL.revokeObjectURL(url), 1000);
+                })
+                .catch((err) => setError(errorText(err)))
+                .finally(() => setExporting(false));
+            }}
+          >
+            {exporting ? "Saving" : "Save with proofs"}
           </button>
         </div>
       </div>

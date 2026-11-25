@@ -302,3 +302,114 @@
   margin: var(--space-5) 0 var(--space-3);
   font-size: var(--text-base, 1rem);
 }
+
+/* ---- Holder tiers: the vault's Holder section and the mark on public pages */
+
+.holder-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+.holder-facts dt {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.holder-facts dd {
+  margin: var(--space-1) 0 0;
+  font-size: 1.125rem;
+  color: var(--color-text);
+}
+.holder-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-4) 0;
+}
+.holder-tier {
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+}
+.holder-tier[data-on="true"] {
+  border-color: var(--color-line-bright);
+  background: rgba(255, 255, 255, 0.03);
+}
+.holder-tier-name {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 1.5rem;
+}
+.holder-perks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.holder-perks li {
+  display: flex;
+  gap: var(--space-3);
+}
+.holder-perks li::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin: 0.48em 2px 0;
+  transform: rotate(45deg);
+  background: var(--color-accent-strong);
+}
+.holder-anchors {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.holder-anchors li {
+  display: grid;
+  grid-template-columns: 7rem 1fr auto auto;
+  gap: var(--space-4);
+  align-items: baseline;
+  padding: var(--space-2) 0;
+  border-top: 1px dotted var(--color-line-strong);
+}
+.holder-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  margin: var(--space-2) 0 0;
+  padding: 0.3em 0.75em;
+  border: 1px solid var(--color-line-bright);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+.holder-mark[data-tier="warden"] {
+  border-color: var(--color-accent-strong);
+  background: rgba(255, 255, 255, 0.06);
+}
+.holder-mark-note {
+  color: var(--color-text-faint);
+  letter-spacing: 0.08em;
+  text-transform: none;
+  font-family: var(--font-sans, inherit);
+}
+@media (max-width: 760px) {
+  .holder-facts,
+  .holder-tiers {
+    grid-template-columns: 1fr;
+  }
+  .holder-anchors li {
+    grid-template-columns: 1fr auto;
+  }
+}

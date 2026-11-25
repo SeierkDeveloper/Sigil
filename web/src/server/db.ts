@@ -6,6 +6,7 @@ import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { trackVersions } from "./versions";
+import { trackHolders } from "./holders";
 
 export type Db = DatabaseSync;
 
@@ -956,6 +957,8 @@ export function openDb(file: string): Db {
   addColumn(db, "memories", "delete_after", "TEXT");
   // Versions of agents' own folders (pinned versions): needs agents and memories, both made above.
   trackVersions(db);
+  // Holder tiers: the linked wallet, included answers counted per day, Warden anchors.
+  trackHolders(db);
   // The last sign-in or vault action of the owner: the legacy plan's heartbeat.
   addColumn(db, "users", "last_active_at", "TEXT");
   // Which key slot a session was opened with, so revoking a device ends its sessions.

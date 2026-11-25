@@ -244,6 +244,8 @@ export interface VaultData {
   emergency: EmergencyView;
   /** Agreements with other vaults, opened on this device. */
   agreements: AgreementView[];
+  /** The holder tier: the linked wallet, its tier and today's included answers. */
+  holder: HolderView | null;
   /** Knowledge packs this vault publishes. */
   packs: PackRow[];
   /** Knowledge packs this vault follows. */
@@ -281,6 +283,19 @@ export interface LogData {
   periodSeconds: number;
   mode: "local" | "anchored";
   entries: LogEntryView[];
+}
+
+/** The holder tier as the server reports it (see server/holders.ts). */
+export interface HolderView {
+  linked: boolean;
+  address: string | null;
+  balance: number;
+  tier: "bearer" | "keeper" | "warden" | null;
+  answersPerDay: number;
+  answersUsedToday: number;
+  includedOn: boolean;
+  checkedAt: string | null;
+  anchors: { day: string; root: string; leaves: number; tx: string | null }[];
 }
 
 export interface ServerVault {
@@ -329,6 +344,7 @@ export interface ServerVault {
   identity?: ServerIdentity | null;
   drafts?: ServerDraft[];
   disclosures?: ServerDisclosure[];
+  holder?: HolderView;
   emergency?: ServerEmergency;
   agreements?: ServerAgreement[];
   packs?: PackRow[];
@@ -700,6 +716,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     disclosures: disclosed.disclosures,
     emergency: em.emergency,
     agreements: agreed.agreements,
+    holder: data.holder ?? null,
     packs: data.packs ?? [],
     follows,
     backups: backed.backups,

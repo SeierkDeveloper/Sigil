@@ -56,6 +56,7 @@ export type TabId =
   | "import"
   | "sync"
   | "storage"
+  | "holder"
   | "shared"
   | "settings";
 

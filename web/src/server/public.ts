@@ -10,6 +10,7 @@
 import { tx, type Db } from "./db";
 import { serverConfig } from "./config";
 import { HttpError, logRead, type AppAuth } from "./store";
+import { tierOf } from "./holders";
 import { sha256Hex } from "@sigil/core";
 import { bookingFor, recordTurn } from "./sessions";
 import { assertNotMoved } from "./nodes";
@@ -94,6 +95,10 @@ export function savePublicSelf(db: Db, userId: string, s: PublicSelfInput): void
     if (!cur && db.prepare("SELECT 1 FROM public_selves WHERE id = ?").get(s.id)) throw new HttpError(409, "That id is taken.");
     const taken = db.prepare("SELECT user_id FROM public_selves WHERE handle = ?").get(s.handle) as Row | undefined;
     if (taken && String(taken.user_id) !== userId) throw new HttpError(409, "That handle is taken. Choose another.", "handle_taken");
+    // Handles of 3 or 4 characters are for Wardens; one already held stays with its owner.
+    if (s.handle.length <= 4 && (!cur || String(cur.handle) !== s.handle) && tierOf(db, userId) !== "warden") {
+      throw new HttpError(403, "Handles of 3 or 4 characters come with the Warden tier. Choose one of 5 or more.", "short_handle");
+    }
     if (s.appId) {
       const app = db.prepare("SELECT revoked_at FROM apps WHERE id = ? AND user_id = ?").get(s.appId, userId) as Row | undefined;
       if (!app || app.revoked_at) throw new HttpError(400, "That app is not connected.");
@@ -189,6 +194,7 @@ export function publicPage(db: Db, handle: string) {
     perVisitorHour: Number(r.per_visitor_hour),
     showAnswers: Number(r.show_answers) === 1,
     voice: Number(r.voice) === 1,
+    holder: tierOf(db, String(r.user_id)),
     sessions: enabled && !!db.prepare("SELECT 1 FROM session_offers WHERE self_id = ? AND json_extract(offer, '$.enabled') = 1").get(String(r.id)),
     items: enabled ? items(db, String(r.id)).map(({ body: _b, ...i }) => i) : [],
     wall: enabled && Number(r.show_answers) === 1 ? wall(db, String(r.id), false).map(({ hidden: _h, ...w }) => w) : [],

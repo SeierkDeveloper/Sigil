@@ -15,6 +15,7 @@ import {
 } from "@sigil/core";
 import { formatDate, formatDateTime, plural } from "@/lib/format";
 import * as selfOps from "../selfOps";
+import * as holderOps from "../holderOps";
 import type { AskLinkView } from "../ops";
 import { errorText, useVault } from "../context";
 import { reportCaught } from "../immuneOps";
@@ -446,12 +447,13 @@ function TestChat() {
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const ready = !!data.model && !!data.self && data.self.folderIds.length > 0;
+  // The owner's own key, or a holder's included answers.
+  const ready = (!!data.model || holderOps.includedAvailable(data)) && !!data.self && data.self.folderIds.length > 0;
 
   const [gate, setGate] = useState<{ question: string; folders: { id: string; name: string; ids: string[] }[] } | null>(null);
 
   const run = async (text: string, open: Set<string>) => {
-    const model = selfOps.modelCaller(data);
+    const model = holderOps.answerCaller(data, api);
     if (!model || !data.self) return;
     setBusy(true);
     setError(null);

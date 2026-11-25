@@ -13,6 +13,7 @@ import { formatDate, plural } from "@/lib/format";
 import { EditorIcon, EyeIcon, LockIcon, PublicIcon } from "@/components/icons";
 import { VoiceControls } from "@/voice/VoiceControls";
 import { SessionBooking } from "./SessionBooking";
+import { HolderMark, type HolderTier } from "@/components/HolderMark";
 
 interface PageInfo {
   id: string;
@@ -28,6 +29,8 @@ interface PageInfo {
   voice?: boolean;
   /** The owner takes booked sessions. */
   sessions?: boolean;
+  /** The owner's holder tier, when they hold the token. */
+  holder?: HolderTier | null;
   items: { id: string; title: string; tags: string[]; editedAt: string }[];
   wall: { id: string; question: string; answer: string; sources: { id: string; title: string }[]; createdAt: string }[];
 }
@@ -184,6 +187,7 @@ export function PublicApp({ handle }: { handle: string }) {
           </span>
           <p className="eyebrow">@{info.handle}, a public AI self</p>
           <h1 className="page-title">{info.name}</h1>
+          <HolderMark tier={info.holder} />
           {info.greeting ? <p className="page-lead">{info.greeting}</p> : null}
         </header>
         <p className="ask-status" data-online={info.online ? "true" : "false"} data-state={state} data-testid="public-status">

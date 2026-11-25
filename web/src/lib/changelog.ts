@@ -10,6 +10,21 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    date: "2026-11-25",
+    title: "Holder tiers: hold the token and your AI self works out of the box",
+    area: "Vault",
+    summary: "Link the wallet you hold the token in and your vault gets a tier: included AI answers every day in Ask and your AI self, no API key needed, the holder mark on your public pages, and more for Wardens.",
+    items: [
+      "Bearer (1,000,000 or more): 10 included AI answers a day and the holder mark on your public AI self page and ask links",
+      "Keeper (5,000,000 or more): 30 included AI answers a day",
+      "Warden (10,000,000 or more): 75 included AI answers a day, a handle of 3 or 4 letters, and each day's reads of your vault anchored on chain",
+      "Link once under Holder: your wallet signs one message, nothing is sent on chain and nothing is paid; the tier follows your balance and is read again every day",
+      "Included answers pass through Sigil's server to the model and are not kept; with your own model key, answers still go from your device straight to the provider",
+      "When the day's answers are used, Ask shows the memories that answer best, and they come back at midnight UTC",
+      "Small print: higher limits for holders' agents and apps, and every read log can now be saved with every seal proof",
+    ],
+  },
+  {
     date: "2026-11-24",
     title: "Nightly backups, clean restarts and a vault that keeps itself current",
     area: "Nodes",

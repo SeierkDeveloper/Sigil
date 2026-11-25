@@ -7,6 +7,7 @@
 import { tx, type Db } from "./db";
 import { serverConfig } from "./config";
 import { HttpError, logRead, type AppAuth } from "./store";
+import { tierOf } from "./holders";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -180,7 +181,14 @@ export function publicLink(db: Db, linkId: string) {
     expiresAt: String(r.expires_at),
     remaining: Math.max(0, Number(r.max_uses) - Number(r.uses)),
     voice: Number(r.voice) === 1,
+    holder: tierOf(db, String(r.user_id)),
   };
+}
+
+/** The owner of a link, for limits that follow the owner's tier. */
+export function linkOwner(db: Db, linkId: string): string | null {
+  const r = db.prepare("SELECT user_id FROM ask_links WHERE id = ?").get(linkId) as Row | undefined;
+  return r ? String(r.user_id) : null;
 }
 
 const STATE_TEXT: Record<Exclude<LinkState, "active">, string> = {

@@ -12,6 +12,7 @@ import { createApi, ApiError } from "@/vault/api";
 import { formatDate, plural } from "@/lib/format";
 import { EditorIcon, EyeIcon, LockIcon, SealIcon } from "@/components/icons";
 import { VoiceControls } from "@/voice/VoiceControls";
+import { HolderMark, type HolderTier } from "@/components/HolderMark";
 
 interface LinkInfo {
   id: string;
@@ -23,6 +24,8 @@ interface LinkInfo {
   remaining: number;
   /** The owner offers voice with this link: speech to text in the asker's own browser. */
   voice?: boolean;
+  /** The owner's holder tier, when they hold the token. */
+  holder?: HolderTier | null;
 }
 
 type Phase =
@@ -191,6 +194,7 @@ export function AskApp({ linkId }: { linkId: string }) {
           </span>
           <p className="eyebrow">An AI self</p>
           <h1 className="page-title">{intro.name}</h1>
+          <HolderMark tier={info.holder} />
           {intro.greeting ? <p className="page-lead">{intro.greeting}</p> : null}
         </header>
         <p className="ask-status" data-online={info.online ? "true" : "false"} data-state={info.state} data-testid="ask-status">

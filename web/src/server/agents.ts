@@ -7,6 +7,7 @@
 import type { StoredApp, StoredFolder, StoredMemory } from "@sigil/core";
 import { tx, type Db } from "./db";
 import { HttpError, logRead, putMemoriesIn, type AppAuth } from "./store";
+import { AGENT_WRITES, tierOf } from "./holders";
 
 type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
@@ -137,7 +138,9 @@ export function agentRemember(db: Db, auth: AppAuth, memories: StoredMemory[], a
   return tx(db, () => {
     assertTool(db, auth, "remember");
     const recent = db.prepare("SELECT COUNT(*) AS n FROM read_log WHERE app_id = ? AND kind = 'remember' AND at > ?").get(auth.appId, new Date(at.getTime() - 3600_000).toISOString()) as Row;
-    if (Number(recent.n) + memories.length > AGENT_WRITES_PER_HOUR) throw new HttpError(429, `An agent may write ${AGENT_WRITES_PER_HOUR} memories an hour.`, "remember_limit");
+    // Holders' agents may write more: 1,000 / 3,000 / 10,000 an hour by tier.
+    const limit = AGENT_WRITES[tierOf(db, auth.userId) ?? "none"];
+    if (Number(recent.n) + memories.length > limit) throw new HttpError(429, `An agent may write ${limit} memories an hour.`, "remember_limit");
     const existing = db.prepare("SELECT folder_id FROM memories WHERE user_id = ? AND id = ?");
     for (const m of memories) {
       if (!writableFolder(db, auth, m.folderId)) throw new HttpError(403, "This agent may not write that folder.", "read_only");

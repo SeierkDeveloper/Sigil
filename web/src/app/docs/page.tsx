@@ -27,6 +27,7 @@ const toc = [
   ["tools", "Tools"],
   ["ai-self", "Your AI self"],
   ["raeto", "Raeto: every model, one key"],
+  ["holder", "Holder tiers"],
   ["ask-links", "Ask links"],
   ["inbox", "Memory inbox"],
   ["meaning", "Search by meaning"],
@@ -342,6 +343,63 @@ export default function Docs() {
               </li>
             </ol>
             <p>The rules and the key are saved as encrypted settings. Changing them updates every app you allowed.</p>
+          </section>
+
+          <section id="holder" className="doc-section">
+            <h2>Holder tiers</h2>
+            <p>
+              Under <strong>Holder</strong> in the vault you link the wallet you hold the token in. The wallet signs one message to prove it is yours: nothing is sent
+              on chain and nothing is paid. One wallet links to one vault at a time. The tier comes from the wallet&apos;s balance, read from the chain when you link it
+              and again every day, and goes down as well as up with it. Everything Sigil does stays free for everyone; holding adds to it.
+            </p>
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Tier</th>
+                    <th>Holds</th>
+                    <th>Gives</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Bearer</td>
+                    <td>1,000,000 or more</td>
+                    <td>10 included AI answers a day, the holder mark on your public AI self page and ask links</td>
+                  </tr>
+                  <tr>
+                    <td>Keeper</td>
+                    <td>5,000,000 or more</td>
+                    <td>30 included AI answers a day, the holder mark</td>
+                  </tr>
+                  <tr>
+                    <td>Warden</td>
+                    <td>10,000,000 or more</td>
+                    <td>75 included AI answers a day, a handle of 3 or 4 letters, each day&apos;s reads of your vault anchored on chain, the Warden mark</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <ul>
+              <li>
+                <strong>Included answers.</strong> Without a model key of your own, Ask and your AI self&apos;s test chat write their answers with included answers.
+                An included answer passes through Sigil&apos;s server to the model and is not kept: only the day&apos;s count is. With a model key of your own,
+                answers go from your device straight to the provider as always. When the day&apos;s answers are used, Ask shows the memories that answer best; the
+                count starts again at midnight UTC.
+              </li>
+              <li>
+                <strong>The holder mark.</strong> Your public AI self page and your ask links show your tier, never your wallet or your balance.
+              </li>
+              <li>
+                <strong>Wardens&apos; reads on chain.</strong> Each day, the read-log lines of a Warden&apos;s vault from the day before (the same leaves the hourly
+                seals hold) become one Merkle root, and all Wardens&apos; roots go on chain in one transaction. The roots and the transaction are listed under Holder.
+              </li>
+              <li>
+                <strong>Small print.</strong> Agents of a Bearer, Keeper or Warden may write 1,000, 3,000 or 10,000 memories an hour (300 otherwise); apps of a Keeper or
+                Warden may make 720 or 1,500 requests a minute (240 otherwise); a Keeper&apos;s or Warden&apos;s public AI self and ask links take 30 questions a minute
+                from a visitor (8 otherwise). Anyone can save their whole read log with every seal proof under Read log.
+              </li>
+            </ul>
           </section>
 
           <section id="raeto" className="doc-section">

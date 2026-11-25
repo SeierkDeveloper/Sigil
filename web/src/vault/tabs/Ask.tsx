@@ -5,7 +5,7 @@ import { evidenceGroups, NOTHING_TEXT, tokenize, type AskSource, type LifeAnswer
 import { ArrowIcon, ChevronIcon, DeviceIcon, ImportIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { formatDate, plural } from "@/lib/format";
 import * as askOps from "../askOps";
-import { modelCaller } from "../selfOps";
+import * as holderOps from "../holderOps";
 import type { Unlocked } from "../ops";
 import { errorText, useVault } from "../context";
 import { Empty, Notice } from "../ui";
@@ -61,12 +61,18 @@ export function AskTab() {
   const { memories, folders: vaultFolders, shares } = data;
   const pool = useMemo(() => askOps.askPool({ memories, folders: vaultFolders, shares }), [memories, vaultFolders, shares]);
   const folders = useMemo(() => askOps.askFolders({ folders: vaultFolders, shares }), [vaultFolders, shares]);
-  const hasModel = !!data.model;
+  // A model key of the owner's own, or, for a holder without one, the included answers.
+  const included = holderOps.includedAvailable(data);
+  const left = holderOps.answersLeft(data.holder);
+  const hasModel = !!data.model || included;
   const useModel = hasModel && written;
+
+  const [usedNote, setUsedNote] = useState<string | null>(null);
 
   const run = async (text: string, open: Set<string>, withModel: boolean) => {
     setBusy(true);
     setError(null);
+    setUsedNote(null);
     try {
       const now = Date.now();
       const range = askOps.rangeFor(rangeChoice, custom, now);
@@ -74,8 +80,19 @@ export function AskTab() {
         data,
         pool,
         { question: text, folderIds, range, open },
-        { model: withModel ? modelCaller(data) : null, embedQuery: semantic.embedQuery, vectors: semantic.vectors, now, api },
-      );
+        { model: withModel ? holderOps.answerCaller(data, api) : null, embedQuery: semantic.embedQuery, vectors: semantic.vectors, now, api },
+      ).catch(async (err) => {
+        // Today's included answers are used: show the memories that answer best instead.
+        if (!(err instanceof holderOps.AnswersUsed)) throw err;
+        setUsedNote(err.message);
+        return askOps.askVault(data, pool, { question: text, folderIds, range, open }, { model: null, embedQuery: semantic.embedQuery, vectors: semantic.vectors, now, api });
+      });
+      if (withModel && included) {
+        holderOps
+          .loadHolder(api)
+          .then((holder) => update((d) => ({ ...d, holder })))
+          .catch(() => undefined);
+      }
       const searchedFolders = folderIds.length ? folderIds.length : folders.length;
       const ids = new Set(folderIds);
       const searchedMemories = folderIds.length ? pool.filter((m) => ids.has(m.folderId)).length : pool.length;
@@ -249,18 +266,21 @@ export function AskTab() {
           <DeviceIcon />
           <span>
             {semantic.status.state === "ready" ? "Searched by words and by meaning on this device" : "Searched by words on this device"}
-            {useModel
-              ? data.model!.provider === "raeto"
-                ? `, written through Raeto (${data.model!.model}) with your own key`
-                : `, written by ${data.model!.model} with your own key`
+            {useModel && data.model
+              ? data.model.provider === "raeto"
+                ? `, written through Raeto (${data.model.model}) with your own key`
+                : `, written by ${data.model.model} with your own key`
               : ""}
-            . Sigil&apos;s server never sees the question or the answer.
+            {useModel && !data.model
+              ? `, written with your included answers (${left} of ${data.holder?.answersPerDay ?? 0} left today). An included answer passes through Sigil's server to the model and is not kept.`
+              : ". Sigil's server never sees the question or the answer."}
           </span>
         </p>
         </div>
       </form>
 
       {error ? <Notice kind="error">{error}</Notice> : null}
+      {usedNote ? <Notice kind="info">{usedNote} Here are the memories that answer best.</Notice> : null}
 
       {gate ? (
         <div className="subpanel protect-gate" data-testid="protect-gate">
@@ -321,7 +341,11 @@ export function AskTab() {
               <button type="button" className="text-button" onClick={() => goTo("self")}>
                 Add a model key under AI self
               </button>{" "}
-              and they become a written answer.
+              and they become a written answer, or{" "}
+              <button type="button" className="text-button" onClick={() => goTo("holder")}>
+                link the wallet you hold the token in
+              </button>{" "}
+              for included answers.
             </p>
           ) : null}
         </section>
@@ -376,7 +400,9 @@ function Result({
     answer.kind === "answer"
       ? answer.route
         ? `Written by ${answer.route.model} through Raeto${answer.route.costUsd !== null ? `, ${usd(answer.route.costUsd)}` : ""}, from ${plural(answer.sources.length, "memory", "memories")}`
-        : `Written by ${answer.model} from ${plural(answer.sources.length, "memory", "memories")}`
+        : answer.model === holderOps.INCLUDED_MODEL
+          ? `Written with an included answer from ${plural(answer.sources.length, "memory", "memories")}`
+          : `Written by ${answer.model} from ${plural(answer.sources.length, "memory", "memories")}`
       : answer.kind === "evidence"
         ? answer.sources.length === 1
           ? "1 memory that answers best"

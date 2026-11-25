@@ -38,6 +38,8 @@ export async function register() {
 
   const { housekeeping, dataFile: dbFile } = await import("./server/db");
   const { snapshotTick } = await import("./server/snapshots");
+  const { answerSpend, holderTick, wardenAnchorTick } = await import("./server/holders");
+  let lastHolderDay = "";
 
   // A stop (SIGTERM from an update): Next.js stops taking requests, answers the
   // ones already running, then exits; on that exit the database is closed
@@ -68,6 +70,21 @@ export async function register() {
       if (Date.now() - lastUpkeep >= 3_600_000) {
         lastUpkeep = Date.now();
         housekeeping(db);
+      }
+      // Holders: wallets read more than a day ago are read again (the tier follows the balance).
+      await holderTick(db).catch((err) => console.error("[sigil] holder recheck failed", err));
+      // Once a day: Wardens' reads of the day before anchored on chain in one transaction, and the
+      // included answers' spend written to the log (no stop on it: the owner of the node adjusts).
+      const day = new Date().toISOString().slice(0, 10);
+      if (day !== lastHolderDay) {
+        lastHolderDay = day;
+        const sent = await wardenAnchorTick(db).catch((err) => {
+          console.error("[sigil] warden anchor failed", err);
+          return null;
+        });
+        if (sent) console.log(`[sigil] warden anchors sent: ${sent}`);
+        const spend = answerSpend(db);
+        console.log(`[sigil] included answers ${spend.month}: ${spend.answers} answers, about $${spend.usd.toFixed(2)}`);
       }
       // Once a night (from 02:00 UTC): a full copy of the database, checked, seven kept.
       try {

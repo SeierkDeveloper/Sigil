@@ -39,7 +39,7 @@ async function setup(opts: { showAnswers?: boolean; perVisitorHour?: number } = 
   await guard.setFolderGuard(s.b.api, work, { redact: ["email"] });
   let data = await ops.loadVault(s.b.api, s.vault);
   const view = await pub.savePublic(s.b.api, s.vault, data, {
-    handle: "sam",
+    handle: "samwise",
     name: "Sam's AI self",
     greeting: "Ask me about my talks.",
     rules: cleanRules({ tone: "Short.", denyTopics: ["salary"] }),
@@ -85,7 +85,7 @@ describe("the public copy", () => {
     expect(db).not.toContain(HEALTH);
     // The public self's private key and rules are not readable on the server.
     expect(db).not.toContain("salary");
-    const page = await visitor("sam").page();
+    const page = await visitor("samwise").page();
     expect(page).toMatchObject({ enabled: true, online: false, items: [{ title: "Talks" }] });
     expect(JSON.stringify(page)).not.toContain(TALK);
   });
@@ -103,7 +103,7 @@ describe("the public copy", () => {
     await setup();
     const other = await signedUp(h);
     const data = await ops.loadVault(other.b.api, other.vault);
-    const input = { handle: "sam", name: "x", greeting: "", rules: cleanRules({}), folderIds: [], perVisitorHour: 5, showAnswers: false, enabled: true, appId: null };
+    const input = { handle: "samwise", name: "x", greeting: "", rules: cleanRules({}), folderIds: [], perVisitorHour: 5, showAnswers: false, enabled: true, appId: null };
     await expect(pub.savePublic(other.b.api, other.vault, data, input)).rejects.toMatchObject({ status: 409 });
     await expect(pub.savePublic(other.b.api, other.vault, data, { ...input, handle: "admin" })).rejects.toMatchObject({ status: 400 });
   });
@@ -112,7 +112,7 @@ describe("the public copy", () => {
 describe("a visitor asks", () => {
   it("is told plainly when the owner's device is offline, then answered end to end, marked with sources", async () => {
     const s = await setup();
-    const v = visitor("sam");
+    const v = visitor("samwise");
     const offline = await v.ask("What do you talk about?");
     expect(offline.res.status).toBe(503);
     expect((await offline.res.json()).code).toBe("offline");
@@ -131,7 +131,7 @@ describe("a visitor asks", () => {
     expect(reply).toEqual({ v: 1, text: "I talk about memory.", refused: null, sources: [{ id: expect.any(String), title: "Talks" }] });
 
     // The source is public and can be read on the page.
-    const item = (await (await h.raw("GET", `public/at/sam/items/${reply.sources[0].id}`)).json()) as { body: string };
+    const item = (await (await h.raw("GET", `public/at/samwise/items/${reply.sources[0].id}`)).json()) as { body: string };
     expect(item.body).toContain(TALK);
 
     // The owner's log has the question and answer, sealed.
@@ -145,7 +145,7 @@ describe("a visitor asks", () => {
   it("keeps to the rules, the per-visitor limit, the wall and the off switch", async () => {
     const s = await setup({ perVisitorHour: 2 });
     const { model, calls } = stubModel();
-    const v = visitor("sam");
+    const v = visitor("samwise");
     await pub.servePublicOnce(s.b.api, s.data, { model });
     const denied = await v.ask("What is your salary?");
     await pub.servePublicOnce(s.b.api, s.data, { model });
@@ -158,7 +158,7 @@ describe("a visitor asks", () => {
     expect((await third.res.json()).code).toBe("visitor_limit");
     // Another visitor is not affected.
     await pub.servePublicOnce(s.b.api, s.data, { model });
-    expect((await visitor("sam", "198.51.100.8").ask("Talks?")).res.status).toBe(201);
+    expect((await visitor("samwise", "198.51.100.8").ask("Talks?")).res.status).toBe(201);
 
     // The owner hides an answer from the page.
     let data = await ops.loadVault(s.b.api, s.vault);
@@ -170,18 +170,18 @@ describe("a visitor asks", () => {
 
     // Off: the page says so and takes no question.
     data = await ops.loadVault(s.b.api, s.vault);
-    await pub.savePublic(s.b.api, s.vault, data, { handle: "sam", name: "Sam", greeting: "", rules: data.publicSelf!.secret!.rules, folderIds: [s.work.id], perVisitorHour: 2, showAnswers: true, enabled: false, appId: null });
+    await pub.savePublic(s.b.api, s.vault, data, { handle: "samwise", name: "Sam", greeting: "", rules: data.publicSelf!.secret!.rules, folderIds: [s.work.id], perVisitorHour: 2, showAnswers: true, enabled: false, appId: null });
     expect(await v.page()).toMatchObject({ enabled: false, online: false, items: [], wall: [] });
-    expect((await visitor("sam", "198.51.100.9").ask("Hi")).res.status).toBe(410);
+    expect((await visitor("samwise", "198.51.100.9").ask("Hi")).res.status).toBe(410);
     await pub.turnOffPublic(s.b.api);
     expect(count(h.db, "SELECT COUNT(*) AS n FROM public_items")).toBe(0);
-    expect((await h.raw("GET", "public/at/sam")).status).toBe(404);
+    expect((await h.raw("GET", "public/at/samwise")).status).toBe(404);
   });
 
   it("shows nothing on the wall unless the owner turned it on", async () => {
     const s = await setup({ showAnswers: false });
     const { model } = stubModel();
-    const v = visitor("sam");
+    const v = visitor("samwise");
     await pub.servePublicOnce(s.b.api, s.data, { model });
     const q = await v.ask("Talks?");
     await pub.servePublicOnce(s.b.api, s.data, { model });
@@ -197,7 +197,7 @@ describe("a connector answering the public page", () => {
     await self.saveModel(s.b.api, s.vault, { provider: "anthropic", model: "claude-opus-5-5", apiKey: "sk-ant-CANARY-key" });
     const { appKey, appId } = await ops.connectApp(s.b.api, s.vault, { name: "Home machine", kind: "other" }, []);
     let data = await ops.loadVault(s.b.api, s.vault);
-    await pub.savePublic(s.b.api, s.vault, data, { handle: "sam", name: "Sam", greeting: "", rules: data.publicSelf!.secret!.rules, folderIds: [s.work.id], perVisitorHour: 5, showAnswers: false, enabled: true, appId });
+    await pub.savePublic(s.b.api, s.vault, data, { handle: "samwise", name: "Sam", greeting: "", rules: data.publicSelf!.secret!.rules, folderIds: [s.work.id], perVisitorHour: 5, showAnswers: false, enabled: true, appId });
     data = await ops.loadVault(s.b.api, s.vault);
     expect(dumpDb(h.db)).not.toContain("sk-ant-CANARY-key");
 
@@ -208,7 +208,7 @@ describe("a connector answering the public page", () => {
     };
     const agent = new SelfAgent(readerFor(h, appKey), { fetch });
     expect(await agent.servePublicOnce()).toBe(0);
-    const v = visitor("sam");
+    const v = visitor("samwise");
     const q = await v.ask("Talks?");
     expect(await agent.servePublicOnce()).toBe(1);
     expect(bodies[0]).toContain(TALK);

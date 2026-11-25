@@ -24,6 +24,16 @@ const short = (a: string) => `${a.slice(0, 6)}...${a.slice(-4)}`;
 const num = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDigits: d, minimumFractionDigits: d });
 const when = (t: number) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
 
+const tiers = [
+  { name: "Bearer", min: "1,000,000+", perks: ["10 included AI answers a day in Ask and your AI self, no API key needed", "The holder mark on your public AI self page and ask links"] },
+  { name: "Keeper", min: "5,000,000+", perks: ["30 included AI answers a day", "The holder mark"] },
+  {
+    name: "Warden",
+    min: "10,000,000+",
+    perks: ["75 included AI answers a day", "A short handle of 3 or 4 letters for your public AI self", "Each day's reads of your vault anchored on chain", "The Warden mark"],
+  },
+];
+
 export default async function TokenPage() {
   const c = tokenConfig();
   const live = tokenLive(c);
@@ -96,6 +106,34 @@ export default async function TokenPage() {
               </li>
             ))}
           </ol>
+        </section>
+
+        <section className="page-section" aria-labelledby="tiers-title" id="tiers">
+          <h2 id="tiers-title" className="section-title">
+            What holding gives you
+          </h2>
+          <p className="small muted">
+            Link the wallet you hold it in under Holder in your vault. Your wallet signs one message to prove it is yours; nothing is sent on chain and nothing is paid.
+            Your tier follows your balance and is read again every day.
+          </p>
+          <div className="grid grid-3">
+            {tiers.map((t) => (
+              <article key={t.name} className="card">
+                <span className="card-number">{t.min}</span>
+                <h3 className="card-title">{t.name}</h3>
+                <ul className="holder-perks">
+                  {t.perks.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <p className="small faint">
+            Included answers pass through Sigil&apos;s server to the model and are not kept; with a model key of your own, answers still go from your device straight to the
+            provider. Every tier also lets agents write more an hour and apps ask more a minute, and saves the read log with every seal proof.{" "}
+            <Link href="/vault#holder">Link your wallet</Link>.
+          </p>
         </section>
 
         {live ? (
@@ -197,7 +235,7 @@ export default async function TokenPage() {
             <article className="card">
               <span className="card-number">Not needed</span>
               <h3 className="card-title">Sigil works without it</h3>
-              <p className="card-text">Your vault, your AI self and every app that connects to it work the same whether you hold the token or not.</p>
+              <p className="card-text">Everything Sigil does today stays free for everyone. Holding adds to it: included AI answers, the holder mark and, for Wardens, more.</p>
             </article>
             <article className="card">
               <span className="card-number">Later</span>

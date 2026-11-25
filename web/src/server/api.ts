@@ -28,6 +28,8 @@ import {
 import { dataFile, getDb, tx, vaultStamp, type Db } from "./db";
 import { snapshotStatus } from "./snapshots";
 import { currentVersion, pinVersion, pinsOf, versionFor } from "./versions";
+import { APP_REQUESTS, holderChallenge, holderStatus, includedAnswer, linkHolder, refreshHolder, tierOf, unlinkHolder, VISITOR_QUESTIONS } from "./holders";
+import { linkOwner } from "./self";
 import { serverConfig } from "./config";
 import {
   addKeyslot,
@@ -296,7 +298,7 @@ function appOf(ctx: Ctx): AppAuth {
   const auth = m ? appByToken(ctx.db, m[1]) : null;
   if (!auth) throw new HttpError(401, "This app key was revoked or does not exist. Create a new one in your Sigil vault.", "app_revoked");
   assertNotMoved(ctx.db, "vault", auth.userId);
-  rateLimit(`app:${auth.appId}`, 240, 60_000);
+  rateLimit(`app:${auth.appId}`, APP_REQUESTS[tierOf(ctx.db, auth.userId) ?? "none"], 60_000);
   return auth;
 }
 
@@ -610,6 +612,7 @@ route("GET", "vault", (ctx) => {
     identity: getIdentity(ctx.db, userId),
     drafts: listDrafts(ctx.db, userId),
     disclosures: listDisclosures(ctx.db, userId),
+    holder: holderStatus(ctx.db, userId),
     emergency: { card: ownerCard(ctx.db, userId), opens: cardOpens(ctx.db, userId) },
     agreements: listAgreements(ctx.db, userId),
     packs: listPacks(ctx.db, userId),
@@ -828,7 +831,8 @@ route("GET", "ask/:id", (ctx, [linkId]) => {
 });
 
 route("POST", "ask/:id/questions", async (ctx, [linkId]) => {
-  rateLimit(`ask:${clientIp(ctx.req)}`, 8, 60_000);
+  const owner = linkOwner(ctx.db, linkId);
+  rateLimit(`ask:${clientIp(ctx.req)}`, VISITOR_QUESTIONS[(owner && tierOf(ctx.db, owner)) || "none"], 60_000);
   rateLimit(`ask-hour:${clientIp(ctx.req)}`, 60, 3600_000);
   assertNotMoved(ctx.db, "ask", linkId);
   const body = parse(z.object({ id, sessionId: id, askerKey: boxPublicKey, sealed: relay(64 * KB) }), await readJson(ctx.req, 80 * KB));
@@ -848,6 +852,61 @@ route("GET", "log", (ctx) => {
   const app = ctx.url.searchParams.get("app") ?? undefined;
   if (app !== undefined && !/^[A-Za-z0-9_-]{4,64}$/.test(app)) throw new HttpError(400, "Invalid app id.", "invalid");
   return json({ periodSeconds: serverConfig.sealSeconds, mode: anchorStatus().mode, entries: listLog(ctx.db, userId, limit, before, app) });
+});
+
+// The whole read log with the seal proof of every sealed line, as one file to keep.
+route("GET", "log/export", (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`log-export:${userId}`, 6, 60_000);
+  sealPending(ctx.db);
+  const entries = listLog(ctx.db, userId, 1_000_000);
+  const lines = entries.map((e) => ({ ...e, proof: e.sealed ? proofFor(ctx.db, e) : null }));
+  const file = { kind: "sigil-read-log", version: 1, node: serverConfig.origin || siteOrigin(ctx.req), exportedAt: new Date().toISOString(), periodSeconds: serverConfig.sealSeconds, entries: lines };
+  return json(file, 200, { "content-disposition": `attachment; filename="sigil-read-log-${new Date().toISOString().slice(0, 10)}.json"` });
+});
+
+// ---- holder tiers: the linked wallet, the tier, included answers
+
+route("GET", "holder", (ctx) => json(holderStatus(ctx.db, userOf(ctx))));
+
+route("POST", "holder/challenge", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`holder:${userId}`, 20, 60_000);
+  const body = parse(z.object({ address: z.string().regex(/^0x[0-9a-fA-F]{40}$/) }), await readJson(ctx.req, 4 * KB));
+  return json(holderChallenge(ctx.db, userId, body.address));
+});
+
+route("POST", "holder/link", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`holder:${userId}`, 20, 60_000);
+  const body = parse(z.object({ challengeId: id, address: z.string().regex(/^0x[0-9a-fA-F]{40}$/), signature: z.string().regex(/^0x[0-9a-fA-F]{130,}$/) }), await readJson(ctx.req, 8 * KB));
+  return json(await linkHolder(ctx.db, userId, body));
+});
+
+route("POST", "holder/refresh", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`holder-refresh:${userId}`, 4, 60_000);
+  return json(await refreshHolder(ctx.db, userId));
+});
+
+route("DELETE", "holder", (ctx) => {
+  const userId = userOf(ctx);
+  unlinkHolder(ctx.db, userId);
+  return json(holderStatus(ctx.db, userId));
+});
+
+route("POST", "holder/answer", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`holder-answer:${userId}`, 20, 60_000);
+  const body = parse(
+    z.object({
+      system: z.string().max(400_000),
+      messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().max(200_000) })).min(1).max(60),
+      maxTokens: z.number().int().min(1).max(4000).optional(),
+    }),
+    await readJson(ctx.req, 2 * MB),
+  );
+  return json(await includedAnswer(ctx.db, userId, body));
 });
 
 route("GET", "log/:id/proof", (ctx, [entryId]) => {
@@ -1475,8 +1534,8 @@ route("GET", "public/at/:handle/items/:id", (ctx, [handle, itemId]) => {
 
 route("POST", "public/at/:handle/questions", async (ctx, [handle]) => {
   const ip = clientIp(ctx.req);
-  rateLimit(`public-ask:${ip}`, 8, 60_000);
   const page = publicPage(ctx.db, handle.toLowerCase());
+  rateLimit(`public-ask:${ip}`, VISITOR_QUESTIONS[page.holder ?? "none"], 60_000);
   const body = parse(z.object({ id, sessionId: id, askerKey: boxPublicKey, sealed: relay(64 * KB) }), await readJson(ctx.req, 80 * KB));
   return json(askPublic(ctx.db, page.handle, visitorOf(ip, page.id), body), 201);
 });
