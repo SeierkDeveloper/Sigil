@@ -5,6 +5,8 @@
 // nothing is paid. The tier follows the balance and is read again every day.
 
 import { useState } from "react";
+import Link from "next/link";
+import { CodeBlock } from "@/components/CodeBlock";
 import { DeviceIcon } from "@/components/icons";
 import { formatDateTime } from "@/lib/format";
 import * as holderOps from "../holderOps";
@@ -20,6 +22,8 @@ export function HolderTab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [passCode, setPassCode] = useState<string | null>(null);
+  const origin = typeof window === "undefined" ? "" : window.location.origin;
 
   const act = async (fn: () => Promise<NonNullable<typeof holder>>, done: (h: NonNullable<typeof holder>) => string | null) => {
     setBusy(true);
@@ -151,9 +155,120 @@ export function HolderTab() {
         </p>
       </section>
 
+      {holder?.linked ? (
+        <section className="subpanel plate" aria-labelledby="holder-pass">
+          <PlateHead number="03" id="holder-pass" title="Sigil Pass" lead="Let other apps, sites and agents check your tier with one call, so they can give holders perks of their own.">
+            <span className="plate-state" data-on={holder.pass ? "true" : "false"} data-testid="pass-state">
+              {holder.pass ? "On" : "Off"}
+            </span>
+          </PlateHead>
+          {passCode ? (
+            <>
+              <CodeBlock code={passCode} label="Your pass code" />
+              <p className="small muted">Copy it now: it is shown once. Give it to an app that asks for your Sigil Pass. A new code stops this one from working.</p>
+            </>
+          ) : null}
+          {holder.pass ? (
+            <>
+              <dl className="holder-facts">
+                <div>
+                  <dt>Checked by apps</dt>
+                  <dd className="mono" data-testid="pass-checks">
+                    {whole(holder.pass.checks)}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Last check</dt>
+                  <dd>{holder.pass.lastCheckAt ? formatDateTime(holder.pass.lastCheckAt) : "Not yet"}</dd>
+                </div>
+                <div>
+                  <dt>Made</dt>
+                  <dd>{formatDateTime(holder.pass.createdAt)}</dd>
+                </div>
+              </dl>
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  checked={holder.pass.byWallet}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const on = e.target.checked;
+                    void act(() => holderOps.passByWallet(api, on), () => (on ? "Apps can now check your tier by your wallet address too." : "Apps can no longer check your tier by your wallet address."));
+                  }}
+                />
+                <span>
+                  Apps can also check by my wallet address
+                  <span className="field-hint">For apps where you already connect this wallet. Without it, only your pass code works.</span>
+                </span>
+              </label>
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(
+                      async () => {
+                        const r = await holderOps.makePass(api);
+                        setPassCode(r.code);
+                        return r.status;
+                      },
+                      () => "New pass code made. The old one no longer works.",
+                    )
+                  }
+                >
+                  New pass code
+                </button>
+                <button
+                  type="button"
+                  className="button button-ghost"
+                  disabled={busy}
+                  onClick={() =>
+                    void act(
+                      async () => {
+                        setPassCode(null);
+                        return holderOps.endPass(api);
+                      },
+                      () => "Pass ended. No app can check your tier now.",
+                    )
+                  }
+                >
+                  End my pass
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="form-actions">
+              <button
+                type="button"
+                className="button button-primary"
+                disabled={busy}
+                data-testid="pass-make"
+                onClick={() =>
+                  void act(
+                    async () => {
+                      const r = await holderOps.makePass(api);
+                      setPassCode(r.code);
+                      return r.status;
+                    },
+                    () => "Your pass is made.",
+                  )
+                }
+              >
+                Make my pass
+              </button>
+            </div>
+          )}
+          <p className="small faint">
+            An app checks with <span className="mono">{`${origin}/api/pass/`}</span>
+            {"<your code>"} and learns only your tier: never your wallet, your balance or anything in your vault. How apps use it is in the <Link href="/docs#pass">docs</Link>.
+          </p>
+        </section>
+      ) : null}
+
       {tier === "warden" ? (
         <section className="subpanel plate" aria-labelledby="holder-anchors">
-          <PlateHead number="03" id="holder-anchors" title="Your reads on chain" lead="Each day, the reads of your vault the day before become one root, anchored on chain." />
+          <PlateHead number="04" id="holder-anchors" title="Your reads on chain" lead="Each day, the reads of your vault the day before become one root, anchored on chain." />
           {holder?.anchors.length ? (
             <ul className="holder-anchors">
               {holder.anchors.map((a) => (

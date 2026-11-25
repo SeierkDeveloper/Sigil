@@ -28,6 +28,7 @@ const toc = [
   ["ai-self", "Your AI self"],
   ["raeto", "Raeto: every model, one key"],
   ["holder", "Holder tiers"],
+  ["pass", "Sigil Pass"],
   ["ask-links", "Ask links"],
   ["inbox", "Memory inbox"],
   ["meaning", "Search by meaning"],
@@ -395,9 +396,64 @@ export default function Docs() {
                 seals hold) become one Merkle root, and all Wardens&apos; roots go on chain in one transaction. The roots and the transaction are listed under Holder.
               </li>
               <li>
+                <strong>Sigil Pass.</strong> Other apps, sites and agents can check your tier with one call and give holders perks of their own. See{" "}
+                <a href="#pass">Sigil Pass</a>.
+              </li>
+              <li>
                 <strong>Small print.</strong> Agents of a Bearer, Keeper or Warden may write 1,000, 3,000 or 10,000 memories an hour (300 otherwise); apps of a Keeper or
                 Warden may make 720 or 1,500 requests a minute (240 otherwise); a Keeper&apos;s or Warden&apos;s public AI self and ask links take 30 questions a minute
                 from a visitor (8 otherwise). Anyone can save their whole read log with every seal proof under Read log.
+              </li>
+            </ul>
+          </section>
+
+          <section id="pass" className="doc-section">
+            <h2>Sigil Pass: check a holder&apos;s tier from any app</h2>
+            <p>
+              Sigil Pass lets any app, site or agent see whether the person in front of it holds the token, and at which tier, with one call and no key. Use it to give
+              Sigil holders perks of your own: early access, a discount, a holder-only feature.
+            </p>
+            <p>
+              A holder makes their pass under <strong>Holder</strong> in the vault and gets a pass code. Nothing can be checked until they do. The holder can also let
+              apps check by their wallet address, for apps where they already connect that wallet. A new code stops the old one from working, and ending the pass stops
+              every check.
+            </p>
+            <CodeBlock code={`curl ${site.url}/api/pass/sp_YourPassCodeFromTheHolderTab`} label="Terminal" />
+            <CodeBlock
+              code={`{
+  "pass": "sigil",
+  "holder": true,
+  "tier": "keeper",
+  "rank": 2,
+  "checkedAt": "2026-11-25T06:00:00.000Z"
+}`}
+              label="Answer"
+              language="json"
+            />
+            <CodeBlock
+              code={`const r = await fetch("${site.url}/api/pass/" + passCode).then((r) => r.json());
+if (r.rank >= 2) {
+  // A Keeper or a Warden: give the perk.
+}`}
+              label="In a web page or an agent"
+              language="js"
+            />
+            <ul>
+              <li>
+                <strong>The key</strong> is a pass code (starting with sp_) or, when the holder turned it on, their wallet address.
+              </li>
+              <li>
+                <strong>rank</strong> is 0 below the first tier, 1 for a Bearer, 2 for a Keeper and 3 for a Warden, so a check is one comparison.
+              </li>
+              <li>
+                <strong>checkedAt</strong> is when the balance was last read from the chain; it is read again every day.
+              </li>
+              <li>
+                <strong>What an app learns</strong> is the tier and nothing else: never the wallet behind a pass code, the balance, or anything in the vault. A code
+                that is unknown, ended or not allowed answers holder false, all the same way.
+              </li>
+              <li>
+                Any origin may call it. The holder sees how many times their pass was checked under Holder.
               </li>
             </ul>
           </section>

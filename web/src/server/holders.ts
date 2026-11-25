@@ -17,6 +17,7 @@
 import { createModelCaller, hex32, fromHex32, merkleRoot, randomId, type ModelCaller, type ModelMessage } from "@sigil/core";
 import { createPublicClient, createWalletClient, defineChain, formatUnits, http, isAddress, parseAbi, recoverMessageAddress, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { createHash, randomBytes } from "node:crypto";
 import type { Db } from "./db";
 import { HttpError, saveChallenge, takeChallenge } from "./store";
 import { tokenConfig } from "./token";
@@ -84,6 +85,14 @@ export function trackHolders(db: Db): void {
       anchored_at TEXT,
       PRIMARY KEY (user_id, day)
     ) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS holder_pass (
+      user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL UNIQUE,
+      by_wallet INTEGER NOT NULL DEFAULT 0,
+      checks INTEGER NOT NULL DEFAULT 0,
+      last_check_at TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
 }
 
@@ -191,6 +200,8 @@ export async function linkHolder(db: Db, userId: string, input: { challengeId: s
 
 export function unlinkHolder(db: Db, userId: string): void {
   db.prepare("DELETE FROM holder_links WHERE user_id = ?").run(userId);
+  // A pass belongs to the linked wallet: unlinking ends it.
+  db.prepare("DELETE FROM holder_pass WHERE user_id = ?").run(userId);
 }
 
 /** Reads one vault's balance again now. */
@@ -232,6 +243,8 @@ export interface HolderStatus {
   includedOn: boolean;
   checkedAt: string | null;
   anchors: { day: string; root: string; leaves: number; tx: string | null }[];
+  /** The holder's Sigil Pass, when they made one. */
+  pass: PassStatus | null;
 }
 
 export function tierOf(db: Db, userId: string): Tier | null {
@@ -257,6 +270,7 @@ export function holderStatus(db: Db, userId: string, at = new Date()): HolderSta
     includedOn: !!answerSettings().apiKey || (devTools() && !!process.env.SIGIL_ANSWERS_STANDIN),
     checkedAt: r ? String(r.checked_at) : null,
     anchors,
+    pass: passStatus(db, userId),
   };
 }
 
@@ -383,4 +397,77 @@ export async function wardenAnchorTick(db: Db, at = new Date()): Promise<string 
   const mark = db.prepare("UPDATE warden_anchors SET tx = ?, anchored_at = ? WHERE user_id = ? AND root = ?");
   for (const p of pending) mark.run(tx, at.toISOString(), String(p.user_id), String(p.root));
   return tx;
+}
+
+// ---------------------------------------------------------------- Sigil Pass: the tier, checked by any app
+
+// A holder can let other apps, sites and agents check their tier with one call,
+// so a project can give Sigil holders perks of its own. Nothing is checked
+// unless the holder made a pass: either a pass code they hand to an app (the app
+// learns the tier and nothing else, not even the wallet), or, if they turn it on,
+// their wallet address itself. A check answers with the tier from the last
+// daily read; it never shows the balance, the vault or anything in it.
+
+export interface PassStatus {
+  byWallet: boolean;
+  checks: number;
+  lastCheckAt: string | null;
+  createdAt: string;
+}
+
+export interface PassCheck {
+  pass: "sigil";
+  holder: boolean;
+  tier: Tier | null;
+  /** 0 below the first tier, then 1 Bearer, 2 Keeper, 3 Warden: compare with >=. */
+  rank: number;
+  /** When the tier was last read from the chain. */
+  checkedAt: string | null;
+}
+
+export const TIER_RANK: Record<Tier, number> = { bearer: 1, keeper: 2, warden: 3 };
+
+const PASS_CODE = /^sp_[A-Za-z0-9_-]{24}$/;
+const hashCode = (code: string) => createHash("sha256").update(code).digest("hex");
+
+function passStatus(db: Db, userId: string): PassStatus | null {
+  const r = db.prepare("SELECT by_wallet, checks, last_check_at, created_at FROM holder_pass WHERE user_id = ?").get(userId) as Row | undefined;
+  return r ? { byWallet: Number(r.by_wallet) === 1, checks: Number(r.checks), lastCheckAt: r.last_check_at ? String(r.last_check_at) : null, createdAt: String(r.created_at) } : null;
+}
+
+/** Makes a new pass code (an earlier code stops working). The code is shown once; only its hash is kept. */
+export function newPass(db: Db, userId: string, at = new Date()): { code: string; status: HolderStatus } {
+  if (!db.prepare("SELECT 1 FROM holder_links WHERE user_id = ?").get(userId)) throw new HttpError(400, "Link the wallet you hold the token in first.", "not_linked");
+  const code = "sp_" + randomBytes(18).toString("base64url");
+  db.prepare(
+    `INSERT INTO holder_pass (user_id, code_hash, created_at) VALUES (?, ?, ?)
+     ON CONFLICT (user_id) DO UPDATE SET code_hash = excluded.code_hash, created_at = excluded.created_at`,
+  ).run(userId, hashCode(code), at.toISOString());
+  return { code, status: holderStatus(db, userId, at) };
+}
+
+export function setPassByWallet(db: Db, userId: string, on: boolean): HolderStatus {
+  const r = db.prepare("UPDATE holder_pass SET by_wallet = ? WHERE user_id = ?").run(on ? 1 : 0, userId);
+  if (!Number(r.changes)) throw new HttpError(400, "Make your pass first.", "no_pass");
+  return holderStatus(db, userId);
+}
+
+export function endPass(db: Db, userId: string): HolderStatus {
+  db.prepare("DELETE FROM holder_pass WHERE user_id = ?").run(userId);
+  return holderStatus(db, userId);
+}
+
+/** One check by an app: a pass code, or a wallet whose holder turned wallet checks on. Unknown and off look the same. */
+export function checkPass(db: Db, key: string, at = new Date()): PassCheck {
+  let r: Row | undefined;
+  if (PASS_CODE.test(key)) {
+    r = db.prepare("SELECT p.user_id, l.tier, l.checked_at FROM holder_pass p JOIN holder_links l ON l.user_id = p.user_id WHERE p.code_hash = ?").get(hashCode(key)) as Row | undefined;
+  } else if (/^0x[0-9a-fA-F]{40}$/.test(key)) {
+    r = db.prepare("SELECT p.user_id, l.tier, l.checked_at FROM holder_links l JOIN holder_pass p ON p.user_id = l.user_id WHERE l.address = ? AND p.by_wallet = 1").get(key.toLowerCase()) as Row | undefined;
+  }
+  if (!r) return { pass: "sigil", holder: false, tier: null, rank: 0, checkedAt: null };
+  db.prepare("UPDATE holder_pass SET checks = checks + 1, last_check_at = ? WHERE user_id = ?").run(at.toISOString(), String(r.user_id));
+  const t = r.tier ? String(r.tier) : null;
+  const tier = t === "bearer" || t === "keeper" || t === "warden" ? t : null;
+  return { pass: "sigil", holder: !!tier, tier, rank: tier ? TIER_RANK[tier] : 0, checkedAt: String(r.checked_at) };
 }

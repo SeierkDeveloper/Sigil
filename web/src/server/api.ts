@@ -28,7 +28,7 @@ import {
 import { dataFile, getDb, tx, vaultStamp, type Db } from "./db";
 import { snapshotStatus } from "./snapshots";
 import { currentVersion, pinVersion, pinsOf, versionFor } from "./versions";
-import { APP_REQUESTS, holderChallenge, holderStatus, includedAnswer, linkHolder, refreshHolder, tierOf, unlinkHolder, VISITOR_QUESTIONS } from "./holders";
+import { APP_REQUESTS, checkPass, endPass, holderChallenge, holderStatus, newPass, setPassByWallet, includedAnswer, linkHolder, refreshHolder, tierOf, unlinkHolder, VISITOR_QUESTIONS } from "./holders";
 import { linkOwner } from "./self";
 import { serverConfig } from "./config";
 import {
@@ -893,6 +893,27 @@ route("DELETE", "holder", (ctx) => {
   const userId = userOf(ctx);
   unlinkHolder(ctx.db, userId);
   return json(holderStatus(ctx.db, userId));
+});
+
+// ---- Sigil Pass: the holder makes it; any app checks the tier with one call
+
+route("POST", "holder/pass", (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`holder-pass:${userId}`, 10, 60_000);
+  return json(newPass(ctx.db, userId), 201);
+});
+
+route("PUT", "holder/pass", async (ctx) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ byWallet: z.boolean() }), await readJson(ctx.req, 1 * KB));
+  return json(setPassByWallet(ctx.db, userId, body.byWallet));
+});
+
+route("DELETE", "holder/pass", (ctx) => json(endPass(ctx.db, userOf(ctx))));
+
+route("GET", "pass/:key", (ctx, [key]) => {
+  rateLimit(`pass:${clientIp(ctx.req)}`, 120, 60_000);
+  return json(checkPass(ctx.db, key), 200, { "cache-control": "no-store" });
 });
 
 route("POST", "holder/answer", async (ctx) => {
@@ -2093,7 +2114,7 @@ function match(pattern: string, path: string[]): string[] | null {
 export async function handleApi(req: Request, path: string[], db: Db = getDb()): Promise<Response> {
   const ctx: Ctx = { req, db, method: req.method.toUpperCase(), path, url: new URL(req.url) };
   // Bearer-only routes: connectors, capture keys and node-to-node calls never use a cookie, so any origin may call them.
-  if (path[0] === "connector" || (path[0] === "capture" && path[1] === "v1") || (path[0] === "nodes" && path[1] === "moves" && path.length >= 3 && ctx.method !== "DELETE")) {
+  if (path[0] === "connector" || path[0] === "pass" || (path[0] === "capture" && path[1] === "v1") || (path[0] === "nodes" && path[1] === "moves" && path.length >= 3 && ctx.method !== "DELETE")) {
     if (ctx.method === "OPTIONS") return withCors(new Response(null, { status: 204 }));
     return withCors(await dispatch(ctx));
   }

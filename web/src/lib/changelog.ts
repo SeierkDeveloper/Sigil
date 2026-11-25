@@ -11,6 +11,18 @@ export interface Release {
 export const releases: Release[] = [
   {
     date: "2026-11-25",
+    title: "Sigil Pass: your holder tier works outside Sigil too",
+    area: "Vault",
+    summary: "Any app, site or agent can now check a holder's tier with one call, so other projects can give Sigil holders perks of their own.",
+    items: [
+      "Make your pass under Holder and give the pass code to an app; it learns your tier and nothing else, never your wallet, your balance or your vault",
+      "Turn on checks by wallet address for apps where you already connect that wallet",
+      "One call, no key: /api/pass/ followed by the code answers holder, tier and a rank from 1 to 3",
+      "See how many times your pass was checked, make a new code, or end the pass at any time",
+    ],
+  },
+  {
+    date: "2026-11-25",
     title: "Holder tiers: hold the token and your AI self works out of the box",
     area: "Vault",
     summary: "Link the wallet you hold the token in and your vault gets a tier: included AI answers every day in Ask and your AI self, no API key needed, the holder mark on your public pages, and more for Wardens.",

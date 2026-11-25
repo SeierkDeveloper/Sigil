@@ -296,6 +296,7 @@ export interface HolderView {
   includedOn: boolean;
   checkedAt: string | null;
   anchors: { day: string; root: string; leaves: number; tx: string | null }[];
+  pass: { byWallet: boolean; checks: number; lastCheckAt: string | null; createdAt: string } | null;
 }
 
 export interface ServerVault {

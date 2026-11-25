@@ -192,6 +192,43 @@ describe("what holders get beyond answers", () => {
     expect(await wardenAnchorTick(h.db)).toBeNull();
   });
 
+  it("lets apps check the tier by a pass code or, when allowed, the wallet, and nothing else", async () => {
+    const s = await holder(6_000_000);
+    const app = h.browser();
+    // No pass yet: nothing can be checked, by code or by wallet.
+    expect(await app.api.get(`pass/${s.account.address}`)).toEqual({ pass: "sigil", holder: false, tier: null, rank: 0, checkedAt: null });
+    const { code, status } = await holderOps.makePass(s.b.api);
+    expect(code).toMatch(/^sp_[A-Za-z0-9_-]{24}$/);
+    expect(status.pass).toMatchObject({ byWallet: false, checks: 0 });
+    const r = await app.api.get<Record<string, unknown>>(`pass/${code}`);
+    expect(r).toMatchObject({ pass: "sigil", holder: true, tier: "keeper", rank: 2 });
+    expect(JSON.stringify(r)).not.toContain(s.account.address.toLowerCase());
+    // The code itself is never kept.
+    expect(dumpDb(h.db)).not.toContain(code);
+    // By wallet only once the holder turns it on.
+    expect((await app.api.get<{ holder: boolean }>(`pass/${s.account.address}`)).holder).toBe(false);
+    await holderOps.passByWallet(s.b.api, true);
+    expect(await app.api.get(`pass/${s.account.address}`)).toMatchObject({ holder: true, tier: "keeper", rank: 2 });
+    expect((await holderOps.loadHolder(s.b.api)).pass?.checks).toBe(2);
+    // A new code ends the old one; ending the pass ends every check.
+    const second = await holderOps.makePass(s.b.api);
+    expect((await app.api.get<{ holder: boolean }>(`pass/${code}`)).holder).toBe(false);
+    expect((await app.api.get<{ holder: boolean }>(`pass/${second.code}`)).holder).toBe(true);
+    await holderOps.endPass(s.b.api);
+    expect((await app.api.get<{ holder: boolean }>(`pass/${second.code}`)).holder).toBe(false);
+    expect((await app.api.get<{ holder: boolean }>(`pass/${s.account.address}`)).holder).toBe(false);
+  });
+
+  it("answers holder false below the first tier and ends the pass with the wallet link", async () => {
+    const s = await holder(300_000);
+    const { code } = await holderOps.makePass(s.b.api);
+    expect(await h.browser().api.get(`pass/${code}`)).toMatchObject({ holder: false, tier: null, rank: 0 });
+    await holderOps.unlinkWallet(s.b.api);
+    expect(Number((h.db.prepare("SELECT COUNT(*) AS n FROM holder_pass").get() as { n: number }).n)).toBe(0);
+    const bare = await signedUp(h);
+    await expect(holderOps.makePass(bare.b.api)).rejects.toMatchObject({ code: "not_linked" });
+  });
+
   it("saves the whole read log with every seal proof", async () => {
     const s = await signedUp(h);
     const file = await s.b.api.get<{ kind: string; entries: { proof: unknown }[] }>("log/export");

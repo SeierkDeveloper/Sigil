@@ -25,12 +25,12 @@ const num = (n: number, d = 0) => n.toLocaleString("en-US", { maximumFractionDig
 const when = (t: number) => new Date(t).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
 
 const tiers = [
-  { name: "Bearer", min: "1,000,000+", perks: ["10 included AI answers a day in Ask and your AI self, no API key needed", "The holder mark on your public AI self page and ask links"] },
-  { name: "Keeper", min: "5,000,000+", perks: ["30 included AI answers a day", "The holder mark"] },
+  { name: "Bearer", min: "1,000,000+", perks: ["10 included AI answers a day in Ask and your AI self, no API key needed", "The holder mark on your public AI self page and ask links", "Sigil Pass: other apps check your tier and give you perks of their own"] },
+  { name: "Keeper", min: "5,000,000+", perks: ["30 included AI answers a day", "The holder mark", "Sigil Pass"] },
   {
     name: "Warden",
     min: "10,000,000+",
-    perks: ["75 included AI answers a day", "A short handle of 3 or 4 letters for your public AI self", "Each day's reads of your vault anchored on chain", "The Warden mark"],
+    perks: ["75 included AI answers a day", "A short handle of 3 or 4 letters for your public AI self", "Each day's reads of your vault anchored on chain", "The Warden mark", "Sigil Pass"],
   },
 ];
 
@@ -235,7 +235,7 @@ export default async function TokenPage() {
             <article className="card">
               <span className="card-number">Not needed</span>
               <h3 className="card-title">Sigil works without it</h3>
-              <p className="card-text">Everything Sigil does today stays free for everyone. Holding adds to it: included AI answers, the holder mark and, for Wardens, more.</p>
+              <p className="card-text">Everything Sigil does today stays free for everyone. Holding adds to it: included AI answers, the holder mark, a Sigil Pass other apps can check and, for Wardens, more.</p>
             </article>
             <article className="card">
               <span className="card-number">Later</span>

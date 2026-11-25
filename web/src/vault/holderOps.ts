@@ -13,12 +13,12 @@ export type Tier = keyof typeof TIER_NAME;
 
 /** What each tier gives, in the order shown. Kept in step with server/holders.ts. */
 export const TIERS: { tier: Tier; min: number; perks: string[] }[] = [
-  { tier: "bearer", min: 1_000_000, perks: ["10 included AI answers a day in Ask and your AI self, no API key needed", "The holder mark on your public AI self page and ask links"] },
-  { tier: "keeper", min: 5_000_000, perks: ["30 included AI answers a day", "The holder mark"] },
+  { tier: "bearer", min: 1_000_000, perks: ["10 included AI answers a day in Ask and your AI self, no API key needed", "The holder mark on your public AI self page and ask links", "Sigil Pass: other apps check your tier and give you perks of their own"] },
+  { tier: "keeper", min: 5_000_000, perks: ["30 included AI answers a day", "The holder mark", "Sigil Pass"] },
   {
     tier: "warden",
     min: 10_000_000,
-    perks: ["75 included AI answers a day", "A short handle of 3 or 4 letters for your public AI self", "Each day's reads of your vault anchored on chain", "The Warden mark"],
+    perks: ["75 included AI answers a day", "A short handle of 3 or 4 letters for your public AI self", "Each day's reads of your vault anchored on chain", "The Warden mark", "Sigil Pass"],
   },
 ];
 
@@ -86,6 +86,19 @@ export async function refreshHolder(api: Api): Promise<HolderView> {
 
 export async function unlinkWallet(api: Api): Promise<HolderView> {
   return api.del<HolderView>("holder");
+}
+
+/** Sigil Pass: a new code (shown once), wallet checks on or off, or no pass at all. */
+export async function makePass(api: Api): Promise<{ code: string; status: HolderView }> {
+  return api.post<{ code: string; status: HolderView }>("holder/pass");
+}
+
+export async function passByWallet(api: Api, byWallet: boolean): Promise<HolderView> {
+  return api.put<HolderView>("holder/pass", { byWallet });
+}
+
+export async function endPass(api: Api): Promise<HolderView> {
+  return api.del<HolderView>("holder/pass");
 }
 
 /** The whole read log with every seal proof, as a file. */
