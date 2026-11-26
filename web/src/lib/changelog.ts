@@ -20,7 +20,7 @@ export const releases: Release[] = [
       "Every receipt says what the self did, when and under which limit, signed by its key and sealed with the hour, and stays private unless you share it",
       "Anyone you share a receipt with can check its signature, its place in the hourly seal and the root this site published on the verify page",
       "The self's wallet now runs from the vault, where you register the self, create its wallet from your own wallet, fund it, set its rules on chain and see them next to your draft, try a payment against the chain, freeze, unfreeze and withdraw",
-      "The registry of selves (0x14f58fEAc7E649d192E94D29Cf954cfAbC36F45e) and the SigilSeal contract (0xA482Fcc6b0Febee91dD80E244bB56712688BddCD) are deployed, so the wallet works on chain and every hourly seal is published on chain, earlier seals included",
+      "The registry of selves (0x7e2b5084f9dD7918a896C202Ed3D480C38e2A5Bb) and the SigilSeal contract (0xA482Fcc6b0Febee91dD80E244bB56712688BddCD) are deployed, so the wallet works on chain and every hourly seal is published on chain, earlier seals included",
       "The fixes from the HeyResearch security review of the contracts read token decimals from the token, keep recipients apart from contracts, make identity transfers two steps, clear allowances on freeze, widen the spend list and sign the gas of signed calls",
     ],
   },
