@@ -401,6 +401,9 @@ export function revokeGasLimit(openApprovals: number): bigint {
   return 180_000n + BigInt(Math.max(0, openApprovals)) * 150_000n;
 }
 
+/** Gas for every allowance the wallet can ever list. You pay only for the gas used, so a freeze always carries this. */
+export const REVOKE_GAS_ALL = revokeGasLimit(16);
+
 /** How many allowances the self gave that the wallet still lists, read fresh from the chain. */
 export async function openApprovalCount(chain: ChainConfig, wallet: string, fetcher: Fetch = defaultFetch): Promise<number> {
   const [answer] = await callMany(chain, [{ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "openApprovals" }) }], fetcher);
@@ -460,6 +463,8 @@ export interface WalletState {
   tokens: TokenOnChain[];
   /** Allowances the self key gave that may still be open. */
   approvals: OpenApproval[];
+  /** The wallet's list of open allowances could not be read; `approvals` is then empty but means nothing. */
+  approvalsUnread?: boolean;
   spends: WalletSpend[];
   /** The oldest block the spends were read from. */
   spendsFromBlock: number;
@@ -613,6 +618,7 @@ export async function readWallet(chain: ChainConfig, wallet: string, opts: { tok
       spender: checksumAddress(a.spender),
       allowance: allowances[i] ? (decodeFunctionResult({ abi: ERC20_ABI, functionName: "allowance", data: allowances[i]! }) as bigint) : null,
     })),
+    ...(answers[base] ? {} : { approvalsUnread: true }),
     spends: page.spends,
     spendsFromBlock: page.fromBlock,
     coversToday: page.reached,

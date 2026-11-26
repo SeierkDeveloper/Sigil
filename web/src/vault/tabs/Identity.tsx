@@ -639,9 +639,15 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
     const tx = await idOps.sendFromOwner(eth, chain!, to, payload, value, gas);
     return { tx, receipt: await idOps.waitForTx(chain!, tx, { eth }) };
   };
-  // Freeze and revoke carry enough gas for every open allowance, read fresh, so no estimate can skip them.
-  // If the count cannot be read, a freeze still goes out, with gas for the most the wallet can list.
-  const revokeGas = async () => idOps.revokeGasLimit(await idOps.openApprovalCount(chain!, wallet).catch(() => 16));
+  // Freeze and revoke always carry gas for all 16 allowances the wallet can list (only the gas used is paid),
+  // so no estimate can skip one and none the self adds while you confirm is missed. Then the list is read back.
+  const revokeAll = async (payload: `0x${string}`, done: string) => {
+    await send(wallet, payload, 0n, idOps.REVOKE_GAS_ALL);
+    const left = await idOps.openApprovalCount(chain!, wallet).catch(() => null);
+    if (left === null) return `${done} The open allowances could not be read back; read the wallet to check them.`;
+    if (left > 0) return `${done} ${left} allowance${left === 1 ? " is" : "s are"} still open: press Set them all to zero.`;
+    return `${done} No allowance the self gave is open.`;
+  };
 
   if (!chain) {
     return (
@@ -842,6 +848,8 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
               void act("configure", async () => {
                 // The caps of each token are scaled by its decimals: checked against the token itself right before they are set.
                 if (rules!.tokens.length) await idOps.checkTokenDecimals(chain, rules!);
+                // An older draft may hold a contract as a recipient: refused here too, before anything is sent.
+                if (rules!.recipients.length) await idOps.checkRecipientsAreNotContracts(chain, rules!);
                 await send(wallet, idOps.configureCalldata(rules!));
                 if (canRead) setRows(await idOps.compareRules(chain, wallet, rules!));
                 return "The rules are set on the wallet.";
@@ -881,7 +889,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
 
       <Band label="Stop" hint="Freezing stops the self at once and sets every allowance it gave back to zero. Only you can unfreeze, and unfreezing cancels any call it signed before.">
         <div className="row">
-          <button type="button" className="button button-small button-danger" disabled={!!busy || !wallet} onClick={() => void act("freeze", async () => (await send(wallet, idOps.freezeCalldata(), 0n, await revokeGas()), "The wallet is frozen."))}>
+          <button type="button" className="button button-small button-danger" disabled={!!busy || !wallet} onClick={() => void act("freeze", async () => revokeAll(idOps.freezeCalldata(), "The wallet is frozen."))}>
             {busy === "freeze" ? "Freezing" : "Freeze the wallet now"}
           </button>
           <button type="button" className="button button-small" disabled={!!busy || !wallet} onClick={() => void act("unfreeze", async () => (await send(wallet, idOps.unfreezeCalldata()), "The wallet is active again."))}>
@@ -953,9 +961,13 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                   ))}
                 </ul>
               ) : null}
-              {state.approvals.length ? (
+              {state.approvals.length || state.approvalsUnread ? (
                 <div className="wallet-approvals">
-                  <p className="small">Allowances the self gave that may still be open:</p>
+                  <p className="small">
+                    {state.approvalsUnread
+                      ? "The allowances the self gave could not be read. Read the wallet again, or set them all to zero now."
+                      : "Allowances the self gave that may still be open:"}
+                  </p>
                   <ul className="list">
                     {state.approvals.map((a) => (
                       <li key={`${a.token}-${a.spender}`} className="list-row">
@@ -968,7 +980,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                       </li>
                     ))}
                   </ul>
-                  <button type="button" className="button button-small" disabled={!!busy} onClick={() => void act("revoke", async () => (await send(wallet, idOps.revokeApprovalsCalldata(), 0n, await revokeGas()), "Every allowance the self gave is back to zero."))}>
+                  <button type="button" className="button button-small" disabled={!!busy} onClick={() => void act("revoke", async () => revokeAll(idOps.revokeApprovalsCalldata(), "Set back to zero."))}>
                     Set them all to zero
                   </button>
                 </div>
