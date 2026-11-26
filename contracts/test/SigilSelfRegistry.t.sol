@@ -169,6 +169,32 @@ contract SigilSelfRegistryTest is Test {
         registry.acceptIdentity(selfKey);
     }
 
+    /// N-5: while a transfer is pending the metadata cannot change, so the new owner accepts what
+    /// was offered; and the current owner cannot propose the identity to itself.
+    function testMetadataIsHeldWhileATransferIsPendingAndNoTransferToSelf() public {
+        _register();
+        string memory before = registry.identityOf(selfKey).metadataURI;
+        vm.prank(owner);
+        vm.expectRevert(SigilSelfRegistry.AlreadyOwner.selector);
+        registry.transferIdentity(selfKey, owner);
+        vm.prank(owner);
+        registry.transferIdentity(selfKey, stranger);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfRegistry.TransferPending.selector, selfKey));
+        registry.setMetadata(selfKey, "ipfs://changed");
+        vm.prank(stranger);
+        registry.acceptIdentity(selfKey);
+        assertEq(registry.identityOf(selfKey).metadataURI, before);
+        // After a cancel the owner can change it again.
+        vm.prank(stranger);
+        registry.transferIdentity(selfKey, owner);
+        vm.prank(stranger);
+        registry.cancelTransfer(selfKey);
+        vm.prank(stranger);
+        registry.setMetadata(selfKey, "ipfs://new");
+        assertEq(registry.identityOf(selfKey).metadataURI, "ipfs://new");
+    }
+
     function testAProposalCanBeCancelledOrReplaced() public {
         _register();
         address other = makeAddr("other");

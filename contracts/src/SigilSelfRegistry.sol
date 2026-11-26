@@ -55,6 +55,8 @@ contract SigilSelfRegistry {
     error BadSignature();
     error UriTooLong();
     error NotPendingOwner();
+    error TransferPending(address selfKey);
+    error AlreadyOwner();
 
     modifier onlyIdentityOwner(address selfKey) {
         Identity storage id = _identities[selfKey];
@@ -85,7 +87,10 @@ contract SigilSelfRegistry {
         emit Registered(selfKey, msg.sender, metadataURI);
     }
 
+    /// @notice Changes where the identity statement lives. Refused while a transfer is pending,
+    ///         so the new owner accepts exactly the metadata that was there when it was offered.
     function setMetadata(address selfKey, string calldata metadataURI) external onlyIdentityOwner(selfKey) {
+        if (pendingOwner[selfKey] != address(0)) revert TransferPending(selfKey);
         if (bytes(metadataURI).length > MAX_URI_BYTES) revert UriTooLong();
         _identities[selfKey].metadataURI = metadataURI;
         emit MetadataChanged(selfKey, metadataURI);
@@ -98,9 +103,11 @@ contract SigilSelfRegistry {
     }
 
     /// @notice Proposes a new owner. Nothing changes until that owner calls acceptIdentity.
-    ///         A new proposal replaces the last one; zero is refused (use cancelTransfer).
+    ///         A new proposal replaces the last one; zero is refused (use cancelTransfer), and so is
+    ///         the current owner, which would only move registeredBy.
     function transferIdentity(address selfKey, address newOwner) external onlyIdentityOwner(selfKey) {
         if (newOwner == address(0)) revert ZeroAddress();
+        if (newOwner == msg.sender) revert AlreadyOwner();
         pendingOwner[selfKey] = newOwner;
         emit TransferProposed(selfKey, msg.sender, newOwner);
     }

@@ -162,6 +162,7 @@ describe("the calls for the chain", () => {
       if (body.method === "eth_blockNumber") return new Response(JSON.stringify({ result: `0x${latest.toString(16)}` }));
       if (body.method === "eth_getBlockByNumber") {
         // Ten blocks a second, block `latest` at `now`.
+        if (body.params[0] === "latest") return new Response(JSON.stringify({ result: { number: `0x${latest.toString(16)}`, timestamp: `0x${Math.floor(now / 1000).toString(16)}` } }));
         const n = Number(BigInt(body.params[0]));
         return new Response(JSON.stringify({ result: { timestamp: `0x${(Math.floor(now / 1000) - Math.floor((latest - n) / 10)).toString(16)}` } }));
       }
@@ -170,14 +171,17 @@ describe("the calls for the chain", () => {
       ranges.push([from, to]);
       // The node refuses a span that holds too many logs: the reader halves it.
       if (to - from > 60_000) return new Response(JSON.stringify({ error: { message: "logs matched by query exceeds limit of 10000" } }));
-      const inRange = from <= latest - 5 && latest - 5 <= to;
+      // One spend this morning, and one a block before 00:00 UTC that a span cut by block would catch.
+      const beforeMidnight = latest - (Math.floor(now / 1000) - dayStart) * 10 - 10;
+      const logAt = (b: number, nonce: bigint) => ({ topics: [EXECUTED_TOPIC, `0x${w(nonce)}`, `0x${w(0x1111n)}`], data: `0x${w(5n)}${"0".repeat(64)}${"0".repeat(64)}${w(0n)}`, blockNumber: `0x${b.toString(16)}`, transactionHash: "0xab" });
       return new Response(
         JSON.stringify({
-          result: inRange ? [{ topics: [EXECUTED_TOPIC, `0x${w(0n)}`, `0x${w(0x1111n)}`], data: `0x${w(5n)}${"0".repeat(64)}${"0".repeat(64)}${w(0n)}`, blockNumber: `0x${(latest - 5).toString(16)}`, transactionHash: "0xab" }] : [],
+          result: [logAt(beforeMidnight, 7n), logAt(latest - 5, 0n)].filter((l) => from <= Number(BigInt(l.blockNumber)) && Number(BigInt(l.blockNumber)) <= to),
         }),
       );
     };
-    const state = await id.readWallet({ chainId: "1", registry: wallet, rpcUrl: "https://rpc.example.org" }, wallet, { tokens: [token], fetcher, now, pauseMs: 0 });
+    // No clock passed: the day comes from the chain's latest block (N-5).
+    const state = await id.readWallet({ chainId: "1", registry: wallet, rpcUrl: "https://rpc.example.org" }, wallet, { tokens: [token], fetcher, pauseMs: 0 });
     expect(state).toMatchObject({ frozen: false, perTxCap: 5n, perDayCap: 9n, remainingToday: 4n });
     // The token caps as set on chain, read back (HeyResearch security review, M-1).
     expect(state.tokens).toEqual([{ token: checksumAddress(token), perTx: 50_000_000n, perDay: 50_000_000n, remainingToday: 20_000_000n }]);

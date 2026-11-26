@@ -523,14 +523,21 @@ export async function readSpends(
   for (let n = 0; n < (opts.maxChunks ?? 12) && to >= floor; n++) {
     from = Math.max(floor, to - LOG_CHUNK + 1);
     const logs = await executedLogs(chain, wallet, from, to, fetcher);
-    spends.push(
-      ...logs
-        .map(decodeSpendLog)
-        .filter((s): s is WalletSpend => !!s)
-        .reverse(),
-    );
+    let got = logs
+      .map(decodeSpendLog)
+      .filter((s): s is WalletSpend => !!s)
+      .reverse();
+    // The span that crosses untilTime is cut by block, not by time: each of its spends is kept
+    // only if its own block is at or after untilTime, so "since 00:00 UTC" means exactly that.
+    const crosses = opts.untilTime !== null && (await blockTime(chain, from, fetcher)) <= opts.untilTime;
+    if (crosses && got.length) {
+      const times = new Map<number, number>();
+      for (const b of new Set(got.map((s) => s.block))) times.set(b, await blockTime(chain, b, fetcher));
+      got = got.filter((s) => times.get(s.block)! >= opts.untilTime!);
+    }
+    spends.push(...got);
+    if (crosses) return { spends, fromBlock: from, reached: true };
     if (from === floor) return { spends, fromBlock: from, reached: true };
-    if (opts.untilTime !== null && (await blockTime(chain, from, fetcher)) <= opts.untilTime) return { spends, fromBlock: from, reached: true };
     to = from - 1;
     if (opts.pauseMs ?? 120) await new Promise((r) => setTimeout(r, opts.pauseMs ?? 120));
   }
@@ -559,7 +566,12 @@ export async function readWallet(chain: ChainConfig, wallet: string, opts: { tok
       { to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "tokenRemainingToday", args: [t as Hex] }) },
     ]),
   ];
-  const [answers, head] = await Promise.all([callMany(chain, calls, fetcher), rpc<{ result?: Hex }>(chain, { jsonrpc: "2.0", id: 99, method: "eth_blockNumber", params: [] }, fetcher)]);
+  // The latest block gives both where to read back from and what day it is on chain, so a
+  // device with a wrong clock still shows the right day's spends.
+  const [answers, head] = await Promise.all([
+    callMany(chain, calls, fetcher),
+    rpc<{ result?: { number?: Hex; timestamp?: Hex } }>(chain, { jsonrpc: "2.0", id: 99, method: "eth_getBlockByNumber", params: ["latest", false] }, fetcher),
+  ]);
   const read = (i: number) => {
     if (!answers[i]) throw new Error("The wallet could not be read. Is the address right, and is it a self wallet?");
     return decodeFunctionResult({ abi: WALLET_ABI, functionName: READS[i], data: answers[i]! }) as unknown;
@@ -583,8 +595,10 @@ export async function readWallet(chain: ChainConfig, wallet: string, opts: { tok
     listed.map((a) => ({ to: a.token, data: encodeFunctionData({ abi: ERC20_ABI, functionName: "allowance", args: [wallet as Hex, a.spender as Hex] }) })),
     fetcher,
   );
-  const latest = Number(BigInt(head.result ?? "0x0"));
-  const page = await readSpends(chain, wallet, { toBlock: latest, untilTime: utcDayStart(opts.now), fetcher, pauseMs: opts.pauseMs });
+  if (!head.result?.number || !head.result.timestamp) throw new Error("The chain did not return its latest block. Try again.");
+  const latest = Number(BigInt(head.result.number));
+  const chainNow = Number(BigInt(head.result.timestamp)) * 1000;
+  const page = await readSpends(chain, wallet, { toBlock: latest, untilTime: utcDayStart(opts.now ?? chainNow), fetcher, pauseMs: opts.pauseMs });
   return {
     owner: String(read(0)),
     selfKey: String(read(1)),
