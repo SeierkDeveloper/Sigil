@@ -49,9 +49,12 @@ export function useLiveVault(api: Api, ready: boolean, memories: number, reload:
   const last = useRef<VaultStamp | null>(null);
   const busy = useRef(false);
   const count = useRef(memories);
-  count.current = memories;
   const reloadRef = useRef(reload);
-  reloadRef.current = reload;
+  // The latest values, for the timer below to read; kept in step after each render.
+  useEffect(() => {
+    count.current = memories;
+    reloadRef.current = reload;
+  }, [memories, reload]);
 
   useEffect(() => {
     if (!ready) return;
