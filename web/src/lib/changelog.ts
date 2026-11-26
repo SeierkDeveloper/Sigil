@@ -10,6 +10,21 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    date: "2026-11-26",
+    title: "A self that acts, within your limits",
+    area: "AI self",
+    summary: "Your AI self can now act on its own inside limits you set, and everything it does on its own comes with a receipt anyone you show it to can check.",
+    items: [
+      "Limits under Self let your self pay listed recipients up to the wallet's caps, approve replies to contacts you list and accept meetings in your free hours; anything past a limit waits for you in Work",
+      "Replies approved within your limits are ready to send, not sent, because this site sends no mail itself",
+      "Every receipt says what the self did, when and under which limit, signed by its key and sealed with the hour, and stays private unless you share it",
+      "Anyone you share a receipt with can check its signature, its place in the hourly seal and the root this site published on the verify page",
+      "The self's wallet now runs from the vault, where you register the self, create its wallet from your own wallet, fund it, set its rules on chain and see them next to your draft, try a payment against the chain, freeze, unfreeze and withdraw",
+      "The wallet works once this site deploys its registry; until then everything above it works off chain",
+      "The fixes from the HeyResearch security review of the contracts read token decimals from the token, keep recipients apart from contracts, make identity transfers two steps, clear allowances on freeze, widen the spend list and sign the gas of signed calls",
+    ],
+  },
+  {
     date: "2026-11-25",
     title: "A model of you",
     area: "AI self",

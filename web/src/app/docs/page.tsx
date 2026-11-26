@@ -1176,7 +1176,14 @@ if (r.rank >= 2) {
               on chain are in the repository: <code>SigilSelfRegistry</code> records which owner stands behind a self key (both must agree, to register and to hand it to a new owner), and{" "}
               <code>SigilSelfWallet</code> lets the self key act only within the owner&apos;s rules while the owner can freeze it, change its rules and withdraw at
               any time. They are tested and not deployed. Until a site sets <code>SIGIL_IDENTITY_CHAIN_ID</code> and <code>SIGIL_IDENTITY_REGISTRY</code>, the
-              tab says so and everything above works off chain; with them set, your own browser wallet sends the calls.
+              tab says so and everything above works off chain; with them set, your own browser wallet sends every step: register the self, create its
+              wallet, fund it, set the rules on chain and compare them with the draft, try a payment against the chain, freeze, unfreeze and withdraw.
+            </p>
+            <p>
+              Under <strong>Limits</strong>, choose what the self may do on its own: pay the wallet&apos;s recipients up to its caps, approve replies to contacts you
+              list, and accept a meeting with another self in your free hours. Everything past a limit waits in Work. This site sends no mail itself, so a reply
+              approved within your limits is ready to send, not sent. Each thing the self does on its own gets a receipt signed by its key, sealed with the hour,
+              private until you share it; anyone can check a shared one on the verify page.
             </p>
           </section>
 

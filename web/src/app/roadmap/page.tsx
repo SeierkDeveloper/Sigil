@@ -50,13 +50,16 @@ const stages: Stage[] = [
   },
   {
     title: "A self that acts",
-    horizon: "next",
+    horizon: "now",
     summary: "Your AI self moves from drafts to actions, inside limits you set and can see at all times.",
+    built: [
+      "Limits for acting on payments to listed recipients within the wallet's caps, replies to contacts you list and meetings in your free hours, with everything past a limit waiting in Work",
+      "A receipt for everything it does on its own, signed by its key and sealed with the hour, checked on the verify page",
+      "Its wallet run from the vault, where you register, create, fund, set the rules on chain, freeze and withdraw from your own wallet, once this site's registry is deployed",
+    ],
     items: [
       "Negotiates times, prices and terms within ranges you set, and stops to ask at the edge of them",
       "Runs your inbox and calendar end to end, with thresholds for what it may send or accept on its own",
-      "Its wallet goes live: payments under your caps and allow-list, every one signed, sealed and stoppable",
-      "Every action carries a receipt anyone you show it to can verify against the seals",
     ],
   },
   {
