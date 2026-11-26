@@ -437,6 +437,33 @@ contract SigilReviewTest is Test {
         w.revokeApprovals();
     }
 
+    /// Retest Low on the I-1 fix: with too little gas, revokeApprovals reverts instead of
+    /// succeeding with the allowance still open, so a gas estimate can no longer land on the path
+    /// that revokes nothing. A freeze still lands with little gas, and the allowance it had no gas
+    /// for stays listed until revokeApprovals clears it.
+    function test_retest_revokeWithTooLittleGasRevertsAndFreezeLeavesItListed() public {
+        SigilSelfWallet w = _fundedWallet();
+        _configureLikeTheVault(w, 0, 0);
+        vm.prank(selfKey);
+        w.execute(usdg, 0, abi.encodeWithSelector(IERC20.approve.selector, friend, 10e6));
+
+        vm.prank(owner);
+        vm.expectRevert(SigilSelfWallet.NotEnoughGas.selector);
+        w.revokeApprovals{gas: 120_000}();
+        assertEq(IERC20(usdg).allowance(address(w), friend), 10e6);
+
+        vm.prank(owner);
+        w.freeze{gas: 90_000}();
+        assertTrue(w.frozen());
+        assertEq(w.openApprovals().length, 1);
+        assertEq(IERC20(usdg).allowance(address(w), friend), 10e6);
+
+        vm.prank(owner);
+        w.revokeApprovals();
+        assertEq(w.openApprovals().length, 0);
+        assertEq(IERC20(usdg).allowance(address(w), friend), 0);
+    }
+
     // ------------------------------------------------------------------ I-2
 
     /// Fixed: a call with no data goes only to a recipient, so no contract's fallback runs on an empty call.

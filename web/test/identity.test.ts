@@ -217,4 +217,22 @@ describe("the calls for the chain", () => {
     await expect(id.checkTokenDecimals(chain, { ...withToken, tokens: [{ ...withToken.tokens[0], decimals: 6 }] }, answer(6))).resolves.toBeUndefined();
     await expect(id.checkTokenDecimals(chain, { ...withToken, tokens: [{ ...withToken.tokens[0], decimals: 6 }] }, answer(null))).rejects.toThrow(/did not answer/);
   });
+
+  it("sizes the gas of freeze and revoke to the open allowances, and refuses a contract as a recipient", async () => {
+    const chain = { chainId: "1", registry: "0x00000000000000000000000000000000005e1f01", rpcUrl: "https://rpc.example.org" };
+    // Enough for the wallet's own check (130,000 left before each allowance) at every count it can list.
+    expect(id.revokeGasLimit(0)).toBe(180_000n);
+    expect(id.revokeGasLimit(16)).toBe(180_000n + 16n * 150_000n);
+    const person = "0x00000000000000000000000000000000000a11ce";
+    const delegated = "0x00000000000000000000000000000000000b0b00";
+    const contract = "0x00000000000000000000000000000000000c0de0";
+    const codes: Record<string, string> = { [person]: "0x", [delegated]: `0xef0100${"12".repeat(20)}`, [contract]: "0x6080604052" };
+    const answer = async (_u: string, init?: RequestInit) => {
+      const calls = JSON.parse(String(init?.body)) as { id: number; params: [string] }[];
+      return new Response(JSON.stringify(calls.map((c) => ({ id: c.id, result: codes[c.params[0].toLowerCase()] }))));
+    };
+    const withRecipients = (addrs: string[]): WalletRules => ({ ...rules, recipients: addrs.map((address, i) => ({ address, label: `R${i}` })) });
+    await expect(id.checkRecipientsAreNotContracts(chain, withRecipients([person, delegated]), answer)).resolves.toBeUndefined();
+    await expect(id.checkRecipientsAreNotContracts(chain, withRecipients([person, contract]), answer)).rejects.toThrow(/is a contract/);
+  });
 });

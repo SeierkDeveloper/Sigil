@@ -282,12 +282,13 @@ export async function ownerAccount(eth: InjectedWallet, chain: ChainConfig): Pro
  * chain: a call (to an address), a deploy (to null), or a payment (with value).
  * Returns the transaction hash.
  */
-export async function sendFromOwner(eth: InjectedWallet, chain: ChainConfig, to: string | null, data: Hex, value = 0n): Promise<string> {
+export async function sendFromOwner(eth: InjectedWallet, chain: ChainConfig, to: string | null, data: Hex, value = 0n, gas?: bigint): Promise<string> {
   const from = await ownerAccount(eth, chain);
   try {
     const tx: Record<string, string> = { from, data };
     if (to) tx.to = to;
     if (value > 0n) tx.value = `0x${value.toString(16)}`;
+    if (gas) tx.gas = `0x${gas.toString(16)}`;
     return String(await eth.request({ method: "eth_sendTransaction", params: [tx] }));
   } catch (err) {
     throw walletError(err);
@@ -391,11 +392,53 @@ export async function checkTokenDecimals(chain: ChainConfig, rules: WalletRules,
   });
 }
 
+/**
+ * The gas to send with freeze() or revokeApprovals() so that every open allowance is tried.
+ * The wallet sets each one back with up to 100,000 gas and needs 130,000 left before it tries;
+ * a node's own estimate would land on the cheapest path, which tries none.
+ */
+export function revokeGasLimit(openApprovals: number): bigint {
+  return 180_000n + BigInt(Math.max(0, openApprovals)) * 150_000n;
+}
+
+/** How many allowances the self gave that the wallet still lists, read fresh from the chain. */
+export async function openApprovalCount(chain: ChainConfig, wallet: string, fetcher: Fetch = defaultFetch): Promise<number> {
+  const [answer] = await callMany(chain, [{ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "openApprovals" }) }], fetcher);
+  if (!answer) throw new Error("The wallet's open allowances could not be read. Try again.");
+  return (decodeFunctionResult({ abi: WALLET_ABI, functionName: "openApprovals", data: answer }) as readonly unknown[]).length;
+}
+
+/** Recipients are people's addresses: a contract is refused, since what it does with a payment is up to its code. */
+export async function checkRecipientsAreNotContracts(chain: ChainConfig, rules: WalletRules, fetcher: Fetch = defaultFetch): Promise<void> {
+  const list = cleanWalletRules(rules).recipients;
+  if (!list.length) return;
+  const answers = await rpc<RpcAnswer[]>(
+    chain,
+    list.map((r, id) => ({ jsonrpc: "2.0", id, method: "eth_getCode", params: [r.address, "latest"] })),
+    fetcher,
+  );
+  const by = new Map((Array.isArray(answers) ? answers : []).map((a) => [a.id, a]));
+  list.forEach((r, i) => {
+    const code = by.get(i)?.result;
+    if (typeof code !== "string") throw new Error(`${r.label || r.address}: the chain did not say whether this address is a contract. Try again.`);
+    if (code !== "0x" && !isDelegatedAccount(code)) {
+      throw new Error(`${r.label || r.address} is a contract. Recipients are addresses of people; list a contract under Contracts instead.`);
+    }
+  });
+}
+
+/** An account that delegates to code under EIP-7702 (0xef0100 + address) is still a person's account. */
+function isDelegatedAccount(code: string): boolean {
+  return /^0xef0100[0-9a-fA-F]{40}$/.test(code);
+}
+
 export interface TokenOnChain {
   token: string;
   perTx: bigint;
   perDay: bigint;
   remainingToday: bigint;
+  /** The caps could not be read; the numbers above mean nothing then. */
+  unread?: boolean;
 }
 
 export interface OpenApproval {
@@ -527,7 +570,13 @@ export async function readWallet(chain: ChainConfig, wallet: string, opts: { tok
     const lim = answers[base + 1 + j * 2];
     const left = answers[base + 2 + j * 2];
     const [perTx, perDay] = lim ? (decodeFunctionResult({ abi: WALLET_ABI, functionName: "tokenLimit", data: lim }) as readonly [bigint, bigint]) : [0n, 0n];
-    return { token: checksumAddress(t), perTx, perDay, remainingToday: left ? (decodeFunctionResult({ abi: WALLET_ABI, functionName: "tokenRemainingToday", data: left }) as bigint) : 0n };
+    return {
+      token: checksumAddress(t),
+      perTx,
+      perDay,
+      remainingToday: left ? (decodeFunctionResult({ abi: WALLET_ABI, functionName: "tokenRemainingToday", data: left }) as bigint) : 0n,
+      ...(lim && left ? {} : { unread: true }),
+    };
   });
   const allowances = await callMany(
     chain,

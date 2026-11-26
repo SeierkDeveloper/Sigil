@@ -345,6 +345,8 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
       const next = cleanWalletRules(draft());
       // Every token's decimals are checked against the token itself before the draft is kept.
       if (next.tokens.length && chain?.rpcUrl) await idOps.checkTokenDecimals(chain, next);
+      // A recipient must be a person's address, never a contract.
+      if (next.recipients.length && chain?.rpcUrl) await idOps.checkRecipientsAreNotContracts(chain, next);
       const clean = await idOps.saveRules(api, vault, next);
       update((d) => ({ ...d, walletRules: clean }));
       setRules(clean);
@@ -421,7 +423,7 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
       </Band>
       <Band
         label="Contracts"
-        hint="Contracts the self may call, and which of their functions, like order(uint256). The self never pays a contract directly. A listed function can still send what it is given to any address its arguments name, and routers do: for a self that should only pay the recipients above, list no router."
+        hint="Contracts the self may call, and which of their functions, like order(uint256). The self never pays a contract directly. A listed function can still send what it is given to any address its arguments name, and routers do: for a self that should only pay the recipients above, list no router. An allowance you give a router from your own wallet for trading can be moved anywhere by the self in one call to that router, and an allowance through Permit2 stays open after a freeze."
       >
         {rules.contracts.map((c, i) => (
           <div key={i} className="rules-row rules-row-wide">
@@ -632,11 +634,14 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
   };
 
   /** Sends one transaction from the owner's wallet and waits for it to be in a block. */
-  const send = async (to: string | null, payload: `0x${string}`, value = 0n) => {
+  const send = async (to: string | null, payload: `0x${string}`, value = 0n, gas?: bigint) => {
     const eth = await ownerWallet();
-    const tx = await idOps.sendFromOwner(eth, chain!, to, payload, value);
+    const tx = await idOps.sendFromOwner(eth, chain!, to, payload, value, gas);
     return { tx, receipt: await idOps.waitForTx(chain!, tx, { eth }) };
   };
+  // Freeze and revoke carry enough gas for every open allowance, read fresh, so no estimate can skip them.
+  // If the count cannot be read, a freeze still goes out, with gas for the most the wallet can list.
+  const revokeGas = async () => idOps.revokeGasLimit(await idOps.openApprovalCount(chain!, wallet).catch(() => 16));
 
   if (!chain) {
     return (
@@ -876,7 +881,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
 
       <Band label="Stop" hint="Freezing stops the self at once and sets every allowance it gave back to zero. Only you can unfreeze, and unfreezing cancels any call it signed before.">
         <div className="row">
-          <button type="button" className="button button-small button-danger" disabled={!!busy || !wallet} onClick={() => void act("freeze", async () => (await send(wallet, idOps.freezeCalldata()), "The wallet is frozen."))}>
+          <button type="button" className="button button-small button-danger" disabled={!!busy || !wallet} onClick={() => void act("freeze", async () => (await send(wallet, idOps.freezeCalldata(), 0n, await revokeGas()), "The wallet is frozen."))}>
             {busy === "freeze" ? "Freezing" : "Freeze the wallet now"}
           </button>
           <button type="button" className="button button-small" disabled={!!busy || !wallet} onClick={() => void act("unfreeze", async () => (await send(wallet, idOps.unfreezeCalldata()), "The wallet is active again."))}>
@@ -928,12 +933,21 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                   {state.tokens.map((t) => (
                     <li key={t.token} className="list-row" data-testid="token-on-chain">
                       <div className="list-row-main">
-                        <p className="list-row-title">
-                          {tokenAmount(rules, t.token, t.perTx)} per payment, {tokenAmount(rules, t.token, t.perDay)} per day
-                        </p>
-                        <p className="list-row-meta">
-                          Set on chain for {t.token}. Left today {tokenAmount(rules, t.token, t.remainingToday)}.
-                        </p>
+                        {t.unread ? (
+                          <>
+                            <p className="list-row-title">Could not read these caps</p>
+                            <p className="list-row-meta">The chain did not answer for {t.token}. Read the wallet again before you rely on them.</p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="list-row-title">
+                              {tokenAmount(rules, t.token, t.perTx)} per payment, {tokenAmount(rules, t.token, t.perDay)} per day
+                            </p>
+                            <p className="list-row-meta">
+                              Set on chain for {t.token}. Left today {tokenAmount(rules, t.token, t.remainingToday)}.
+                            </p>
+                          </>
+                        )}
                       </div>
                     </li>
                   ))}
@@ -954,7 +968,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                       </li>
                     ))}
                   </ul>
-                  <button type="button" className="button button-small" disabled={!!busy} onClick={() => void act("revoke", async () => (await send(wallet, idOps.revokeApprovalsCalldata()), "Every allowance the self gave is back to zero."))}>
+                  <button type="button" className="button button-small" disabled={!!busy} onClick={() => void act("revoke", async () => (await send(wallet, idOps.revokeApprovalsCalldata(), 0n, await revokeGas()), "Every allowance the self gave is back to zero."))}>
                     Set them all to zero
                   </button>
                 </div>

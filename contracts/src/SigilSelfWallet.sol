@@ -177,14 +177,17 @@ contract SigilSelfWallet {
         if (msg.sender != owner && msg.sender != selfKey) revert NotOwnerOrSelf();
         frozen = true;
         emit FrozenChanged(true, msg.sender);
-        _revokeApprovals();
+        // A freeze always lands, even with little gas; the allowances it had no gas for stay
+        // listed in openApprovals(), and revokeApprovals() clears them or reverts.
+        _revokeApprovals(false);
     }
 
     /// @notice Sets every allowance the self key gave back to zero. The owner or the self key.
-    ///         An allowance a token refuses to reset stays listed.
+    ///         An allowance a token refuses to reset stays listed. Reverts with NotEnoughGas
+    ///         rather than stop part way, so a call that succeeds has tried every allowance.
     function revokeApprovals() external {
         if (msg.sender != owner && msg.sender != selfKey) revert NotOwnerOrSelf();
-        _revokeApprovals();
+        _revokeApprovals(true);
     }
 
     // ------------------------------------------------------------------ the owner
@@ -426,11 +429,15 @@ contract SigilSelfWallet {
 
     /// @dev Sets each listed allowance to zero with a bounded amount of gas and without copying
     ///      more than one word back, so no token can make it fail. One that refuses stays listed.
-    function _revokeApprovals() private {
+    ///      strict: revert when the gas runs out instead of stopping with allowances left untried.
+    function _revokeApprovals(bool strict) private {
         uint256 i = _approvals.length;
         while (i > 0) {
             i--;
-            if (gasleft() < REVOKE_GAS + 30_000) break;
+            if (gasleft() < REVOKE_GAS + 30_000) {
+                if (strict) revert NotEnoughGas();
+                break;
+            }
             Approval memory a = _approvals[i];
             bytes memory call_ = abi.encodeWithSelector(APPROVE, a.spender, uint256(0));
             address token = a.token;
