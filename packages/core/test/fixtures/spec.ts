@@ -69,6 +69,9 @@ import {
   statementHash,
   walletConfig,
   walletRulesHash,
+  receiptLeaf,
+  receiptMessage,
+  signReceipt,
   fieldClaim,
   EMERGENCY_AAD,
   EMERGENCY_OWNER_AAD,
@@ -261,7 +264,23 @@ export async function deterministic() {
     ...(await versionOneOne(vault, signing)),
     ...(await versionOneTwo(vault, signing)),
     ...(await versionOneThree()),
+    ...(await versionOneFive(vault)),
   };
+}
+
+/** 1.5: receipts of what the AI self does on its own. */
+async function versionOneFive(vault: Uint8Array) {
+  const self = await selfIdentityKey(vault);
+  const receipt = signReceipt(self, {
+    kind: "payment",
+    what: "Paid 0.01 to A friend (0x1111111111111111111111111111111111111111)",
+    limit: "Payments to listed recipients, within the wallet's caps on chain",
+    ref: { chainId: "1", wallet: EVM.wallet, tx: "0x" + "ab".repeat(32) },
+    origin: "https://vault.example",
+    at: "2026-11-26T12:00:00.000Z",
+    salt: "07".repeat(32),
+  });
+  return { selfReceipt: { message: receiptMessage(receipt.body), signature: receipt.signature, leaf: receiptLeaf(receipt) } };
 }
 
 /** 1.3: the memory immune system. */

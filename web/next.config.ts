@@ -31,7 +31,8 @@ const chainRead = (() => {
 const identityRead = (() => {
   try {
     const v = process.env.SIGIL_IDENTITY_READ_RPC?.trim();
-    return v && v.startsWith("https://") ? ` ${new URL(v).origin}` : "";
+    // https, or a test chain on this machine.
+    return v && (v.startsWith("https://") || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(v)) ? ` ${new URL(v).origin}` : "";
   } catch {
     return "";
   }

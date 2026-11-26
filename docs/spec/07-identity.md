@@ -65,3 +65,29 @@ The owner drafts the rules in the vault, where they are an encrypted setting nam
 ```
 
 Amounts are decimals in whole units. A token's `decimals` is what the token answers to `decimals()` on chain: a vault reads it when the token is added and checks it again before the rules are kept or set on chain, and never fills in a default (a wrong value moves every cap by powers of ten). Addresses are EIP-55; no address appears twice, in one list or across them; a cap per call is never above its cap per day. The fingerprint of a draft is hex32(SHA-256(`sigil-wallet-rules-v1` newline canonical JSON)). The arguments of `configure` follow from the rules: the caps in base units, the expiry in Unix seconds, the recipients, the targets (contracts, then tokens), the selectors of each contract's functions and `transfer` and `approve` for each token, and each token's caps. The `walletRules` vector shows a draft, its fingerprint, these arguments and the encoded call.
+
+## Limits for acting
+
+What the AI self may do on its own is an encrypted setting named `limits`:
+
+```json
+{ "v": 1,
+  "payments": { "on": true, "maxPerPayment": "0.02" },
+  "replies":  { "on": true, "contacts": ["sam lee", "robin lee"] },
+  "meetings": { "on": true, "days": [1, 2, 3, 4, 5], "from": "09:00", "to": "17:00", "timeZone": "Europe/Paris" } }
+```
+
+A payment by the self key is made on its own only when payments are on, the recipient is one of the wallet rules' recipients, the wallet answers on chain that it would take the call (an `eth_call` of `execute` from the self key), and a payment of the chain's coin is within `maxPerPayment` when it is set. A reply is approved on its own only when replies are on and the sender's address, or the sender's name, is one of `contacts` (compared in lower case). A time agreed with another self is accepted on its own only when meetings are on and the agreed message names exactly one time written as a date and a time (`2026-12-03 14:00`, read in `timeZone` unless it carries `Z` or an offset), on one of `days` (0 is Sunday), from `from` up to but not including `to`. Anything else waits for the owner.
+
+## Receipts
+
+Everything the self does on its own gets a receipt, signed by the self key:
+
+```json
+{ "format": "sigil-self-receipt", "version": 1,
+  "body": { "selfKey": "0x...", "kind": "payment", "what": "...", "at": "2026-11-26T12:00:00.000Z",
+            "limit": "...", "ref": { "chainId": "1", "tx": "0x..." }, "origin": "https://vault.example", "salt": "<64 hex>" },
+  "signature": "0x<65 bytes>" }
+```
+
+`kind` is `payment`, `approval` or `agreement`. `ref` holds at most ten short strings (a chain and transaction, a draft, a meeting). `salt` is 32 random bytes. The message is the UTF-8 of `sigil-self-receipt-v1`, a newline and the body as canonical JSON (part 6); the self key signs it as an EIP-191 personal message, as it signs the identity statement. The receipt's leaf is SHA-256(0x00 || UTF-8 of `sigil-receipt-v1`, a newline, the message, a newline, the signature in lower case), and it joins the hourly seal of the hour it is kept in, after that hour's read-log entries (part 5). The node keeps the leaf and the receipt as an envelope under the vault key (AAD `sigil:receipt:<id>`), so only the owner can read it. A shared receipt is `{ "receipt": ..., "seal": { "hour", "proof", "root", "periodSeconds" } }`; a checker confirms the signature, that the proof leads from the leaf to the root, that the root is the one published for that hour (and on chain when anchored), and that the hour is the one the receipt names or the next. The `selfReceipt` vector shows a message, its signature and its leaf.

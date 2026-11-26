@@ -15,15 +15,17 @@ import {
   type RulesToken,
   type WalletRules,
 } from "@sigil/core";
-import { IdentityIcon, ImportIcon } from "@/components/icons";
+import { IdentityIcon, ImportIcon, WalletIcon } from "@/components/icons";
 import { formatDate, formatDateTime } from "@/lib/format";
 import * as idOps from "../identityOps";
+import * as pay from "../payOps";
+import { connectWallet } from "../wallet";
 import { errorText, useVault } from "../context";
 import { Band, CopyButton, download, Empty, Notice, PlateHead, Quiet } from "../ui";
 
 /** The AI self's identity: its own key, a statement signed by that key and the vault, and the rules of its wallet. */
 export function IdentityTab() {
-  const { api } = useVault();
+  const { api, data } = useVault();
   const [chain, setChain] = useState<idOps.ChainConfig | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
@@ -54,9 +56,11 @@ export function IdentityTab() {
         </Notice>
       ) : null}
       <KeySection />
-      <StatementSection chain={chain ?? null} />
+      {/* The address connected and the wallet created on chain below fill the statement's form in again. */}
+      <StatementSection key={`${data.identityChoices.owner}-${data.identityChoices.wallet}`} chain={chain ?? null} />
       <RulesSection chain={chain ?? null} />
       <ChainSection chain={chain ?? null} />
+      {chain ? <PaySection chain={chain} /> : null}
     </div>
   );
 }
@@ -264,6 +268,8 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [trial, setTrial] = useState({ what: "coin", target: "", value: "" });
+  const [onChain, setOnChain] = useState<{ ok: boolean; text: string } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [newToken, setNewToken] = useState("");
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
@@ -296,6 +302,23 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
     trialOk = r.ok;
     trialResult = r.ok ? "The wallet would let the self send this." : r.reason;
   }
+
+  const canTryOnChain = !!chain?.rpcUrl && !!data.identityChoices.wallet && !!data.identity;
+  /** The same payment, asked of the wallet on chain as the self key: its real rules, caps, spending today and balance. */
+  const tryOnChain = async () => {
+    if (!chain || !data.identity) return;
+    setChecking(true);
+    setOnChain(null);
+    try {
+      const call = idOps.paymentCall(trial.target.trim(), trial.value || "0", trialToken ? { address: trialToken.address, decimals: trialToken.decimals } : null);
+      const refusal = await idOps.tryOnChain(chain, data.identityChoices.wallet, data.identity.address, call);
+      setOnChain(refusal ? { ok: false, text: `On chain: ${refusal}` } : { ok: true, text: "On chain: the wallet would let the self send this now." });
+    } catch (err) {
+      setOnChain({ ok: false, text: errorText(err) });
+    } finally {
+      setChecking(false);
+    }
+  };
 
   const addToken = async () => {
     if (!chain) return;
@@ -472,7 +495,7 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
         )}
         {tokenError ? <Notice kind="error">{tokenError}</Notice> : null}
       </Band>
-      <Band label="Try a payment" hint="Checked here against this draft, the same way the wallet checks.">
+      <Band label="Try a payment" hint={canTryOnChain ? "Checked here against this draft, the same way the wallet checks, and on chain against what the wallet holds now." : "Checked here against this draft, the same way the wallet checks."}>
         <div className={rules.tokens.length ? "grid grid-3" : "grid grid-2"}>
           {rules.tokens.length ? (
             <div className="field">
@@ -507,6 +530,18 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
             {trialResult}
           </p>
         ) : null}
+        {canTryOnChain && trial.target.trim() ? (
+          <div className="rules-trial-chain">
+            <button type="button" className="button button-small" disabled={checking} onClick={() => void tryOnChain()}>
+              {checking ? "Asking the chain" : "Check on chain"}
+            </button>
+            {onChain ? (
+              <p className="small rules-trial" data-ok={onChain.ok ? "true" : "false"} data-testid="rules-trial-chain">
+                {onChain.text}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
       </Band>
       {problem ? <Notice kind="error">{problem}</Notice> : fingerprint ? <p className="small faint">Fingerprint of this draft: <code className="mono">{fingerprint.slice(0, 18)}...</code></p> : null}
       <div className="form-actions">
@@ -526,18 +561,56 @@ function tokenAmount(rules: WalletRules | null, token: string, amount: bigint): 
   return t ? `${formatUnits(amount, t.decimals)} ${t.label || "tokens"}` : `${amount} base units`;
 }
 
+/** The owner's own browser wallet. On a phone without one, this page opens inside the wallet app instead. */
+async function ownerWallet(): Promise<idOps.InjectedWallet> {
+  return (await connectWallet()).provider;
+}
+
+function short(a: string): string {
+  return `${a.slice(0, 6)}...${a.slice(-4)}`;
+}
+
 function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
-  const { vault, data } = useVault();
+  const { api, vault, data, update } = useVault();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [state, setState] = useState<idOps.WalletState | null>(null);
+  const [entry, setEntry] = useState<idOps.RegistryEntry | null | undefined>(undefined);
+  const [balance, setBalance] = useState<bigint | null>(null);
+  const [rows, setRows] = useState<idOps.RuleRow[] | null>(null);
+  const [fund, setFund] = useState("");
+  const [take, setTake] = useState("");
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const wallet = data.identityChoices.wallet;
   const owner = data.identityChoices.owner;
   const rules = data.walletRules;
+  const selfKey = data.identity?.address ?? "";
+  const canRead = !!chain?.rpcUrl;
 
-  const eth = () => (typeof window !== "undefined" ? (window as unknown as { ethereum?: idOps.InjectedWallet }).ethereum : undefined);
+  const refresh = async () => {
+    if (!chain || !canRead || !selfKey) return;
+    setEntry(await idOps.readRegistry(chain, selfKey));
+    if (wallet) setBalance(await idOps.walletBalance(chain, wallet));
+  };
+
+  useEffect(() => {
+    let alive = true;
+    if (!chain || !canRead || !selfKey) return;
+    idOps
+      .readRegistry(chain, selfKey)
+      .then((e) => alive && setEntry(e))
+      .catch(() => alive && setEntry(undefined));
+    if (wallet)
+      idOps
+        .walletBalance(chain, wallet)
+        .then((b) => alive && setBalance(b))
+        .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [chain, canRead, selfKey, wallet]);
+
   const act = async (name: string, fn: () => Promise<string | void>) => {
     setBusy(name);
     setError(null);
@@ -550,6 +623,19 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
     } finally {
       setBusy(null);
     }
+  };
+
+  const saveChoice = async (patch: Partial<idOps.IdentityChoices>) => {
+    const choices = await idOps.saveChoices(api, vault, { ...data.identityChoices, ...patch });
+    update((d) => ({ ...d, identityChoices: choices }));
+    return choices;
+  };
+
+  /** Sends one transaction from the owner's wallet and waits for it to be in a block. */
+  const send = async (to: string | null, payload: `0x${string}`, value = 0n) => {
+    const eth = await ownerWallet();
+    const tx = await idOps.sendFromOwner(eth, chain!, to, payload, value);
+    return { tx, receipt: await idOps.waitForTx(chain!, tx, { eth }) };
   };
 
   if (!chain) {
@@ -574,47 +660,240 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
     setState({ ...state, spends: [...state.spends, ...page.spends], spendsFromBlock: page.fromBlock, coversToday: state.coversToday });
   };
 
+  const registered = !!entry && !entry.revokedAt;
+  const linked = registered && !!wallet && entry!.wallet?.toLowerCase() === wallet.toLowerCase();
+  const stage = registered ? (wallet ? "Wallet ready" : "Registered") : "Not registered";
+
   return (
     <section className="subpanel plate identity-chain" aria-labelledby="chain-title">
-      <PlateHead number="04" id="chain-title" title="On chain" lead={`Chain ${chain.chainId}, registry ${chain.registry.slice(0, 10)}... Each call is sent by your own wallet in this browser; the self key only signs.`} />
+      <PlateHead number="04" id="chain-title" title="On chain" lead={`Chain ${chain.chainId}, registry ${short(chain.registry)}. Every step is sent by your own wallet in this browser; the self key only signs.`}>
+        <span className="plate-state" data-on={registered ? "true" : "false"} data-testid="chain-stage">
+          {stage}
+        </span>
+      </PlateHead>
       {error ? <Notice kind="error">{error}</Notice> : null}
-      {note ? <Notice kind="success">{note}</Notice> : null}
-      <div className="row">
-        <button
-          type="button"
-          className="button"
-          disabled={!!busy || !data.identity || !owner || !eth()}
-          onClick={() =>
-            void act("register", async () => {
-              const w = eth()!;
-              const data_ = await idOps.registerCalldata(vault, chain, owner, idOps.metadataUrl(origin, data.identity!.address));
-              return `Sent: ${await idOps.sendFromOwner(w, chain, chain.registry, data_)}`;
-            })
-          }
-        >
-          {busy === "register" ? "Waiting for your wallet" : "Register the self"}
-        </button>
-        <button
-          type="button"
-          className="button"
-          disabled={!!busy || !wallet || !rules || !eth()}
-          onClick={() =>
-            void act("configure", async () => {
-              // The caps of each token are scaled by its decimals: checked against the token itself right before they are set.
-              if (rules!.tokens.length) await idOps.checkTokenDecimals(chain, rules!);
-              return `Sent: ${await idOps.sendFromOwner(eth()!, chain, wallet, idOps.configureCalldata(rules!))}`;
-            })
-          }
-        >
-          {busy === "configure" ? "Waiting for your wallet" : "Set these rules on the wallet"}
-        </button>
-        <button type="button" className="button button-danger" disabled={!!busy || !wallet || !eth()} onClick={() => void act("freeze", async () => `Sent: ${await idOps.sendFromOwner(eth()!, chain, wallet, idOps.freezeCalldata())}`)}>
-          Freeze the wallet now
-        </button>
-      </div>
-      <p className="small faint">Freezing stops the self at once and sets every allowance it gave back to zero.</p>
-      {!owner || !wallet ? <p className="small faint">Add your own address and the self&apos;s wallet to the statement above to use these.</p> : null}
-      {wallet && chain.rpcUrl ? (
+      {note ? (
+        <Notice kind="success">
+          <span data-testid="chain-note">{note}</span>
+        </Notice>
+      ) : null}
+      {!canRead ? <Notice>This site has no read address for the chain, so the vault cannot check what each step did. Steps can still be sent from your wallet.</Notice> : null}
+
+      <Band label="Your wallet" hint="Your own address registers the self and owns its wallet. It can do anything the self cannot.">
+        <div className="chain-step">
+          <p className="chain-step-state mono" data-testid="owner-address">
+            {owner || "Not connected"}
+          </p>
+          <button
+            type="button"
+            className="button button-small"
+            disabled={!!busy}
+            onClick={() =>
+              void act("connect", async () => {
+                const eth = await ownerWallet();
+                const address = await idOps.ownerAccount(eth, chain);
+                await saveChoice({ owner: address });
+                return `Connected ${address}.`;
+              })
+            }
+          >
+            <WalletIcon /> {busy === "connect" ? "Waiting for your wallet" : owner ? "Use another address" : "Connect your wallet"}
+          </button>
+        </div>
+      </Band>
+
+      <Band label="Registry" hint="The public record that your address stands behind this self key. Its statement above is what the record points to.">
+        <div className="chain-step">
+          <p className="chain-step-state" data-testid="registry-state">
+            {entry === undefined
+              ? canRead
+                ? "Reading"
+                : "Unknown"
+              : entry === null
+                ? "Not registered"
+                : entry.revokedAt
+                  ? "Revoked"
+                  : `Registered to ${short(entry.owner)}${entry.pendingOwner ? `, handing over to ${short(entry.pendingOwner)}` : ""}`}
+          </p>
+          <button
+            type="button"
+            className="button button-small"
+            disabled={!!busy || !data.identity || !owner || !data.identity.statement || registered}
+            onClick={() =>
+              void act("register", async () => {
+                const payload = await idOps.registerCalldata(vault, chain, owner, idOps.metadataUrl(origin, selfKey));
+                await send(chain.registry, payload);
+                await refresh();
+                return "The self is registered to your address.";
+              })
+            }
+          >
+            {busy === "register" ? "Registering" : "Register the self"}
+          </button>
+        </div>
+        {!data.identity?.statement ? <p className="small faint">Sign the statement above first: the registry points to it.</p> : null}
+      </Band>
+
+      <Band label="The self's wallet" hint="A contract only for this self: your address owns it, the self key above may spend from it within the rules.">
+        <div className="chain-step">
+          <p className="chain-step-state mono" data-testid="self-wallet">
+            {wallet ? `${wallet}${balance !== null ? `, holds ${formatUnits(balance)}` : ""}` : "No wallet yet"}
+          </p>
+          {!wallet ? (
+            <button
+              type="button"
+              className="button button-small"
+              disabled={!!busy || !registered || !owner}
+              onClick={() =>
+                void act("create", async () => {
+                  const made = await send(null, idOps.deployWalletData(owner, selfKey));
+                  const address = made.receipt.contractAddress;
+                  if (!address) throw new Error("The wallet was sent but its address could not be read. Check the transaction in your wallet.");
+                  await saveChoice({ wallet: address });
+                  await send(chain.registry, idOps.setWalletCalldata(selfKey, address));
+                  await refresh();
+                  return `The self's wallet is at ${address} and linked in the registry. Sign a new statement above so it names the wallet.`;
+                })
+              }
+            >
+              {busy === "create" ? "Creating" : "Create the self's wallet"}
+            </button>
+          ) : !linked && registered ? (
+            <button
+              type="button"
+              className="button button-small"
+              disabled={!!busy}
+              onClick={() =>
+                void act("link", async () => {
+                  await send(chain.registry, idOps.setWalletCalldata(selfKey, wallet));
+                  await refresh();
+                  return "The wallet is linked in the registry.";
+                })
+              }
+            >
+              Link it in the registry
+            </button>
+          ) : null}
+        </div>
+        {wallet ? (
+          <div className="grid grid-2">
+            <div className="chain-amount">
+              <label className="field-label" htmlFor="chain-fund">
+                Send to the wallet
+              </label>
+              <div className="chain-amount-row">
+                <input id="chain-fund" className="input" inputMode="decimal" value={fund} placeholder="0.01" onChange={(e) => setFund(e.target.value)} />
+                <button
+                  type="button"
+                  className="button button-small"
+                  disabled={!!busy || !fund.trim()}
+                  onClick={() =>
+                    void act("fund", async () => {
+                      await send(wallet, "0x", parseUnits(fund));
+                      setFund("");
+                      await refresh();
+                      return `Sent ${fund} to the self's wallet.`;
+                    })
+                  }
+                >
+                  {busy === "fund" ? "Sending" : "Send"}
+                </button>
+              </div>
+            </div>
+            <div className="chain-amount">
+              <label className="field-label" htmlFor="chain-take">
+                Take back to your address
+              </label>
+              <div className="chain-amount-row">
+                <input id="chain-take" className="input" inputMode="decimal" value={take} placeholder="0.01" onChange={(e) => setTake(e.target.value)} />
+                <button
+                  type="button"
+                  className="button button-small"
+                  disabled={!!busy || !take.trim() || !owner}
+                  onClick={() =>
+                    void act("take", async () => {
+                      await send(wallet, idOps.withdrawCalldata(owner, parseUnits(take)));
+                      setTake("");
+                      await refresh();
+                      return `${take} is back at your address.`;
+                    })
+                  }
+                >
+                  {busy === "take" ? "Sending" : "Withdraw"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Band>
+
+      <Band label="Rules on chain" hint="The draft above, set on the wallet by your own wallet. What the chain holds is read back and shown next to the draft.">
+        <div className="row">
+          <button
+            type="button"
+            className="button button-small"
+            disabled={!!busy || !wallet || !rules}
+            onClick={() =>
+              void act("configure", async () => {
+                // The caps of each token are scaled by its decimals: checked against the token itself right before they are set.
+                if (rules!.tokens.length) await idOps.checkTokenDecimals(chain, rules!);
+                await send(wallet, idOps.configureCalldata(rules!));
+                if (canRead) setRows(await idOps.compareRules(chain, wallet, rules!));
+                return "The rules are set on the wallet.";
+              })
+            }
+          >
+            {busy === "configure" ? "Setting" : "Set these rules on the wallet"}
+          </button>
+          <button type="button" className="button button-small button-ghost" disabled={!!busy || !wallet || !rules || !canRead} onClick={() => void act("compare", async () => setRows(await idOps.compareRules(chain, wallet, rules!)))}>
+            {busy === "compare" ? "Reading" : "Compare with the chain"}
+          </button>
+        </div>
+        {rows ? (
+          <table className="rules-compare" data-testid="rules-compare">
+            <thead>
+              <tr>
+                <th scope="col">Rule</th>
+                <th scope="col">Draft</th>
+                <th scope="col">On chain</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={`${r.what}-${i}`} data-same={r.same ? "true" : "false"}>
+                  <th scope="row">{r.what}</th>
+                  <td>{r.draft}</td>
+                  <td>
+                    {r.chain}
+                    {r.same ? null : <span className="rules-compare-flag"> Differs</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </Band>
+
+      <Band label="Stop" hint="Freezing stops the self at once and sets every allowance it gave back to zero. Only you can unfreeze, and unfreezing cancels any call it signed before.">
+        <div className="row">
+          <button type="button" className="button button-small button-danger" disabled={!!busy || !wallet} onClick={() => void act("freeze", async () => (await send(wallet, idOps.freezeCalldata()), "The wallet is frozen."))}>
+            {busy === "freeze" ? "Freezing" : "Freeze the wallet now"}
+          </button>
+          <button type="button" className="button button-small" disabled={!!busy || !wallet} onClick={() => void act("unfreeze", async () => (await send(wallet, idOps.unfreezeCalldata()), "The wallet is active again."))}>
+            Unfreeze
+          </button>
+          <button
+            type="button"
+            className="button button-small button-ghost"
+            disabled={!!busy || !wallet}
+            onClick={() => void act("cancel", async () => (await send(wallet, idOps.cancelSignedCalldata()), "Every call the self signed and nobody sent yet is cancelled."))}
+          >
+            Cancel signed calls
+          </button>
+        </div>
+      </Band>
+
+      {wallet && canRead ? (
         <>
           <button
             type="button"
@@ -629,7 +908,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
               <dl className="identity-facts">
                 <div>
                   <dt>State</dt>
-                  <dd>{state.frozen ? "Frozen" : "Active"}</dd>
+                  <dd data-testid="wallet-frozen">{state.frozen ? "Frozen" : "Active"}</dd>
                 </div>
                 <div>
                   <dt>Per payment</dt>
@@ -675,19 +954,14 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                       </li>
                     ))}
                   </ul>
-                  <button
-                    type="button"
-                    className="button button-small"
-                    disabled={!!busy || !eth()}
-                    onClick={() => void act("revoke", async () => `Sent: ${await idOps.sendFromOwner(eth()!, chain, wallet, idOps.revokeApprovalsCalldata())}`)}
-                  >
+                  <button type="button" className="button button-small" disabled={!!busy} onClick={() => void act("revoke", async () => (await send(wallet, idOps.revokeApprovalsCalldata()), "Every allowance the self gave is back to zero."))}>
                     Set them all to zero
                   </button>
                 </div>
               ) : null}
               <p className="small faint">{state.coversToday ? `Spends since 00:00 UTC today, read back to block ${state.spendsFromBlock}.` : `Spends read back to block ${state.spendsFromBlock}.`}</p>
               {state.spends.length ? (
-                <ul className="list">
+                <ul className="list" data-testid="wallet-spends">
                   {state.spends.map((s) => (
                     <li key={`${s.tx}-${s.nonce}`} className="list-row">
                       <div className="list-row-main">
@@ -713,5 +987,104 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
         </>
       ) : null}
     </section>
+  );
+}
+
+// ---------------------------------------------------------------- payments by the self
+
+function PaySection({ chain }: { chain: idOps.ChainConfig }) {
+  const { api, vault, data, update } = useVault();
+  const rules = data.walletRules;
+  const wallet = data.identityChoices.wallet;
+  const [ask, setAsk] = useState({ to: "", token: "", amount: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [outcome, setOutcome] = useState<pay.PaymentOutcome | null>(null);
+  if (!wallet || !rules || !data.identity) return null;
+  const run = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setOutcome(null);
+    try {
+      const out = await pay.selfPay(api, vault, data, ownerWallet, chain, wallet, data.identity!.address, { to: ask.to, amount: ask.amount, token: ask.token || null });
+      if (out.kind === "queued") update((d) => ({ ...d, drafts: [out.draft, ...d.drafts] }));
+      setOutcome(out);
+      setAsk({ ...ask, amount: "" });
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form className="subpanel plate identity-pay" onSubmit={run} aria-label="Ask the self to pay">
+      <PlateHead
+        number="05"
+        id="pay-title"
+        title="Payments by the self"
+        lead="Ask your self to pay a recipient. Within the limits you set under Limits and the wallet's caps on chain, the self key signs the payment and your wallet sends it, with a receipt. Past a limit, it waits in Work for you."
+      >
+        <span className="plate-state" data-on={data.limits.payments.on ? "true" : "false"}>
+          {data.limits.payments.on ? "On its own within limits" : "Every payment waits for you"}
+        </span>
+      </PlateHead>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      {outcome?.kind === "paid" ? (
+        <Notice kind="success">
+          <span data-testid="pay-outcome">Paid on its own, under: {outcome.limit}. Its receipt is under Limits.</span>
+        </Notice>
+      ) : null}
+      {outcome?.kind === "queued" ? (
+        <Notice>
+          <span data-testid="pay-outcome">Waiting for you in Work: {outcome.reason}</span>
+        </Notice>
+      ) : null}
+      {rules.recipients.length === 0 ? (
+        <Quiet>Add a recipient to the wallet rules first, and set them on the wallet.</Quiet>
+      ) : (
+        <>
+          <div className="grid grid-3">
+            <div className="field">
+              <label className="field-label" htmlFor="pay-to">
+                To
+              </label>
+              <select id="pay-to" className="input" value={ask.to} onChange={(e) => setAsk({ ...ask, to: e.target.value })} required>
+                <option value="">Choose a recipient</option>
+                {rules.recipients.map((r) => (
+                  <option key={r.address} value={r.address}>
+                    {r.label || r.address}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="pay-in">
+                Pay in
+              </label>
+              <select id="pay-in" className="input" value={ask.token} onChange={(e) => setAsk({ ...ask, token: e.target.value })}>
+                <option value="">The chain&apos;s coin</option>
+                {rules.tokens.map((t) => (
+                  <option key={t.address} value={t.address}>
+                    {t.label || t.address}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label className="field-label" htmlFor="pay-amount">
+                Amount
+              </label>
+              <input id="pay-amount" className="input" inputMode="decimal" value={ask.amount} onChange={(e) => setAsk({ ...ask, amount: e.target.value })} required />
+            </div>
+          </div>
+          <div className="form-actions">
+            <button type="submit" className="button button-primary" disabled={busy || !ask.to || !ask.amount.trim()}>
+              {busy ? "Asking" : "Ask the self to pay"}
+            </button>
+          </div>
+        </>
+      )}
+    </form>
   );
 }

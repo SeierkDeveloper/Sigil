@@ -38,6 +38,7 @@ import { makeBrief, shouldMakeBrief } from "./thinkOps";
 import { refresh as refreshPacks } from "./packOps";
 import { WorkTab } from "./tabs/Work";
 import { IdentityTab } from "./tabs/Identity";
+import { LimitsTab } from "./tabs/Limits";
 import { EmergencyTab } from "./tabs/Emergency";
 import { AgreementsTab } from "./tabs/Agreements";
 import { PacksTab } from "./tabs/Packs";
@@ -71,6 +72,7 @@ const TAB_GROUPS: { label: string; tabs: { id: TabId; label: string }[] }[] = [
       { id: "you", label: "Model of you" },
       { id: "work", label: "Work" },
       { id: "identity", label: "Identity" },
+      { id: "limits", label: "Limits" },
       { id: "meet", label: "Meet" },
     ],
   },
@@ -463,6 +465,7 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
           {tab === "self" ? <SelfTab /> : null}
           {tab === "work" ? <WorkTab /> : null}
           {tab === "identity" ? <IdentityTab /> : null}
+          {tab === "limits" ? <LimitsTab /> : null}
           {tab === "meet" ? <MeetTab /> : null}
           {tab === "agreements" ? <AgreementsTab /> : null}
           {tab === "review" ? <ReviewTab /> : null}

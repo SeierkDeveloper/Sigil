@@ -22,13 +22,32 @@ import type { SelfSource } from "./self";
 export const STYLE_FOLDER = "How I write";
 export const PLANS_FOLDER = "Plans";
 
-export type DraftKind = "reply" | "plan" | "answer";
+export type DraftKind = "reply" | "plan" | "answer" | "payment";
 
 /** Where an answer goes once approved: the channel the question came from. */
 export type AnswerChannel =
   | { kind: "link"; questionId: string; linkId: string; sessionId: string; askerKey: string }
   | { kind: "public"; questionId: string; selfId: string; sessionId: string; askerKey: string }
-  | { kind: "meet"; meetId: string; turn: number; done: boolean };
+  | { kind: "meet"; meetId: string; turn: number; done: boolean }
+  | PaymentChannel;
+
+/** A payment from the self's wallet that went past the owner's limits: what the self key would sign once approved. */
+export interface PaymentChannel {
+  kind: "payment";
+  chainId: string;
+  wallet: string;
+  /** The call the self key signs: the recipient for the chain's coin, or the token contract. */
+  target: string;
+  /** Native value in base units, as a decimal string. */
+  value: string;
+  /** Call data, 0x hex ("0x" for a plain payment). */
+  data: string;
+  /** Who is paid, and how much, in plain units, for the owner to read. */
+  to: string;
+  amount: string;
+  /** The token's label, or null for the chain's coin. */
+  token: string | null;
+}
 
 export interface DraftRecord {
   v: 1;
@@ -53,6 +72,8 @@ export interface DraftRecord {
   decidedAt: string | null;
   /** The "How I write" memory made from the owner's edit. */
   learned: string | null;
+  /** Set when the self approved it on its own, within a limit the owner set: which limit, and its receipt. */
+  auto?: { limit: string; receiptId: string | null } | null;
 }
 
 export type DraftState = "waiting" | "approved" | "discarded";
@@ -61,7 +82,7 @@ export function newDraft(input: Partial<DraftRecord> & Pick<DraftRecord, "kind" 
   return {
     v: 1,
     kind: input.kind,
-    title: (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 200) || (input.kind === "plan" ? "Your week" : input.kind === "answer" ? "An answer" : "A reply"),
+    title: (input.title ?? "").replace(/\s+/g, " ").trim().slice(0, 200) || (input.kind === "plan" ? "Your week" : input.kind === "answer" ? "An answer" : input.kind === "payment" ? "A payment" : "A reply"),
     input: (input.input ?? "").slice(0, 20_000),
     from: (input.from ?? "").replace(/\s+/g, " ").trim().slice(0, 120),
     threadId: input.threadId ?? null,
@@ -74,6 +95,7 @@ export function newDraft(input: Partial<DraftRecord> & Pick<DraftRecord, "kind" 
     createdAt: input.createdAt ?? new Date().toISOString(),
     decidedAt: null,
     learned: null,
+    auto: input.auto ?? null,
   };
 }
 
@@ -390,5 +412,5 @@ export function cleanLesson(text: string): string[] {
 }
 
 export function lessonTitle(kind: DraftKind, at = new Date()): string {
-  return `From an edit to ${kind === "plan" ? "a plan" : kind === "answer" ? "an answer" : "a reply"}, ${at.toISOString().slice(0, 10)}`;
+  return `From an edit to ${kind === "plan" ? "a plan" : kind === "answer" ? "an answer" : kind === "payment" ? "a payment" : "a reply"}, ${at.toISOString().slice(0, 10)}`;
 }

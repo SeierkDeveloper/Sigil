@@ -15,10 +15,11 @@ import { AAD } from "./keys";
  * guide     how far the owner got in the getting-started guide
  * immune    how strictly memories from outside are checked for hidden instructions
  * you       a model of you: the lessons, the choices, the ranker trained on them, and its history
+ * limits    what the AI self may do on its own: payments, replies, meetings
  */
-export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs" | "backup" | "voice" | "guide" | "immune" | "you";
+export type SettingName = "self" | "model" | "thinking" | "work" | "identity" | "wallet" | "packs" | "backup" | "voice" | "guide" | "immune" | "you" | "limits";
 
-export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs", "backup", "voice", "guide", "immune", "you"];
+export const SETTING_NAMES: readonly SettingName[] = ["self", "model", "thinking", "work", "identity", "wallet", "packs", "backup", "voice", "guide", "immune", "you", "limits"];
 
 export function isSettingName(value: string): value is SettingName {
   return (SETTING_NAMES as readonly string[]).includes(value);

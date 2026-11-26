@@ -39,6 +39,7 @@ export type TabId =
   | "self"
   | "work"
   | "identity"
+  | "limits"
   | "meet"
   | "agreements"
   | "review"

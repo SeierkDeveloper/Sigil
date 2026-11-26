@@ -142,7 +142,10 @@ export function bundleBody(db: Db, userId: string, origin: string, madeBy: "vaul
     disclosures: tagged("disclosures", all(db, "SELECT * FROM disclosures WHERE user_id = ?", userId), userId),
     certificates: tagged("certificates", all(db, "SELECT * FROM certificates WHERE user_id = ?", userId), userId),
     sync: tagged("sync_sources", all(db, "SELECT * FROM sync_sources WHERE user_id = ?", userId), userId),
-    identity: tagged("self_identities", all(db, "SELECT * FROM self_identities WHERE user_id = ?", userId), userId),
+    identity: [
+      ...tagged("self_identities", all(db, "SELECT * FROM self_identities WHERE user_id = ?", userId), userId),
+      ...tagged("self_receipts", all(db, "SELECT * FROM self_receipts WHERE user_id = ?", userId), userId),
+    ],
     nodes: tagged("vault_nodes", all(db, "SELECT * FROM vault_nodes WHERE user_id = ?", userId), userId),
     captureKeys: tagged("capture_keys", all(db, "SELECT * FROM capture_keys WHERE user_id = ?", userId), userId),
     sessions: [
@@ -217,6 +220,7 @@ const TABLE_ORDER = [
   "certificates",
   "sync_sources",
   "self_identities",
+  "self_receipts",
   "vault_nodes",
   "capture_keys",
   "session_offers",
@@ -391,6 +395,8 @@ function placeRow(db: Db, table: string, row: Row, userId: string, placed: Map<s
     }
     if (!placed.get(parent)?.has(String(v))) return false;
   }
+  // A receipt was sealed (or will only be provable) where it was made: it is not sealed again here, in another hour.
+  if (table === "self_receipts") row.sealed = 1;
   if (table === "legacy_people") {
     // A trusted person is found again by their vault's public key, if their vault is on this node.
     row.trustee_id = row.public_key ? userByBoxKey(db, String(row.public_key)) : null;

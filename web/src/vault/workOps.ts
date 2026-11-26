@@ -4,9 +4,16 @@
 // it, and approving an answer sends it through the channel it came from, the
 // same way the open vault answers when nothing is held. An edit made before
 // approving becomes a note in "How I write", which later drafts read.
+//
+// Limits for acting (limitsOps.ts): a reply to a contact the owner listed is
+// approved on its own, and a time agreed with another self in the owner's
+// free hours is sent on its own. Each such step gets a receipt signed by the
+// self key (receiptOps.ts). Approving a reply marks it approved and ready:
+// this site sends no mail itself.
 
 import {
   AAD,
+  agreedTime,
   cleanLesson,
   cleanRules,
   cleanWork,
@@ -15,6 +22,7 @@ import {
   encryptJson,
   lessonPrompt,
   lessonTitle,
+  meetingWithinLimits,
   newDraft,
   openSetting,
   plainPlan,
@@ -22,6 +30,7 @@ import {
   planPrompt,
   randomId,
   replyPrompt,
+  replyWithinLimits,
   retrieve,
   sealSetting,
   STYLE_FOLDER,
@@ -34,6 +43,8 @@ import {
   type Memory,
   type ModelCaller,
   type OpenFolder,
+  type PaymentChannel,
+  type ReceiptKind,
   type StyleHints,
   type WorkSettings,
 } from "@sigil/core";
@@ -43,6 +54,7 @@ import { addFolder, createMemory, deleteMemories, updateMemory, type Unlocked, t
 import { composeLinkAnswer, selfMemories, sendLinkAnswer, type PendingQuestion } from "./selfOps";
 import { composePublicAnswer, pendingPublic, sendPublicAnswer } from "./publicOps";
 import { composeTurn, sendTurn, waitingMeets } from "./meetOps";
+import { recordReceipt } from "./receiptOps";
 
 export interface ServerDraft {
   id: string;
@@ -87,11 +99,25 @@ export async function loadDrafts(api: Api, vault: Unlocked): Promise<DraftView[]
   return (await openDrafts(vault, (await api.get<{ drafts: ServerDraft[] }>("drafts")).drafts)).drafts;
 }
 
-async function saveDraft(api: Api, vault: Unlocked, ref: string | null, record: DraftRecord): Promise<DraftView> {
+export async function saveDraft(api: Api, vault: Unlocked, ref: string | null, record: DraftRecord): Promise<DraftView> {
   const id = randomId();
   const r = await api.post<{ draft: ServerDraft }>("drafts", { id, kind: record.kind, ref, box: await encryptJson(vault.key, record, AAD.draft(id)) });
   const { box: _b, ...rest } = r.draft;
   return { ...rest, record };
+}
+
+/**
+ * The self approves a draft on its own, within a limit the owner set: it
+ * signs a receipt with the self key (its fingerprint joins this hour's seal),
+ * and the draft is kept as approved, with the limit and the receipt on it.
+ */
+export async function autoApprove(api: Api, vault: Unlocked, view: DraftView, limit: string, receipt: { kind: ReceiptKind; what: string; ref?: Record<string, string> }): Promise<DraftView> {
+  if (!view.record) throw new Error("This draft could not be opened.");
+  const r = await recordReceipt(api, vault, { kind: receipt.kind, what: receipt.what, limit, ref: { draft: view.id, ...(receipt.ref ?? {}) } });
+  const next: DraftRecord = { ...view.record, final: view.record.draft, decidedAt: new Date().toISOString(), auto: { limit, receiptId: r.id } };
+  const put = await api.put<{ draft: ServerDraft }>(`drafts/${view.id}`, { box: await encryptJson(vault.key, next, AAD.draft(view.id)), state: "approved" });
+  const { box: _b, ...rest } = put.draft;
+  return { ...rest, record: next };
 }
 
 // ---------------------------------------------------------------- what it learned
@@ -162,12 +188,16 @@ export async function draftReply(api: Api, vault: Unlocked, data: VaultData, inp
     draft = plainReply({ message, from: input.from, subject }, hints);
   }
   const who = input.from.replace(/<[^<>]*>/g, "").trim();
-  return saveDraft(
+  const saved = await saveDraft(
     api,
     vault,
     null,
     newDraft({ kind: "reply", title: `Reply to ${who || subject || "a message"}`, input: message, from: input.from, threadId: input.threadId ?? null, draft, sources, usedModel: !!deps.model }),
   );
+  // Within the owner's limits, the self approves it on its own: approved and ready to send, not sent.
+  const within = replyWithinLimits(data.limits, input.from);
+  if (within.ok) return autoApprove(api, vault, saved, within.limit, { kind: "approval", what: `Approved a reply to ${who || "a listed contact"}, ready to send` });
+  return saved;
 }
 
 /** Plans the next seven days from the calendar memories in the vault, wherever they are. */
@@ -251,22 +281,48 @@ export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData,
   return made;
 }
 
-/** Drafts this side's turns in meetings of selves instead of sending them. */
+/**
+ * This side's turns in meetings of selves, under the owner's choices: held
+ * as drafts when the owner holds meet turns; and, when meetings are a limit,
+ * a turn that agrees a time is sent on its own (with a receipt) only when the
+ * time falls in the owner's free hours, and held otherwise. A turn that agrees
+ * nothing yet is sent as usual when turns are not held.
+ */
 export async function holdMeetsOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: { model: ModelCaller }): Promise<DraftView[]> {
   if (!data.box) return [];
   const seen = drafted(known);
   const made: DraftView[] = [];
+  const limits = data.limits;
   for (const m of await waitingMeets(api, vault, data.box)) {
     const ref = `m:${m.id}:${m.turns + 1}`;
     if (seen.has(ref)) continue;
     const t = await composeTurn(api, data, m, deps);
     if (!t) continue;
+    const decision = t.done && limits.meetings.on ? meetingWithinLimits(limits, agreedTime(t.text, limits.meetings.timeZone)) : null;
+    if (!data.work.holdMeets && !t.done) {
+      await sendTurn(api, m, data.box, t);
+      continue;
+    }
     const channel: AnswerChannel = { kind: "meet", meetId: m.id, turn: t.turn, done: t.done };
+    const who = m.record?.label ?? m.peerName;
+    const record = newDraft({ kind: "answer", title: `Turn ${t.turn} with ${who}`, input: m.lines.filter((l) => !l.mine).at(-1)?.text ?? m.note, from: m.peerName, channel, draft: t.text, sources: [], usedModel: true });
+    if (!data.work.holdMeets && !decision) {
+      // Meetings are not a limit and turns are not held: as before, it goes out.
+      await sendTurn(api, m, data.box, t);
+      continue;
+    }
+    let view: DraftView;
     try {
-      made.push(await saveDraft(api, vault, ref, newDraft({ kind: "answer", title: `Turn ${t.turn} with ${m.record?.label ?? m.peerName}`, input: m.lines.filter((l) => !l.mine).at(-1)?.text ?? m.note, from: m.peerName, channel, draft: t.text, sources: [], usedModel: true })));
+      view = await saveDraft(api, vault, ref, decision && !decision.ok ? { ...record, title: `${record.title}: ${decision.reason}` } : record);
     } catch {
       // Drafted on another device meanwhile.
+      continue;
     }
+    if (decision?.ok) {
+      await sendTurn(api, m, data.box, t);
+      const at = agreedTime(t.text, limits.meetings.timeZone);
+      made.push(await autoApprove(api, vault, view, decision.limit, { kind: "agreement", what: `Agreed a meeting with ${who} on ${at ? at.toISOString().slice(0, 16).replace("T", " ") + " UTC" : "the agreed time"}`, ref: { meet: m.id } }));
+    } else made.push(view);
   }
   return made;
 }
@@ -282,7 +338,7 @@ async function sendAnswer(api: Api, data: VaultData, record: DraftRecord, text: 
     await sendLinkAnswer(api, data, { id: ch.questionId, linkId: ch.linkId, sessionId: ch.sessionId, askerKey: ch.askerKey }, { reply: { v: 1, text, refused }, question: record.input, citations: record.sources }, data.boxPublic);
   } else if (ch.kind === "public") {
     await sendPublicAnswer(api, data, { id: ch.questionId, sessionId: ch.sessionId, askerKey: ch.askerKey }, { reply: { v: 1, text, refused, sources: record.sources }, question: record.input });
-  } else {
+  } else if (ch.kind === "meet") {
     const meet = data.meets.find((m) => m.id === ch.meetId);
     if (!meet || !data.box) throw new Error("That conversation is gone.");
     if (meet.state !== "running" || meet.turns + 1 !== ch.turn) throw new Error("This turn can no longer be sent: the conversation moved on or ended.");
@@ -319,11 +375,29 @@ export interface Approved {
  * page copies it). If the owner changed the text and learning is on, the change
  * becomes a note in "How I write".
  */
-export async function approve(api: Api, vault: Unlocked, data: VaultData, view: DraftView, text: string, deps: { model: ModelCaller | null; settings: WorkSettings }): Promise<Approved> {
+export async function approve(
+  api: Api,
+  vault: Unlocked,
+  data: VaultData,
+  view: DraftView,
+  text: string,
+  deps: { model: ModelCaller | null; settings: WorkSettings; pay?: (channel: PaymentChannel) => Promise<{ tx: string }> },
+): Promise<Approved> {
   const record = view.record;
   if (!record || view.state !== "waiting") throw new Error("This draft is not waiting for you.");
   const final = text.trim();
   if (!final) throw new Error("The text is empty.");
+  if (record.kind === "payment") {
+    // The self key signs the payment; the owner's own wallet sends it.
+    if (record.channel?.kind !== "payment" || !deps.pay) throw new Error("This payment cannot be sent from here.");
+    const ch = record.channel;
+    const { tx } = await deps.pay(ch);
+    const receipt = await recordReceipt(api, vault, { kind: "payment", what: `Paid ${ch.amount}${ch.token ? ` ${ch.token}` : ""} to ${ch.to}`, limit: "Approved by you in Work", ref: { chainId: ch.chainId, wallet: ch.wallet, tx, draft: view.id } });
+    const next: DraftRecord = { ...record, final: record.draft, decidedAt: new Date().toISOString(), auto: { limit: "Approved by you in Work", receiptId: receipt.id } };
+    const r = await api.put<{ draft: ServerDraft }>(`drafts/${view.id}`, { box: await encryptJson(vault.key, next, AAD.draft(view.id)), state: "approved" });
+    const { box: _b, ...rest } = r.draft;
+    return { draft: { ...rest, record: next }, lesson: null, folder: styleFolder(data), createdFolder: false };
+  }
   if (record.kind === "answer") await sendAnswer(api, data, record, final);
   let lesson: Memory | null = null;
   let folder = styleFolder(data);

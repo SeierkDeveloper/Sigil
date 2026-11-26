@@ -74,7 +74,7 @@ Each backup is a `backup` entry of the log (part 4), memoryId the bundle's hash,
 Every Sigil server is a node. It serves `GET /api/health`:
 
 ```json
-{ "ok": true, "node": { "origin": "https://node.example", "version": "0.1.0", "spec": "1.4.0" }, "time": "..." }
+{ "ok": true, "node": { "origin": "https://node.example", "version": "0.1.0", "spec": "1.5.0" }, "time": "..." }
 ```
 
 A node's address is an https origin; plain http is allowed only for a node on the same machine.

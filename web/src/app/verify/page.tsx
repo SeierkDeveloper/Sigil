@@ -9,7 +9,7 @@ import { DocumentChecker } from "@/components/live/DocumentChecker";
 
 export const metadata: Metadata = {
   title: "Verify",
-  description: "Check a Sigil seal, a read-log entry, a life certificate, a proof of a fact, a sealed agreement, an identity statement or a knowledge pack: in your browser, or with a few lines of your own code.",
+  description: "Check a Sigil seal, a read-log entry, a life certificate, a proof of a fact, a sealed agreement, an identity statement, a knowledge pack or a receipt of an AI self: in your browser, or with a few lines of your own code.",
 };
 
 const rules = `leaf  = SHA-256( 0x00 || data )
@@ -51,7 +51,7 @@ export default function VerifyPage() {
         <PageHeader
           eyebrow="Verify"
           title="Check it yourself, by hand"
-          lead="Your vault checks a log entry against its seal with one button. This page is the long way round: the same check, with every step in the open, with code you can run without trusting ours, and checkers for life certificates, proofs of a fact, agreements, identity statements and knowledge packs."
+          lead="Your vault checks a log entry against its seal with one button. This page is the long way round: the same check, with every step in the open, with code you can run without trusting ours, and checkers for life certificates, proofs of a fact, agreements, identity statements, knowledge packs and receipts."
         />
 
         <section className="page-section" aria-labelledby="tool-title">
@@ -128,7 +128,7 @@ export default function VerifyPage() {
             <div>
               <p className="eyebrow">Signed by a vault</p>
               <h2 id="proof-title" className="section-title">
-                A proof, an agreement, an identity or a pack
+                A proof, an agreement, an identity, a pack or a receipt
               </h2>
               <p className="section-lead">
                 Open a proof from its link, or drop any of these files here. The page tells them apart by their first line and checks each in this browser.
@@ -148,6 +148,10 @@ export default function VerifyPage() {
                 </li>
                 <li>
                   <strong>A knowledge pack.</strong> A public folder signed by its publisher&apos;s vault, version by version.
+                </li>
+                <li>
+                  <strong>A receipt of the AI self.</strong> Something the self did on its own within its owner&apos;s limits, signed by the self&apos;s key. Its fingerprint
+                  is in the seal of the hour it was made, and the root is compared with the one this site published.
                 </li>
               </ol>
               <p className="muted">

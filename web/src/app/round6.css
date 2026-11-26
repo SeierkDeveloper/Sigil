@@ -758,6 +758,111 @@
   margin-top: var(--space-4);
 }
 
+/* One step of the way on chain: where it stands on the left, the one action that moves it on the right. */
+.chain-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: #060606;
+}
+
+.chain-step-state {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.chain-step + .small.faint {
+  margin: 0;
+}
+
+.chain-amount {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.chain-amount-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.identity-chain .band .row {
+  gap: var(--space-3);
+}
+
+.identity-chain .band .row > .button-danger {
+  margin-right: auto;
+}
+
+/* The draft and the chain, rule by rule; a rule the chain holds differently is marked in words. */
+.rules-compare {
+  width: 100%;
+  margin-top: var(--space-4);
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.rules-compare th,
+.rules-compare td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.rules-compare thead th {
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.rules-compare tbody th {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.rules-compare tr[data-same="false"] td {
+  color: var(--color-text);
+}
+
+.rules-compare-flag {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  text-decoration: underline;
+}
+
+.rules-trial-chain {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  margin-top: var(--space-3);
+}
+
+.rules-trial-chain > .rules-trial {
+  width: 100%;
+}
+
+.identity-pay .grid {
+  margin-bottom: 0;
+}
+
 .wallet-state .identity-facts {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -1531,5 +1636,101 @@ body:has(.emergency-page) .site-header-inner {
 
   .emergency-blood {
     padding: var(--space-3) var(--space-4);
+  }
+}
+
+/* ------------------------------------------------------------------ limits for acting */
+
+.limits-days {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.limits-day-row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.limits-day {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-sm);
+  background: #060606;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+/* A free day is a filled chip; the checkbox itself stays for keyboards and readers. */
+.limits-day:has(input:checked) {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: #000;
+}
+
+.limits-day:has(input:focus-visible) {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+.limits-day input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.limits-receipts > .quiet {
+  margin-top: var(--space-4);
+}
+
+.draft-payment {
+  margin-bottom: var(--space-4);
+}
+
+@media (max-width: 640px) {
+  .limits-day {
+    padding: 0;
+    font-size: 0.6875rem;
+    letter-spacing: 0.02em;
+  }
+
+  .rules-compare thead {
+    display: none;
+  }
+
+  .rules-compare tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--color-line);
+  }
+
+  .rules-compare tbody th {
+    grid-column: 1 / -1;
+    padding-bottom: 0;
+  }
+
+  .rules-compare th,
+  .rules-compare td {
+    border-bottom: 0;
+  }
+
+  .chain-amount-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .chain-amount-row > .button {
+    justify-self: end;
   }
 }

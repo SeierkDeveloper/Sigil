@@ -1,16 +1,21 @@
 "use client";
 
 // Checks, in this browser, the signed documents a vault can hand out: a proof
-// of a fact, a sealed agreement, an identity statement or a knowledge pack.
-// Each is recognised by its format line. Nothing about it is sent anywhere,
-// except the hours whose published roots are looked up.
+// of a fact, a sealed agreement, an identity statement, a knowledge pack or a
+// receipt of the AI self. Each is recognised by its format line. Nothing about
+// it is sent anywhere, except the hours whose published roots are looked up, a
+// receipt's fingerprint when its proof is asked for, and its self key when the
+// identity statement behind it is read.
 
 import { useEffect, useState } from "react";
 import {
   AGREEMENT_FORMAT,
+  checkReceipt,
   DISCLOSURE_FORMAT,
   IDENTITY_FORMAT,
   PACK_FORMAT,
+  parseReceipt,
+  RECEIPT_FORMAT,
   parseAgreement,
   parseDisclosure,
   parseIdentityStatement,
@@ -52,10 +57,64 @@ async function sources() {
   return { chain, period };
 }
 
+const RECEIPT_KIND: Record<string, string> = { payment: "A payment", approval: "An approval within limits", agreement: "A meeting agreed" };
+
+/** A receipt of the AI self: its signature, its proof to a sealed root, that root against the site's seals (and the chain's), and the identity statement of its self key. */
+async function checkReceiptDocument(text: string, chain: ChainInfo | null, period: number): Promise<State> {
+  const shared = parseReceipt(text);
+  const body = shared.receipt.body;
+  const same = body.origin === window.location.origin;
+  // A receipt shared before its hour was sealed: ask this site for the proof of its fingerprint.
+  if (!shared.seal && same) {
+    const first = checkReceipt(shared);
+    const atHour = Math.floor(Date.parse(body.at) / 1000 / period);
+    for (const hour of [atHour, atHour + 1]) {
+      if (!first.leaf) break;
+      const r = await fetch(`/api/seals/${hour}/proof?leaf=${first.leaf}`, { cache: "no-store" });
+      if (r.ok) {
+        const p = (await r.json()) as { hour: number; root: string; proof: string[] };
+        shared.seal = { hour: p.hour, root: p.root, proof: p.proof, periodSeconds: period };
+        break;
+      }
+    }
+  }
+  const r = checkReceipt(shared);
+  const checks: CertificateCheck[] = r.checks.map((c) => ({ name: c.name, ok: c.ok, detail: c.detail }));
+  if (!shared.seal) checks.push({ name: "seal", ok: false, detail: same ? "Its fingerprint is not in a seal yet. Seals are made once an hour is over: try again after the hour." : `This receipt was made on ${body.origin}. Check it on that site to find its seal.` });
+  else if (same) {
+    const roots = await siteRoots()([shared.seal.hour]);
+    const published = roots.get(shared.seal.hour);
+    const match = !!published && published.toLowerCase() === shared.seal.root.toLowerCase();
+    checks.push({ name: "published", ok: match, detail: match ? `The root is the one this site published for hour ${shared.seal.hour}.` : "The root is not the one this site published for that hour." });
+    if (chain) {
+      const onChain = (await chainRoots(chain)([shared.seal.hour])).get(shared.seal.hour);
+      checks.push({ name: "chain", ok: !!onChain && onChain.toLowerCase() === shared.seal.root.toLowerCase(), detail: onChain ? "The root matches SigilSeal on chain." : "That hour is not on chain yet." });
+    }
+  } else checks.push({ name: "published", ok: false, detail: `This receipt was made on ${body.origin}. Check it on that site to compare its root with the seals it publishes.` });
+  let attestedBy = `The self key ${body.selfKey}.`;
+  if (same) {
+    try {
+      const st = await fetch(`/api/identity/at/${body.selfKey}`, { cache: "no-store" });
+      if (st.ok) {
+        const statement = parseIdentityStatement(await st.text());
+        if (verifyIdentityStatement(statement).ok) attestedBy = `The self key ${body.selfKey}, whose signed identity statement names it ${statement.body.name}.`;
+      }
+    } catch {
+      // No statement: the self key alone stands behind it.
+    }
+  }
+  return {
+    kind: "done",
+    chain: !!chain,
+    outcome: { ok: checks.every((c) => c.ok), kind: `A receipt of the AI self: ${RECEIPT_KIND[body.kind] ?? "an action"}`, headline: `${body.what}. Under: ${body.limit || "no limit named"}.`, attestedBy, checks, seals: true },
+  };
+}
+
 export async function checkDocument(text: string): Promise<State> {
   let format = "";
   try {
-    format = String((JSON.parse(text) as { format?: unknown }).format ?? "");
+    const v = JSON.parse(text) as { format?: unknown; receipt?: { format?: unknown } };
+    format = String(v.format ?? v.receipt?.format ?? "");
   } catch {
     return { kind: "error", reason: "This is not a signed document: it is not valid JSON." };
   }
@@ -79,6 +138,7 @@ export async function checkDocument(text: string): Promise<State> {
       const r = verifyIdentityStatement(s);
       return { kind: "done", chain: !!chain, outcome: { ok: r.ok, kind: "An identity statement", headline: `${s.body.name}, self key ${s.body.selfKey}`, attestedBy: "The owner's vault key and the self's own key, together.", checks: r.checks, seals: false } };
     }
+    if (format === RECEIPT_FORMAT) return await checkReceiptDocument(text, chain, period);
     if (format === PACK_FORMAT) {
       const p = parsePack(text);
       const r = verifyPack(p);

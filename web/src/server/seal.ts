@@ -34,9 +34,11 @@ function toSeal(r: Row): SealRow {
 export function sealPending(db: Db, nowMs = Date.now()): SealRow[] {
   if (!serverConfig.sealsEnabled) return [];
   const current = hourOf(nowMs);
-  // Hours with unsealed reads, and hours with an immune record not yet sealed (an hour may have either or both).
+  // Hours with unsealed reads, receipts of the AI self, or an immune record not yet sealed (an hour may have any of them).
   const hours = (
-    db.prepare("SELECT hour FROM read_log WHERE sealed = 0 AND hour < ? UNION SELECT hour FROM immune_records WHERE sealed = 0 AND hour < ? ORDER BY hour").all(current, current) as Row[]
+    db
+      .prepare("SELECT hour FROM read_log WHERE sealed = 0 AND hour < ? UNION SELECT hour FROM self_receipts WHERE sealed = 0 AND hour < ? UNION SELECT hour FROM immune_records WHERE sealed = 0 AND hour < ? ORDER BY hour")
+      .all(current, current, current) as Row[]
   ).map((r) => Number(r.hour));
   const made: SealRow[] = [];
   for (const hour of hours) {
@@ -47,9 +49,10 @@ export function sealPending(db: Db, nowMs = Date.now()): SealRow[] {
         return null;
       }
       const rows = db.prepare("SELECT leaf FROM read_log WHERE hour = ? AND sealed = 0 ORDER BY at, id").all(hour) as Row[];
-      // The immune record of the hour comes last, after every read.
+      // Receipts of the AI self come after the reads, and the immune record of the hour last.
+      const receipts = db.prepare("SELECT leaf FROM self_receipts WHERE hour = ? AND sealed = 0 ORDER BY created_at, id").all(hour) as Row[];
       const immune = db.prepare("SELECT leaf FROM immune_records WHERE hour = ? AND sealed = 0").get(hour) as Row | undefined;
-      const leaves = [...rows.map((r) => String(r.leaf)), ...(immune ? [String(immune.leaf)] : [])];
+      const leaves = [...rows.map((r) => String(r.leaf)), ...receipts.map((r) => String(r.leaf)), ...(immune ? [String(immune.leaf)] : [])];
       if (leaves.length === 0) return null;
       const root = hex32(merkleRoot(leaves.map(fromHex32)));
       const sealedAt = new Date(nowMs).toISOString();
@@ -57,6 +60,7 @@ export function sealPending(db: Db, nowMs = Date.now()): SealRow[] {
       const ins = db.prepare("INSERT INTO seal_leaves (hour, idx, leaf) VALUES (?, ?, ?)");
       leaves.forEach((leaf, idx) => ins.run(hour, idx, leaf));
       db.prepare("UPDATE read_log SET sealed = 1 WHERE hour = ? AND sealed = 0").run(hour);
+      db.prepare("UPDATE self_receipts SET sealed = 1 WHERE hour = ? AND sealed = 0").run(hour);
       db.prepare("UPDATE immune_records SET sealed = 1 WHERE hour = ?").run(hour);
       return { hour, root, leaves: leaves.length, sealedAt, anchorTx: null, anchoredAt: null } satisfies SealRow;
     });

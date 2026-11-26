@@ -148,6 +148,7 @@ import {
 import { acceptMeet, addTurn, declineMeet, invite, listMeets, meetsWaiting, removeMeet, stopMeet } from "./meets";
 import { getIdentity, publicStatement, putStatement, setSelfKey, withdrawStatement } from "./identity";
 import { createDraft, deleteDraft, listDrafts, logLesson, updateDraft } from "./work";
+import { addReceipt, deleteReceipt, listReceipts } from "./receipts";
 import { createDisclosure, deleteDisclosure, disclosureAnchor, listDisclosures, MAX_PROOF_BYTES, publishDisclosure, publishedDisclosure, spaceJoinEntry, unpublishDisclosure, updateDisclosureBox } from "./disclose";
 import { cardOpens, openPublicCard, ownerCard, putCard, revokeCard } from "./emergency";
 import { agreementSeal, declineAgreement, listAgreements, peerSigningKey, proposeAgreement, removeAgreement, signAgreementRow } from "./agreements";
@@ -1633,6 +1634,25 @@ route("DELETE", "self/identity/statement", (ctx) => {
   return json({ ok: true });
 });
 
+// ---- receipts of what the AI self did on its own: a fingerprint for the seal, the receipt under the vault key
+
+route("GET", "self/receipts", (ctx) => {
+  sealPending(ctx.db);
+  return json({ receipts: listReceipts(ctx.db, userOf(ctx)) });
+});
+
+route("POST", "self/receipts", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`receipts:${userId}`, 120, 60_000);
+  const body = parse(z.object({ id, leaf: hex32, box: envelope(16 * KB) }), await readJson(ctx.req, 20 * KB));
+  return json({ receipt: addReceipt(ctx.db, userId, body) }, 201);
+});
+
+route("DELETE", "self/receipts/:id", (ctx, [receiptId]) => {
+  deleteReceipt(ctx.db, userOf(ctx), receiptId);
+  return json({ ok: true });
+});
+
 // ---- the AI self at work: drafts waiting for the owner, each sealed under the vault key
 
 route("GET", "drafts", (ctx) => json({ drafts: listDrafts(ctx.db, userOf(ctx)) }));
@@ -1640,7 +1660,7 @@ route("GET", "drafts", (ctx) => json({ drafts: listDrafts(ctx.db, userOf(ctx)) }
 route("POST", "drafts", async (ctx) => {
   const userId = userOf(ctx);
   rateLimit(`drafts:${userId}`, 60, 60_000);
-  const body = parse(z.object({ id, kind: z.enum(["reply", "plan", "answer"]), ref: z.string().regex(/^[A-Za-z0-9_:-]{4,140}$/).nullable(), box: envelope(160 * KB) }), await readJson(ctx.req, 200 * KB));
+  const body = parse(z.object({ id, kind: z.enum(["reply", "plan", "answer", "payment"]), ref: z.string().regex(/^[A-Za-z0-9_:-]{4,140}$/).nullable(), box: envelope(160 * KB) }), await readJson(ctx.req, 200 * KB));
   return json({ draft: createDraft(ctx.db, userId, body) }, 201);
 });
 

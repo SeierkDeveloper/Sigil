@@ -10,7 +10,7 @@ type Row = Record<string, unknown>;
 const now = () => new Date().toISOString();
 
 export const MAX_WAITING = 300;
-export type DraftKind = "reply" | "plan" | "answer";
+export type DraftKind = "reply" | "plan" | "answer" | "payment";
 export type DraftState = "waiting" | "approved" | "discarded";
 
 export interface DraftRow {

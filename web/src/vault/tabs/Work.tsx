@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cleanWork, type WorkSettings } from "@sigil/core";
+import { cleanWork, type PaymentChannel, type WorkSettings } from "@sigil/core";
+import type { ChainConfig } from "../identityOps";
+import { payApproved } from "../payOps";
+import { connectWallet } from "../wallet";
 import { DraftIcon, StyleIcon } from "@/components/icons";
 import { formatDateTime, plural } from "@/lib/format";
 import * as work from "../workOps";
@@ -9,7 +12,14 @@ import { modelCaller } from "../selfOps";
 import { errorText, useVault } from "../context";
 import { Band, Empty, Notice, PlateHead, Quiet } from "../ui";
 
-const KIND_WORD = { reply: "Reply", plan: "Plan", answer: "Answer" } as const;
+const KIND_WORD = { reply: "Reply", plan: "Plan", answer: "Answer", payment: "Payment" } as const;
+
+/** The owner's browser wallet, for a payment the owner approves; the chain from the site's settings. */
+async function payFromWork(vault: Parameters<typeof payApproved>[0], channel: PaymentChannel, api: { get<T>(path: string): Promise<T> }) {
+  const { chain } = await api.get<{ chain: ChainConfig | null }>("identity/config");
+  if (!chain) throw new Error("This site has no registry on chain, so the payment cannot be sent.");
+  return payApproved(vault, (await connectWallet()).provider, chain, channel);
+}
 
 /** The AI self at work: drafts in an approval queue, what it holds back, and what it learned from your edits. */
 export function WorkTab() {
@@ -21,9 +31,9 @@ export function WorkTab() {
       <div className="panel-header">
         <h2 className="panel-title">Work</h2>
         <p className="small muted">
-          Your AI self drafts replies, plans your week and answers people. Every draft waits here for you. Nothing is sent anywhere on its own: approving a reply or a plan
-          copies it for you, and approving an answer sends it back the way the question came. When you change a draft before approving it, the change becomes a note under
-          How I write, and later drafts follow it.
+          Your AI self drafts replies, plans your week and answers people. Every draft waits here for you, unless it falls within a limit you set under Limits. Approving a
+          reply or a plan copies it for you, and approving an answer sends it back the way the question came. This site sends no mail itself: a reply approved within your
+          limits is ready to send, not sent. When you change a draft before approving it, the change becomes a note under How I write, and later drafts follow it.
         </p>
       </div>
       {!data.model ? <Notice>With no model key under AI self, a reply is a plain start in your own greeting and sign-off, and a plan is a plain list of your week.</Notice> : null}
@@ -170,8 +180,8 @@ function DraftCard({ view }: { view: work.DraftView }) {
     setBusy("approve");
     setError(null);
     try {
-      const out = await work.approve(api, vault, data, view, text, { model: modelCaller(data), settings: data.work });
-      if (r.kind !== "answer") {
+      const out = await work.approve(api, vault, data, view, text, { model: modelCaller(data), settings: data.work, pay: (ch) => payFromWork(vault, ch, api) });
+      if (r.kind === "reply" || r.kind === "plan") {
         try {
           await navigator.clipboard.writeText(text.trim());
         } catch {
@@ -204,6 +214,7 @@ function DraftCard({ view }: { view: work.DraftView }) {
 
   const where =
     r.channel?.kind === "link" ? "the ask link it came from" : r.channel?.kind === "public" ? "your public page" : r.channel?.kind === "meet" ? "the conversation with the other self" : null;
+  if (r.kind === "payment") return <PaymentCard view={view} busy={busy} error={error} onApprove={approve} onDiscard={discard} />;
 
   return (
     <article className="draft-card" data-kind={r.kind} data-testid="draft-card" aria-label={r.title}>
@@ -239,6 +250,53 @@ function DraftCard({ view }: { view: work.DraftView }) {
         </button>
       </div>
       {where ? <p className="small faint">Approving sends it to {where}, and only there.</p> : null}
+    </article>
+  );
+}
+
+/** A payment past the owner's limits: what the self would pay, and why it waits. Approving signs it with the self key and sends it from the owner's wallet. */
+function PaymentCard({ view, busy, error, onApprove, onDiscard }: { view: work.DraftView; busy: string | null; error: string | null; onApprove: () => void; onDiscard: () => void }) {
+  const r = view.record!;
+  const ch = r.channel?.kind === "payment" ? r.channel : null;
+  return (
+    <article className="draft-card" data-kind="payment" data-testid="draft-card" aria-label={r.title}>
+      <header className="draft-head">
+        <span className="badge">{KIND_WORD.payment}</span>
+        <p className="draft-title">{r.title}</p>
+        <span className="faint small">{formatDateTime(view.createdAt)}</span>
+      </header>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      {ch ? (
+        <dl className="identity-facts draft-payment">
+          <div>
+            <dt>To</dt>
+            <dd className="mono">{ch.to}</dd>
+          </div>
+          <div>
+            <dt>Amount</dt>
+            <dd>
+              {ch.amount} {ch.token ?? ""}
+            </dd>
+          </div>
+          <div>
+            <dt>From</dt>
+            <dd className="mono">{ch.wallet}</dd>
+          </div>
+          <div>
+            <dt>Why it waits</dt>
+            <dd>{r.input}</dd>
+          </div>
+        </dl>
+      ) : null}
+      <div className="form-actions">
+        <button type="button" className="button button-primary" disabled={!!busy || !ch} onClick={onApprove}>
+          {busy === "approve" ? "Paying" : "Approve and pay"}
+        </button>
+        <button type="button" className="button button-ghost" disabled={!!busy} onClick={onDiscard}>
+          Discard
+        </button>
+      </div>
+      <p className="small faint">Approving signs it with the self key and sends it from your own wallet. The wallet on chain still checks its rules and caps.</p>
     </article>
   );
 }
@@ -400,6 +458,7 @@ function DoneSection({ drafts }: { drafts: work.DraftView[] }) {
               <p className="list-row-meta">
                 {formatDateTime(d.updatedAt)}
                 {d.record?.learned ? ". Your edit was noted under How I write." : ""}
+                {d.record?.auto ? `. ${d.record.auto.limit === "Approved by you in Work" ? "Signed by the self key once you approved it" : `Approved on its own, under: ${d.record.auto.limit}`}. Its receipt is under Limits.` : ""}
               </p>
               {d.state === "approved" && d.record?.final ? <p className="draft-final">{d.record.final}</p> : null}
             </div>

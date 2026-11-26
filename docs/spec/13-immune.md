@@ -87,4 +87,4 @@ The round's record:
 }
 ```
 
-Its leaf is `SHA-256(0x00 || UTF-8("sigil-immune-v1\n" || canonical JSON of the record))`, in hex32. The leaf joins the seal of its period, after every read-log leaf of that period, so a proof from the leaf to the period's root shows the record was not changed after the period ended. A node publishes its latest rounds at `GET /api/immune` with each round's leaf and, once sealed, its root, index and proof. The `immuneLeaf` vector shows a record and its leaf.
+Its leaf is `SHA-256(0x00 || UTF-8("sigil-immune-v1\n" || canonical JSON of the record))`, in hex32. The leaf joins the seal of its period, after every read-log leaf and every receipt leaf (part 7) of that period, so a proof from the leaf to the period's root shows the record was not changed after the period ended. A node publishes its latest rounds at `GET /api/immune` with each round's leaf and, once sealed, its root, index and proof. The `immuneLeaf` vector shows a record and its leaf.

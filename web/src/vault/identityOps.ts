@@ -5,12 +5,17 @@
 // and the wallet's state and spends read through a public read-only address.
 // Nothing here holds or sends a private key.
 
-import { decodeFunctionResult, encodeFunctionData, parseAbi, type Hex } from "viem";
+import { decodeErrorResult, decodeFunctionResult, encodeAbiParameters, encodeFunctionData, parseAbi, parseAbiParameters, type Hex } from "viem";
 import {
   checksumAddress,
   cleanWalletRules,
   decodeSpendLog,
+  executeDigest,
   EXECUTED_TOPIC,
+  formatUnits,
+  functionSelector,
+  parseUnits,
+  sameAddress,
   isEvmAddress,
   openSetting,
   parseIdentityStatement,
@@ -26,6 +31,7 @@ import {
   type WalletSpend,
 } from "@sigil/core";
 import type { Api } from "./api";
+import { SELF_WALLET_BYTECODE } from "./selfWalletCode";
 import type { Unlocked } from "./ops";
 
 export interface ChainConfig {
@@ -137,6 +143,7 @@ export const REGISTRY_ABI = parseAbi([
   "function register(address selfKey, string metadataURI, uint256 deadline, bytes selfSignature)",
   "function setWallet(address selfKey, address wallet)",
   "function revoke(address selfKey)",
+  "function pendingOwner(address selfKey) view returns (address)",
   "function identityOf(address selfKey) view returns ((address owner, address wallet, uint64 registeredAt, uint64 revokedAt, string metadataURI))",
 ]);
 
@@ -155,6 +162,34 @@ export const WALLET_ABI = parseAbi([
   "function perDayCap() view returns (uint256)",
   "function expiresAt() view returns (uint64)",
   "function remainingToday() view returns (uint256)",
+  "function nonce() view returns (uint256)",
+  "function isRecipient(address recipient) view returns (bool)",
+  "function isTargetAllowed(address target) view returns (bool)",
+  "function isSelectorAllowed(address target, bytes4 selector) view returns (bool)",
+  "function cancelSignedCalls()",
+  "function withdraw(address to, uint256 amount)",
+  "function withdrawToken(address token, address to, uint256 amount)",
+  "function execute(address target, uint256 value, bytes data) returns (bytes)",
+  "function executeWithSig(address target, uint256 value, bytes data, uint256 deadline, uint256 gas, bytes signature) returns (bytes)",
+  "error NotOwner()",
+  "error NotSelf()",
+  "error NotOwnerOrSelf()",
+  "error ZeroAddress()",
+  "error IsFrozen()",
+  "error RulesExpired()",
+  "error Expired()",
+  "error BadSignature()",
+  "error TargetNotAllowed(address target)",
+  "error SelectorNotAllowed(address target, bytes4 selector)",
+  "error TokenNotAllowed(address token)",
+  "error RecipientNotAllowed(address to)",
+  "error TokenMoveRefused(bytes4 selector)",
+  "error OverTxCap(uint256 amount, uint256 cap)",
+  "error OverDayCap(uint256 spent, uint256 cap)",
+  "error CallFailed(bytes reason)",
+  "error RecipientAndContract(address account)",
+  "error TooManyOpenApprovals()",
+  "error NotEnoughGas()",
 ]);
 
 /** The call data of configure() for these rules: the owner's wallet sends it to the self wallet. */
@@ -195,17 +230,68 @@ export function revokeApprovalsCalldata(): Hex {
   return encodeFunctionData({ abi: WALLET_ABI, functionName: "revokeApprovals" });
 }
 
+export function cancelSignedCalldata(): Hex {
+  return encodeFunctionData({ abi: WALLET_ABI, functionName: "cancelSignedCalls" });
+}
+
+/** The owner takes the chain's coin out of the self wallet. */
+export function withdrawCalldata(to: string, amount: bigint): Hex {
+  return encodeFunctionData({ abi: WALLET_ABI, functionName: "withdraw", args: [to as Hex, amount] });
+}
+
+export function withdrawTokenCalldata(token: string, to: string, amount: bigint): Hex {
+  return encodeFunctionData({ abi: WALLET_ABI, functionName: "withdrawToken", args: [token as Hex, to as Hex, amount] });
+}
+
+export function setWalletCalldata(selfKey: string, wallet: string): Hex {
+  return encodeFunctionData({ abi: REGISTRY_ABI, functionName: "setWallet", args: [selfKey as Hex, wallet as Hex] });
+}
+
+/** The creation code of the self's wallet for this owner and self key: the owner's browser wallet sends it as a deploy. */
+export function deployWalletData(owner: string, selfKey: string): Hex {
+  return `${SELF_WALLET_BYTECODE}${encodeAbiParameters(parseAbiParameters("address owner, address selfKey"), [owner as Hex, selfKey as Hex]).slice(2)}` as Hex;
+}
+
 export interface InjectedWallet {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
 }
 
-/** Sends one call from the owner's own browser wallet, on the registry's chain. Returns the transaction hash. */
-export async function sendFromOwner(eth: InjectedWallet, chain: ChainConfig, to: string, data: Hex): Promise<string> {
-  const [from] = (await eth.request({ method: "eth_requestAccounts" })) as string[];
-  const want = `0x${BigInt(chain.chainId).toString(16)}`;
-  const have = String(await eth.request({ method: "eth_chainId" }));
-  if (have.toLowerCase() !== want) await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: want }] });
-  return String(await eth.request({ method: "eth_sendTransaction", params: [{ from, to, data }] }));
+function walletError(err: unknown): Error {
+  const e = err as { code?: number; message?: string };
+  if (e?.code === 4001) return new Error("You declined the request in your wallet.");
+  if (e?.code === -32002) return new Error("Your wallet already has a request open. Check the wallet window.");
+  return err instanceof Error ? err : new Error(e?.message ?? "The wallet request failed.");
+}
+
+/** The address the owner's browser wallet uses, on the registry's chain (it is asked to switch when it is on another). */
+export async function ownerAccount(eth: InjectedWallet, chain: ChainConfig): Promise<string> {
+  try {
+    const [from] = (await eth.request({ method: "eth_requestAccounts" })) as string[];
+    if (!from) throw new Error("The wallet did not share an address.");
+    const want = `0x${BigInt(chain.chainId).toString(16)}`;
+    const have = String(await eth.request({ method: "eth_chainId" }));
+    if (have.toLowerCase() !== want) await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: want }] });
+    return checksumAddress(from);
+  } catch (err) {
+    throw walletError(err);
+  }
+}
+
+/**
+ * Sends one transaction from the owner's own browser wallet, on the registry's
+ * chain: a call (to an address), a deploy (to null), or a payment (with value).
+ * Returns the transaction hash.
+ */
+export async function sendFromOwner(eth: InjectedWallet, chain: ChainConfig, to: string | null, data: Hex, value = 0n): Promise<string> {
+  const from = await ownerAccount(eth, chain);
+  try {
+    const tx: Record<string, string> = { from, data };
+    if (to) tx.to = to;
+    if (value > 0n) tx.value = `0x${value.toString(16)}`;
+    return String(await eth.request({ method: "eth_sendTransaction", params: [tx] }));
+  } catch (err) {
+    throw walletError(err);
+  }
 }
 
 // ---------------------------------------------------------------- reading the chain, from this browser
@@ -468,4 +554,225 @@ export async function readWallet(chain: ChainConfig, wallet: string, opts: { tok
     spendsFromBlock: page.fromBlock,
     coversToday: page.reached,
   };
+}
+
+// ---------------------------------------------------------------- the whole flow on chain
+
+export interface TxReceipt {
+  status: "success" | "failed";
+  block: number;
+  contractAddress: string | null;
+}
+
+/**
+ * Waits until a transaction is in a block, asking the site's read address (or
+ * the owner's wallet when the site has none). Throws when it failed on chain.
+ */
+export async function waitForTx(chain: ChainConfig, hash: string, opts: { eth?: InjectedWallet; fetcher?: Fetch; timeoutMs?: number; everyMs?: number } = {}): Promise<TxReceipt> {
+  const fetcher = opts.fetcher ?? defaultFetch;
+  const until = Date.now() + (opts.timeoutMs ?? 180_000);
+  for (;;) {
+    type Raw = { status?: string; blockNumber?: string; contractAddress?: string | null };
+    let r: Raw | null = null;
+    if (chain.rpcUrl) r = (await rpc<{ result?: Raw | null }>(chain, { jsonrpc: "2.0", id: 1, method: "eth_getTransactionReceipt", params: [hash] }, fetcher)).result ?? null;
+    else if (opts.eth) r = (await opts.eth.request({ method: "eth_getTransactionReceipt", params: [hash] })) as Raw | null;
+    if (r && r.blockNumber) {
+      const out: TxReceipt = { status: r.status === "0x1" ? "success" : "failed", block: Number(BigInt(r.blockNumber)), contractAddress: r.contractAddress ? checksumAddress(r.contractAddress) : null };
+      if (out.status === "failed") throw new Error("The transaction was sent but failed on chain. Nothing changed.");
+      return out;
+    }
+    if (Date.now() > until) throw new Error("The transaction is not in a block yet. Check your wallet, then read again.");
+    await new Promise((res) => setTimeout(res, opts.everyMs ?? 1200));
+  }
+}
+
+export interface RegistryEntry {
+  owner: string;
+  wallet: string | null;
+  registeredAt: number;
+  revokedAt: number;
+  metadataURI: string;
+  pendingOwner: string | null;
+}
+
+/** What the registry says about this self key, or null when it is not registered. */
+export async function readRegistry(chain: ChainConfig, selfKey: string, fetcher: Fetch = defaultFetch): Promise<RegistryEntry | null> {
+  const [id, pending] = await callMany(
+    chain,
+    [
+      { to: chain.registry, data: encodeFunctionData({ abi: REGISTRY_ABI, functionName: "identityOf", args: [selfKey as Hex] }) },
+      { to: chain.registry, data: encodeFunctionData({ abi: REGISTRY_ABI, functionName: "pendingOwner", args: [selfKey as Hex] }) },
+    ],
+    fetcher,
+  );
+  if (!id) throw new Error("The registry could not be read. Is the site's registry address right?");
+  const v = decodeFunctionResult({ abi: REGISTRY_ABI, functionName: "identityOf", data: id }) as { owner: string; wallet: string; registeredAt: bigint; revokedAt: bigint; metadataURI: string };
+  if (/^0x0{40}$/i.test(v.owner)) return null;
+  const p = pending ? String(decodeFunctionResult({ abi: REGISTRY_ABI, functionName: "pendingOwner", data: pending })) : "";
+  return {
+    owner: checksumAddress(v.owner),
+    wallet: /^0x0{40}$/i.test(v.wallet) ? null : checksumAddress(v.wallet),
+    registeredAt: Number(v.registeredAt),
+    revokedAt: Number(v.revokedAt),
+    metadataURI: v.metadataURI,
+    pendingOwner: p && !/^0x0{40}$/i.test(p) ? checksumAddress(p) : null,
+  };
+}
+
+/** The chain's coin a self wallet holds, in base units. */
+export async function walletBalance(chain: ChainConfig, wallet: string, fetcher: Fetch = defaultFetch): Promise<bigint> {
+  const r = await rpc<{ result?: Hex }>(chain, { jsonrpc: "2.0", id: 1, method: "eth_getBalance", params: [wallet, "latest"] }, fetcher);
+  return BigInt(r.result ?? "0x0");
+}
+
+export interface RuleRow {
+  /** What the rule is, in a few words. */
+  what: string;
+  /** As the draft has it, and as the wallet holds it on chain. */
+  draft: string;
+  chain: string;
+  same: boolean;
+}
+
+/** Each rule of the draft next to what the wallet holds on chain, so the owner sees what the chain enforces. */
+export async function compareRules(chain: ChainConfig, wallet: string, input: WalletRules, fetcher: Fetch = defaultFetch): Promise<RuleRow[]> {
+  const rules = cleanWalletRules(input);
+  const cfg = walletConfig(rules);
+  const calls: { to: string; data: Hex }[] = [
+    { to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "perTxCap" }) },
+    { to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "perDayCap" }) },
+    { to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "expiresAt" }) },
+    ...rules.recipients.map((r) => ({ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "isRecipient", args: [r.address as Hex] }) })),
+    ...cfg.targets.map((t) => ({ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "isTargetAllowed", args: [t as Hex] }) })),
+    ...cfg.selectors.map((x) => ({ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "isSelectorAllowed", args: [x.target as Hex, x.selector as Hex] }) })),
+    ...rules.tokens.map((t) => ({ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "tokenLimit", args: [t.address as Hex] }) })),
+  ];
+  const a = await callMany(chain, calls, fetcher);
+  if (!a[0]) throw new Error("The wallet could not be read. Is the address right, and is it a self wallet?");
+  let i = 0;
+  const next = <T>(fn: Parameters<typeof decodeFunctionResult<typeof WALLET_ABI>>[0]["functionName"]): T => decodeFunctionResult({ abi: WALLET_ABI, functionName: fn, data: a[i++] ?? "0x" }) as T;
+  const yes = (b: boolean) => (b ? "Listed" : "Not listed");
+  const rows: RuleRow[] = [];
+  const perTx = next<bigint>("perTxCap");
+  const perDay = next<bigint>("perDayCap");
+  const expires = next<bigint>("expiresAt");
+  rows.push({ what: "Per payment", draft: rules.perTx, chain: formatUnits(perTx), same: perTx === cfg.perTxCap });
+  rows.push({ what: "Per day", draft: rules.perDay, chain: formatUnits(perDay), same: perDay === cfg.perDayCap });
+  const day = (n: bigint) => (n === 0n ? "No end" : new Date(Number(n) * 1000).toISOString().slice(0, 10));
+  rows.push({ what: "Until", draft: day(cfg.expiresAt), chain: day(expires), same: expires === cfg.expiresAt });
+  for (const r of rules.recipients) {
+    const on = next<boolean>("isRecipient");
+    rows.push({ what: `Recipient ${r.label || r.address}`, draft: "Listed", chain: yes(on), same: on });
+  }
+  const names = new Map([...rules.contracts.map((c) => [c.address, c.label] as const), ...rules.tokens.map((t) => [t.address, t.label] as const)]);
+  for (const t of cfg.targets) {
+    const on = next<boolean>("isTargetAllowed");
+    rows.push({ what: `Contract ${names.get(t) || t}`, draft: "Listed", chain: yes(on), same: on });
+  }
+  const fnName = new Map(rules.contracts.flatMap((c) => c.functions.map((f) => [`${c.address}:${functionSelector(f)}`, f] as const)));
+  for (const x of cfg.selectors) {
+    const on = next<boolean>("isSelectorAllowed");
+    const fn = fnName.get(`${x.target}:${x.selector}`) ?? (x.selector === "0xa9059cbb" ? "transfer" : x.selector === "0x095ea7b3" ? "approve" : x.selector);
+    rows.push({ what: `${names.get(x.target) || x.target}: ${fn}`, draft: "Allowed", chain: on ? "Allowed" : "Not allowed", same: on });
+  }
+  for (const t of rules.tokens) {
+    const [tx, dayCap] = next<readonly [bigint, bigint]>("tokenLimit");
+    const want = cfg.tokens.find((x) => sameAddress(x.token, t.address))!;
+    rows.push({
+      what: `${t.label || t.address} caps`,
+      draft: `${t.perTx} and ${t.perDay}`,
+      chain: `${formatUnits(tx, t.decimals)} and ${formatUnits(dayCap, t.decimals)}`,
+      same: tx === want.perTx && dayCap === want.perDay,
+    });
+  }
+  return rows;
+}
+
+const ERROR_TEXT: Record<string, string> = {
+  IsFrozen: "The wallet is frozen.",
+  RulesExpired: "The rules have expired.",
+  TargetNotAllowed: "This contract is not on the list of contracts.",
+  RecipientNotAllowed: "This address is not one of the recipients.",
+  SelectorNotAllowed: "That function is not allowed on this contract.",
+  TokenNotAllowed: "This token has no caps, so it cannot be moved.",
+  TokenMoveRefused: "The wallet never lets the self call this function.",
+  OverTxCap: "Over the cap per transaction.",
+  OverDayCap: "Over the cap per day.",
+  CallFailed: "The rules allow it, but the payment itself failed: the wallet may hold too little.",
+  NotSelf: "The wallet has another self key.",
+  BadSignature: "The self key's signature does not fit this wallet.",
+  Expired: "The signature is too old.",
+  TooManyOpenApprovals: "Too many allowances are open. Set them to zero first.",
+  NotEnoughGas: "Too little gas was sent for this call.",
+};
+
+/** A wallet's refusal in plain words, from the revert data of a call. */
+export function refusalText(data: string | undefined | null): string {
+  if (data && data.length >= 10) {
+    try {
+      const e = decodeErrorResult({ abi: WALLET_ABI, data: data as Hex });
+      return ERROR_TEXT[e.errorName] ?? "The wallet refused it.";
+    } catch {
+      return "The call failed.";
+    }
+  }
+  return "The wallet refused it.";
+}
+
+export interface SelfCall {
+  target: string;
+  value: bigint;
+  data: Hex;
+}
+
+/** The call the self key makes for a payment: the chain's coin straight to the recipient, or a token's transfer. */
+export function paymentCall(to: string, amount: string, token: { address: string; decimals: number } | null): SelfCall {
+  if (!token) return { target: checksumAddress(to), value: parseUnits(amount), data: "0x" };
+  return { target: checksumAddress(token.address), value: 0n, data: encodeFunctionData({ abi: parseAbi(["function transfer(address to, uint256 amount) returns (bool)"]), args: [to as Hex, parseUnits(amount, token.decimals)] }) };
+}
+
+/**
+ * What the wallet on chain says to a call by the self key, right now: the
+ * call is run as the self key against the wallet's real rules, caps and
+ * balance (eth_call, nothing is sent). Null when it would go through,
+ * otherwise the refusal in plain words.
+ */
+export async function tryOnChain(chain: ChainConfig, wallet: string, selfKey: string, call: SelfCall, fetcher: Fetch = defaultFetch): Promise<string | null> {
+  const r = await rpc<{ result?: Hex; error?: { message?: string; data?: unknown } }>(
+    chain,
+    {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "eth_call",
+      params: [{ from: selfKey, to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "execute", args: [call.target as Hex, call.value, call.data] }) }, "latest"],
+    },
+    fetcher,
+  );
+  if (r.error) {
+    const d = r.error.data;
+    const hex = typeof d === "string" ? d : d && typeof d === "object" && typeof (d as { data?: unknown }).data === "string" ? String((d as { data: string }).data) : null;
+    return refusalText(hex);
+  }
+  return null;
+}
+
+/** The wallet's next nonce for signed calls. */
+export async function walletNonce(chain: ChainConfig, wallet: string, fetcher: Fetch = defaultFetch): Promise<bigint> {
+  const [n] = await callMany(chain, [{ to: wallet, data: encodeFunctionData({ abi: WALLET_ABI, functionName: "nonce" }) }], fetcher);
+  if (!n) throw new Error("The wallet could not be read.");
+  return decodeFunctionResult({ abi: WALLET_ABI, functionName: "nonce", data: n }) as bigint;
+}
+
+/**
+ * Signs a call with the self key, on this device (EIP-712, as the wallet
+ * checks it), and returns the executeWithSig call data anyone may submit. The
+ * owner's own wallet submits it here, so the self key never needs gas.
+ */
+export async function signSelfCall(vault: Unlocked, chain: ChainConfig, wallet: string, call: SelfCall, nonce: bigint, opts: { deadline?: bigint; gas?: bigint } = {}): Promise<Hex> {
+  const key = await selfIdentityKey(vault.raw);
+  const deadline = opts.deadline ?? BigInt(Math.floor(Date.now() / 1000) + 3600);
+  const gas = opts.gas ?? 0n;
+  const digest = executeDigest({ chainId: BigInt(chain.chainId), wallet, target: call.target, value: call.value, data: call.data, nonce, deadline, gas });
+  const sig = signDigest(key.secret, digest);
+  return encodeFunctionData({ abi: WALLET_ABI, functionName: "executeWithSig", args: [call.target as Hex, call.value, call.data, deadline, gas, sig as Hex] });
 }

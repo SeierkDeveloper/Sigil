@@ -91,7 +91,9 @@ export const serverConfig = {
     const registry = process.env.SIGIL_IDENTITY_REGISTRY?.trim() ?? "";
     if (!/^[1-9]\d{0,17}$/.test(chainId) || !/^0x[0-9a-fA-F]{40}$/.test(registry)) return null;
     const rpc = process.env.SIGIL_IDENTITY_READ_RPC?.trim() ?? "";
-    return { chainId, registry, rpcUrl: /^https:\/\/[^\s]+$/.test(rpc) ? rpc : "" };
+    // https, or plain http to a chain on this machine (a local test chain).
+    const ok = /^https:\/\/[^\s]+$/.test(rpc) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/[^\s]*)?$/.test(rpc);
+    return { chainId, registry, rpcUrl: ok ? rpc : "" };
   },
   /**
    * Whether this node may talk to nodes and storage addresses on a private

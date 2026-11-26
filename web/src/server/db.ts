@@ -549,7 +549,7 @@ CREATE TABLE IF NOT EXISTS self_identities (
 CREATE TABLE IF NOT EXISTS drafts (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('reply', 'plan', 'answer')),
+  kind TEXT NOT NULL CHECK (kind IN ('reply', 'plan', 'answer', 'payment')),
   ref TEXT,
   box TEXT NOT NULL,
   state TEXT NOT NULL CHECK (state IN ('waiting', 'approved', 'discarded')),
@@ -789,6 +789,22 @@ CREATE TABLE IF NOT EXISTS space_heirs (
   UNIQUE (space_id, public_key)
 );
 
+-- Receipts of what the AI self did on its own. leaf is a salted hash of the
+-- receipt (the server learns nothing from it) and joins its hour's seal; box is
+-- the receipt under the vault key, readable by the owner only.
+CREATE TABLE IF NOT EXISTS self_receipts (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  leaf TEXT NOT NULL,
+  hour INTEGER NOT NULL,
+  box TEXT NOT NULL,
+  sealed INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  UNIQUE (user_id, leaf)
+);
+CREATE INDEX IF NOT EXISTS self_receipts_unsealed ON self_receipts (sealed, hour);
+CREATE INDEX IF NOT EXISTS self_receipts_by_user ON self_receipts (user_id, created_at);
+
 -- The immune system's public test: one record per hour (each strain, how it
 -- varied, whether it was held and by what). Its leaf joins that hour's seal.
 CREATE TABLE IF NOT EXISTS immune_records (
@@ -927,6 +943,29 @@ function migrateAgreements(db: Db): void {
   }
 }
 
+/** Drafts gained the kind "payment" (a payment by the self key past its limits, waiting for the owner). Rebuild the table, keeping every row. */
+function migrateDrafts(db: Db): void {
+  const row = db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'drafts'").get() as { sql?: string } | undefined;
+  if (!row?.sql || row.sql.includes("'payment'")) return;
+  const start = SCHEMA.indexOf("CREATE TABLE IF NOT EXISTS drafts (");
+  const create = SCHEMA.slice(start, SCHEMA.indexOf(");", start) + 2);
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    db.exec("ALTER TABLE drafts RENAME TO drafts_old");
+    db.exec(create);
+    db.exec("INSERT INTO drafts SELECT * FROM drafts_old");
+    db.exec("DROP TABLE drafts_old");
+    db.exec("CREATE INDEX IF NOT EXISTS drafts_by_user ON drafts (user_id, state, created_at);");
+    db.exec("COMMIT");
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  } finally {
+    db.exec("PRAGMA foreign_keys = ON");
+  }
+}
+
 function addColumn(db: Db, table: string, column: string, type: string): void {
   const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!cols.some((c) => c.name === column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
@@ -953,6 +992,7 @@ export function openDb(file: string): Db {
   migrateKeyslots(db);
   db.exec(SCHEMA.replace("READ_LOG_TABLE", READ_LOG));
   migrateAgreements(db);
+  migrateDrafts(db);
   trackChanges(db);
   addColumn(db, "memories", "delete_after", "TEXT");
   // Versions of agents' own folders (pinned versions): needs agents and memories, both made above.

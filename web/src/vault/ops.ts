@@ -87,6 +87,7 @@ import { openPublicSelf, type PublicSelfView, type ServerPublicSelf } from "./pu
 import { openMeets, type MeetView, type ServerMeet } from "./meetOps";
 import { openChoices, openIdentity, openRules, type IdentityChoices, type IdentityView, type ServerIdentity } from "./identityOps";
 import { openDrafts, openWork, type DraftView, type ServerDraft } from "./workOps";
+import { openLimits } from "./limitsOps";
 import { openDisclosures, type DisclosureView, type ServerDisclosure } from "./discloseOps";
 import { openEmergency, type EmergencyView, type ServerEmergency } from "./emergencyOps";
 import { openAgreements, type AgreementView, type ServerAgreement } from "./agreementOps";
@@ -96,7 +97,7 @@ import { openBackups, type BackupView, type ServerBackups } from "./storageOps";
 import { NO_NODES, type NodesView } from "./nodeOps";
 import { openCaptureKeys, type CaptureKeyView, type ServerCaptureKey } from "./captureKeyOps";
 import { openSessions, type ServerSessions, type SessionsView } from "./sessionOps";
-import { DEFAULT_WORK, type FollowedPack, type WalletRules, type WorkSettings } from "@sigil/core";
+import { DEFAULT_LIMITS, DEFAULT_WORK, type FollowedPack, type SelfLimits, type WalletRules, type WorkSettings } from "@sigil/core";
 
 // ---------------------------------------------------------------- types
 
@@ -237,6 +238,8 @@ export interface VaultData {
   identityChoices: IdentityChoices;
   /** The draft rules of the self wallet, kept encrypted. */
   walletRules: WalletRules | null;
+  /** What the AI self may do on its own, kept encrypted. */
+  limits: SelfLimits;
   /** What the AI self holds for approval, and how it learns. */
   work: WorkSettings;
   /** The approval queue. */
@@ -689,6 +692,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   };
   const identityChoices = await later(() => openChoices(vault, settings.identity), EMPTY_CHOICES);
   const walletRules = await later(() => openRules(vault, settings.wallet), null);
+  const limits = await later(() => openLimits(vault, settings.limits), DEFAULT_LIMITS);
   const work = await later(() => openWork(vault, settings.work), DEFAULT_WORK);
   const follows = await later(() => openFollows(vault, settings.packs), []);
   const drafted = await openDrafts(vault, data.drafts ?? []);
@@ -718,6 +722,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     identity: openIdentity(data.identity),
     identityChoices,
     walletRules,
+    limits,
     work,
     drafts: drafted.drafts,
     disclosures: disclosed.disclosures,

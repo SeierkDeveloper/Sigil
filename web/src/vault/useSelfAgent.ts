@@ -71,7 +71,8 @@ export function useSelfAgent(api: Api, vault: Unlocked, data: VaultData | null, 
           } else answered += await servePublicOnce(api, d, { model });
         }
         if (d.meets.some((m) => m.state === "running" || m.state === "invited")) {
-          if (d.work.holdMeets) keep(await holdMeetsOnce(api, vault, d, known, { model }));
+          // Held turns, or meetings as a limit: a time agreed in free hours goes out on its own, any other agreement waits.
+          if (d.work.holdMeets || d.limits.meetings.on) keep(await holdMeetsOnce(api, vault, d, known, { model }));
           else answered += await meetOnce(api, vault, d, { model });
         }
         if (alive) setProgress({ answered, failed: null });
