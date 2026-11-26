@@ -39,7 +39,7 @@ const parts = [
   {
     path: "contracts",
     title: "The seal contract",
-    text: "SigilSeal.sol records hourly seal roots on chain and checks proofs with the same rules as the browser. Written and tested; not deployed.",
+    text: "SigilSeal.sol records hourly seal roots on chain and checks proofs with the same rules as the browser. Deployed at 0xA482Fcc6b0Febee91dD80E244bB56712688BddCD.",
   },
   {
     path: "e2e",

@@ -87,8 +87,8 @@ export default function SealsPage() {
               The public list
             </h2>
             <p className="section-lead">
-              The newest 48 seals. Local means the seal is kept by this server. Publishing seals on chain, so that not even Sigil could change one
-              later, is written and tested but not switched on yet.
+              The newest 48 seals. Each one is also published on chain in the SigilSeal contract, so that not even Sigil could change one
+              later; seals from before 26 November 2026 were published together that day.
             </p>
           </div>
           <SealList limit={48} />

@@ -1175,8 +1175,8 @@ if (r.rank >= 2) {
               their own caps (each token&apos;s decimals are read from the token on chain), and an end date. The draft is encrypted in your vault, and you can try any payment against it. The contracts that make this real
               on chain are in the repository: <code>SigilSelfRegistry</code> records which owner stands behind a self key (both must agree, to register and to hand it to a new owner), and{" "}
               <code>SigilSelfWallet</code> lets the self key act only within the owner&apos;s rules while the owner can freeze it, change its rules and withdraw at
-              any time. They are tested and not deployed. Until a site sets <code>SIGIL_IDENTITY_CHAIN_ID</code> and <code>SIGIL_IDENTITY_REGISTRY</code>, the
-              tab says so and everything above works off chain; with them set, your own browser wallet sends every step: register the self, create its
+              any time. This site&apos;s registry is deployed at <code>0x14f58fEAc7E649d192E94D29Cf954cfAbC36F45e</code>. A site that does not set <code>SIGIL_IDENTITY_CHAIN_ID</code> and <code>SIGIL_IDENTITY_REGISTRY</code> says so in the
+              tab and everything above works off chain; with them set, your own browser wallet sends every step: register the self, create its
               wallet, fund it, set the rules on chain and compare them with the draft, try a payment against the chain, freeze, unfreeze and withdraw.
             </p>
             <p>

@@ -174,7 +174,7 @@ const faq = [
   },
   {
     q: "Is anything stored on a blockchain?",
-    a: "Not by Sigil. Seals are kept by the Sigil server and marked Local; a contract that publishes seal roots on chain is written and tested but not deployed. If you choose Arweave as a place for your backups, your own device uploads your bundle there, encrypted, with your own key file. Nothing else of yours goes on a chain.",
+    a: "Not by Sigil. Every hourly seal root is published on chain in the SigilSeal contract, so not even Sigil can change one later. If you choose Arweave as a place for your backups, your own device uploads your bundle there, encrypted, with your own key file. Nothing else of yours goes on a chain.",
   },
   {
     q: "What does it cost?",

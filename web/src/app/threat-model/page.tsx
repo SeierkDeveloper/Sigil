@@ -129,7 +129,7 @@ const covered = [
   {
     threat: "The self key spends more than you allowed",
     answer:
-      "The self wallet checks every call against your caps per payment and per day, your recipients (the only addresses it can pay), the contracts and functions it may call, token caps in each token's own decimals as read from the token, and the end date, and refuses token moves it cannot cap. Freezing it also sets the allowances it gave back to zero. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing; not deployed.",
+      "The self wallet checks every call against your caps per payment and per day, your recipients (the only addresses it can pay), the contracts and functions it may call, token caps in each token's own decimals as read from the token, and the end date, and refuses token moves it cannot cap. Freezing it also sets the allowances it gave back to zero. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing, and each owner deploys their own from the vault.",
   },
   {
     threat: "A proof shows more than its claim",
@@ -256,7 +256,7 @@ const notCovered = [
   },
   {
     threat: "Seals rewritten by the server itself",
-    answer: "Seals are local today: kept by Sigil. The contract that publishes them on chain, so that not even Sigil could change one, is written and tested but not deployed.",
+    answer: "Every hourly seal root is published on chain in the SigilSeal contract, so not even Sigil could change one later. Seals from before 26 November 2026 were published together that day.",
   },
   {
     threat: "What your model provider sees",
@@ -299,7 +299,7 @@ const notCovered = [
   },
   {
     threat: "A self key on chain before the contracts are reviewed",
-    answer: "The registry and the wallet are tested, not audited, and not deployed. Put on chain only what you could lose until they have been reviewed.",
+    answer: "The registry is deployed and each owner deploys their own wallet from the vault. Both are tested with fuzzing. Put in the wallet only what you could afford to lose.",
   },
   {
     threat: "Storage that does not last",
