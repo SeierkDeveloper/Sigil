@@ -10,6 +10,19 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    date: "2026-11-27",
+    title: "Upoch x Sigil: state and memory roll back together",
+    area: "Agents",
+    summary: "An agent's own folder now keeps pinned versions, so a rollback can bring back exactly what the agent remembered at that moment. Run live with Upoch, whose checkpoints now point at a pinned Sigil memory version.",
+    items: [
+      "Every change to an agent's own folder gives it a new version, kept as ciphertext like everything else",
+      "pin_memory returns a pointer to that version with a SHA-256 fingerprint over its ciphertext, small enough to anchor on chain with a checkpoint",
+      "restore_memory brings a pinned version back and checks it against the fingerprint before the agent uses it",
+      "Run end to end with Upoch on chain: memory v1 pinned at checkpoint 8, a bad instruction written as v2 at checkpoint 9, a rollback to 8, and version 1 restored with its fingerprint checked",
+      "Both tools are in the connector (npx -y sigil-connector) for agent keys; the docs show the whole flow under Pinned versions",
+    ],
+  },
+  {
     date: "2026-11-26",
     title: "A self that acts, within your limits",
     area: "AI self",
