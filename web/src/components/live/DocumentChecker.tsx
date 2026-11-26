@@ -85,7 +85,7 @@ async function checkReceiptDocument(text: string, chain: ChainInfo | null, perio
     const roots = await siteRoots()([shared.seal.hour]);
     const published = roots.get(shared.seal.hour);
     const match = !!published && published.toLowerCase() === shared.seal.root.toLowerCase();
-    checks.push({ name: "published", ok: match, detail: match ? `The root is the one this site published for hour ${shared.seal.hour}.` : "The root is not the one this site published for that hour." });
+    checks.push({ name: "published", ok: match, detail: match ? `The root is the one this site published for the hour from ${new Date(shared.seal.hour * (shared.seal.periodSeconds ?? period) * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC.` : "The root is not the one this site published for that hour." });
     if (chain) {
       const onChain = (await chainRoots(chain)([shared.seal.hour])).get(shared.seal.hour);
       checks.push({ name: "chain", ok: !!onChain && onChain.toLowerCase() === shared.seal.root.toLowerCase(), detail: onChain ? "The root matches SigilSeal on chain." : "That hour is not on chain yet." });

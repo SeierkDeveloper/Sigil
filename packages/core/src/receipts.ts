@@ -169,7 +169,7 @@ export function checkReceipt(shared: SharedReceipt): { ok: boolean; leaf: string
     } catch {
       proven = false;
     }
-    checks.push({ name: "seal", ok: proven, detail: proven ? `Its fingerprint is in the seal of hour ${shared.seal.hour}, root ${shared.seal.root.slice(0, 18)}...` : "The proof does not lead from this receipt to the root it names." });
+    checks.push({ name: "seal", ok: proven, detail: proven ? `Its fingerprint is in the sealed root ${shared.seal.root.slice(0, 18)}...` : "The proof does not lead from this receipt to the root it names." });
     const period = shared.seal.periodSeconds ?? 3600;
     const atHour = Math.floor(Date.parse(body.at) / 1000 / period);
     const timely = shared.seal.hour >= atHour && shared.seal.hour <= atHour + 1;

@@ -89,6 +89,8 @@ test("the self wallet goes live on a local chain: register, create, fund, rules,
     bypassCSP: true,
     baseURL: CHAIN_URL,
     permissions: ["clipboard-read", "clipboard-write"],
+    timezoneId: "UTC",
+    locale: "en-US",
     ...(PHONE ? { viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width: 1440, height: 900 } }),
   });
   const owner = await installChainWallet(ctx);
@@ -245,7 +247,7 @@ test("the self wallet goes live on a local chain: register, create, fund, rules,
   await page.waitForTimeout(6_000);
   await openTab(page, "Limits");
   await expect(page.getByTestId("receipt")).toHaveCount(3);
-  await expect(page.getByTestId("receipt").first()).toContainText("Sealed in hour");
+  await expect(page.getByTestId("receipt").first()).toContainText("In the seal of the hour from");
   await shot(page, "limits-receipts", page.getByRole("heading", { name: "Receipts" }));
   await page.getByTestId("receipt").first().getByRole("button", { name: "Copy" }).click();
   const file = await page.evaluate(() => navigator.clipboard.readText());
@@ -266,7 +268,7 @@ test("the self wallet goes live on a local chain: register, create, fund, rules,
     await verify.locator("#doc-text").fill(file);
     await verify.getByRole("button", { name: "Check it" }).click();
     await expect(result).toHaveAttribute("data-ok", "true");
-    await shot(verify, "verify-receipt", verify.locator("#doc-text"));
+    await shot(verify, "verify-receipt", verify.getByRole("button", { name: "Check it" }));
   }
   await ctx.close();
 });

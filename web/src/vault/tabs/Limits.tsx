@@ -195,7 +195,7 @@ function ReceiptsSection() {
                 </p>
                 <p className="list-row-meta">
                   {formatDateTime(r.createdAt)}
-                  {r.receipt ? `. Under: ${r.receipt.body.limit}` : ""}. {r.shared?.seal ? `Sealed in hour ${r.shared.seal.hour}.` : "Sealed once its hour is over."}
+                  {r.receipt ? `. Under: ${r.receipt.body.limit}` : ""}. {r.shared?.seal ? `In the seal of the hour from ${formatDateTime(new Date(r.shared.seal.hour * (r.shared.seal.periodSeconds ?? 3600) * 1000).toISOString())}.` : "Sealed once its hour is over."}
                 </p>
               </div>
               {r.shared ? (

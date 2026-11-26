@@ -502,7 +502,7 @@ function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
               <label className="field-label" htmlFor="try-what">
                 Pay in
               </label>
-              <select id="try-what" className="input" value={trial.what} onChange={(e) => setTrial({ ...trial, what: e.target.value })}>
+              <select id="try-what" className="select" value={trial.what} onChange={(e) => setTrial({ ...trial, what: e.target.value })}>
                 <option value="coin">The chain&apos;s coin</option>
                 {rules.tokens.map((t, i) => (
                   <option key={t.address} value={String(i)}>
@@ -862,8 +862,8 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
               {rows.map((r, i) => (
                 <tr key={`${r.what}-${i}`} data-same={r.same ? "true" : "false"}>
                   <th scope="row">{r.what}</th>
-                  <td>{r.draft}</td>
-                  <td>
+                  <td data-label="Draft">{r.draft}</td>
+                  <td data-label="On chain">
                     {r.chain}
                     {r.same ? null : <span className="rules-compare-flag"> Differs</span>}
                   </td>
@@ -1049,7 +1049,7 @@ function PaySection({ chain }: { chain: idOps.ChainConfig }) {
               <label className="field-label" htmlFor="pay-to">
                 To
               </label>
-              <select id="pay-to" className="input" value={ask.to} onChange={(e) => setAsk({ ...ask, to: e.target.value })} required>
+              <select id="pay-to" className="select" value={ask.to} onChange={(e) => setAsk({ ...ask, to: e.target.value })} required>
                 <option value="">Choose a recipient</option>
                 {rules.recipients.map((r) => (
                   <option key={r.address} value={r.address}>
@@ -1062,7 +1062,7 @@ function PaySection({ chain }: { chain: idOps.ChainConfig }) {
               <label className="field-label" htmlFor="pay-in">
                 Pay in
               </label>
-              <select id="pay-in" className="input" value={ask.token} onChange={(e) => setAsk({ ...ask, token: e.target.value })}>
+              <select id="pay-in" className="select" value={ask.token} onChange={(e) => setAsk({ ...ask, token: e.target.value })}>
                 <option value="">The chain&apos;s coin</option>
                 {rules.tokens.map((t) => (
                   <option key={t.address} value={t.address}>
