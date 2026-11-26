@@ -142,17 +142,76 @@ contract SigilSelfRegistryTest is Test {
         registry.setMetadata(stranger, "x");
     }
 
-    function testTransferIdentity() public {
+    function testTransferIdentityTakesTwoSteps() public {
         _register();
         vm.prank(owner);
+        registry.setWallet(selfKey, address(0xBEEF));
+        vm.prank(owner);
         registry.transferIdentity(selfKey, stranger);
-        assertEq(registry.identityOf(selfKey).owner, stranger);
+        // Only proposed: the owner is still the owner.
+        assertEq(registry.identityOf(selfKey).owner, owner);
+        assertEq(registry.pendingOwner(selfKey), stranger);
+        vm.prank(stranger);
+        registry.acceptIdentity(selfKey);
+        SigilSelfRegistry.Identity memory id = registry.identityOf(selfKey);
+        assertEq(id.owner, stranger);
+        assertEq(id.wallet, address(0));
+        assertEq(registry.registeredBy(stranger), 1);
         vm.prank(owner);
         vm.expectRevert(SigilSelfRegistry.NotOwner.selector);
         registry.setMetadata(selfKey, "x");
         vm.prank(stranger);
         vm.expectRevert(SigilSelfRegistry.ZeroAddress.selector);
         registry.transferIdentity(selfKey, address(0));
+        // Accepting twice does nothing more: nothing is pending.
+        vm.prank(stranger);
+        vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
+        registry.acceptIdentity(selfKey);
+    }
+
+    function testAProposalCanBeCancelledOrReplaced() public {
+        _register();
+        address other = makeAddr("other");
+        vm.startPrank(owner);
+        registry.transferIdentity(selfKey, stranger);
+        registry.transferIdentity(selfKey, other);
+        vm.stopPrank();
+        vm.prank(stranger);
+        vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
+        registry.acceptIdentity(selfKey);
+        vm.prank(owner);
+        registry.cancelTransfer(selfKey);
+        vm.prank(other);
+        vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
+        registry.acceptIdentity(selfKey);
+        assertEq(registry.identityOf(selfKey).owner, owner);
+        // Only the owner proposes or cancels.
+        vm.prank(stranger);
+        vm.expectRevert(SigilSelfRegistry.NotOwner.selector);
+        registry.cancelTransfer(selfKey);
+    }
+
+    function testARevokedIdentityCannotBeAccepted() public {
+        _register();
+        vm.prank(owner);
+        registry.transferIdentity(selfKey, stranger);
+        vm.prank(selfKey);
+        registry.revoke(selfKey);
+        assertEq(registry.pendingOwner(selfKey), address(0));
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfRegistry.IsRevoked.selector, selfKey));
+        registry.acceptIdentity(selfKey);
+    }
+
+    function testFuzzOnlyTheProposedOwnerAccepts(address who) public {
+        vm.assume(who != stranger);
+        _register();
+        vm.prank(owner);
+        registry.transferIdentity(selfKey, stranger);
+        vm.prank(who);
+        vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
+        registry.acceptIdentity(selfKey);
+        assertEq(registry.identityOf(selfKey).owner, owner);
     }
 
     // ---------------------------------------------------------------- revocation

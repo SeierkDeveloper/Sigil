@@ -88,14 +88,25 @@ describe("EIP-712, as the contracts compute it", () => {
   it("matches viem's typed data hash for SigilSelfWallet.execute, and signs it", async () => {
     const key = await selfIdentityKey(VAULT);
     const data = encodeFunctionData({ abi: parseAbi(["function order(uint256)"]), args: [3n] });
-    const digest = executeDigest({ chainId: 1n, wallet: WALLET, target: SHOP, value: 5n, data, nonce: 7n, deadline: 99n });
+    const digest = executeDigest({ chainId: 1n, wallet: WALLET, target: SHOP, value: 5n, data, nonce: 7n, deadline: 99n, gas: 150_000n });
     const viemDigest = hashTypedData({
-      domain: { name: "SigilSelfWallet", version: "1", chainId: 1, verifyingContract: WALLET },
-      types: { Execute: [{ name: "target", type: "address" }, { name: "value", type: "uint256" }, { name: "data", type: "bytes" }, { name: "nonce", type: "uint256" }, { name: "deadline", type: "uint256" }] },
+      domain: { name: "SigilSelfWallet", version: "2", chainId: 1, verifyingContract: WALLET },
+      types: {
+        Execute: [
+          { name: "target", type: "address" },
+          { name: "value", type: "uint256" },
+          { name: "data", type: "bytes" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "gas", type: "uint256" },
+        ],
+      },
       primaryType: "Execute",
-      message: { target: SHOP, value: 5n, data, nonce: 7n, deadline: 99n },
+      message: { target: SHOP, value: 5n, data, nonce: 7n, deadline: 99n, gas: 150_000n },
     });
     expect(hex(digest)).toBe(viemDigest);
+    // The signed gas is part of what the self key agrees to.
+    expect(hex(executeDigest({ chainId: 1n, wallet: WALLET, target: SHOP, value: 5n, data, nonce: 7n, deadline: 99n, gas: 0n }))).not.toBe(viemDigest);
     expect(recoverDigest(digest, signDigest(key.secret, digest))).toBe(key.address);
   });
 });
@@ -128,12 +139,42 @@ describe("wallet rules", () => {
     expect(() => cleanWalletRules({ ...rules, contracts: [{ address: SHOP, label: "", functions: ["not a function"] }] })).toThrow();
   });
 
+  it("never guess a token's decimals (HeyResearch security review, M-1)", () => {
+    const { decimals: _gone, ...noDecimals } = rules.tokens[0];
+    expect(() => cleanWalletRules({ ...rules, tokens: [noDecimals as never] })).toThrow(/decimals were not read from the chain/);
+    expect(() => cleanWalletRules({ ...rules, tokens: [{ ...rules.tokens[0], decimals: Number.NaN }] })).toThrow(/decimals/);
+    expect(() => cleanWalletRules({ ...rules, tokens: [{ ...rules.tokens[0], decimals: 37 }] })).toThrow(/decimals/);
+    // The same "50" is 50e6 base units for a 6-decimal token: what the wallet holds is what the vault checks.
+    const six = walletConfig({ ...rules, tokens: [{ ...rules.tokens[0], perTx: "50", perDay: "50" }] }).tokens[0];
+    expect([six.perTx, six.perDay]).toEqual([50_000_000n, 50_000_000n]);
+    const call = { target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: FRIEND, amount: "60" };
+    expect(checkCall({ ...rules, tokens: [{ ...rules.tokens[0], perTx: "50", perDay: "50" }] }, call, undefined, { now: Date.parse("2029-06-01") })).toMatchObject({ reason: "Over the token's cap per transaction." });
+  });
+
+  it("keep recipients and contracts apart (HeyResearch security review, L-1)", () => {
+    // An address is a recipient or a contract, never both, and a token is never a recipient.
+    expect(() => cleanWalletRules({ ...rules, recipients: [...rules.recipients, { address: SHOP, label: "Shop" }] })).toThrow(/never both/);
+    expect(() => cleanWalletRules({ ...rules, recipients: [...rules.recipients, { address: TOKEN, label: "Token" }] })).toThrow(/never both/);
+    const at = { now: Date.parse("2029-06-01") };
+    // A token goes only to a recipient: never to a listed contract or to a token contract.
+    expect(checkCall(rules, { target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: SHOP, amount: "1" }, undefined, at)).toMatchObject({ reason: "The recipient is not one of the recipients." });
+    expect(checkCall(rules, { target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: TOKEN, amount: "1" }, undefined, at)).toMatchObject({ reason: "The recipient is not one of the recipients." });
+    expect(checkCall(rules, { target: TOKEN, value: "0", fn: "approve(address,uint256)", to: SHOP, amount: "1" }, undefined, at)).toMatchObject({ reason: "The recipient is not one of the recipients." });
+    expect(checkCall(rules, { target: TOKEN, value: "0", fn: "approve(address,uint256)", to: FRIEND, amount: "1" }, undefined, at)).toEqual({ ok: true });
+    // A plain payment (no function) goes only to a recipient, never to a contract's receive or fallback.
+    expect(checkCall(rules, { target: SHOP, value: "0.1", fn: "" }, undefined, at)).toMatchObject({ reason: "This address is not one of the recipients." });
+    expect(checkCall(rules, { target: SHOP, value: "0", fn: "" }, undefined, at)).toMatchObject({ reason: "This address is not one of the recipients." });
+    // And a recipient is never called with a function.
+    expect(checkCall(rules, { target: FRIEND, value: "0", fn: "order(uint256)" }, undefined, at)).toMatchObject({ reason: "This contract is not on the list of contracts." });
+  });
+
   it("give the exact arguments of configure()", () => {
     const cfg = walletConfig(rules);
     expect(cfg.perTxCap).toBe(500_000_000_000_000_000n);
     expect(cfg.perDayCap).toBe(1_250_000_000_000_000_000n);
     expect(cfg.expiresAt).toBe(1_893_456_000n);
-    expect(cfg.targets.map((t) => t.toLowerCase())).toEqual([FRIEND, SHOP, TOKEN]);
+    expect(cfg.recipients.map((t) => t.toLowerCase())).toEqual([FRIEND]);
+    expect(cfg.targets.map((t) => t.toLowerCase())).toEqual([SHOP, TOKEN]);
     expect(cfg.selectors).toContainEqual({ target: checksumAddress(SHOP), selector: functionSelector("order(uint256)") });
     expect(cfg.selectors).toContainEqual({ target: checksumAddress(TOKEN), selector: "0xa9059cbb" });
     expect(cfg.tokens).toEqual([{ token: checksumAddress(TOKEN), perTx: 100_000_000n, perDay: 250_000_000n }]);
@@ -152,10 +193,11 @@ describe("wallet rules", () => {
     expect(ok({ target: FRIEND, value: "0.5", fn: "" }, { native: parseUnits("1"), tokens: {} })).toMatchObject({ reason: "Over the cap per day." });
     expect(ok({ target: SHOP, value: "0", fn: "order(uint256)" })).toEqual({ ok: true });
     expect(ok({ target: SHOP, value: "0", fn: "cancel()" })).toMatchObject({ reason: "That function is not allowed on this contract." });
-    expect(ok({ target: "0x4444444444444444444444444444444444444444", value: "0", fn: "" })).toMatchObject({ reason: "The target is not on the allowed list." });
+    expect(ok({ target: "0x4444444444444444444444444444444444444444", value: "0", fn: "" })).toMatchObject({ reason: "This address is not one of the recipients." });
+    expect(ok({ target: "0x4444444444444444444444444444444444444444", value: "0", fn: "order(uint256)" })).toMatchObject({ reason: "This contract is not on the list of contracts." });
     expect(ok({ target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: FRIEND, amount: "100" })).toEqual({ ok: true });
     expect(ok({ target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: FRIEND, amount: "101" })).toMatchObject({ reason: "Over the token's cap per transaction." });
-    expect(ok({ target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: "0x4444444444444444444444444444444444444444", amount: "1" })).toMatchObject({ reason: "The recipient is not on the allowed list." });
+    expect(ok({ target: TOKEN, value: "0", fn: "transfer(address,uint256)", to: "0x4444444444444444444444444444444444444444", amount: "1" })).toMatchObject({ reason: "The recipient is not one of the recipients." });
     expect(ok({ target: FRIEND, value: "0.1", fn: "" }, undefined, { frozen: true })).toMatchObject({ reason: "The wallet is frozen." });
     expect(checkCall(rules, { target: FRIEND, value: "0.1", fn: "" }, undefined, { now: Date.parse("2031-01-01") })).toMatchObject({ reason: "The rules have expired." });
   });

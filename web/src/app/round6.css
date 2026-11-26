@@ -268,6 +268,53 @@
   margin-top: var(--space-2);
 }
 
+/* A token row: what the token answered on chain is shown, not typed; its caps in base units under it. */
+.rules-token {
+  margin-bottom: var(--space-3);
+}
+
+.rules-token .rules-row {
+  margin-bottom: var(--space-1);
+}
+
+.rules-token + .rules-token .rules-cell::before {
+  display: none;
+}
+
+.rules-row .input[readonly] {
+  border-style: dashed;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+.rules-base {
+  margin: 0;
+}
+
+.rules-add-token {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+  margin-top: var(--space-2);
+}
+
+.wallet-approvals {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  margin: var(--space-4) 0;
+}
+
+.wallet-approvals > * {
+  margin: 0;
+  width: 100%;
+}
+
+.wallet-approvals > .button {
+  width: auto;
+}
+
 @media (max-width: 640px) {
   /* On a phone every row is a small sheet of its own, and every field keeps its name. */
   .rules-row,
@@ -288,8 +335,17 @@
     grid-column: 1 / -1;
   }
 
-  .rules-row ~ .rules-row .rules-cell::before {
+  .rules-row ~ .rules-row .rules-cell::before,
+  .rules-token + .rules-token .rules-cell::before {
     display: block;
+  }
+
+  .rules-add-token {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rules-add-token > .button {
+    justify-self: end;
   }
 
   .rules-row-wide:has(> :nth-child(6)) .rules-cell:nth-child(n + 3) {

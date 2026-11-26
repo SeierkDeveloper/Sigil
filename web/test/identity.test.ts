@@ -98,9 +98,11 @@ describe("wallet rules", () => {
 
     const call = decodeFunctionData({ abi: id.WALLET_ABI, data: id.configureCalldata(rules) });
     expect(call.functionName).toBe("configure");
-    const [perTx, perDay, expires, targets, selectors] = call.args as unknown as [bigint, bigint, bigint, string[], { target: string; selector: string }[]];
+    const [perTx, perDay, expires, recipients, targets, selectors] = call.args as unknown as [bigint, bigint, bigint, string[], string[], { target: string; selector: string }[]];
     expect([perTx, perDay, expires]).toEqual([50_000_000_000_000_000n, 200_000_000_000_000_000n, 1_811_808_000n]);
-    expect(targets.map((t) => t.toLowerCase())).toEqual(["0x1111111111111111111111111111111111111111", "0x2222222222222222222222222222222222222222"]);
+    // Recipients and contracts are two lists on chain (HeyResearch security review, L-1).
+    expect(recipients.map((t) => t.toLowerCase())).toEqual(["0x1111111111111111111111111111111111111111"]);
+    expect(targets.map((t) => t.toLowerCase())).toEqual(["0x2222222222222222222222222222222222222222"]);
     expect(selectors).toEqual([{ target: checksumAddress("0x2222222222222222222222222222222222222222"), selector: functionSelector("order(uint256)") }]);
   });
 
@@ -121,34 +123,98 @@ describe("the calls for the chain", () => {
     expect(id.freezeCalldata()).toBe(toFunctionSelector("function freeze()"));
   });
 
-  it("read the wallet and its spends through the public read address, with no key", async () => {
+  it("read the wallet, its token caps, open allowances and today's spends through the public read address, with no key", async () => {
     const wallet = "0x00000000000000000000000000000000005e1f02";
+    const token = "0x3333333333333333333333333333333333333333";
+    const friend = "0x1111111111111111111111111111111111111111";
+    const now = Date.parse("2026-11-26T12:00:00Z");
+    const dayStart = Math.floor(now / 86_400_000) * 86_400;
+    const latest = 1_000_000;
     const seen: unknown[] = [];
+    const ranges: [number, number][] = [];
+    const w = (n: bigint) => n.toString(16).padStart(64, "0");
     const fetcher = async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body));
       seen.push(body);
       if (Array.isArray(body)) {
-        const values: Record<string, unknown> = { owner: "0x000000000000000000000000000000000000dEaD", selfKey: "0x000000000000000000000000000000000000bEEF", frozen: false, perTxCap: 5n, perDayCap: 9n, expiresAt: 0n, remainingToday: 4n };
+        const values: Record<string, unknown> = {
+          owner: "0x000000000000000000000000000000000000dEaD",
+          selfKey: "0x000000000000000000000000000000000000bEEF",
+          frozen: false,
+          perTxCap: 5n,
+          perDayCap: 9n,
+          expiresAt: 0n,
+          remainingToday: 4n,
+          openApprovals: [{ token, spender: friend }],
+          tokenLimit: [50_000_000n, 50_000_000n],
+          tokenRemainingToday: 20_000_000n,
+        };
         return new Response(
           JSON.stringify(
-            body.map((c: { id: number; params: [{ data: Hex }] }) => {
-              if (c.id === 99) return { id: 99, result: "0x64" };
+            body.map((c: { id: number; params: [{ to: string; data: Hex }] }) => {
+              if (c.params[0].to.toLowerCase() === token) return { id: c.id, result: encodeFunctionResult({ abi: id.ERC20_ABI, functionName: "allowance", result: 30_000_000n }) };
               const fn = decodeFunctionData({ abi: id.WALLET_ABI, data: c.params[0].data }).functionName;
               return { id: c.id, result: encodeFunctionResult({ abi: id.WALLET_ABI, functionName: fn, result: values[fn] as never }) };
             }),
           ),
         );
       }
-      const w = (n: bigint) => n.toString(16).padStart(64, "0");
+      if (body.method === "eth_blockNumber") return new Response(JSON.stringify({ result: `0x${latest.toString(16)}` }));
+      if (body.method === "eth_getBlockByNumber") {
+        // Ten blocks a second, block `latest` at `now`.
+        const n = Number(BigInt(body.params[0]));
+        return new Response(JSON.stringify({ result: { timestamp: `0x${(Math.floor(now / 1000) - Math.floor((latest - n) / 10)).toString(16)}` } }));
+      }
+      const from = Number(BigInt(body.params[0].fromBlock));
+      const to = Number(BigInt(body.params[0].toBlock));
+      ranges.push([from, to]);
+      // The node refuses a span that holds too many logs: the reader halves it.
+      if (to - from > 60_000) return new Response(JSON.stringify({ error: { message: "logs matched by query exceeds limit of 10000" } }));
+      const inRange = from <= latest - 5 && latest - 5 <= to;
       return new Response(
         JSON.stringify({
-          result: [{ topics: [EXECUTED_TOPIC, `0x${w(0n)}`, `0x${w(0x1111n)}`], data: `0x${w(5n)}${"0".repeat(64)}${"0".repeat(64)}${w(0n)}`, blockNumber: "0x60", transactionHash: "0xab" }],
+          result: inRange ? [{ topics: [EXECUTED_TOPIC, `0x${w(0n)}`, `0x${w(0x1111n)}`], data: `0x${w(5n)}${"0".repeat(64)}${"0".repeat(64)}${w(0n)}`, blockNumber: `0x${(latest - 5).toString(16)}`, transactionHash: "0xab" }] : [],
         }),
       );
     };
-    const state = await id.readWallet({ chainId: "1", registry: wallet, rpcUrl: "https://rpc.example.org" }, wallet, fetcher);
+    const state = await id.readWallet({ chainId: "1", registry: wallet, rpcUrl: "https://rpc.example.org" }, wallet, { tokens: [token], fetcher, now, pauseMs: 0 });
     expect(state).toMatchObject({ frozen: false, perTxCap: 5n, perDayCap: 9n, remainingToday: 4n });
+    // The token caps as set on chain, read back (HeyResearch security review, M-1).
+    expect(state.tokens).toEqual([{ token: checksumAddress(token), perTx: 50_000_000n, perDay: 50_000_000n, remainingToday: 20_000_000n }]);
+    // The allowances the self key gave, and what each spender may still take (I-1).
+    expect(state.approvals).toEqual([{ token: checksumAddress(token), spender: checksumAddress(friend), allowance: 30_000_000n }]);
     expect(state.spends).toEqual([expect.objectContaining({ nonce: 0, value: 5n, selector: null })]);
+    // The spends go back to 00:00 UTC, twelve hours here: far past the old window of 50,000 blocks (I-3).
+    expect(state.coversToday).toBe(true);
+    expect(latest - state.spendsFromBlock).toBeGreaterThan(12 * 3600 * 10 - id.LOG_CHUNK);
+    expect(state.spendsFromBlock).toBeLessThanOrEqual(latest - (Math.floor(now / 1000) - dayStart) * 10);
+    // No query asked for more than one chunk of blocks.
+    expect(Math.max(...ranges.map(([a, b]) => b - a + 1))).toBeLessThanOrEqual(id.LOG_CHUNK);
     expect(JSON.stringify(seen)).not.toMatch(/private|secret|sign/i);
+  });
+
+  it("read a token's decimals from the token, and refuse a token that does not answer (HeyResearch security review, M-1)", async () => {
+    const chain = { chainId: "1", registry: "0x00000000000000000000000000000000005e1f01", rpcUrl: "https://rpc.example.org" };
+    const usdg = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+    const answer = (decimals: number | null) => async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { id: number; params: [{ data: Hex }] }[];
+      return new Response(
+        JSON.stringify(
+          body.map((c) => {
+            const fn = decodeFunctionData({ abi: id.ERC20_ABI, data: c.params[0].data }).functionName;
+            if (decimals === null) return { id: c.id, error: { message: "execution reverted" } };
+            return { id: c.id, result: fn === "decimals" ? encodeFunctionResult({ abi: id.ERC20_ABI, functionName: "decimals", result: decimals }) : encodeFunctionResult({ abi: id.ERC20_ABI, functionName: "symbol", result: "USDG" }) };
+          }),
+        ),
+      );
+    };
+    expect(await id.readToken(chain, usdg, answer(6))).toEqual({ address: checksumAddress(usdg), decimals: 6, symbol: "USDG" });
+    await expect(id.readToken(chain, usdg, answer(null))).rejects.toThrow(/did not answer decimals\(\)/);
+    await expect(id.readToken({ ...chain, rpcUrl: "" }, usdg, answer(6))).rejects.toThrow(/read address/);
+    // A draft whose decimals differ from the token's is refused before it is kept or set on chain.
+    const withToken: WalletRules = { ...rules, tokens: [{ address: usdg, label: "USDG", decimals: 18, perTx: "50", perDay: "50" }] };
+    await expect(id.checkTokenDecimals(chain, withToken, answer(6))).rejects.toThrow(/6 decimals on chain, the draft says 18/);
+    await expect(id.checkTokenDecimals(chain, { ...withToken, tokens: [{ ...withToken.tokens[0], decimals: 6 }] }, answer(6))).resolves.toBeUndefined();
+    await expect(id.checkTokenDecimals(chain, { ...withToken, tokens: [{ ...withToken.tokens[0], decimals: 6 }] }, answer(null))).rejects.toThrow(/did not answer/);
   });
 });

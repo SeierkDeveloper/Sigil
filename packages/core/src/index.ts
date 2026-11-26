@@ -45,5 +45,5 @@ export * from "./immunerun";
 export * from "./versions";
 
 /** The version of the Sigil open standard this code follows (docs/spec). */
-export const SPEC_VERSION = "1.3.0";
+export const SPEC_VERSION = "1.4.0";
 export * from "./you";

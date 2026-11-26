@@ -12,6 +12,8 @@ pragma solidity 0.8.28;
 contract SigilSeal {
     struct Seal {
         bytes32 root;
+        /// @dev What the sealer says the tree holds. The contract cannot check it against the
+        ///      root, so a reader must not rely on it as a count; only proofs against the root count.
         uint32 leaves;
         uint64 sealedAt;
     }
@@ -62,6 +64,7 @@ contract SigilSeal {
 
     /// @notice Records the root of one finished hour. A seal can never be changed.
     /// @param hour Unix time divided by 3600, rounded down.
+    /// @param leaves The number of entries, as the sealer states it; not checked against the root.
     function seal(uint64 hour, bytes32 root, uint32 leaves) external onlySealer {
         _seal(hour, root, leaves);
     }

@@ -117,7 +117,7 @@ export const RULES: WalletRules = {
 };
 
 const CONFIGURE_ABI = parseAbi([
-  "function configure(uint256 perTxCap, uint256 perDayCap, uint64 expiresAt, address[] targets, (address target, bytes4 selector)[] selectors, (address token, uint128 perTx, uint128 perDay)[] tokens)",
+  "function configure(uint256 perTxCap, uint256 perDayCap, uint64 expiresAt, address[] recipients, address[] targets, (address target, bytes4 selector)[] selectors, (address token, uint128 perTx, uint128 perDay)[] tokens)",
 ]);
 
 export const H = (n: number, len = 32) => Uint8Array.from({ length: len }, (_, i) => (i * 7 + n) & 0xff);
@@ -339,7 +339,7 @@ async function versionOneOne(vault: Uint8Array, signing: Awaited<ReturnType<type
   const register = { chainId: EVM.chainId, registry: EVM.registry, owner: EVM.owner, selfKey: self.address, metadataURI: "https://vault.example/api/identity/at/self", deadline: 1_900_000_000n };
   const registerHash = registerDigest(register);
   const callData = encodeFunctionData({ abi: parseAbi(["function order(uint256)"]), args: [3n] });
-  const execute = { chainId: EVM.chainId, wallet: EVM.wallet, target: EVM.shop, value: 0n, data: callData, nonce: 0n, deadline: 1_900_000_000n };
+  const execute = { chainId: EVM.chainId, wallet: EVM.wallet, target: EVM.shop, value: 0n, data: callData, nonce: 0n, deadline: 1_900_000_000n, gas: 100_000n };
   const executeHash = executeDigest(execute);
   const identity = signIdentity(signing, self, { name: "Sam's AI self", about: "Answers questions about my work.", owner: EVM.owner, wallet: EVM.wallet, chain: { chainId: "1", registry: EVM.registry }, origin: "https://vault.example", issuedAt: "2026-11-20T12:00:00.000Z" });
   const cfg = walletConfig(RULES);
@@ -380,7 +380,7 @@ async function versionOneOne(vault: Uint8Array, signing: Awaited<ReturnType<type
   return {
     selfKey: { vaultKey: INPUT.vaultKey, address: self.address },
     registerDigest: { ...register, chainId: "1", deadline: "1900000000", digest: hex32(registerHash), signature: signDigest(self.secret, registerHash) },
-    executeDigest: { ...execute, chainId: "1", value: "0", nonce: "0", deadline: "1900000000", digest: hex32(executeHash), signature: signDigest(self.secret, executeHash) },
+    executeDigest: { ...execute, chainId: "1", value: "0", nonce: "0", deadline: "1900000000", gas: "100000", digest: hex32(executeHash), signature: signDigest(self.secret, executeHash) },
     identityStatement: { message: identityMessage(identity.body), vaultSignature: identity.vaultSignature, selfSignature: identity.selfSignature },
     walletRules: {
       rules: RULES,
@@ -389,6 +389,7 @@ async function versionOneOne(vault: Uint8Array, signing: Awaited<ReturnType<type
         perTxCap: cfg.perTxCap.toString(),
         perDayCap: cfg.perDayCap.toString(),
         expiresAt: cfg.expiresAt.toString(),
+        recipients: cfg.recipients,
         targets: cfg.targets,
         selectors: cfg.selectors,
         tokens: cfg.tokens.map((t) => ({ token: t.token, perTx: t.perTx.toString(), perDay: t.perDay.toString() })),
@@ -400,6 +401,7 @@ async function versionOneOne(vault: Uint8Array, signing: Awaited<ReturnType<type
           cfg.perTxCap,
           cfg.perDayCap,
           cfg.expiresAt,
+          cfg.recipients as `0x${string}`[],
           cfg.targets as `0x${string}`[],
           cfg.selectors.map((x) => ({ target: x.target as `0x${string}`, selector: x.selector as `0x${string}` })),
           cfg.tokens.map((t) => ({ token: t.token as `0x${string}`, perTx: t.perTx, perDay: t.perDay })),

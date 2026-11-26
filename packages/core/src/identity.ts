@@ -11,9 +11,11 @@
 //              self, signed by both keys, so each vouches for the other.
 //   rules      the owner's rules for the self wallet (contracts/src/
 //              SigilSelfWallet.sol): caps per transaction and per day,
-//              recipients, contracts and the functions it may call on them,
-//              token caps and an expiry. Drafted and kept encrypted in the
-//              vault; `walletConfig` gives the exact arguments of configure().
+//              recipients (who may be paid), contracts and the functions it
+//              may call on them (never paid), token caps with the decimals
+//              read from each token on chain, and an expiry. Drafted and kept
+//              encrypted in the vault; `walletConfig` gives the exact
+//              arguments of configure().
 //
 // EIP-712 digests for SigilSelfRegistry.register and SigilSelfWallet.execute
 // are computed here byte for byte as the contracts compute them, so the self
@@ -118,10 +120,13 @@ const k = (s: string | Uint8Array) => keccak_256(typeof s === "string" ? utf8(s)
 
 const DOMAIN_TYPE = k("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
 const REGISTER_TYPE = k("Register(address owner,address selfKey,string metadataURI,uint256 deadline)");
-const EXECUTE_TYPE = k("Execute(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline)");
+const EXECUTE_TYPE = k("Execute(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline,uint256 gas)");
 
-export function domainSeparator(name: string, chainId: bigint, contract: string): Uint8Array {
-  return k(concatBytes(DOMAIN_TYPE, k(name), k("1"), word(chainId), addrWord(contract)));
+/** The EIP-712 domain versions of the contracts: the wallet's signed call gained its gas field in version 2. */
+export const DOMAIN_VERSION = { registry: "1", wallet: "2" } as const;
+
+export function domainSeparator(name: string, chainId: bigint, contract: string, version = "1"): Uint8Array {
+  return k(concatBytes(DOMAIN_TYPE, k(name), k(version), word(chainId), addrWord(contract)));
 }
 
 function typedDigest(domain: Uint8Array, structHash: Uint8Array): Uint8Array {
@@ -141,7 +146,7 @@ export interface RegisterInput {
 /** What the self key signs so its owner can register it (SigilSelfRegistry.registerDigest). */
 export function registerDigest(i: RegisterInput): Uint8Array {
   const struct = k(concatBytes(REGISTER_TYPE, addrWord(i.owner), addrWord(i.selfKey), k(i.metadataURI), word(i.deadline)));
-  return typedDigest(domainSeparator("SigilSelfRegistry", i.chainId, i.registry), struct);
+  return typedDigest(domainSeparator("SigilSelfRegistry", i.chainId, i.registry, DOMAIN_VERSION.registry), struct);
 }
 
 export interface ExecuteInput {
@@ -153,12 +158,14 @@ export interface ExecuteInput {
   data: string;
   nonce: bigint;
   deadline: bigint;
+  /** The gas the inner call gets; 0 for all that is left. The submitter cannot give it less. */
+  gas: bigint;
 }
 
 /** What the self key signs for a call anyone may submit (SigilSelfWallet.executeDigest). */
 export function executeDigest(i: ExecuteInput): Uint8Array {
-  const struct = k(concatBytes(EXECUTE_TYPE, addrWord(i.target), word(i.value), k(fromHex(i.data)), word(i.nonce), word(i.deadline)));
-  return typedDigest(domainSeparator("SigilSelfWallet", i.chainId, i.wallet), struct);
+  const struct = k(concatBytes(EXECUTE_TYPE, addrWord(i.target), word(i.value), k(fromHex(i.data)), word(i.nonce), word(i.deadline), word(i.gas)));
+  return typedDigest(domainSeparator("SigilSelfWallet", i.chainId, i.wallet, DOMAIN_VERSION.wallet), struct);
 }
 
 // ---------------------------------------------------------------- amounts
@@ -220,6 +227,7 @@ export interface RulesContract {
 export interface RulesToken {
   address: string;
   label: string;
+  /** As the token itself answers decimals() on chain: the vault reads it, the owner never types it. */
   decimals: number;
   /** Amounts in whole tokens, as decimals. */
   perTx: string;
@@ -256,7 +264,7 @@ export function cleanWalletRules(value: unknown): WalletRules {
     if (!isEvmAddress(s)) throw new Error(`The ${what} "${s}" is not an address.`);
     if (/^0x0{40}$/.test(s)) throw new Error(`The ${what} cannot be the zero address.`);
     const c = checksumAddress(s);
-    if (seen.has(c.toLowerCase())) throw new Error(`${c} is listed twice.`);
+    if (seen.has(c.toLowerCase())) throw new Error(`${c} is listed twice. An address is either a recipient or a contract, never both.`);
     seen.add(c.toLowerCase());
     return c;
   };
@@ -280,8 +288,9 @@ export function cleanWalletRules(value: unknown): WalletRules {
     tokens: list(v.tokens)
       .slice(0, 20)
       .map((t) => {
-        const decimals = Number(t.decimals ?? 18);
-        if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) throw new Error("Token decimals are a whole number from 0 to 36.");
+        // Never a default: a wrong number of decimals moves every cap by powers of ten.
+        const decimals = typeof t.decimals === "number" ? t.decimals : typeof t.decimals === "string" && /^\d{1,2}$/.test(t.decimals) ? Number(t.decimals) : NaN;
+        if (!Number.isInteger(decimals) || decimals < 0 || decimals > 36) throw new Error(`${label(t.label) || String(t.address ?? "A token")}: its decimals were not read from the chain. Add the token again to read them.`);
         return { address: addr(t.address, "token"), label: label(t.label), decimals, perTx: amount(t.perTx, decimals), perDay: amount(t.perDay, decimals) };
       }),
   };
@@ -299,15 +308,19 @@ export interface WalletConfig {
   perTxCap: bigint;
   perDayCap: bigint;
   expiresAt: bigint;
+  /** Who may be paid: native value, token transfers and approvals. */
+  recipients: string[];
+  /** The contracts the self may call, tokens included. Never paid. */
   targets: string[];
   selectors: { target: string; selector: string }[];
   tokens: { token: string; perTx: bigint; perDay: bigint }[];
 }
 
-/** The exact arguments of SigilSelfWallet.configure for these rules. Tokens are targets too, and each gets transfer and approve. */
+/** The exact arguments of SigilSelfWallet.configure for these rules. Recipients are their own list; contracts and tokens are the targets, and each token gets transfer and approve. */
 export function walletConfig(input: WalletRules): WalletConfig {
   const rules = cleanWalletRules(input);
-  const targets = [...rules.recipients.map((r) => r.address), ...rules.contracts.map((c) => c.address), ...rules.tokens.map((t) => t.address)];
+  const recipients = rules.recipients.map((r) => r.address);
+  const targets = [...rules.contracts.map((c) => c.address), ...rules.tokens.map((t) => t.address)];
   const selectors = [
     ...rules.contracts.flatMap((c) => c.functions.map((f) => ({ target: c.address, selector: functionSelector(f) }))),
     ...rules.tokens.flatMap((t) => [TOKEN_SELECTORS.transfer, TOKEN_SELECTORS.approve].map((selector) => ({ target: t.address, selector }))),
@@ -316,6 +329,7 @@ export function walletConfig(input: WalletRules): WalletConfig {
     perTxCap: parseUnits(rules.perTx),
     perDayCap: parseUnits(rules.perDay),
     expiresAt: rules.expiresAt ? BigInt(Math.floor(Date.parse(rules.expiresAt) / 1000)) : 0n,
+    recipients,
     targets,
     selectors,
     tokens: rules.tokens.map((t) => ({ token: t.address, perTx: parseUnits(t.perTx, t.decimals), perDay: parseUnits(t.perDay, t.decimals) })),
@@ -351,7 +365,13 @@ export function checkCall(input: WalletRules, call: CallToCheck, spent: Spent = 
   if (rules.expiresAt && (opts.now ?? Date.now()) >= Date.parse(rules.expiresAt)) return no("The rules have expired.");
   if (!isEvmAddress(call.target)) return no("The target is not an address.");
   const config = walletConfig(rules);
-  if (!config.targets.some((t) => sameAddress(t, call.target))) return no("The target is not on the allowed list.");
+  const isRecipient = (a: string | undefined) => !!a && config.recipients.some((r) => sameAddress(r, a));
+  if (!call.fn.trim()) {
+    // A plain payment, or a call with no data: only to a recipient.
+    if (!isRecipient(call.target)) return no("This address is not one of the recipients.");
+  } else if (!config.targets.some((t) => sameAddress(t, call.target))) {
+    return no("This contract is not on the list of contracts.");
+  }
   if (call.fn.trim()) {
     let selector: string;
     try {
@@ -363,7 +383,7 @@ export function checkCall(input: WalletRules, call: CallToCheck, spent: Spent = 
     if (selector === TOKEN_SELECTORS.transfer || selector === TOKEN_SELECTORS.approve) {
       const token = rules.tokens.find((t) => sameAddress(t.address, call.target));
       if (!token) return no("This token has no caps, so it cannot be moved.");
-      if (!call.to || !config.targets.some((t) => sameAddress(t, call.to))) return no("The recipient is not on the allowed list.");
+      if (!isRecipient(call.to)) return no("The recipient is not one of the recipients.");
       const amt = parseUnits(call.amount ?? "0", token.decimals);
       if (amt > parseUnits(token.perTx, token.decimals)) return no("Over the token's cap per transaction.");
       if ((spent.tokens[token.address.toLowerCase()] ?? 0n) + amt > parseUnits(token.perDay, token.decimals)) return no("Over the token's cap per day.");

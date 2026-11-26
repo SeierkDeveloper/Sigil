@@ -1171,9 +1171,9 @@ if (r.rank >= 2) {
               signatures, here or on the verify page.
             </p>
             <p>
-              Draft the rules of its wallet: a cap per payment and per day, the recipients and contracts it may pay or call and which functions, tokens with
-              their own caps, and an end date. The draft is encrypted in your vault, and you can try any payment against it. The contracts that make this real
-              on chain are in the repository: <code>SigilSelfRegistry</code> records which owner stands behind a self key (both must agree), and{" "}
+              Draft the rules of its wallet: a cap per payment and per day, the recipients it may pay, the contracts it may call and which functions, tokens with
+              their own caps (each token&apos;s decimals are read from the token on chain), and an end date. The draft is encrypted in your vault, and you can try any payment against it. The contracts that make this real
+              on chain are in the repository: <code>SigilSelfRegistry</code> records which owner stands behind a self key (both must agree, to register and to hand it to a new owner), and{" "}
               <code>SigilSelfWallet</code> lets the self key act only within the owner&apos;s rules while the owner can freeze it, change its rules and withdraw at
               any time. They are tested and not deployed. Until a site sets <code>SIGIL_IDENTITY_CHAIN_ID</code> and <code>SIGIL_IDENTITY_REGISTRY</code>, the
               tab says so and everything above works off chain; with them set, your own browser wallet sends the calls.

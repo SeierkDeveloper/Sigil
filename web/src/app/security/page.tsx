@@ -266,10 +266,12 @@ export default function Security() {
               </li>
               <li>
                 <strong>The contracts.</strong> <code>SigilSelfRegistry</code> registers a self key only with an EIP-712 signature by that key naming its owner, and
-                refuses high-s signatures; a revoked key stays revoked. <code>SigilSelfWallet</code> checks, for every call by the self key, freeze, expiry, the
-                allowed target, the allowed function, token caps with allowed recipients, and native caps per call and per UTC day; it refuses token moves it cannot
-                cap. The owner can always freeze, change the rules and withdraw. Both are tested with Foundry, with fuzzing of the caps and the freeze, and are not
-                deployed.
+                refuses high-s signatures; a revoked key stays revoked, and a new owner takes a key only by accepting it. <code>SigilSelfWallet</code> checks, for
+                every call by the self key, freeze, expiry, payments only to listed recipients, calls only to listed contracts and functions, token caps with
+                recipients only, and native caps per call and per UTC day; it refuses token moves it cannot cap, and a freeze sets the allowances the self gave back to
+                zero. The owner can always freeze, change the rules and withdraw. Both are tested with Foundry, with fuzzing of the caps and the freeze, and are not
+                deployed. The HeyResearch security review of the three contracts found one medium and two low issues and five notes; all are fixed, and the
+                findings and fixes are listed in <code>docs/SECURITY-REVIEW.md</code>.
               </li>
               <li>
                 <strong>Drafts.</strong> Each draft of your AI self is an envelope under your vault key; the server knows its kind and state. Nothing is sent on its

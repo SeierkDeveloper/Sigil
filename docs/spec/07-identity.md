@@ -28,26 +28,30 @@ domain  EIP712Domain(string name,string version,uint256 chainId,address verifyin
 type    Register(address owner,address selfKey,string metadataURI,uint256 deadline)
 ```
 
-so the signature names the owner and cannot be used by anyone else. The owner may change the metadata URI and the wallet and hand the identity to another owner. The owner, or the self key itself, may revoke it; a revoked self key can never be registered again. Signatures with a high s are refused. The `registerDigest` vector shows a digest and the self key's signature over it; the contract's tests check the same digest and register with that signature.
+so the signature names the owner and cannot be used by anyone else. The owner may change the metadata URI and the wallet. Handing the identity to another owner takes two steps, so both sides agree here too: the owner proposes a new owner (`transferIdentity`, which records `pendingOwner`), and that owner accepts with a call of its own (`acceptIdentity`); the owner may cancel a proposal before it is accepted (`cancelTransfer`). On acceptance the wallet entry is cleared, so the new owner never inherits the old owner's wallet claim. The owner, or the self key itself, may revoke it; a revoked self key can never be registered or accepted again. Signatures with a high s are refused. The `registerDigest` vector shows a digest and the self key's signature over it; the contract's tests check the same digest and register with that signature.
 
 ## The wallet
 
-`contracts/src/SigilSelfWallet.sol` has an owner and a self key. The owner can do anything at any time: set rules, freeze and unfreeze, withdraw, call any contract, move the wallet to a new self key. The self key may freeze it, and may make a call only when all of these hold, in this order:
+`contracts/src/SigilSelfWallet.sol` has an owner and a self key. The owner can do anything at any time: set rules, freeze and unfreeze, withdraw, call any contract, move the wallet to a new self key. The wallet keeps two lists: recipients, who may be paid, and contracts (tokens included), which may be called. No address is on both. The self key may freeze it, and may make a call only when all of these hold, in this order:
 
 1. the wallet is not frozen, and the rules have not expired (`expiresAt` of zero means no end);
-2. the target is on the allowed list and is not the wallet itself;
-3. a call with data uses a function selector allowed for that target;
-4. for `transfer(address,uint256)` and `approve(address,uint256)`: the token has caps, the recipient or spender is on the allowed list, and the amount is within the token's cap per call and its cap per UTC day; `transferFrom`, `increaseAllowance` and `permit` are always refused;
+2. the target is not the wallet itself; a call with no data goes to a recipient; a call with data goes to a listed contract;
+3. a call with data uses a function selector allowed for that contract;
+4. for `transfer(address,uint256)` and `approve(address,uint256)`: the token has caps, the recipient or spender is a recipient (never a contract or token), and the amount is within the token's cap per call and its cap per UTC day; `transferFrom`, `increaseAllowance` and `permit` are always refused, and on a token with caps no other function goes through;
 5. native value is within the cap per call and the cap per UTC day.
+
+A listed contract's function arguments are not read: a function that pays out (a router's swap, for example) can send what the self gives it, within the caps, to any address its arguments name. An allowance the owner gives a contract with `ownerExecute` is the owner's own and is not counted against the caps.
+
+The wallet records every allowance the self key gives (at most `MAX_OPEN_APPROVALS`, 16, open at once; an approve of zero takes one off) and lists them in `openApprovals()`. `freeze()` sets each of them back to zero, and so does `revokeApprovals()` without a freeze; each token gets a bounded amount of gas for it, so no token can stop a freeze, and one that refuses stays listed.
 
 The self key sends a call itself, or signs it for anyone to submit:
 
 ```
-domain  name "SigilSelfWallet", version "1"
-type    Execute(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline)
+domain  name "SigilSelfWallet", version "2"
+type    Execute(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline,uint256 gas)
 ```
 
-The nonce goes up with every call by the self key. `configure` replaces every rule at once; what was allowed before no longer counts, and spending per day is not reset by it. Every call by the self key emits `Executed(uint256 indexed nonce, address indexed target, uint256 value, bytes4 selector, address tokenTo, uint256 tokenAmount)`; the vault reads these as the wallet's spends. The `executeDigest` vector shows a digest and its signature.
+`gas` is the gas the signed call gets; zero means all that is left. With a nonzero amount, a submitter who sends too little for it makes the whole call revert, so a target that catches an inner failure cannot be made to "succeed" with less than the self key agreed to. The nonce goes up with every call by the self key. `configure` replaces every rule at once; what was allowed before no longer counts, and spending per day is not reset by it. Every call by the self key emits `Executed(uint256 indexed nonce, address indexed target, uint256 value, bytes4 selector, address tokenTo, uint256 tokenAmount)`; the vault reads these as the wallet's spends, newest first in spans of 100,000 blocks, back to 00:00 UTC of the current day (the day the caps count) and further on request, with `tokenLimit` and `tokenRemainingToday` for each token. The `executeDigest` vector shows a digest and its signature.
 
 ## Wallet rules
 
@@ -60,4 +64,4 @@ The owner drafts the rules in the vault, where they are an encrypted setting nam
   "tokens":     [{ "address": "0x...", "label": "...", "decimals": 6, "perTx": "100", "perDay": "250" }] }
 ```
 
-Amounts are decimals in whole units. Addresses are EIP-55; no address appears twice; a cap per call is never above its cap per day. The fingerprint of a draft is hex32(SHA-256(`sigil-wallet-rules-v1` newline canonical JSON)). The arguments of `configure` follow from the rules: the caps in base units, the expiry in Unix seconds, the targets (recipients, then contracts, then tokens), the selectors of each contract's functions and `transfer` and `approve` for each token, and each token's caps. The `walletRules` vector shows a draft, its fingerprint, these arguments and the encoded call.
+Amounts are decimals in whole units. A token's `decimals` is what the token answers to `decimals()` on chain: a vault reads it when the token is added and checks it again before the rules are kept or set on chain, and never fills in a default (a wrong value moves every cap by powers of ten). Addresses are EIP-55; no address appears twice, in one list or across them; a cap per call is never above its cap per day. The fingerprint of a draft is hex32(SHA-256(`sigil-wallet-rules-v1` newline canonical JSON)). The arguments of `configure` follow from the rules: the caps in base units, the expiry in Unix seconds, the recipients, the targets (contracts, then tokens), the selectors of each contract's functions and `transfer` and `approve` for each token, and each token's caps. The `walletRules` vector shows a draft, its fingerprint, these arguments and the encoded call.

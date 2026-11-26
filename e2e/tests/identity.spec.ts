@@ -48,7 +48,7 @@ test("the identity tab works off chain: key, signed statement, wallet rules", as
   await rules.getByLabel("Amount").fill("0.05");
   await expect(page.getByTestId("rules-trial")).toHaveText("The wallet would let the self send this.");
   await rules.getByLabel("To", { exact: true }).fill("0x2222222222222222222222222222222222222222");
-  await expect(page.getByTestId("rules-trial")).toHaveText("The target is not on the allowed list.");
+  await expect(page.getByTestId("rules-trial")).toHaveText("This address is not one of the recipients.");
   await rules.getByRole("button", { name: "Save the rules" }).click();
   await expect(page.getByText("Rules saved.")).toBeVisible();
 

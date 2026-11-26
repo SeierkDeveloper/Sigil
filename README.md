@@ -375,8 +375,8 @@ Under **Identity**, the AI self gets a secp256k1 key derived from your vault key
 
 `contracts/` has the two contracts that make it real on chain, tested and **not deployed**:
 
-- **SigilSelfRegistry** records which owner stands behind a self key, its metadata address, its wallet, and revocation. It registers a key only with that key's own EIP-712 signature naming the owner.
-- **SigilSelfWallet** lets the self key act, by itself or by a signature anyone can submit, only within the owner's rules: not frozen, not expired, an allowed target and function, token transfers and approvals to allowed recipients within token caps, native value within the caps per call and per UTC day. It refuses token moves it cannot cap. The owner can freeze, change the rules, withdraw and call anything at any time.
+- **SigilSelfRegistry** records which owner stands behind a self key, its metadata address, its wallet, and revocation. It registers a key only with that key's own EIP-712 signature naming the owner, and hands it to a new owner only when that owner accepts with a call of its own.
+- **SigilSelfWallet** lets the self key act, by itself or by a signature anyone can submit, only within the owner's rules: not frozen, not expired, payments only to listed recipients, calls only to listed contracts and functions, token transfers and approvals only to recipients within token caps (each token's decimals read from the token on chain), native value within the caps per call and per UTC day. Recipients and contracts are separate lists, so a router or a token is never paid. It refuses token moves it cannot cap. A signed call names the gas its call gets. Freezing stops the self at once and sets the allowances it gave back to zero. The owner can freeze, change the rules, withdraw and call anything at any time.
 
 With no registry configured (`SIGIL_IDENTITY_CHAIN_ID`, `SIGIL_IDENTITY_REGISTRY`), the tab says so and everything above works off chain. With them, your own browser wallet sends the registration, the rules and a freeze, and the vault reads the wallet's spends through a public read-only address (`SIGIL_IDENTITY_READ_RPC`).
 
@@ -479,7 +479,7 @@ Under **Shared memory**, start a family's or a team's history on a shared space:
 
 ## An open standard and a privacy score
 
-[`docs/spec`](docs/spec/README.md) is the open standard, version 1.3.0: the memory format, folder keys and sealed boxes, the connector's tools and permissions, the access log entry, seals and presence, certificates, since 1.1 the AI self's identity and wallet rules, proofs of a fact, the emergency card, agreements and knowledge packs, since 1.2 the vault bundle, storage, nodes and moving, capture keys, sessions and shared memory, and since 1.3 the memory immune system, the v2 ask link key, the connector bundle's HMAC and the legacy release proof. Its test vectors are generated from the code and checked on every test run; the site renders it at `/spec`.
+[`docs/spec`](docs/spec/README.md) is the open standard, version 1.4.0: the memory format, folder keys and sealed boxes, the connector's tools and permissions, the access log entry, seals and presence, certificates, since 1.1 the AI self's identity and wallet rules, proofs of a fact, the emergency card, agreements and knowledge packs, since 1.2 the vault bundle, storage, nodes and moving, capture keys, sessions and shared memory, since 1.3 the memory immune system, the v2 ask link key, the connector bundle's HMAC and the legacy release proof, and in 1.4 the self wallet's formats as fixed after the HeyResearch security review. Its test vectors are generated from the code and checked on every test run; the site renders it at `/spec`.
 
 Under **Apps** and **Agents**, each app has a privacy score computed in your browser from your own read log of the last 30 days: how much of what it may read it read, how many folders, protected reads, how often, and its writes, each with its points shown. It says what was read, not what an app did with it.
 
@@ -592,7 +592,7 @@ It proves that whoever could open the vault signed in each listed hour and that 
 Every request a connected app makes is written to your read log with a random salt. When an hour ends, all of that hour's entries become leaves of one Merkle tree, and its root is the seal for that hour.
 
 - **Verify any entry in your browser.** The vault's read log has a Verify button on each entry: it rebuilds the path from the entry to the hour's root.
-- **On chain, when switched on.** `contracts/src/SigilSeal.sol` records hourly roots so nobody, Sigil included, could change them later. It is written and tested (15 Foundry tests, including fuzzing and a shared test vector that proves the browser and the contract compute seals the same way) and is not deployed yet. The AI self's registry and wallet are next to it, with 53 tests of their own, also not deployed. While `SIGIL_ANCHOR` is off, every seal is labelled *Local*.
+- **On chain, when switched on.** `contracts/src/SigilSeal.sol` records hourly roots so nobody, Sigil included, could change them later. It is written and tested (16 Foundry tests, including fuzzing and a shared test vector that proves the browser and the contract compute seals the same way) and is not deployed yet. The AI self's registry and wallet are next to it, with 76 tests of their own, including the proofs of the HeyResearch security review adapted to the fixes, also not deployed. While `SIGIL_ANCHOR` is off, every seal is labelled *Local*.
 
 ---
 
@@ -796,7 +796,7 @@ npm run test:unit       # 623: cryptography, sealed boxes, the ask link relay, s
                         #      route, the memory immune system's rules against attacks and ordinary mail,
                         #      its wrapper, strains and sealed record, the getting-started guide, and the
                         #      sign-in of a live sync source on the owner's computer
-npm run test:contracts  # 75: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
+npm run test:contracts  # 92: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
                         #     wallet's caps, freeze, expiry and signatures (used once, not in their
                         #     malleable form, not on another chain), an invariant run of random payments
                         #     against the caps, entries checked by their data, and the standard's vectors

@@ -43,9 +43,9 @@ contract WalletHandler is Test {
     function paySigned(uint96 value) external {
         uint256 before = friend.balance;
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = wallet.executeDigest(friend, value, "", wallet.nonce(), deadline);
+        bytes32 digest = wallet.executeDigest(friend, value, "", wallet.nonce(), deadline, 0);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(selfPk, digest);
-        try wallet.executeWithSig(friend, value, "", deadline, abi.encodePacked(r, s, v)) {
+        try wallet.executeWithSig(friend, value, "", deadline, 0, abi.encodePacked(r, s, v)) {
             _record(friend.balance - before);
         } catch {}
     }
@@ -80,10 +80,10 @@ contract SigilSelfWalletInvariantTest is Test {
         vm.warp(1_800_000_000);
         wallet = new SigilSelfWallet(owner, vm.addr(SELF_PK));
         vm.deal(address(wallet), 1_000 ether);
-        address[] memory targets = new address[](1);
-        targets[0] = friend;
+        address[] memory recipients = new address[](1);
+        recipients[0] = friend;
         vm.prank(owner);
-        wallet.configure(PER_TX, PER_DAY, 0, targets, new SigilSelfWallet.SelectorRule[](0), new SigilSelfWallet.TokenLimit[](0));
+        wallet.configure(PER_TX, PER_DAY, 0, recipients, new address[](0), new SigilSelfWallet.SelectorRule[](0), new SigilSelfWallet.TokenLimit[](0));
         handler = new WalletHandler(wallet, SELF_PK, friend, PER_TX, PER_DAY);
         targetContract(address(handler));
     }

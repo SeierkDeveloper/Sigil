@@ -7,7 +7,10 @@ pragma solidity 0.8.28;
 /// @dev The self key is an ordinary secp256k1 key derived on the owner's device from the
 ///      vault key. Registering needs both sides: the owner sends the transaction, and the
 ///      self key signs an EIP-712 message that names that owner, so neither can claim the
-///      other alone. A revoked self key stays revoked and can never be registered again.
+///      other alone. Handing the identity to a new owner needs both sides too: the owner
+///      proposes, and the new owner accepts with a call of its own (or the owner cancels).
+///      On acceptance the wallet entry is cleared, so a claim is never inherited.
+///      A revoked self key stays revoked and can never be registered again.
 ///      The same EIP-712 digest is computed in packages/core/src/identity.ts.
 contract SigilSelfRegistry {
     struct Identity {
@@ -29,13 +32,17 @@ contract SigilSelfRegistry {
     uint256 public constant MAX_URI_BYTES = 512;
 
     mapping(address selfKey => Identity) private _identities;
-    /// @notice How many selves each owner registered (revoked ones included).
+    /// @notice How many selves each owner registered or accepted (revoked ones included).
     mapping(address owner => uint256) public registeredBy;
+    /// @notice The owner a self key is being handed to, until that owner accepts. Zero when none.
+    mapping(address selfKey => address) public pendingOwner;
 
     event Registered(address indexed selfKey, address indexed owner, string metadataURI);
     event MetadataChanged(address indexed selfKey, string metadataURI);
     event WalletChanged(address indexed selfKey, address indexed wallet);
     event OwnerChanged(address indexed selfKey, address indexed previousOwner, address indexed newOwner);
+    event TransferProposed(address indexed selfKey, address indexed owner, address indexed newOwner);
+    event TransferCancelled(address indexed selfKey, address indexed newOwner);
     event Revoked(address indexed selfKey, address indexed by);
 
     error ZeroAddress();
@@ -47,6 +54,7 @@ contract SigilSelfRegistry {
     error Expired();
     error BadSignature();
     error UriTooLong();
+    error NotPendingOwner();
 
     modifier onlyIdentityOwner(address selfKey) {
         Identity storage id = _identities[selfKey];
@@ -89,10 +97,39 @@ contract SigilSelfRegistry {
         emit WalletChanged(selfKey, wallet);
     }
 
+    /// @notice Proposes a new owner. Nothing changes until that owner calls acceptIdentity.
+    ///         A new proposal replaces the last one; zero is refused (use cancelTransfer).
     function transferIdentity(address selfKey, address newOwner) external onlyIdentityOwner(selfKey) {
         if (newOwner == address(0)) revert ZeroAddress();
-        emit OwnerChanged(selfKey, msg.sender, newOwner);
-        _identities[selfKey].owner = newOwner;
+        pendingOwner[selfKey] = newOwner;
+        emit TransferProposed(selfKey, msg.sender, newOwner);
+    }
+
+    /// @notice Withdraws a proposal that was not accepted yet.
+    function cancelTransfer(address selfKey) external onlyIdentityOwner(selfKey) {
+        address pending = pendingOwner[selfKey];
+        delete pendingOwner[selfKey];
+        emit TransferCancelled(selfKey, pending);
+    }
+
+    /// @notice The proposed owner takes the identity. The wallet entry is cleared: the new
+    ///         owner names its own. The metadata stays until the new owner changes it.
+    function acceptIdentity(address selfKey) external {
+        Identity storage id = _identities[selfKey];
+        if (id.owner == address(0)) revert NotRegistered(selfKey);
+        if (id.revokedAt != 0) revert IsRevoked(selfKey);
+        if (pendingOwner[selfKey] != msg.sender) revert NotPendingOwner();
+        delete pendingOwner[selfKey];
+        address previous = id.owner;
+        id.owner = msg.sender;
+        if (id.wallet != address(0)) {
+            id.wallet = address(0);
+            emit WalletChanged(selfKey, address(0));
+        }
+        unchecked {
+            registeredBy[msg.sender]++;
+        }
+        emit OwnerChanged(selfKey, previous, msg.sender);
     }
 
     /// @notice Revokes a self key for good. The owner can, and so can the self key itself.
@@ -102,6 +139,7 @@ contract SigilSelfRegistry {
         if (msg.sender != id.owner && msg.sender != selfKey) revert NotOwnerOrSelf();
         if (id.revokedAt != 0) revert IsRevoked(selfKey);
         id.revokedAt = uint64(block.timestamp);
+        delete pendingOwner[selfKey];
         emit Revoked(selfKey, msg.sender);
     }
 

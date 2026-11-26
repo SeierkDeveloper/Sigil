@@ -124,12 +124,12 @@ const covered = [
   {
     threat: "Someone else registers your AI self's key, or uses its signature for another owner",
     answer:
-      "The registry takes a self key only with that key's own signature over the owner's address, the metadata and a deadline. A signature for one owner fails for any other, and a revoked key can never be registered again.",
+      "The registry takes a self key only with that key's own signature over the owner's address, the metadata and a deadline. A signature for one owner fails for any other, a revoked key can never be registered again, and a key moves to a new owner only when that owner accepts it.",
   },
   {
     threat: "The self key spends more than you allowed",
     answer:
-      "The self wallet checks every call against your caps per payment and per day, the allowed recipients, contracts and functions, token caps and the end date, and refuses token moves it cannot cap. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing; not deployed.",
+      "The self wallet checks every call against your caps per payment and per day, your recipients (the only addresses it can pay), the contracts and functions it may call, token caps in each token's own decimals as read from the token, and the end date, and refuses token moves it cannot cap. Freezing it also sets the allowances it gave back to zero. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing; not deployed.",
   },
   {
     threat: "A proof shows more than its claim",

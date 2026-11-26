@@ -83,10 +83,11 @@ contract SigilSelfWalletTest is Test {
     // ---------------------------------------------------------------- helpers
 
     function _configure(uint256 perTx, uint256 perDay, uint64 expiry) internal {
-        address[] memory targets = new address[](3);
-        targets[0] = friend;
-        targets[1] = address(shop);
-        targets[2] = address(token);
+        address[] memory recipients = new address[](1);
+        recipients[0] = friend;
+        address[] memory targets = new address[](2);
+        targets[0] = address(shop);
+        targets[1] = address(token);
         SigilSelfWallet.SelectorRule[] memory sels = new SigilSelfWallet.SelectorRule[](3);
         sels[0] = SigilSelfWallet.SelectorRule(address(shop), ORDER);
         sels[1] = SigilSelfWallet.SelectorRule(address(token), TestToken.transfer.selector);
@@ -94,7 +95,7 @@ contract SigilSelfWalletTest is Test {
         SigilSelfWallet.TokenLimit[] memory limits = new SigilSelfWallet.TokenLimit[](1);
         limits[0] = SigilSelfWallet.TokenLimit(address(token), 100e18, 250e18);
         vm.prank(owner);
-        wallet.configure(perTx, perDay, expiry, targets, sels, limits);
+        wallet.configure(perTx, perDay, expiry, recipients, targets, sels, limits);
     }
 
     function _pay(address to, uint256 value) internal {
@@ -103,7 +104,7 @@ contract SigilSelfWalletTest is Test {
     }
 
     function _sign(uint256 pk, address target, uint256 value, bytes memory data, uint256 n, uint256 deadline) internal view returns (bytes memory) {
-        bytes32 digest = wallet.executeDigest(target, value, data, n, deadline);
+        bytes32 digest = wallet.executeDigest(target, value, data, n, deadline, 0);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(pk, digest);
         return abi.encodePacked(r, s, v);
     }
@@ -143,8 +144,11 @@ contract SigilSelfWalletTest is Test {
 
     function testTargetMustBeAllowed() public {
         vm.prank(selfKey);
-        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, stranger));
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.RecipientNotAllowed.selector, stranger));
         wallet.execute(stranger, 1, "");
+        vm.prank(selfKey);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, stranger));
+        wallet.execute(stranger, 0, abi.encodeCall(Shop.order, (1)));
     }
 
     function testTheWalletItselfIsNeverATarget() public {
@@ -234,7 +238,7 @@ contract SigilSelfWalletTest is Test {
         wallet.execute(address(token), 0, abi.encodeCall(TestToken.transfer, (friend, 100e18 + 1)));
         vm.startPrank(selfKey);
         wallet.execute(address(token), 0, abi.encodeCall(TestToken.transfer, (friend, 100e18)));
-        wallet.execute(address(token), 0, abi.encodeCall(TestToken.approve, (address(shop), 100e18)));
+        wallet.execute(address(token), 0, abi.encodeCall(TestToken.approve, (friend, 100e18)));
         vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.OverDayCap.selector, 250e18 + 1, 250e18));
         wallet.execute(address(token), 0, abi.encodeCall(TestToken.transfer, (friend, 50e18 + 1)));
         vm.stopPrank();
@@ -299,26 +303,29 @@ contract SigilSelfWalletTest is Test {
         address[] memory targets = new address[](1);
         targets[0] = makeAddr("new friend");
         vm.prank(owner);
-        wallet.configure(1 ether, 1 ether, 0, targets, new SigilSelfWallet.SelectorRule[](0), new SigilSelfWallet.TokenLimit[](0));
+        wallet.configure(1 ether, 1 ether, 0, targets, new address[](0), new SigilSelfWallet.SelectorRule[](0), new SigilSelfWallet.TokenLimit[](0));
         assertEq(wallet.rulesVersion(), 3);
-        assertFalse(wallet.isTargetAllowed(friend));
+        assertFalse(wallet.isRecipient(friend));
+        assertFalse(wallet.isTargetAllowed(address(shop)));
         assertFalse(wallet.isSelectorAllowed(address(shop), ORDER));
         (uint128 perTx,) = wallet.tokenLimit(address(token));
         assertEq(perTx, 0);
         vm.prank(selfKey);
-        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, friend));
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.RecipientNotAllowed.selector, friend));
         wallet.execute(friend, 1, "");
         _pay(targets[0], 1);
     }
 
     function testSingleRuleChanges() public {
         vm.startPrank(owner);
-        wallet.setTarget(friend, false);
+        wallet.setRecipient(friend, false);
+        wallet.setTarget(address(shop), false);
         wallet.setSelector(address(shop), ORDER, false);
         wallet.setTokenLimit(address(token), 1, 1);
         wallet.setLimits(2 ether, 2 ether, 0);
         vm.stopPrank();
-        assertFalse(wallet.isTargetAllowed(friend));
+        assertFalse(wallet.isRecipient(friend));
+        assertFalse(wallet.isTargetAllowed(address(shop)));
         assertFalse(wallet.isSelectorAllowed(address(shop), ORDER));
         assertEq(wallet.perTxCap(), 2 ether);
         (uint128 perTx, uint128 perDay) = wallet.tokenLimit(address(token));
@@ -348,45 +355,45 @@ contract SigilSelfWalletTest is Test {
         uint256 deadline = block.timestamp + 10 minutes;
         bytes memory sig = _sign(selfPk, friend, 0.25 ether, "", 0, deadline);
         vm.prank(relayer);
-        wallet.executeWithSig(friend, 0.25 ether, "", deadline, sig);
+        wallet.executeWithSig(friend, 0.25 ether, "", deadline, 0, sig);
         assertEq(friend.balance, 0.25 ether);
         // The same signature cannot be used twice: the nonce moved on.
         vm.prank(relayer);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 0.25 ether, "", deadline, sig);
+        wallet.executeWithSig(friend, 0.25 ether, "", deadline, 0, sig);
     }
 
     function testSignedCallsFollowTheRulesToo() public {
         uint256 deadline = block.timestamp + 10 minutes;
         bytes memory sig = _sign(selfPk, friend, 2 ether, "", 0, deadline);
         vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.OverTxCap.selector, 2 ether, 1 ether));
-        wallet.executeWithSig(friend, 2 ether, "", deadline, sig);
+        wallet.executeWithSig(friend, 2 ether, "", deadline, 0, sig);
     }
 
     function testSignedCallsFromAnotherKeyOrTooLateFail() public {
         uint256 deadline = block.timestamp + 10 minutes;
         bytes memory wrong = _sign(0xBAD, friend, 1, "", 0, deadline);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 1, "", deadline, wrong);
+        wallet.executeWithSig(friend, 1, "", deadline, 0, wrong);
         bytes memory late = _sign(selfPk, friend, 1, "", 0, block.timestamp - 1);
         vm.expectRevert(SigilSelfWallet.Expired.selector);
-        wallet.executeWithSig(friend, 1, "", block.timestamp - 1, late);
+        wallet.executeWithSig(friend, 1, "", block.timestamp - 1, 0, late);
         // A signature over other data does not fit this call.
         bytes memory other = _sign(selfPk, friend, 2, "", 0, deadline);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 1, "", deadline, other);
+        wallet.executeWithSig(friend, 1, "", deadline, 0, other);
     }
 
     function testHighSSignaturesAreRefused() public {
         uint256 deadline = block.timestamp + 10 minutes;
-        bytes32 digest = wallet.executeDigest(friend, 1, "", 0, deadline);
+        bytes32 digest = wallet.executeDigest(friend, 1, "", 0, deadline, 0);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(selfPk, digest);
         uint256 n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
         bytes memory flipped = abi.encodePacked(r, bytes32(n - uint256(s)), v == 27 ? uint8(28) : uint8(27));
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 1, "", deadline, flipped);
+        wallet.executeWithSig(friend, 1, "", deadline, 0, flipped);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 1, "", deadline, hex"1234");
+        wallet.executeWithSig(friend, 1, "", deadline, 0, hex"1234");
     }
 
     // ---------------------------------------------------------------- the owner
@@ -432,7 +439,11 @@ contract SigilSelfWalletTest is Test {
         vm.expectRevert(SigilSelfWallet.NotOwner.selector);
         wallet.ownerExecute(stranger, 1, "");
         vm.expectRevert(SigilSelfWallet.NotOwner.selector);
-        wallet.configure(1, 1, 0, new address[](0), new SigilSelfWallet.SelectorRule[](0), new SigilSelfWallet.TokenLimit[](0));
+        wallet.setRecipient(stranger, true);
+        vm.expectRevert(SigilSelfWallet.NotOwner.selector);
+        wallet.configure(1, 1, 0, new address[](0), new address[](0), new SigilSelfWallet.SelectorRule[](0), new SigilSelfWallet.TokenLimit[](0));
+        vm.expectRevert(SigilSelfWallet.NotOwnerOrSelf.selector);
+        wallet.revokeApprovals();
         vm.stopPrank();
         // The self key is no owner either.
         vm.prank(selfKey);
@@ -463,7 +474,7 @@ contract SigilSelfWalletTest is Test {
     // ---------------------------------------------------------------- the shared vector
 
     /// Same values as the executeDigest vector in docs/spec/vectors.json, made by packages/core: the
-    /// self key signs order(3) on the device, a relayer submits it, and the wallet runs it.
+    /// self key signs order(3) with 100000 gas on the device, a relayer submits it, and the wallet runs it.
     function testVectorFromTypeScript() public {
         address at = 0x00000000000000000000000000000000005E1F02;
         address vectorSelf = 0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923;
@@ -473,22 +484,46 @@ contract SigilSelfWalletTest is Test {
         deployCodeTo("SigilSelfWallet.t.sol:Shop", shopAt);
         SigilSelfWallet w = SigilSelfWallet(payable(at));
         bytes memory data = hex"21603f430000000000000000000000000000000000000000000000000000000000000003";
-        assertEq(w.executeDigest(shopAt, 0, data, 0, 1_900_000_000), 0xc6231f245bff07897480b774b56fb33e839faf5b0d18d640c2dcbbc8bcafdc51);
+        assertEq(w.executeDigest(shopAt, 0, data, 0, 1_900_000_000, 100_000), 0xf9e06715a08cac392c0b6ecb20f1093af01c2551ac6b21725e2ca37962ac475b);
         address[] memory targets = new address[](1);
         targets[0] = shopAt;
         SigilSelfWallet.SelectorRule[] memory sels = new SigilSelfWallet.SelectorRule[](1);
         sels[0] = SigilSelfWallet.SelectorRule(shopAt, ORDER);
         vm.prank(owner);
-        w.configure(0, 0, 0, targets, sels, new SigilSelfWallet.TokenLimit[](0));
+        w.configure(0, 0, 0, new address[](0), targets, sels, new SigilSelfWallet.TokenLimit[](0));
         vm.prank(relayer);
         w.executeWithSig(
             shopAt,
             0,
             data,
             1_900_000_000,
-            hex"b320e91c2fe74ac34928316dedf20c1d74a6dab0ea4510ae72345c4f12ebe055441be50bc7d8df3a59993e4f67562888fc0ae1d3cba82939958a327dc3ab212e1b"
+            100_000,
+            hex"4788b9bb807b9d67b86782501dc5ddddc08cf6835b56b0c2df1064703d673fd77c6e03aaab6374472730b020835fc4767fd833fb232480abbfced96258f5b5a61b"
         );
         assertEq(Shop(shopAt).orders(), 3);
+    }
+
+    /// The walletRules vector's configure() call data, made by packages/core from the vault's rules,
+    /// sets exactly the rules the vault shows: recipients apart from contracts and tokens.
+    function testConfigureVectorFromTypeScript() public {
+        vm.prank(owner);
+        (bool ok,) = address(wallet).call(hex"c2dd807700000000000000000000000000000000000000000000000000b1a2bc2ec5000000000000000000000000000000000000000000000000000002c68af0bb140000000000000000000000000000000000000000000000000000000000006bfdff0000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000002000000000000000000000000222222222222222222222222222222222222222200000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000000000003000000000000000000000000222222222222222222222222222222222222222221603f43000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333a9059cbb000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333095ea7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000ee6b280");
+        assertTrue(ok);
+        address friendAt = 0x1111111111111111111111111111111111111111;
+        address shopAt = 0x2222222222222222222222222222222222222222;
+        address tokenAt = 0x3333333333333333333333333333333333333333;
+        assertEq(wallet.perTxCap(), 0.05 ether);
+        assertEq(wallet.perDayCap(), 0.2 ether);
+        assertEq(wallet.expiresAt(), 1_811_808_000);
+        assertTrue(wallet.isRecipient(friendAt));
+        assertFalse(wallet.isTargetAllowed(friendAt));
+        assertTrue(wallet.isTargetAllowed(shopAt) && wallet.isTargetAllowed(tokenAt));
+        assertFalse(wallet.isRecipient(shopAt) || wallet.isRecipient(tokenAt));
+        assertTrue(wallet.isSelectorAllowed(shopAt, ORDER));
+        assertTrue(wallet.isSelectorAllowed(tokenAt, TestToken.transfer.selector));
+        (uint128 perTx, uint128 perDay) = wallet.tokenLimit(tokenAt);
+        assertEq(perTx, 100e6);
+        assertEq(perDay, 250e6);
     }
 
     // ---------------------------------------------------------------- fuzzing
@@ -558,7 +593,7 @@ contract SigilSelfWalletTest is Test {
         uint256 deadline = block.timestamp + 1;
         bytes memory sig = _sign(selfPk, friend, value, data, 0, deadline);
         vm.expectRevert(SigilSelfWallet.IsFrozen.selector);
-        wallet.executeWithSig(friend, value, data, deadline, sig);
+        wallet.executeWithSig(friend, value, data, deadline, 0, sig);
         assertEq(wallet.nonce(), 0);
         vm.prank(owner);
         wallet.withdraw(payable(owner), 1 ether);
@@ -567,9 +602,11 @@ contract SigilSelfWalletTest is Test {
 
     /// Any target that is not on the list is refused, whatever the call.
     function testFuzzUnlistedTargetsAreRefused(address target, uint64 value, bytes calldata data) public {
-        vm.assume(target != friend && target != address(shop) && target != address(token));
+        vm.assume(target != friend && target != address(shop) && target != address(token) && target != address(wallet));
         vm.prank(selfKey);
-        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, target));
+        // A call with no data goes only to recipients; a call with data only to listed contracts.
+        if (data.length == 0) vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.RecipientNotAllowed.selector, target));
+        else vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, target));
         wallet.execute(target, value, data);
     }
 
@@ -603,7 +640,7 @@ contract SigilSelfWalletTest is Test {
         assertEq(wallet.nonce(), 1);
         vm.prank(relayer);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 0.25 ether, "", deadline, sig);
+        wallet.executeWithSig(friend, 0.25 ether, "", deadline, 0, sig);
         assertEq(friend.balance, 0);
         // Only the owner may cancel.
         vm.prank(selfKey);
@@ -620,33 +657,33 @@ contract SigilSelfWalletTest is Test {
         wallet.unfreeze();
         vm.prank(relayer);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, 0.25 ether, "", deadline, sig);
+        wallet.executeWithSig(friend, 0.25 ether, "", deadline, 0, sig);
     }
 
     function testFuzzASignatureWorksOnceOnlyAndNotInItsOtherForm(uint64 amount) public {
         amount = uint64(bound(amount, 1, 1 ether));
         uint256 deadline = block.timestamp + 1 hours;
-        bytes32 digest = wallet.executeDigest(friend, amount, "", 0, deadline);
+        bytes32 digest = wallet.executeDigest(friend, amount, "", 0, deadline, 0);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(selfPk, digest);
         // The malleable twin (r, n - s, other v) is refused.
         bytes32 twinS = bytes32(0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - uint256(s));
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, amount, "", deadline, abi.encodePacked(r, twinS, v == 27 ? uint8(28) : uint8(27)));
+        wallet.executeWithSig(friend, amount, "", deadline, 0, abi.encodePacked(r, twinS, v == 27 ? uint8(28) : uint8(27)));
         bytes memory sig = abi.encodePacked(r, s, v);
-        wallet.executeWithSig(friend, amount, "", deadline, sig);
+        wallet.executeWithSig(friend, amount, "", deadline, 0, sig);
         assertEq(friend.balance, amount);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, amount, "", deadline, sig);
+        wallet.executeWithSig(friend, amount, "", deadline, 0, sig);
         // The same signature on another chain fails too.
         vm.chainId(block.chainid + 1);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, amount, "", deadline, sig);
+        wallet.executeWithSig(friend, amount, "", deadline, 0, sig);
     }
 
     function testFuzzRandomSignaturesNeverPass(bytes32 r, bytes32 s, uint8 v, uint64 amount) public {
         vm.assume(uint256(r) != 0);
         uint256 deadline = block.timestamp + 1 hours;
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
-        wallet.executeWithSig(friend, uint256(amount) % 1 ether, "", deadline, abi.encodePacked(r, s, v));
+        wallet.executeWithSig(friend, uint256(amount) % 1 ether, "", deadline, 0, abi.encodePacked(r, s, v));
     }
 }

@@ -225,7 +225,7 @@ const nodeEndpoints: Endpoint[] = [
     method: "GET",
     path: "/api/health",
     summary: "The node's health, for a container's health check, a load balancer or another node. It touches no vault.",
-    response: `{ "ok": true, "node": { "origin": "https://node.example", "version": "0.1.0", "spec": "1.3.0" }, "time": "2026-11-20T10:00:00.000Z" }`,
+    response: `{ "ok": true, "node": { "origin": "https://node.example", "version": "0.1.0", "spec": "1.4.0" }, "time": "2026-11-20T10:00:00.000Z" }`,
     notes: "Any origin may call it.",
   },
   {

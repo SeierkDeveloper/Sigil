@@ -6,6 +6,7 @@ import {
   cleanWalletRules,
   EMPTY_RULES,
   formatUnits,
+  parseUnits,
   signingFingerprint,
   verifyIdentityStatement,
   walletRulesHash,
@@ -54,7 +55,7 @@ export function IdentityTab() {
       ) : null}
       <KeySection />
       <StatementSection chain={chain ?? null} />
-      <RulesSection />
+      <RulesSection chain={chain ?? null} />
       <ChainSection chain={chain ?? null} />
     </div>
   );
@@ -245,16 +246,28 @@ function StatementSection({ chain }: { chain: idOps.ChainConfig | null }) {
 
 const emptyRecipient = (): RulesRecipient => ({ address: "", label: "" });
 const emptyContract = (): RulesContract => ({ address: "", label: "", functions: [] });
-const emptyToken = (): RulesToken => ({ address: "", label: "", decimals: 18, perTx: "0", perDay: "0" });
 
-function RulesSection() {
+/** A token's caps as the wallet will hold them: whole tokens scaled by the decimals the token answered on chain. */
+function baseUnits(t: RulesToken): string | null {
+  try {
+    return `${parseUnits(t.perTx || "0", t.decimals).toLocaleString("en-US")} and ${parseUnits(t.perDay || "0", t.decimals).toLocaleString("en-US")}`;
+  } catch {
+    return null;
+  }
+}
+
+function RulesSection({ chain }: { chain: idOps.ChainConfig | null }) {
   const { api, vault, data, update } = useVault();
   const [rules, setRules] = useState<WalletRules>(data.walletRules ?? EMPTY_RULES);
   const [fns, setFns] = useState<string[]>((data.walletRules?.contracts ?? []).map((c) => c.functions.join(", ")));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [trial, setTrial] = useState({ target: "", value: "" });
+  const [trial, setTrial] = useState({ what: "coin", target: "", value: "" });
+  const [newToken, setNewToken] = useState("");
+  const [tokenBusy, setTokenBusy] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const canReadTokens = !!chain?.rpcUrl;
 
   const draft = (): WalletRules => ({
     ...rules,
@@ -275,11 +288,30 @@ function RulesSection() {
   }
   let trialResult: string | null = null;
   let trialOk = false;
+  const trialToken = trial.what === "coin" ? null : (rules.tokens[Number(trial.what)] ?? null);
   if (trial.target.trim() && !problem) {
-    const r = checkCall(draft(), { target: trial.target.trim(), value: trial.value || "0", fn: "" });
+    const r = trialToken
+      ? checkCall(draft(), { target: trialToken.address, value: "0", fn: "transfer(address,uint256)", to: trial.target.trim(), amount: trial.value || "0" })
+      : checkCall(draft(), { target: trial.target.trim(), value: trial.value || "0", fn: "" });
     trialOk = r.ok;
     trialResult = r.ok ? "The wallet would let the self send this." : r.reason;
   }
+
+  const addToken = async () => {
+    if (!chain) return;
+    setTokenBusy(true);
+    setTokenError(null);
+    try {
+      const info = await idOps.readToken(chain, newToken);
+      if (rules.tokens.some((t) => t.address.toLowerCase() === info.address.toLowerCase())) throw new Error("That token is already listed.");
+      setRules({ ...rules, tokens: [...rules.tokens, { address: info.address, label: info.symbol, decimals: info.decimals, perTx: "0", perDay: "0" }] });
+      setNewToken("");
+    } catch (err) {
+      setTokenError(errorText(err));
+    } finally {
+      setTokenBusy(false);
+    }
+  };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -287,7 +319,10 @@ function RulesSection() {
     setError(null);
     setSaved(false);
     try {
-      const clean = await idOps.saveRules(api, vault, cleanWalletRules(draft()));
+      const next = cleanWalletRules(draft());
+      // Every token's decimals are checked against the token itself before the draft is kept.
+      if (next.tokens.length && chain?.rpcUrl) await idOps.checkTokenDecimals(chain, next);
+      const clean = await idOps.saveRules(api, vault, next);
       update((d) => ({ ...d, walletRules: clean }));
       setRules(clean);
       setSaved(true);
@@ -302,6 +337,7 @@ function RulesSection() {
   const drop = (k: "recipients" | "contracts" | "tokens", i: number) => {
     setRules({ ...rules, [k]: rules[k].filter((_, j) => j !== i) });
     if (k === "contracts") setFns(fns.filter((_, j) => j !== i));
+    if (k === "tokens") setTrial({ ...trial, what: "coin" });
   };
 
   return (
@@ -342,7 +378,7 @@ function RulesSection() {
           <span className="field-hint">After this day the self can do nothing until you set new rules. Empty: no end.</span>
         </div>
       </Band>
-      <Band label="Recipients" hint="Who the self may pay.">
+      <Band label="Recipients" hint="Who the self may pay, in the chain's coin or in the tokens below. Only these addresses can receive anything from the self.">
         {rules.recipients.map((r, i) => (
           <div key={i} className="rules-row">
             <span className="rules-cell" data-label="Address">
@@ -360,7 +396,10 @@ function RulesSection() {
           Add a recipient
         </button>
       </Band>
-      <Band label="Contracts" hint="Contracts the self may call, and which of their functions, like order(uint256).">
+      <Band
+        label="Contracts"
+        hint="Contracts the self may call, and which of their functions, like order(uint256). The self never pays a contract directly. A listed function can still send what it is given to any address its arguments name, and routers do: for a self that should only pay the recipients above, list no router."
+      >
         {rules.contracts.map((c, i) => (
           <div key={i} className="rules-row rules-row-wide">
             <span className="rules-cell" data-label="Address">
@@ -388,35 +427,68 @@ function RulesSection() {
           Add a contract
         </button>
       </Band>
-      <Band label="Tokens" hint="Tokens the self may send or approve, each with its own caps, only to recipients above. Moves the wallet cannot cap are always refused.">
+      <Band
+        label="Tokens"
+        hint="Tokens the self may send or approve, each with its own caps, only to the recipients above. Each token's decimals are read from the token itself, never typed. Moves the wallet cannot cap are always refused."
+      >
         {rules.tokens.map((t, i) => (
-          <div key={i} className="rules-row rules-row-wide">
-            <span className="rules-cell" data-label="Address">
-              <input aria-label={`Token ${i + 1} address`} className="input mono" value={t.address} placeholder="0x..." onChange={(e) => setAt("tokens", i, { ...t, address: e.target.value })} spellCheck={false} />
-            </span>
-            <span className="rules-cell" data-label="Name">
-              <input aria-label={`Token ${i + 1} label`} className="input" value={t.label} placeholder="Name" onChange={(e) => setAt("tokens", i, { ...t, label: e.target.value })} />
-            </span>
-            <span className="rules-cell" data-label="Decimals">
-              <input aria-label={`Token ${i + 1} decimals`} className="input" inputMode="numeric" value={String(t.decimals)} onChange={(e) => setAt("tokens", i, { ...t, decimals: Number(e.target.value) || 0 })} />
-            </span>
-            <span className="rules-cell" data-label="Per payment">
-              <input aria-label={`Token ${i + 1} per payment`} className="input" inputMode="decimal" value={t.perTx} onChange={(e) => setAt("tokens", i, { ...t, perTx: e.target.value })} />
-            </span>
-            <span className="rules-cell" data-label="Per day">
-              <input aria-label={`Token ${i + 1} per day`} className="input" inputMode="decimal" value={t.perDay} onChange={(e) => setAt("tokens", i, { ...t, perDay: e.target.value })} />
-            </span>
-            <button type="button" className="button button-small button-ghost" onClick={() => drop("tokens", i)}>
-              Remove
-            </button>
+          <div key={t.address} className="rules-token">
+            <div className="rules-row rules-row-wide">
+              <span className="rules-cell" data-label="Address">
+                <input aria-label={`Token ${i + 1} address`} className="input mono" value={t.address} readOnly spellCheck={false} />
+              </span>
+              <span className="rules-cell" data-label="Name">
+                <input aria-label={`Token ${i + 1} label`} className="input" value={t.label} placeholder="Name" onChange={(e) => setAt("tokens", i, { ...t, label: e.target.value })} />
+              </span>
+              <span className="rules-cell" data-label="Decimals">
+                <input aria-label={`Token ${i + 1} decimals`} className="input" value={String(t.decimals)} readOnly title="Read from the token on chain" />
+              </span>
+              <span className="rules-cell" data-label="Per payment">
+                <input aria-label={`Token ${i + 1} per payment`} className="input" inputMode="decimal" value={t.perTx} onChange={(e) => setAt("tokens", i, { ...t, perTx: e.target.value })} />
+              </span>
+              <span className="rules-cell" data-label="Per day">
+                <input aria-label={`Token ${i + 1} per day`} className="input" inputMode="decimal" value={t.perDay} onChange={(e) => setAt("tokens", i, { ...t, perDay: e.target.value })} />
+              </span>
+              <button type="button" className="button button-small button-ghost" onClick={() => drop("tokens", i)}>
+                Remove
+              </button>
+            </div>
+            {baseUnits(t) ? (
+              <p className="small faint rules-base" data-testid={`token-base-${i + 1}`}>
+                On chain these caps are {baseUnits(t)} base units ({t.decimals} decimals, as the token answered).
+              </p>
+            ) : null}
           </div>
         ))}
-        <button type="button" className="button button-small" onClick={() => setRules({ ...rules, tokens: [...rules.tokens, emptyToken()] })}>
-          Add a token
-        </button>
+        {canReadTokens ? (
+          <div className="rules-add-token">
+            <input aria-label="New token address" className="input mono" value={newToken} placeholder="Token address, 0x..." onChange={(e) => setNewToken(e.target.value)} spellCheck={false} />
+            <button type="button" className="button button-small" disabled={tokenBusy || !newToken.trim()} onClick={() => void addToken()}>
+              {tokenBusy ? "Reading the token" : "Add a token"}
+            </button>
+          </div>
+        ) : (
+          <Quiet>Tokens are added once this site has a read address for the chain: each token&apos;s decimals are read from the token itself, so no cap is ever guessed.</Quiet>
+        )}
+        {tokenError ? <Notice kind="error">{tokenError}</Notice> : null}
       </Band>
       <Band label="Try a payment" hint="Checked here against this draft, the same way the wallet checks.">
-        <div className="grid grid-2">
+        <div className={rules.tokens.length ? "grid grid-3" : "grid grid-2"}>
+          {rules.tokens.length ? (
+            <div className="field">
+              <label className="field-label" htmlFor="try-what">
+                Pay in
+              </label>
+              <select id="try-what" className="input" value={trial.what} onChange={(e) => setTrial({ ...trial, what: e.target.value })}>
+                <option value="coin">The chain&apos;s coin</option>
+                {rules.tokens.map((t, i) => (
+                  <option key={t.address} value={String(i)}>
+                    {t.label || t.address}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <div className="field">
             <label className="field-label" htmlFor="try-to">
               To
@@ -448,6 +520,12 @@ function RulesSection() {
 
 // ---------------------------------------------------------------- on chain
 
+/** A token amount in its own units when the draft knows the token, otherwise in base units. */
+function tokenAmount(rules: WalletRules | null, token: string, amount: bigint): string {
+  const t = rules?.tokens.find((x) => x.address.toLowerCase() === token.toLowerCase());
+  return t ? `${formatUnits(amount, t.decimals)} ${t.label || "tokens"}` : `${amount} base units`;
+}
+
 function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
   const { vault, data } = useVault();
   const [busy, setBusy] = useState<string | null>(null);
@@ -457,6 +535,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const wallet = data.identityChoices.wallet;
   const owner = data.identityChoices.owner;
+  const rules = data.walletRules;
 
   const eth = () => (typeof window !== "undefined" ? (window as unknown as { ethereum?: idOps.InjectedWallet }).ethereum : undefined);
   const act = async (name: string, fn: () => Promise<string | void>) => {
@@ -489,6 +568,12 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
     );
   }
 
+  const readOlder = async () => {
+    if (!state) return;
+    const page = await idOps.readSpends(chain, wallet, { toBlock: state.spendsFromBlock - 1, untilTime: null, maxChunks: 9 });
+    setState({ ...state, spends: [...state.spends, ...page.spends], spendsFromBlock: page.fromBlock, coversToday: state.coversToday });
+  };
+
   return (
     <section className="subpanel plate identity-chain" aria-labelledby="chain-title">
       <PlateHead number="04" id="chain-title" title="On chain" lead={`Chain ${chain.chainId}, registry ${chain.registry.slice(0, 10)}... Each call is sent by your own wallet in this browser; the self key only signs.`} />
@@ -512,8 +597,14 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
         <button
           type="button"
           className="button"
-          disabled={!!busy || !wallet || !data.walletRules || !eth()}
-          onClick={() => void act("configure", async () => `Sent: ${await idOps.sendFromOwner(eth()!, chain, wallet, idOps.configureCalldata(data.walletRules!))}`)}
+          disabled={!!busy || !wallet || !rules || !eth()}
+          onClick={() =>
+            void act("configure", async () => {
+              // The caps of each token are scaled by its decimals: checked against the token itself right before they are set.
+              if (rules!.tokens.length) await idOps.checkTokenDecimals(chain, rules!);
+              return `Sent: ${await idOps.sendFromOwner(eth()!, chain, wallet, idOps.configureCalldata(rules!))}`;
+            })
+          }
         >
           {busy === "configure" ? "Waiting for your wallet" : "Set these rules on the wallet"}
         </button>
@@ -521,14 +612,20 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
           Freeze the wallet now
         </button>
       </div>
+      <p className="small faint">Freezing stops the self at once and sets every allowance it gave back to zero.</p>
       {!owner || !wallet ? <p className="small faint">Add your own address and the self&apos;s wallet to the statement above to use these.</p> : null}
       {wallet && chain.rpcUrl ? (
         <>
-          <button type="button" className="button button-small" disabled={!!busy} onClick={() => void act("read", async () => setState(await idOps.readWallet(chain, wallet)))}>
+          <button
+            type="button"
+            className="button button-small"
+            disabled={!!busy}
+            onClick={() => void act("read", async () => setState(await idOps.readWallet(chain, wallet, { tokens: (rules?.tokens ?? []).map((t) => t.address) })))}
+          >
             {busy === "read" ? "Reading" : "Read the wallet"}
           </button>
           {state ? (
-            <div className="wallet-state">
+            <div className="wallet-state" data-testid="wallet-state">
               <dl className="identity-facts">
                 <div>
                   <dt>State</dt>
@@ -547,14 +644,54 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                   <dd>{formatUnits(state.remainingToday)}</dd>
                 </div>
               </dl>
+              {state.tokens.length ? (
+                <ul className="list" aria-label="Token caps on chain">
+                  {state.tokens.map((t) => (
+                    <li key={t.token} className="list-row" data-testid="token-on-chain">
+                      <div className="list-row-main">
+                        <p className="list-row-title">
+                          {tokenAmount(rules, t.token, t.perTx)} per payment, {tokenAmount(rules, t.token, t.perDay)} per day
+                        </p>
+                        <p className="list-row-meta">
+                          Set on chain for {t.token}. Left today {tokenAmount(rules, t.token, t.remainingToday)}.
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {state.approvals.length ? (
+                <div className="wallet-approvals">
+                  <p className="small">Allowances the self gave that may still be open:</p>
+                  <ul className="list">
+                    {state.approvals.map((a) => (
+                      <li key={`${a.token}-${a.spender}`} className="list-row">
+                        <div className="list-row-main">
+                          <p className="list-row-title mono">{a.allowance === null ? "Unknown" : tokenAmount(rules, a.token, a.allowance)}</p>
+                          <p className="list-row-meta">
+                            To {a.spender}, on {a.token}
+                          </p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    className="button button-small"
+                    disabled={!!busy || !eth()}
+                    onClick={() => void act("revoke", async () => `Sent: ${await idOps.sendFromOwner(eth()!, chain, wallet, idOps.revokeApprovalsCalldata())}`)}
+                  >
+                    Set them all to zero
+                  </button>
+                </div>
+              ) : null}
+              <p className="small faint">{state.coversToday ? `Spends since 00:00 UTC today, read back to block ${state.spendsFromBlock}.` : `Spends read back to block ${state.spendsFromBlock}.`}</p>
               {state.spends.length ? (
                 <ul className="list">
                   {state.spends.map((s) => (
                     <li key={`${s.tx}-${s.nonce}`} className="list-row">
                       <div className="list-row-main">
-                        <p className="list-row-title mono">
-                          {s.tokenTo ? `${s.tokenAmount} to ${s.tokenTo}` : `${formatUnits(s.value)} to ${s.target}`}
-                        </p>
+                        <p className="list-row-title mono">{s.tokenTo ? `${tokenAmount(rules, s.target, s.tokenAmount)} to ${s.tokenTo}` : `${formatUnits(s.value)} to ${s.target}`}</p>
                         <p className="list-row-meta">
                           Call {s.nonce}
                           {s.selector ? `, function ${s.selector}` : ""}, block {s.block}
@@ -564,8 +701,13 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
                   ))}
                 </ul>
               ) : (
-                <Quiet>No spends in the recent blocks.</Quiet>
+                <Quiet>No spends in the blocks read so far.</Quiet>
               )}
+              {state.spendsFromBlock > 0 ? (
+                <button type="button" className="button button-small button-ghost" disabled={!!busy} onClick={() => void act("older", readOlder)}>
+                  {busy === "older" ? "Reading" : "Read further back"}
+                </button>
+              ) : null}
             </div>
           ) : null}
         </>
