@@ -318,7 +318,7 @@ function InboxForm() {
         label="Mail"
         hint="It reads what waits for an answer and replies on its own only to the senders you list, about the kinds you tick, up to the number a day. Through your Gmail under Sync, or through an AI app you allow below."
       >
-        {toggle("limits-mail", mail.on, (v) => setMail({ ...mail, on: v }), "Answer mail on its own", "Off, every message waits for you.")}
+        {toggle("limits-mail", mail.on, (v) => setMail({ ...mail, on: v }), "Answer mail on its own", "When off, every message waits for you.")}
         <div className="field">
           <label className="field-label" htmlFor="limits-senders">
             Senders
@@ -330,13 +330,13 @@ function InboxForm() {
           <div className="limits-chip-row">{MESSAGE_KINDS.map(kindToggle)}</div>
         </fieldset>
         <div className="limits-number">{number("limits-mail-day", "At most a day", mail.perDay, (v) => setMail({ ...mail, perDay: v }), 0, 500)}</div>
-        {toggle("limits-mail-start", mail.mayStart, (v) => setMail({ ...mail, mayStart: v }), "Also write first to the senders you list", "Off, it only replies.")}
+        {toggle("limits-mail-start", mail.mayStart, (v) => setMail({ ...mail, mayStart: v }), "Also write first to the senders you list", "When off, it only replies.")}
       </Band>
       <Band
         label="Invites"
         hint={`It accepts an invite on its own only from the people you list, when the whole meeting fits your free hours above (${m.from} to ${m.to}, ${m.timeZone}) and nothing in your calendar overlaps it.`}
       >
-        {toggle("limits-cal", cal.on, (v) => setCal({ ...cal, on: v }), "Answer invites on its own", "Off, every invite waits for you.")}
+        {toggle("limits-cal", cal.on, (v) => setCal({ ...cal, on: v }), "Answer invites on its own", "When off, every invite waits for you.")}
         <div className="field">
           <label className="field-label" htmlFor="limits-people">
             People
@@ -347,7 +347,7 @@ function InboxForm() {
           {number("limits-cal-minutes", "Longest meeting, in minutes", cal.maxMinutes, (v) => setCal({ ...cal, maxMinutes: v }), 5, 1440)}
           {number("limits-cal-day", "At most a day", cal.perDay, (v) => setCal({ ...cal, perDay: v }), 0, 200)}
         </div>
-        {toggle("limits-cal-decline", cal.mayDecline, (v) => setCal({ ...cal, mayDecline: v }), "Decline the ones that do not fit", "From the people you list. Off, those wait for you too.")}
+        {toggle("limits-cal-decline", cal.mayDecline, (v) => setCal({ ...cal, mayDecline: v }), "Decline the ones that do not fit", "From the people you list. When off, those wait for you too.")}
       </Band>
       <Band label="Never touch" hint="Words, addresses or @domains. A message, invite or offer that names one is refused: your self does not act on it, and it shows under Work.">
         <div className="field">
@@ -415,7 +415,7 @@ function RangesForm() {
       {error ? <Notice kind="error">{error}</Notice> : null}
       {saved ? <Notice kind="success">Ranges saved.</Notice> : null}
       <Band label="Negotiating" hint="It proposes and counters inside your ranges, in mail it answers, with apps you allow and when it meets another self. The numbers and times come from your ranges, never from a model.">
-        {toggle("ranges-on", ranges.on, (v) => setRanges({ ...ranges, on: v }), "Negotiate within these ranges on its own", "Off, every offer waits for you.")}
+        {toggle("ranges-on", ranges.on, (v) => setRanges({ ...ranges, on: v }), "Negotiate within these ranges on its own", "When off, every offer waits for you.")}
         <div className="field limits-rounds">
           <label className="field-label" htmlFor="ranges-rounds">
             Counters before it asks you
