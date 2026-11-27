@@ -51,6 +51,7 @@ const toc = [
   ["meet", "Selves meet"],
   ["work", "Your AI self at work"],
   ["identity", "Identity and wallet"],
+  ["acting", "A self that acts"],
   ["prove", "Proving a fact"],
   ["emergency", "Emergency card"],
   ["agreements", "Agreements"],
@@ -312,10 +313,51 @@ export default function Docs() {
                     </td>
                     <td>The app read the index and the memories it used, and your AI self answered a question (the question and answer, sealed for your vault).</td>
                   </tr>
+                  <tr>
+                    <td>
+                      <code>get_thresholds</code>
+                    </td>
+                    <td>Your thresholds for mail, invites and negotiation, in plain lines. Works only if you let this app act, under Limits.</td>
+                    <td>Nothing: the thresholds were wrapped for this app when you let it act.</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>check_action</code>
+                    </td>
+                    <td>
+                      Before the app sends mail or answers an invite with its own access: <code>area</code>, <code>action</code>, <code>who</code>, and
+                      optionally the <code>subject</code>, <code>text</code>, the time and what it would send. Answers allowed, needs approval (it waits in
+                      Work) or refused. With an <code>id</code>, your answer to a step that waited.
+                    </td>
+                    <td>A step of your AI self in that area, allowed, waiting or refused (sealed for your vault).</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>report_action</code>
+                    </td>
+                    <td>
+                      After it acted: the step&apos;s <code>id</code> and <code>what</code> it did. A receipt is signed on your computer with the app&apos;s own
+                      key, which your self key vouched for.
+                    </td>
+                    <td>A receipt, sealed with the hour.</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <code>negotiate</code>
+                    </td>
+                    <td>
+                      One step of a negotiation over a <code>price</code>, a <code>time</code> or <code>terms</code>: accept, counter with the exact offer, or
+                      ask you at the edge of your range.
+                    </td>
+                    <td>A step of your AI self in negotiation.</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
-            <p>No tool changes or deletes a memory. A suggestion becomes a memory only when you approve it.</p>
+            <p>
+              No tool changes or deletes a memory. A suggestion becomes a memory only when you approve it. The four tools for acting work only for an app you let
+              act; each step is decided on your computer against your thresholds.
+            </p>
           </section>
 
           <section id="ai-self" className="doc-section">
@@ -1184,6 +1226,41 @@ if (r.rank >= 2) {
               list, and accept a meeting with another self in your free hours. Everything past a limit waits in Work. This site sends no mail itself, so a reply
               approved within your limits is ready to send, not sent. Each thing the self does on its own gets a receipt signed by its key, sealed with the hour,
               private until you share it; anyone can check a shared one on the verify page.
+            </p>
+          </section>
+
+          <section id="acting" className="doc-section">
+            <h2>A self that acts</h2>
+            <p>
+              Under <strong>Limits</strong>, set thresholds for your inbox and calendar: the senders it may answer (an address, a name, or <code>@</code> and a
+              domain for everyone there), what a message may be about, how many a day; whose invites it may accept, the longest meeting and how many a day, inside
+              your free hours and clear of your calendar; and words, addresses and domains it never touches. Each step is allowed, waits for you in Work with the
+              whole thread and what the self would send next (change it before you say yes), or is refused. What it does alone gets a receipt like a payment&apos;s.
+            </p>
+            <p>
+              <strong>Ranges</strong> set what it may agree to: times, a price range per kind of deal (selling, it opens at the top and never goes below the bottom;
+              buying, the other way round) and terms it may or never may agree to. It counters halfway toward the other side&apos;s offer each round and stops to ask
+              at the edge of a range, past it, after the most counters you allow, or for a term on neither list. The numbers and times come from your ranges, never
+              from a model. When it meets another self it is told your ranges, and a turn past them waits for you. An agreed result becomes a sealed agreement from
+              Work.
+            </p>
+            <ol>
+              <li>
+                <strong>Through an AI app.</strong> An app that already has your mail or calendar, such as Claude with its own Gmail tools, asks first. Let it act
+                under Limits, <em>Apps that ask first</em>, and the connector offers <code>get_thresholds</code>, <code>check_action</code>,{" "}
+                <code>report_action</code> and <code>negotiate</code>. Your thresholds reach it wrapped for its key only; a step that needs you is sealed to your
+                vault; your answer goes back under the app&apos;s key; its receipts are signed with its own key, which your self key vouched for, so the self key
+                never leaves your device. This works on any site, with no Google client.
+              </li>
+              <li>
+                <strong>In your own Google account.</strong> Under Sync, tick <em>Let your self act here</em> on a Gmail or Google Calendar source; Google is asked
+                once more, to send mail or answer invites. While your vault is open, each sync pass looks at what waits for an answer and replies or answers within
+                your thresholds, from your device with your own token. This needs the site&apos;s Google client (<code>SIGIL_GOOGLE_CLIENT_ID</code>).
+              </li>
+            </ol>
+            <p>
+              The server sees which area a step is in, its state and when, and counts the steps taken alone each day across the vault and every app. It never sees
+              a message, a threshold, a range or your answer.
             </p>
           </section>
 

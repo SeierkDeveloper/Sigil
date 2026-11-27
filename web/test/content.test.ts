@@ -67,6 +67,7 @@ describe("copy rules", () => {
     expect(withTicker.map((f) => path.relative(ROOT, f))).toEqual([]);
     expect(readFileSync(path.join(ROOT, "README.md"), "utf8").includes("$" + "SIGIL")).toBe(false);
     expect(readFileSync(path.join(ROOT, "web/src/app/roadmap/page.tsx"), "utf8")).not.toMatch(/\d+\s?%/);
+    expect(readFileSync(path.join(ROOT, "web/src/lib/roadmap.ts"), "utf8")).not.toMatch(/\d+\s?%/);
   });
 
   it("contains no email addresses", () => {

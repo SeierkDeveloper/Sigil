@@ -11,6 +11,25 @@ export interface Release {
 export const releases: Release[] = [
   {
     date: "2026-11-27",
+    title: "A self that acts: your inbox, your calendar and your negotiations",
+    area: "AI self",
+    summary:
+      "Your AI self now runs mail and invites within thresholds you set, negotiates times, prices and terms within your ranges, and stops to ask you at the edge. AI apps with their own mail or calendar access ask it first. Stage 03 of the roadmap is done.",
+    items: [
+      "Thresholds under Limits: whom it may answer, what about (times, questions, thanks, money, contracts), how many a day, the longest meeting, your free hours, and a never-touch list it refuses outright",
+      "Every step it takes alone gets the same receipt as a payment: signed, sealed with the hour, checkable on the verify page",
+      "Everything past a threshold waits in Work with the whole thread and what it would send next, which you can change before you say yes",
+      "Ranges for times, prices and terms: it proposes and counters inside them, takes the numbers and times only from your ranges, and asks you at the edge or past it",
+      "Through the connector (0.6.0), an AI app that already reads your mail, such as Claude with Gmail, calls check_action before it acts and report_action after; get_thresholds and negotiate complete the set. This works today with no Google client on the site",
+      "Receipts from an app are signed with that app's own key, vouched for by your self key in your vault, so the self key never leaves your device",
+      "In your own Gmail and Google Calendar, connected under Sync, it replies and answers invites from your device while the vault is open. This needs the site's Google client (SIGIL_GOOGLE_CLIENT_ID), which this site does not set yet",
+      "Meetings of selves follow your ranges, and a turn that names a price past your edge or a term you never agree to waits for you",
+      "An agreed result becomes a sealed agreement in one step from Work",
+      "Your thresholds, ranges, requests and answers stay end to end encrypted: the server sees only which area a step was in, its state and when",
+    ],
+  },
+  {
+    date: "2026-11-27",
     title: "Upoch x Sigil: state and memory roll back together",
     area: "Agents",
     summary: "An agent's own folder now keeps pinned versions, so a rollback can bring back exactly what the agent remembered at that moment. Run live with Upoch, whose checkpoints now point at a pinned Sigil memory version.",

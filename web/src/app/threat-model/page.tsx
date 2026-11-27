@@ -132,6 +132,16 @@ const covered = [
       "The self wallet checks every call against your caps per payment and per day, your recipients (the only addresses it can pay), the contracts and functions it may call, token caps in each token's own decimals as read from the token, and the end date, and refuses token moves it cannot cap. Freezing it also sets the allowances it gave back to zero, and the vault tells you if any are still open. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing, and each owner deploys their own from the vault.",
   },
   {
+    threat: "The server forges your yes for an app that acts",
+    answer:
+      "Your answer to a step an app asked about is encrypted under a key from that app's secret, which the server never holds, and names the step it answers. A forged answer, or one moved to another step, does not open in the connector, so the app is never told yes.",
+  },
+  {
+    threat: "The server reads your thresholds, ranges or the mail a step is about",
+    answer:
+      "Thresholds and ranges are a setting under your vault key, and reach an app only wrapped for its key. A step waiting for you is sealed to your vault's public key. The server sees which area it is in (mail, invites or negotiation), its state and when, which it needs to count the most per day.",
+  },
+  {
     threat: "A proof shows more than its claim",
     answer: "Every field of a memory is committed with its own random salt, so revealing one field and its path to the commitment says nothing about the others, and an age proof keeps the date back.",
   },
@@ -302,6 +312,21 @@ const notCovered = [
     answer: "The registry is deployed and each owner deploys their own wallet from the vault. Both are tested with fuzzing. Put in the wallet only what you could afford to lose.",
   },
   {
+    threat: "An app you let act ignores the answer",
+    answer:
+      "The thresholds are checked by the connector on the app's own machine, and the app sends mail with access of its own, so an app that ignores a needs-approval or refused answer can still act. What Sigil keeps: such a step has no yes it can show and no receipt, and the most per day is counted on the server. Let only apps you trust act, and turn one off under Limits at any time.",
+  },
+  {
+    threat: "An app's receipt key",
+    answer:
+      "An app that acts signs its receipts with a key made from its own app key, which your self key vouched for in your vault. Whoever holds that app key can sign receipts in your self's name for that app, never a payment: the self key itself never leaves your device. A receipt names the app key that signed it.",
+  },
+  {
+    threat: "Your self answering mail or invites in your own Google account",
+    answer:
+      "Only while your vault is open, from your device, with your own token, within the thresholds you set; everything else waits for you. It needs Google's permission to send mail or answer invites, which you grant once per account, and this site's Google client. Thresholds read words, not intent: a message can be about money without saying so, so list only senders you trust.",
+  },
+  {
     threat: "Storage that does not last",
     answer:
       "How long a bundle lasts depends on where you keep it: a bucket while your account and the object exist, a pin while the pinning service keeps it, Arweave while its network keeps what was paid for. Sigil does not pay for, renew or check any of these. Keep more than one copy.",
@@ -332,12 +357,12 @@ const parties = [
   { who: "You", sees: "Everything in your vault, your read log with its salts, and every app's permissions.", not: "Other people's vaults." },
   {
     who: "Sigil's server",
-    sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address, how often an ask link is used, and when an expiring memory is to be deleted.",
-    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other, drafts of your AI self, your wallet rules, your emergency card, the text of an agreement, your storage tokens and where your bundles are, what a capture key sends (unless you allowed it plain text), a session's intake and conversation, shared memory, anything you say by voice.",
+    sees: "Ciphertext, ids, sizes, times, which app may read which folder, the read log, your passkey's public key or wallet address, how often an ask link is used, when an expiring memory is to be deleted, and for each step your self takes or asks about, its area, its state and when.",
+    not: "Titles, bodies, tags, folder names, app names, search words, any key, your model key, your rules, ask link questions and answers, what kind a protected folder is, your sync sign-ins, mail, events, files and messages, what two selves say to each other, drafts of your AI self, your thresholds and ranges, what a step of your self is about and your answer to it, your wallet rules, your emergency card, the text of an agreement, your storage tokens and where your bundles are, what a capture key sends (unless you allowed it plain text), a session's intake and conversation, shared memory, anything you say by voice.",
   },
   {
     who: "A connected app",
-    sees: "The folders you granted it, decrypted on your computer by the connector.",
+    sees: "The folders you granted it, decrypted on your computer by the connector, and, when you let it act, your thresholds and ranges and your answers to its steps.",
     not: "Any other folder, your other apps, your keys, and anything at all once revoked.",
   },
   {

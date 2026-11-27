@@ -9,7 +9,7 @@ import { site } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Connector",
   description:
-    "The Sigil connector: a small MCP server that runs on your computer, decrypts there, searches by meaning there, and gives AI apps four tools that read, one that suggests memories to your inbox, and one that asks your AI self.",
+    "The Sigil connector: a small MCP server that runs on your computer, decrypts there, searches by meaning there, and gives AI apps four tools that read, one that suggests memories to your inbox, one that asks your AI self, and four that let them ask before they act for you.",
 };
 
 const tools = [
@@ -98,6 +98,60 @@ Ship on a Tuesday.`,
     example: `Short answers, plain words and metric units, please [1].
 
 From: How I like answers (Self card)`,
+  },
+  {
+    name: "get_thresholds",
+    title: "Read the user's thresholds for acting",
+    text: "Your thresholds for mail, invites and negotiation, in plain lines: whom, what about, how many a day, meeting lengths, free hours, ranges and what it never touches. Works only if you let this app act, under Limits.",
+    args: [] as [string, string][],
+    logged: "Nothing: the thresholds were wrapped for this app when you let it act.",
+    example: `The user's thresholds:
+- Mail: it may reply to sam lee and @team.example about times and meetings and questions, up to 10 a day. Everything else waits for the owner.
+- Invites: off. Every invite waits for the owner.
+- Price for Consulting day: opens at 1200 EUR, never below 800 EUR.`,
+  },
+  {
+    name: "check_action",
+    title: "Ask Sigil before acting",
+    text: "Called before the app sends mail or answers an invite with access of its own. Decided on your computer against your thresholds: allowed, needs approval (it waits for you in Work with the thread and what the app would send) or refused. With an id, your answer to a step that waited.",
+    args: [
+      ["area, action, who", "mail with reply or send, or calendar with accept, decline or propose; and the other person."],
+      ["subject, text, kinds", "Optional. What the message is about; Sigil reads the text too."],
+      ["start, minutes, conflicts", "Optional, for an invite."],
+      ["next, thread", "Optional. What the app would send, and the thread so far, for you to read in Work."],
+      ["id", "Instead of the above: a step that waited, to learn your answer."],
+    ] as [string, string][],
+    logged: "A step of your AI self, allowed, waiting or refused, sealed for your vault.",
+    example: `needs-approval: The other person is not one of the senders you listed.
+It waits for the user in their Sigil vault, under Work, with the thread and what you would send. Do not act yet.
+Step id: 8kQ2mV0xRr1sT3uW
+Call check_action with this id later to see their answer.`,
+  },
+  {
+    name: "report_action",
+    title: "Report what was done",
+    text: "Called after the app acted on an allowed or approved step. A receipt is signed on your computer with the app's own key, which your self key vouched for in your vault, and sealed with the hour.",
+    args: [
+      ["id", "The step."],
+      ["what", "What it did, in plain words."],
+    ] as [string, string][],
+    logged: "A receipt, its fingerprint in the hourly seal.",
+    example: `Kept a signed receipt (Zt4nB8cQ1wE6rY2u). Its fingerprint 0x5b1d9a2c7e4f8b03... joins this hour's seal.`,
+  },
+  {
+    name: "negotiate",
+    title: "Negotiate within the user's ranges",
+    text: "One step of a negotiation over a price, a meeting time or terms. It accepts, counters with the exact offer and words to send, or stops at the edge of your range and waits for you in Work. The numbers and times come from your ranges.",
+    args: [
+      ["kind, topic, who", "price, time or terms; what it is about; the other side."],
+      ["theirs, ours, round", "Optional. Their offer now, your last offer, and how many counters so far."],
+    ] as [string, string][],
+    logged: "A step of your AI self in negotiation, sealed for your vault.",
+    example: `counter: Inside your range: it moves halfway toward their 900 EUR.
+Offer: 1050 EUR
+Say: I can do 1050 EUR.
+Step id: Qm7cX2pL9vB4nK1d
+After you sent it, call report_action with this id.`,
   },
 ];
 
@@ -212,11 +266,11 @@ export default function ConnectorPage() {
         <section className="page-section" aria-labelledby="tools-title">
           <div className="section-header">
             <h2 id="tools-title" className="section-title">
-              Four tools that read, one that suggests, one that answers as you
+              Four tools that read, one that suggests, one that answers as you, four that ask before acting
             </h2>
             <p className="section-lead">
-              The tools that read and ask_self are marked read only for the AI app. The answers below are the plain text an app receives, in the
-              connector&apos;s own format.
+              The tools that read, ask_self and get_thresholds are marked read only for the AI app. The four for acting work only for an app you let act, under
+              Limits, and need no Google client on this site. The answers below are the plain text an app receives, in the connector&apos;s own format.
             </p>
           </div>
           <div className="tools">
