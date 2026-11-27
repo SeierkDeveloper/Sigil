@@ -129,7 +129,7 @@ const covered = [
   {
     threat: "The self key spends more than you allowed",
     answer:
-      "The self wallet checks every call against your caps per payment and per day, your recipients (the only addresses it can pay), the contracts and functions it may call, token caps in each token's own decimals as read from the token, and the end date, and refuses token moves it cannot cap. Freezing it also sets the allowances it gave back to zero. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing, and each owner deploys their own from the vault.",
+      "The self wallet checks every call against your caps per payment and per day, your recipients (the only addresses it can pay), the contracts and functions it may call, token caps in each token's own decimals as read from the token, and the end date, and refuses token moves it cannot cap. Freezing it also sets the allowances it gave back to zero, and the vault tells you if any are still open. You can freeze it, change its rules or withdraw at any time. Tested with fuzzing, and each owner deploys their own from the vault.",
   },
   {
     threat: "A proof shows more than its claim",

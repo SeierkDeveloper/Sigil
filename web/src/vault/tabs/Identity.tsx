@@ -887,7 +887,7 @@ function ChainSection({ chain }: { chain: idOps.ChainConfig | null }) {
         ) : null}
       </Band>
 
-      <Band label="Stop" hint="Freezing stops the self at once and sets every allowance it gave back to zero. Only you can unfreeze, and unfreezing cancels any call it signed before.">
+      <Band label="Stop" hint="Freezing stops the self at once and sets every allowance it gave back to zero, and tells you if any are still open. Only you can unfreeze, and unfreezing cancels any call it signed before.">
         <div className="row">
           <button type="button" className="button button-small button-danger" disabled={!!busy || !wallet} onClick={() => void act("freeze", async () => revokeAll(idOps.freezeCalldata(), "The wallet is frozen."))}>
             {busy === "freeze" ? "Freezing" : "Freeze the wallet now"}
