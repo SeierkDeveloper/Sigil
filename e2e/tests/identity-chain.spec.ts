@@ -228,7 +228,8 @@ test("the self wallet goes live on a local chain: register, create, fund, rules,
 
   // Freeze stops the self at once; unfreeze; cancel signed calls; withdraw.
   await page.getByRole("button", { name: "Freeze the wallet now" }).click();
-  await expect(page.getByTestId("chain-note")).toHaveText("The wallet is frozen.");
+  // Freezing sets every allowance the self gave back to zero, and the vault reads the list back to say so.
+  await expect(page.getByTestId("chain-note")).toHaveText("The wallet is frozen. No allowance the self gave is open.");
   await rules.getByLabel("To", { exact: true }).fill(FRIEND);
   await rules.getByLabel("Amount").fill("0.01");
   await rules.getByRole("button", { name: "Check on chain" }).click();

@@ -64,8 +64,8 @@ test("an app asks before it acts, a step waits in Work, the owner says yes with 
   await page.reload();
   await page.getByTestId("method-wallet").click();
   await expect(page.getByRole("heading", { name: "Your vault", exact: true })).toBeVisible();
-  await expect(page.getByRole("tab", { name: /Work/ }).locator(".tab-count")).toHaveText("2");
   await openTab(page, "Work");
+  await expect(page.getByRole("tab", { name: /Work/ }).locator(".tab-count")).toHaveText("2");
   const card = page.getByTestId("act-card").filter({ hasText: "Partnership" });
   await expect(card).toContainText("Claude Desktop");
   await expect(card).toContainText("The other person is not one of the senders you listed.");
