@@ -1,6 +1,6 @@
 # sigil-connector
 
-Lets Claude Desktop, Claude Code, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, suggest memories to your inbox, and ask your AI self, when you allow it. With an agent key, an agent also gets a memory of its own. It runs on your own machine: it decrypts, searches, seals and calls your model there.
+Lets Claude Desktop, Claude Code, Cursor, ChatGPT and other MCP apps read the parts of your Sigil vault you choose, search them by meaning, suggest memories to your inbox, ask your AI self, and ask it before they send mail, answer invites or negotiate for you, when you allow it. With an agent key, an agent also gets a memory of its own. It runs on your own machine: it decrypts, searches, seals and calls your model there.
 
 ## Setup
 
@@ -34,6 +34,17 @@ Build `dist/index.js` with `npm run build -w sigil-connector` from the repositor
 - `ask_self`: ask the owner's AI self a `question`. It answers as the owner, only from the folders the owner's rules allow that this app may also read, with the owner's own model key, called from this machine. Needs "May answer as your AI self" on for this app, under AI self in the vault.
 
 No tool above changes or deletes a memory, and every request shows up in the vault's read log.
+
+## Acting within your thresholds
+
+An AI app that already has your mail or calendar (Claude with its own Gmail tools, say) asks your AI self before it acts. In your vault, under Limits, set the thresholds and ranges and, under *Apps that ask first*, let this app act. The thresholds reach this machine wrapped for this app's key only and are checked here. Nothing here needs a Google client on the site: the app acts with its own access.
+
+- `get_thresholds`: your thresholds in plain lines: whom it may answer, what about, how many a day, meeting lengths, free hours, the ranges for times, prices and terms, and what it never touches.
+- `check_action`: before the app sends mail (`area` `mail`, `action` `reply` or `send`) or answers an invite (`calendar`, `accept`, `decline` or `propose`) for `who`, with optional `subject`, `text`, `kinds`, `start`, `minutes`, `conflicts`, `next` (what it would send) and `thread`. Answers `allowed`, `needs-approval` (the step is sealed to the vault and waits for you in Work, with the thread and what the app would send) or `refused` (it names something you never let anyone touch). With `id`, it returns your answer to a step that waited: approved (with your own text, if you changed it) or declined. Your answer comes back under this app's key, so the server cannot forge a yes.
+- `report_action`: after the app acted on an allowed or approved step: its `id` and `what` it did. A receipt is signed here with this app's own receipt key (derived from the app key; your self key vouched for it in the vault, so the self key never leaves your device), sealed to the vault and sealed with the hour. Anyone you show it to can check it on the verify page.
+- `negotiate`: one step of a negotiation over a `price`, a `time` or `terms`, with what the other side offers (`theirs`), your last offer (`ours`) and the `round`. It accepts, counters with the exact offer and words, or stops at the edge of your range (`ask`), where the step waits for you in Work with what it would say next. The numbers and times come from your ranges.
+
+The steps taken alone each day are counted on the server across your vault and every app, so the most per day holds everywhere. The server sees each step's area, state and time, and nothing of what it is about.
 
 ## Agent keys
 

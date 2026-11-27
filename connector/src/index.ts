@@ -33,6 +33,7 @@ import { ObsidianWatcher } from "./watch";
 import { BackupWorker } from "./backup";
 import { AgentMemory } from "./agent";
 import { SyncWorker } from "./sync";
+import { ActingClient } from "./acting";
 
 function fail(message: string): never {
   process.stderr.write(`sigil-connector: ${message}\n`);
@@ -49,7 +50,7 @@ function help(): never {
     [
       `sigil-connector ${CONNECTOR_VERSION}`,
       "",
-      "Reads your Sigil vault for MCP clients and suggests memories to its inbox. Decrypts and encrypts on this machine.",
+      "Reads your Sigil vault for MCP clients, suggests memories to its inbox, and lets an AI app ask before it acts for you. Decrypts and encrypts on this machine.",
       "",
       "Environment:",
       "  SIGIL_APP_KEY   app key from your vault (Apps, Connect an app)",
@@ -213,9 +214,11 @@ async function main() {
   } catch (err) {
     process.stderr.write(`sigil-connector: could not check whether this key is an agent's: ${(err as Error).message}\n`);
   }
+  // Acting within the owner's thresholds: the tools are always there; the server refuses them until the owner allows this app under Limits.
+  const acting = new ActingClient(reader);
   const serve = () => {
     const agent = isAgent ? new AgentMemory(reader) : undefined;
-    const server = createServer(reader, self, agent);
+    const server = createServer(reader, self, agent, acting);
     if (agent) agent.name = () => server.server.getClientVersion()?.name?.slice(0, 80) || "An agent";
     return server;
   };

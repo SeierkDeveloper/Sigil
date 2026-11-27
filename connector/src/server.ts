@@ -1,6 +1,8 @@
 // The MCP server: four tools that read the parts of the vault this app was
-// given, one that suggests a memory to the owner's inbox, and one that asks the
-// owner's AI self (when the owner allowed this app to answer as it).
+// given, one that suggests a memory to the owner's inbox, one that asks the
+// owner's AI self (when the owner allowed this app to answer as it), and four
+// for acting within the owner's thresholds: read them, check before acting,
+// report what was done, and take a step of a negotiation.
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -8,8 +10,9 @@ import { APPROVAL_MINUTES, newNonce, randomBytes, UNTRUSTED_NOTE, wrapUntrusted,
 import type { FolderInfo, FullMemory, SearchResult } from "./reader";
 import { ReaderError } from "./reader";
 import type { AgentTools, PickedNote, RecallHit } from "./agent";
+import type { ActingTools, CheckResult, NegotiateResult, StatusResult } from "./acting";
 
-export const CONNECTOR_VERSION = "0.5.0";
+export const CONNECTOR_VERSION = "0.6.0";
 
 /** What the server needs from a reader. VaultReader implements it; tests pass a stub. */
 export interface Reader {
@@ -37,6 +40,7 @@ const INSTRUCTIONS = [
   "ask_self answers a question the way the user would, from their memories and within rules they wrote, when they allowed this app to.",
   "Every read and every suggestion is shown to the user in their Sigil read log.",
   "Folders the user protected (health, money, legal) are never searched or read without the user's yes for that read: naming one asks the user in their Sigil inbox, and the same call works once they say yes.",
+  "Before you send mail, answer a calendar invite or make an offer for the user with tools of your own, call check_action (or negotiate for a price, a time or terms) and follow its answer: act only on allowed, wait on needs-approval, never act on refused. After acting, call report_action with the step id so a signed receipt is kept.",
 ].join(" ");
 
 const AGENT_INSTRUCTIONS = [
@@ -83,6 +87,10 @@ const SERVER_REASONS: Record<string, string> = {
   backup_off: "The user has not let this app back up the vault.",
   offline: "Nobody is answering for the user right now.",
   self_off: "The user has not let this app answer as their AI self.",
+  acting_off: "The user has not let this app act for them. They can allow it in their Sigil vault, under Limits.",
+  not_allowed: "The user has not allowed this step. Do not act on it.",
+  done: "This step already has its receipt.",
+  queue_full: "Too many steps wait for the user already. Wait until they go through Work in their Sigil vault.",
   server: "Something went wrong on the Sigil server. Try again later.",
 };
 
@@ -194,7 +202,31 @@ export function formatHandoffs(notes: PickedNote[]): string {
     .join("\n\n---\n\n");
 }
 
-export function createServer(reader: Reader, self?: SelfAsker, agent?: AgentTools): McpServer {
+export function formatCheck(r: CheckResult): string {
+  if (r.verdict === "allowed") return `allowed: you may go ahead. Under the user's limit: ${r.limit}.\nStep id: ${r.id}\nAfter you act, call report_action with this id and what you did.`;
+  if (r.verdict === "refused") return `refused: ${r.reason}\nDo not act on this, and do not ask again. The user can see it in their Sigil vault, under Work.`;
+  return `needs-approval: ${r.reason}\nIt waits for the user in their Sigil vault, under Work, with the thread and what you would send. Do not act yet.\nStep id: ${r.id}\nCall check_action with this id later to see their answer.`;
+}
+
+export function formatStatus(id: string, r: StatusResult): string {
+  if (r.state === "approved") return r.next ? `approved: the user said yes and changed what to send. Send exactly this:\n\n${r.next}\n\nThen call report_action with id ${id}.` : `approved: the user said yes. Go ahead as you asked, then call report_action with id ${id}.`;
+  if (r.state === "declined") return "declined: the user said no. Do not act on this.";
+  if (r.state === "waiting") return "needs-approval: it still waits for the user. Do not act yet.";
+  if (r.state === "allowed") return `allowed: go ahead, then call report_action with id ${id}.`;
+  if (r.state === "done") return "done: this step was carried out and has its receipt.";
+  return "refused: do not act on this.";
+}
+
+export function formatNegotiation(r: NegotiateResult): string {
+  const s = r.step;
+  const offer = s.offer ? (s.offer.price ? `${s.offer.price} ${s.offer.unit}` : s.offer.time ? `${s.offer.time}${s.offer.minutes ? `, ${s.offer.minutes} minutes` : ""}` : s.offer.terms?.join("; ")) : null;
+  if (r.state === "refused") return `refused: ${s.reason}\nDo not negotiate this for the user.`;
+  if (s.move === "ask")
+    return `ask: ${s.reason}\nThis is at or past the edge of the user's range, so it waits for them in their Sigil vault, under Work.${s.say ? ` What it would say next: "${s.say}"` : ""}\nStep id: ${r.id}\nDo not answer the other side yet. Call check_action with this id later.`;
+  return `${s.move}: ${s.reason}${offer ? `\nOffer: ${offer}` : ""}\nSay: ${s.say}\nStep id: ${r.id}\nAfter you sent it, call report_action with this id.`;
+}
+
+export function createServer(reader: Reader, self?: SelfAsker, agent?: AgentTools, acting?: ActingTools): McpServer {
   const server = new McpServer({ name: "sigil", title: "Sigil", version: CONNECTOR_VERSION }, { instructions: agent ? `${INSTRUCTIONS} ${AGENT_INSTRUCTIONS}` : INSTRUCTIONS });
 
   server.registerTool(
@@ -328,9 +360,123 @@ export function createServer(reader: Reader, self?: SelfAsker, agent?: AgentTool
     },
   );
 
+  if (acting) registerActingTools(server, acting);
   if (agent) registerAgentTools(server, agent);
 
   return server;
+}
+
+const KINDS = ["scheduling", "question", "thanks", "money", "legal", "other"] as const;
+const threadShape = z.array(z.object({ from: z.string().max(200), text: z.string().max(8000) })).max(30);
+const refShape = z.record(z.string().regex(/^[A-Za-z][A-Za-z0-9]{0,30}$/), z.string().max(300));
+
+function registerActingTools(server: McpServer, acting: ActingTools): void {
+  server.registerTool(
+    "get_thresholds",
+    {
+      title: "Read the user's thresholds for acting",
+      description:
+        "Reads, in plain lines, what the user lets their AI self do on its own with mail, calendar invites and negotiations: whom, what kinds of message, how many a day, meeting lengths, free hours, ranges for times, prices and terms, and what it never touches. Works only when the user let this app act, under Limits in their Sigil vault.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        return text(`The user's thresholds:\n${(await acting.summary()).map((l) => `- ${l}`).join("\n")}\n\nCall check_action before each step all the same: it also counts what was done today.`);
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "check_action",
+    {
+      title: "Ask Sigil before acting",
+      description:
+        "Call this before you send mail, reply, accept, decline or propose a calendar invite for the user with your own tools. It answers allowed (go ahead, then report_action), needs-approval (the step waits for the user in their Sigil vault with the thread and what you would send; do not act) or refused (it names something the user never lets anyone touch; do not act). With id, it tells you how the user answered a step that waited.",
+      inputSchema: {
+        id: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).optional().describe("A step id from an earlier needs-approval answer: returns the user's answer instead of checking a new step."),
+        area: z.enum(["mail", "calendar"]).optional().describe("mail or calendar."),
+        action: z.enum(["reply", "send", "accept", "decline", "propose"]).optional().describe("mail: reply or send (write first). calendar: accept, decline or propose."),
+        who: z.string().max(200).optional().describe("The other person: the sender, recipient or organizer, as Name <address> or an address."),
+        subject: z.string().max(300).optional().describe("The subject, or the event's title."),
+        text: z.string().max(8000).optional().describe("The message you answer, or the invite's description."),
+        kinds: z.array(z.enum(KINDS)).max(6).optional().describe("What the message is about, as you read it. Sigil reads the text too."),
+        start: z.string().max(40).optional().describe("For an invite: its start, ISO time with an offset or Z."),
+        minutes: z.number().int().min(1).max(1440).optional().describe("For an invite: how long it is."),
+        conflicts: z.boolean().optional().describe("For an invite: true when it overlaps something already in the user's calendar."),
+        next: z.string().max(20_000).optional().describe("What you mean to send, or do, so the user can read and change it."),
+        thread: threadShape.optional().describe("The thread so far, oldest first."),
+        ref: refShape.optional().describe("Ids in your own world, such as thread, message or event."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (a) => {
+      try {
+        if (a.id) return text(formatStatus(a.id, await acting.status(a.id)));
+        if (!a.area || !a.action || !a.who) throw new Error("Give area, action and who, or the id of a step that waited.");
+        if ((a.area === "mail") !== (a.action === "reply" || a.action === "send")) throw new Error("mail takes reply or send; calendar takes accept, decline or propose.");
+        return text(formatCheck(await acting.check({ ...a, area: a.area, action: a.action, who: a.who })));
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "report_action",
+    {
+      title: "Report what was done",
+      description:
+        "Call this after you acted on a step check_action or negotiate allowed, or the user approved. A receipt of what you did is signed on this machine with this app's own key, which the user's AI self vouched for, and sealed with the hour in the user's vault. Anyone the user shows it to can check it.",
+      inputSchema: {
+        id: z.string().regex(/^[A-Za-z0-9_-]{8,64}$/).describe("The step id."),
+        what: z.string().min(1).max(400).describe("What you did, in plain words, for example 'Replied to Sam that Friday at 12:30 works'."),
+        ref: refShape.optional().describe("Ids of what you sent or changed, such as message or event."),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async ({ id, what, ref }) => {
+      try {
+        const r = await acting.report({ id, what, ref });
+        return text(`Kept a signed receipt (${r.receiptId}). Its fingerprint ${r.leaf.slice(0, 18)}... joins this hour's seal.`);
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "negotiate",
+    {
+      title: "Negotiate within the user's ranges",
+      description:
+        "One step of a negotiation for the user: a price, a meeting time or terms. Give what the other side offers now (or nothing, to open) and the user's last offer. It answers accept, counter (with the exact offer and words to send) or ask: at or past the edge of the user's range it stops, and the step waits for the user in their Sigil vault with the thread and what it would say next. The numbers and times come from the user's ranges.",
+      inputSchema: {
+        kind: z.enum(["price", "time", "terms"]).describe("What is negotiated."),
+        topic: z.string().min(1).max(200).describe("What it is about, for example 'Consulting day in March'. A price is matched to the user's range of that name."),
+        who: z.string().max(200).describe("The other side."),
+        theirs: z
+          .object({ price: z.string().max(40).optional(), time: z.string().max(40).optional(), minutes: z.number().int().min(5).max(1440).optional(), terms: z.array(z.string().max(200)).max(30).optional() })
+          .optional()
+          .describe("Their offer now: a price as a plain number, a time (ISO) and its length, or terms."),
+        ours: z.object({ price: z.string().max(40).optional(), time: z.string().max(40).optional() }).optional().describe("The user's last offer in this negotiation, if any."),
+        round: z.number().int().min(0).max(50).optional().describe("How many counters were made for the user so far."),
+        thread: threadShape.optional().describe("The conversation so far, oldest first."),
+        busy: z.array(z.object({ start: z.string().max(40), end: z.string().max(40) })).max(200).optional().describe("For times: what is already in the user's calendar."),
+        ref: refShape.optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    },
+    async (a) => {
+      try {
+        return text(formatNegotiation(await acting.negotiate(a)));
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
 }
 
 function registerAgentTools(server: McpServer, agent: AgentTools): void {
