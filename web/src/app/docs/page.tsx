@@ -1254,7 +1254,7 @@ if (r.rank >= 2) {
               </li>
               <li>
                 <strong>In your own Google account.</strong> Under Sync, tick <em>Let your self act here</em> on a Gmail or Google Calendar source; Google is asked
-                once more, to send mail or answer invites. While your vault is open, each sync pass looks at what waits for an answer and replies or answers within
+                once more, to send mail or answer invites. While your vault is open, each sync pass looks at mail that arrived since you turned it on and invites that wait for you, and replies or answers within
                 your thresholds, from your device with your own token. This needs the site&apos;s Google client (<code>SIGIL_GOOGLE_CLIENT_ID</code>).
               </li>
             </ol>
