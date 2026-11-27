@@ -1,0 +1,189 @@
+/* ------------------------------------------------------------------ a self that acts: thresholds, ranges, steps */
+
+/* Message kinds are chips like the free days, set in a wrapping row since their names are longer. */
+.limits-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.limits-chip {
+  flex: 1 1 auto;
+  min-width: 7.5rem;
+  padding: 0 var(--space-3);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.limits-inline-check {
+  display: flex;
+  align-items: flex-end;
+}
+
+.limits-inline-check .suggest-toggle {
+  margin-bottom: 0;
+}
+
+.limits-rounds {
+  max-width: 16rem;
+}
+
+.limits-none {
+  margin: 0 0 var(--space-4);
+}
+
+/* One price range: an engraved sheet with its name across the top and its four numbers below. */
+.price-range {
+  position: relative;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-sm);
+  background: #060606;
+  min-width: 0;
+}
+
+.price-range-name {
+  margin-right: 6rem;
+}
+
+.price-range-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.price-range-grid .field {
+  margin-bottom: 0;
+}
+
+.price-range-remove {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+}
+
+.limits-summary {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.limits-summary > summary {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+.limits-summary-list {
+  margin: var(--space-3) 0 0;
+  padding: 0 0 0 calc(7px + var(--space-4));
+  background: var(--ruled-edge-faint) left top / 7px 100% no-repeat;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.limits-summary-list li + li {
+  margin-top: var(--space-2);
+}
+
+.limits-app-list .list-row {
+  align-items: center;
+}
+
+/* A step waiting for the owner: the facts in an engraved table, the reason across it. */
+.act-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.act-facts .act-why {
+  grid-column: 1 / -1;
+}
+
+.act-card .draft-title svg {
+  width: 1em;
+  height: 1em;
+  margin-right: var(--space-2);
+  vertical-align: -0.125em;
+  color: var(--color-text-faint);
+}
+
+.act-thread {
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.act-thread li + li {
+  margin-top: var(--space-4);
+}
+
+.act-thread-from {
+  margin: 0;
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+}
+
+.act-next {
+  margin: 0 0 var(--space-4);
+}
+
+.work-steps .list-row-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sync-act {
+  margin-top: var(--space-3);
+}
+
+@media (max-width: 640px) {
+  .price-range-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .price-range-name {
+    margin-right: 0;
+    margin-top: var(--space-6);
+  }
+
+  .act-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .limits-chip {
+    min-width: calc(50% - var(--space-1));
+  }
+
+  .limits-inline-check {
+    align-items: flex-start;
+  }
+}
+
+/* ------------------------------------------------------------------ roadmap: a stage done in full */
+
+.stage-done {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-accent-strong);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stage-done svg {
+  flex: none;
+}
+
+.stage[data-done="true"] .stage-summary {
+  color: var(--color-text);
+}

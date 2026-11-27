@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { cleanWork, type PaymentChannel, type WorkSettings } from "@sigil/core";
+import { agreementText, cleanWork, formatSlot, type PaymentChannel, type WorkSettings } from "@sigil/core";
 import type { ChainConfig } from "../identityOps";
 import { payApproved } from "../payOps";
 import { connectWallet } from "../wallet";
-import { DraftIcon, StyleIcon } from "@/components/icons";
+import { AgreementIcon, CalendarIcon, DraftIcon, MailIcon, StyleIcon } from "@/components/icons";
 import { formatDateTime, plural } from "@/lib/format";
 import * as work from "../workOps";
+import * as acting from "../actingOps";
 import { modelCaller } from "../selfOps";
 import { errorText, useVault } from "../context";
 import { Band, Empty, Notice, PlateHead, Quiet } from "../ui";
@@ -26,30 +27,36 @@ export function WorkTab() {
   const { data } = useVault();
   const waiting = data.drafts.filter((d) => d.state === "waiting");
   const decided = data.drafts.filter((d) => d.state !== "waiting");
+  const asks = data.acts.filter((a) => a.state === "waiting");
+  const steps = data.acts.filter((a) => a.state !== "waiting");
   return (
     <div className="work">
       <div className="panel-header">
         <h2 className="panel-title">Work</h2>
         <p className="small muted">
-          Your AI self drafts replies, plans your week and answers people. Every draft waits here for you, unless it falls within a limit you set under Limits. Approving a
-          reply or a plan copies it for you, and approving an answer sends it back the way the question came. This site sends no mail itself: a reply approved within your
-          limits is ready to send, not sent. When you change a draft before approving it, the change becomes a note under How I write, and later drafts follow it.
+          Your AI self drafts replies, plans your week, answers people, runs your inbox and calendar and negotiates. Every draft and every step past your limits waits here
+          for you, with the whole thread and what it would send next. Approving a reply or a plan copies it for you, and approving an answer sends it back the way the
+          question came. Mail and invites go out only through your own Google account (connected under Sync) or the AI app that asked. When you change a draft before
+          approving it, the change becomes a note under How I write, and later drafts follow it.
         </p>
       </div>
       {!data.model ? <Notice>With no model key under AI self, a reply is a plain start in your own greeting and sign-off, and a plan is a plain list of your week.</Notice> : null}
       <AskSection />
       <section className="subpanel plate work-queue" aria-labelledby="queue-title">
         <PlateHead number="02" id="queue-title" title="Waiting for you" lead="Read, change and approve, or discard.">
-          <span className="plate-state" data-on={waiting.length ? "true" : "false"}>
-            {waiting.length ? plural(waiting.length, "draft") : "Nothing waiting"}
+          <span className="plate-state" data-on={waiting.length + asks.length ? "true" : "false"}>
+            {waiting.length + asks.length ? plural(waiting.length + asks.length, "item") : "Nothing waiting"}
           </span>
         </PlateHead>
-        {waiting.length === 0 ? (
-          <Empty icon={<DraftIcon />} title="No drafts waiting">
-            Ask for a reply or a plan above. Answers to people show up here when you hold them for approval below.
+        {waiting.length + asks.length === 0 ? (
+          <Empty icon={<DraftIcon />} title="Nothing waiting">
+            Ask for a reply or a plan above. Mail, invites and offers past your limits, and answers you hold for approval below, show up here.
           </Empty>
         ) : (
           <div className="draft-list">
+            {asks.map((a) => (
+              <ActCard key={a.id} view={a} />
+            ))}
             {waiting.map((d) => (
               <DraftCard key={d.id} view={d} />
             ))}
@@ -58,8 +65,189 @@ export function WorkTab() {
       </section>
       <HoldSection />
       <LessonsSection />
+      {steps.length ? <StepsSection acts={steps} /> : null}
       {decided.length ? <DoneSection drafts={decided} /> : null}
     </div>
+  );
+}
+
+const AREA_WORD = { mail: "Mail", calendar: "Invite", negotiation: "Negotiation" } as const;
+
+/** Where a step comes from: the app that asked, by its name, or this vault in your own Google account. */
+function byWhom(data: { apps: { id: string; name: string }[] }, appId: string | null, area?: string): string {
+  if (appId) return data.apps.find((a) => a.id === appId)?.name ?? "A connected app";
+  return area === "calendar" ? "Your Google Calendar, from this vault" : area === "mail" || area === "negotiation" ? "Your Gmail, from this vault" : "This vault";
+}
+
+/** A step with mail, an invite or an offer that went past a limit: the thread, why it waits, what it would send next. */
+function ActCard({ view }: { view: acting.ActView }) {
+  const { api, vault, data, update } = useVault();
+  const r = view.request;
+  const [text, setText] = useState(r?.next ?? "");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  if (!r) return <Notice kind="error">A step could not be opened with your key.</Notice>;
+  const editable = r.area !== "calendar";
+  const decide = async (yes: boolean) => {
+    setBusy(yes ? "approve" : "decline");
+    setError(null);
+    try {
+      const out = yes ? await acting.approveAct(api, vault, data, view, text, { carryOut: acting.carryOutWith(api, vault, data) }) : await acting.declineAct(api, vault, data, view);
+      update((d) => ({ ...d, acts: d.acts.map((x) => (x.id === view.id ? out : x)) }));
+    } catch (err) {
+      setError(errorText(err));
+      setBusy(null);
+    }
+  };
+  const zone = data.limits.meetings.timeZone;
+  const Icon = r.area === "calendar" ? CalendarIcon : r.area === "negotiation" ? AgreementIcon : MailIcon;
+  const go = view.appId
+    ? `Approving tells ${byWhom(data, view.appId)} it may go ahead${editable ? ", with your text" : ""}. It reports back, and a receipt is kept.`
+    : r.area === "calendar"
+      ? "Approving answers the invite from your own Google account, on this device, and keeps a receipt."
+      : "Approving sends it from your own Gmail, on this device, and keeps a receipt.";
+  return (
+    <article className="draft-card act-card" data-kind={r.area} data-testid="act-card" aria-label={r.subject || AREA_WORD[r.area]}>
+      <header className="draft-head">
+        <span className="badge">{AREA_WORD[r.area]}</span>
+        <p className="draft-title">
+          <Icon /> {r.subject || "No subject"}
+        </p>
+        <span className="faint small">{formatDateTime(view.createdAt)}</span>
+      </header>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <dl className="identity-facts act-facts">
+        <div>
+          <dt>With</dt>
+          <dd>{r.who || "Unknown"}</dd>
+        </div>
+        <div>
+          <dt>Through</dt>
+          <dd>{byWhom(data, view.appId, r.area)}</dd>
+        </div>
+        {r.when ? (
+          <div>
+            <dt>When</dt>
+            <dd>
+              {formatSlot(new Date(r.when.start), zone)}, {r.when.minutes} minutes
+            </dd>
+          </div>
+        ) : null}
+        {r.offer?.price ? (
+          <div>
+            <dt>On the table</dt>
+            <dd>
+              {r.offer.price} {r.offer.unit}
+              {r.offer.range ? `, ${r.offer.range}` : ""}
+            </dd>
+          </div>
+        ) : null}
+        <div className="act-why">
+          <dt>Why it waits</dt>
+          <dd>{r.reason}</dd>
+        </div>
+      </dl>
+      {r.thread.length ? (
+        <details className="draft-input">
+          <summary>The thread, {plural(r.thread.length, "message")}</summary>
+          <ol className="act-thread">
+            {r.thread.map((t, i) => (
+              <li key={i}>
+                <p className="act-thread-from">{t.from}</p>
+                <p className="draft-input-text">{t.text}</p>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+      {editable ? (
+        <div className="field">
+          <label className="field-label" htmlFor={`act-${view.id}`}>
+            What it would send next
+          </label>
+          <textarea id={`act-${view.id}`} className="textarea" rows={6} value={text} onChange={(e) => setText(e.target.value)} />
+        </div>
+      ) : (
+        <p className="small act-next">
+          It would <strong>{r.action === "decline" ? "decline" : "accept"}</strong> the invite.
+        </p>
+      )}
+      <div className="form-actions">
+        <button type="button" className="button button-primary" disabled={!!busy || (editable && !text.trim())} onClick={() => void decide(true)}>
+          {busy === "approve" ? "Approving" : r.area === "calendar" ? (r.action === "decline" ? "Approve and decline" : "Approve and accept") : "Approve and send"}
+        </button>
+        <button type="button" className="button button-ghost" disabled={!!busy} onClick={() => void decide(false)}>
+          Decline
+        </button>
+      </div>
+      <p className="small faint">{go}</p>
+    </article>
+  );
+}
+
+const STEP_WORD: Record<acting.ActState, string> = { allowed: "Allowed", waiting: "Waiting", approved: "Approved", declined: "Declined", refused: "Refused", done: "Done" };
+
+/** Steps the self took alone, the ones you answered, and the ones it refused. */
+function StepsSection({ acts }: { acts: acting.ActView[] }) {
+  const { api, data, update, goTo } = useVault();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <section className="subpanel plate work-steps" aria-labelledby="steps-title">
+      <PlateHead number="05" id="steps-title" title="Mail, invites and offers" lead="What your self did on its own, what you answered, and what it refused. Each step it carried out has a receipt under Limits.">
+        <span className="plate-state" data-on="true">
+          {plural(acts.length, "step")}
+        </span>
+      </PlateHead>
+      {error ? <Notice kind="error">{error}</Notice> : null}
+      <ul className="list">
+        {acts.slice(0, 50).map((a) => {
+          const r = a.request;
+          const agreed = r?.area === "negotiation" && r.offer && (r.action === "agree" || a.state === "approved" || a.state === "done");
+          return (
+            <li key={a.id} className="list-row" data-state={a.state} data-testid="act-done">
+              <div className="list-row-main">
+                <p className="list-row-title">
+                  {r ? `${AREA_WORD[r.area]}: ${r.subject || r.who}` : "A step that could not be opened"} <span className="badge">{a.alone && a.state === "done" ? "Done on its own" : STEP_WORD[a.state]}</span>
+                </p>
+                <p className="list-row-meta">
+                  {formatDateTime(a.updatedAt)}. {byWhom(data, a.appId, r?.area)}
+                  {r?.who ? `, with ${r.who}` : ""}. {r ? (a.state === "refused" ? `Refused: ${r.reason}` : a.alone ? `Under: ${r.reason}` : r.reason) : ""}
+                  {a.receiptId ? " Its receipt is under Limits." : ""}
+                </p>
+              </div>
+              <div className="list-row-actions">
+                {agreed && r?.offer ? (
+                  <button
+                    type="button"
+                    className="button button-small"
+                    onClick={() => {
+                      acting.handAgreement(agreementText({ topic: r.offer?.range || r.subject || "Our agreement", who: r.who, me: data.self?.name ?? "", offer: r.offer!, timeZone: data.limits.meetings.timeZone }));
+                      goTo("agreements");
+                    }}
+                  >
+                    <AgreementIcon /> Seal as an agreement
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="button button-small button-ghost"
+                  onClick={async () => {
+                    try {
+                      await acting.removeAct(api, a.id);
+                      update((x) => ({ ...x, acts: x.acts.filter((y) => y.id !== a.id) }));
+                    } catch (err) {
+                      setError(errorText(err));
+                    }
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -442,11 +630,12 @@ function Lesson({ id }: { id: string }) {
 }
 
 function DoneSection({ drafts }: { drafts: work.DraftView[] }) {
-  const { api, update } = useVault();
+  const { api, data, update } = useVault();
+  const stepsShown = data.acts.some((a) => a.state !== "waiting");
   const [error, setError] = useState<string | null>(null);
   return (
     <section className="subpanel plate work-done" aria-labelledby="done-title">
-      <PlateHead number="05" id="done-title" title="Decided" lead="Approved and discarded drafts, kept until you remove them." />
+      <PlateHead number={stepsShown ? "06" : "05"} id="done-title" title="Decided" lead="Approved and discarded drafts, kept until you remove them." />
       {error ? <Notice kind="error">{error}</Notice> : null}
       <ul className="list">
         {drafts.slice(0, 50).map((d) => (

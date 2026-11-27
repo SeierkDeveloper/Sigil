@@ -10,7 +10,7 @@ import { trackHolders } from "./holders";
 
 export type Db = DatabaseSync;
 
-const SCHEMA_VERSION = 9;
+const SCHEMA_VERSION = 10;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -805,6 +805,37 @@ CREATE TABLE IF NOT EXISTS self_receipts (
 CREATE INDEX IF NOT EXISTS self_receipts_unsealed ON self_receipts (sealed, hour);
 CREATE INDEX IF NOT EXISTS self_receipts_by_user ON self_receipts (user_id, created_at);
 
+-- Apps the owner lets act within the thresholds (mail, invites, negotiation):
+-- the thresholds, the vault public key and the self key's delegation, under a
+-- key derived from that app's own secret.
+CREATE TABLE IF NOT EXISTS act_apps (
+  app_id TEXT PRIMARY KEY REFERENCES apps(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  config TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Steps the AI self took or wants to take with mail, invites and offers. box is
+-- the request (who, the thread, what it would do next) sealed to the vault's
+-- public key; answer is the owner's yes or no under the asking app's key. The
+-- server sees the area, the state and the times, which it counts for the
+-- owner's limits per day, and nothing of what was asked. app_id is null for
+-- the vault's own steps. alone is 1 when it acted without asking.
+CREATE TABLE IF NOT EXISTS acts (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  app_id TEXT,
+  area TEXT NOT NULL CHECK (area IN ('mail', 'calendar', 'negotiation')),
+  state TEXT NOT NULL CHECK (state IN ('allowed', 'waiting', 'approved', 'declined', 'refused', 'done')),
+  alone INTEGER NOT NULL DEFAULT 0,
+  box TEXT NOT NULL,
+  answer TEXT,
+  receipt_id TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS acts_by_user ON acts (user_id, created_at);
+
 -- The immune system's public test: one record per hour (each strain, how it
 -- varied, whether it was held and by what). Its leaf joins that hour's seal.
 CREATE TABLE IF NOT EXISTS immune_records (
@@ -1014,6 +1045,9 @@ export function openDb(file: string): Db {
   addColumn(db, "public_selves", "voice", "INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "ask_links", "voice", "INTEGER NOT NULL DEFAULT 0");
   addColumn(db, "legacy_plans", "release_hash", "TEXT");
+  // A self that acts: a receipt an app signed is sealed to the vault's public key and names the app, and the area it acted in.
+  addColumn(db, "self_receipts", "app_id", "TEXT");
+  addColumn(db, "self_receipts", "area", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS memories_to_delete ON memories (delete_after) WHERE delete_after IS NOT NULL;");
   db.exec(`PRAGMA user_version = ${SCHEMA_VERSION};`);
   // Fresh planner statistics for the tables that changed since the last start.
@@ -1047,6 +1081,9 @@ function trackChanges(db: Db): void {
     // An app's last use is written on every call; only what the vault shows of it counts.
     ["apps", "UPDATE OF meta, revoked_at", "NEW"],
     ["apps", "DELETE", "OLD"],
+    // A step an app asks the owner about, or reports, shows in Work without a reload.
+    ["acts", "INSERT", "NEW"],
+    ["acts", "UPDATE OF state", "NEW"],
   ];
   for (const [table, event, row] of watch) {
     const name = `changes_${table}_${event.split(" ")[0].toLowerCase()}`;

@@ -5,6 +5,7 @@ import { parseVaultCode, vaultFingerprint } from "@sigil/core";
 import { AgreementIcon, ImportIcon } from "@/components/icons";
 import { formatDateTime } from "@/lib/format";
 import * as ag from "../agreementOps";
+import { clearAgreement, peekAgreement } from "../actingOps";
 import { errorText, useVault } from "../context";
 import { download, Empty, Fingerprint, Notice, PlateHead } from "../ui";
 
@@ -13,7 +14,10 @@ const STATE_WORD: Record<ag.AgreementState, string> = { proposed: "Waiting for a
 /** Sealed agreements: one vault drafts, the other reviews and signs, both sign one hash, and it is sealed in both logs. */
 export function AgreementsTab() {
   const { api, vault, data, update } = useVault();
-  const [drafting, setDrafting] = useState<ag.AgreementView | "new" | null>(null);
+  // An agreed result from Work opens as a new draft with its text.
+  const [handed] = useState(() => peekAgreement());
+  const [drafting, setDrafting] = useState<ag.AgreementView | "new" | null>(handed ? "new" : null);
+  useEffect(() => clearAgreement(), []);
 
   // While this tab is open, the list is read again now and then, so a signature from the other side shows.
   useEffect(() => {
@@ -46,7 +50,7 @@ export function AgreementsTab() {
         signed it goes into both of your hourly seals. Nothing can be changed after signing: a change is an amendment, a new version that points to the old one. The text travels
         sealed to the other vault; Sigil passes it on and cannot read it.
       </p>
-      {drafting ? <DraftForm amends={drafting === "new" ? null : drafting} onDone={() => setDrafting(null)} /> : null}
+      {drafting ? <DraftForm amends={drafting === "new" ? null : drafting} initial={drafting === "new" ? handed : null} onDone={() => setDrafting(null)} /> : null}
       {data.agreements.length === 0 && !drafting ? (
         <Empty icon={<AgreementIcon />} title="No agreements yet">
           Ask the other person for their vault code (under Folders, Your vault code), and draft the first one.
@@ -59,12 +63,12 @@ export function AgreementsTab() {
   );
 }
 
-function DraftForm({ amends, onDone }: { amends: ag.AgreementView | null; onDone(): void }) {
+function DraftForm({ amends, initial, onDone }: { amends: ag.AgreementView | null; initial?: { title: string; text: string } | null; onDone(): void }) {
   const { api, vault, data, reload } = useVault();
   const me = amends?.doc ? amends.doc.parties[amends.role === "from" ? 0 : 1].name : "";
   const [code, setCode] = useState("");
-  const [title, setTitle] = useState(amends?.doc?.title ?? "");
-  const [text, setText] = useState(amends?.doc?.text ?? "");
+  const [title, setTitle] = useState(amends?.doc?.title ?? initial?.title ?? "");
+  const [text, setText] = useState(amends?.doc?.text ?? initial?.text ?? "");
   const [myName, setMyName] = useState(me);
   const [them, setThem] = useState("");
   const [busy, setBusy] = useState(false);

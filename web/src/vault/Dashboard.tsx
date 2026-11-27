@@ -340,7 +340,10 @@ export function Dashboard({ api, vault, onLock, onSignOut, onDeleted }: Props) {
   const waiting: Partial<Record<TabId, { n: number; label: string }>> = {
     legacy: { n: data.trusted.filter((x) => x.state === "open" && !x.kept).length, label: "A plan that names you is open for release" },
     inbox: { n: data.proposals.length + waitingRequests, label: `${data.proposals.length + waitingRequests} waiting` },
-    work: { n: data.drafts.filter((d) => d.state === "waiting").length, label: `${data.drafts.filter((d) => d.state === "waiting").length} drafts waiting` },
+    work: {
+      n: data.drafts.filter((d) => d.state === "waiting").length + data.acts.filter((a) => a.state === "waiting").length,
+      label: `${data.drafts.filter((d) => d.state === "waiting").length + data.acts.filter((a) => a.state === "waiting").length} waiting for you`,
+    },
     agreements: { n: data.agreements.filter((a) => a.role === "to" && a.state === "proposed").length, label: "An agreement waits for your signature" },
     shared: { n: data.spaces.filter((s) => s.kind !== "team" && !s.me.acceptedAt).length, label: "A shared memory waits for you to accept it" },
     meet: { n: data.meets.filter((m) => m.role === "invitee" && m.state === "invited").length, label: "An invite is waiting" },

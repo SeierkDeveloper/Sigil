@@ -88,6 +88,7 @@ import { openMeets, type MeetView, type ServerMeet } from "./meetOps";
 import { openChoices, openIdentity, openRules, type IdentityChoices, type IdentityView, type ServerIdentity } from "./identityOps";
 import { openDrafts, openWork, type DraftView, type ServerDraft } from "./workOps";
 import { openLimits } from "./limitsOps";
+import { openActs, type ActView, type ServerAct } from "./actingOps";
 import { openDisclosures, type DisclosureView, type ServerDisclosure } from "./discloseOps";
 import { openEmergency, type EmergencyView, type ServerEmergency } from "./emergencyOps";
 import { openAgreements, type AgreementView, type ServerAgreement } from "./agreementOps";
@@ -133,6 +134,8 @@ export interface AppView {
   canPropose: boolean;
   /** May answer as the AI self (the ask_self tool, and links it serves). */
   canAskSelf: boolean;
+  /** May act within the thresholds under Limits (check_action, report_action, negotiate). */
+  canAct: boolean;
   /** Folders it may write: only agents have any. */
   writeIds: string[];
 }
@@ -244,6 +247,8 @@ export interface VaultData {
   work: WorkSettings;
   /** The approval queue. */
   drafts: DraftView[];
+  /** Steps with mail, invites and offers: taken alone, waiting for the owner, or refused. */
+  acts: ActView[];
   /** Proofs of a fact, opened on this device. */
   disclosures: DisclosureView[];
   /** The emergency card and who opened it. */
@@ -320,6 +325,7 @@ export interface ServerVault {
     grants: { folderId: string; mode?: "read" | "write" }[];
     canPropose?: boolean;
     canAskSelf?: boolean;
+    canAct?: boolean;
   }[];
   settings?: Record<string, string>;
   askLinks?: {
@@ -352,6 +358,7 @@ export interface ServerVault {
   meets?: ServerMeet[];
   identity?: ServerIdentity | null;
   drafts?: ServerDraft[];
+  acts?: ServerAct[];
   disclosures?: ServerDisclosure[];
   holder?: HolderView;
   emergency?: ServerEmergency;
@@ -572,6 +579,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
       secret: a.secret,
       canPropose: a.canPropose === true,
       canAskSelf: a.canAskSelf === true,
+      canAct: a.canAct === true,
     });
   }
 
@@ -697,6 +705,8 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
   const follows = await later(() => openFollows(vault, settings.packs), []);
   const drafted = await openDrafts(vault, data.drafts ?? []);
   unreadable += drafted.unreadable;
+  const acted = openActs(box, data.acts ?? []);
+  unreadable += acted.unreadable;
   const disclosed = await openDisclosures(vault, data.disclosures ?? []);
   unreadable += disclosed.unreadable;
   const em = await openEmergency(vault, data.emergency);
@@ -725,6 +735,7 @@ export async function decodeVault(data: ServerVault, vault: Unlocked, api: Api |
     limits,
     work,
     drafts: drafted.drafts,
+    acts: acted.acts,
     disclosures: disclosed.disclosures,
     emergency: em.emergency,
     agreements: agreed.agreements,
@@ -1175,7 +1186,12 @@ export interface VaultExport {
   /** The AI self's identity, its signed statement and the draft rules of its wallet. The self key itself is never in the file: it is made again from the vault key. */
   identity: { address: string; statement: unknown; choices: IdentityChoices; walletRules: WalletRules | null } | null;
   /** The approval queue and what is held back. */
-  work: { settings: WorkSettings; drafts: { kind: string; state: string; title: string; draft: string; final: string | null; createdAt: string }[] };
+  work: {
+    settings: WorkSettings;
+    drafts: { kind: string; state: string; title: string; draft: string; final: string | null; createdAt: string }[];
+    /** Steps with mail, invites and offers: what, with whom, why, and what became of each. */
+    steps?: { area: string; state: string; alone: boolean; who: string; subject: string; next: string; reason: string; createdAt: string }[];
+  };
   /** Proofs of a fact, complete with their evidence. */
   proofs: unknown[];
   /** The emergency card, without its key. */
@@ -1278,6 +1294,9 @@ export function buildExport(data: VaultData, log: LogEntryView[]): VaultExport {
       drafts: data.drafts
         .filter((d) => d.record)
         .map((d) => ({ kind: d.kind, state: d.state, title: d.record!.title, draft: d.record!.draft, final: d.record!.final, createdAt: d.createdAt })),
+      steps: (data.acts ?? [])
+        .filter((a) => a.request)
+        .map((a) => ({ area: a.area, state: a.state, alone: a.alone, who: a.request!.who, subject: a.request!.subject, next: a.request!.next, reason: a.request!.reason, createdAt: a.createdAt })),
     },
     proofs: data.disclosures.map((d) => d.proof).filter(Boolean),
     emergency: { card: data.emergency.card?.card ?? null, published: data.emergency.card?.createdAt ?? null, opens: data.emergency.opens.map((o) => ({ at: o.at, device: o.device, lang: o.lang })) },

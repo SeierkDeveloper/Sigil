@@ -10,6 +10,7 @@ import {
   encryptJson,
   meetKey,
   meetTurn,
+  rangesForPrompt,
   openAnswer,
   openInvite,
   openMeetMessage,
@@ -249,6 +250,7 @@ export async function composeTurn(api: Api, data: VaultData, meet: MeetView, dep
     model: deps.model,
     turn,
     turnLimit: meet.turnLimit,
+    ranges: rangesForPrompt(data.limits),
   });
   if (gate.extra.length) await gate.use(gate.extra.map((m) => m.id));
   return { turn, text: gate.asked.length ? `${out.text}\n\n${ASKED_TEXT}` : out.text, done: out.done, cited: out.citations.length };

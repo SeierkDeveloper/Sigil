@@ -66,7 +66,7 @@ test("sign up, import, connect over MCP, read, revoke, read fails", async ({ pag
   // ---- the connector, over MCP stdio, exactly as Claude Desktop would start it
   const mcp = await connectMcp(appKey, baseURL!);
   const tools = await mcp.listTools();
-  expect(tools.tools.map((t) => t.name).sort()).toEqual(["ask_self", "get_profile", "list_folders", "propose_memory", "read_memory", "search_memories"]);
+  expect(tools.tools.map((t) => t.name).sort()).toEqual(["ask_self", "check_action", "get_profile", "get_thresholds", "list_folders", "negotiate", "propose_memory", "read_memory", "report_action", "search_memories"]);
   // The AI self answers only for apps the owner allowed.
   const notAllowed = await mcp.callTool({ name: "ask_self", arguments: { question: "What do I grow?" } });
   expect(notAllowed.isError).toBe(true);

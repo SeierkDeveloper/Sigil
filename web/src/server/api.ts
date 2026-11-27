@@ -149,6 +149,7 @@ import { acceptMeet, addTurn, declineMeet, invite, listMeets, meetsWaiting, remo
 import { getIdentity, publicStatement, putStatement, setSelfKey, withdrawStatement } from "./identity";
 import { createDraft, deleteDraft, listDrafts, logLesson, updateDraft } from "./work";
 import { addReceipt, deleteReceipt, listReceipts } from "./receipts";
+import { actAppIds, actForApp, actingForApp, aloneSince, createAct, createActForApp, decideAct, deleteAct, finishAct, finishActForApp, listActs, setActApp } from "./acting";
 import { createDisclosure, deleteDisclosure, disclosureAnchor, listDisclosures, MAX_PROOF_BYTES, publishDisclosure, publishedDisclosure, spaceJoinEntry, unpublishDisclosure, updateDisclosureBox } from "./disclose";
 import { cardOpens, openPublicCard, ownerCard, putCard, revokeCard } from "./emergency";
 import { agreementSeal, declineAgreement, listAgreements, peerSigningKey, proposeAgreement, removeAgreement, signAgreementRow } from "./agreements";
@@ -588,10 +589,11 @@ route("GET", "vault", (ctx) => {
   purgeExpired(ctx.db);
   const inbox = appInboxStates(ctx.db, userId);
   const selfApps = selfAppIds(ctx.db, userId);
+  const actApps = actAppIds(ctx.db, userId);
   return json({
     folders: listFolders(ctx.db, userId),
     memories: listMemories(ctx.db, userId),
-    apps: listApps(ctx.db, userId).map((a) => ({ ...a, canPropose: !a.revokedAt && inbox.get(a.id) === true, canAskSelf: !a.revokedAt && selfApps.has(a.id) })),
+    apps: listApps(ctx.db, userId).map((a) => ({ ...a, canPropose: !a.revokedAt && inbox.get(a.id) === true, canAskSelf: !a.revokedAt && selfApps.has(a.id), canAct: !a.revokedAt && actApps.has(a.id) })),
     settings: listSettings(ctx.db, userId),
     askLinks: listLinks(ctx.db, userId),
     keyslots: listKeyslots(ctx.db, userId),
@@ -612,6 +614,7 @@ route("GET", "vault", (ctx) => {
     meets: listMeets(ctx.db, userId),
     identity: getIdentity(ctx.db, userId),
     drafts: listDrafts(ctx.db, userId),
+    acts: listActs(ctx.db, userId),
     disclosures: listDisclosures(ctx.db, userId),
     holder: holderStatus(ctx.db, userId),
     emergency: { card: ownerCard(ctx.db, userId), opens: cardOpens(ctx.db, userId) },
@@ -1651,6 +1654,77 @@ route("POST", "self/receipts", async (ctx) => {
 route("DELETE", "self/receipts/:id", (ctx, [receiptId]) => {
   deleteReceipt(ctx.db, userOf(ctx), receiptId);
   return json({ ok: true });
+});
+
+// ---- a self that acts: apps that may act within the thresholds, and steps with mail, invites and offers
+
+const actArea = z.enum(["mail", "calendar", "negotiation"]);
+const actShape = z.object({ id, area: actArea, state: z.enum(["allowed", "waiting", "refused"]), box: sealed(256 * KB) });
+
+route("PUT", "apps/:id/acting", async (ctx, [appId]) => {
+  const body = parse(z.object({ config: envelope(128 * KB) }), await readJson(ctx.req, 160 * KB));
+  setActApp(ctx.db, userOf(ctx), appId, body.config);
+  return json({ ok: true });
+});
+
+route("DELETE", "apps/:id/acting", (ctx, [appId]) => {
+  setActApp(ctx.db, userOf(ctx), appId, null);
+  return json({ ok: true });
+});
+
+route("GET", "acting", (ctx) => {
+  const userId = userOf(ctx);
+  const since = ctx.url.searchParams.get("since");
+  return json({ acts: listActs(ctx.db, userId), today: since && Number.isFinite(Date.parse(since)) ? aloneSince(ctx.db, userId, new Date(since).toISOString()) : null });
+});
+
+route("POST", "acting", async (ctx) => {
+  const userId = userOf(ctx);
+  rateLimit(`acts:${userId}`, 120, 60_000);
+  return json({ act: createAct(ctx.db, userId, null, parse(actShape, await readJson(ctx.req, 300 * KB))) }, 201);
+});
+
+route("POST", "acting/:id/decide", async (ctx, [actId]) => {
+  const body = parse(z.object({ state: z.enum(["approved", "declined"]), answer: envelope(64 * KB).nullable() }), await readJson(ctx.req, 80 * KB));
+  return json({ act: decideAct(ctx.db, userOf(ctx), actId, body) });
+});
+
+route("POST", "acting/:id/done", async (ctx, [actId]) => {
+  const userId = userOf(ctx);
+  const body = parse(z.object({ receipt: z.object({ id, leaf: hex32, box: envelope(16 * KB) }) }), await readJson(ctx.req, 20 * KB));
+  return json(finishAct(ctx.db, userId, null, actId, body.receipt));
+});
+
+route("DELETE", "acting/:id", (ctx, [actId]) => {
+  deleteAct(ctx.db, userOf(ctx), actId);
+  return json({ ok: true });
+});
+
+// An app the owner lets act: its thresholds (wrapped for it) and when the steps taken alone lately happened.
+route("GET", "connector/v1/acting", (ctx) => {
+  const auth = appOf(ctx);
+  return json({ appId: auth.appId, ...actingForApp(ctx.db, auth) });
+});
+
+route("POST", "connector/v1/acting", async (ctx) => {
+  const auth = appOf(ctx);
+  rateLimit(`acts-app:${auth.appId}`, 60, 60_000);
+  const a = createActForApp(ctx.db, auth, parse(actShape, await readJson(ctx.req, 300 * KB)));
+  return json({ appId: auth.appId, act: { id: a.id, state: a.state, createdAt: a.createdAt } }, 201);
+});
+
+route("GET", "connector/v1/acting/:id", (ctx, [actId]) => {
+  const auth = appOf(ctx);
+  const a = actForApp(ctx.db, auth, actId);
+  return json({ appId: auth.appId, act: { id: a.id, area: a.area, state: a.state, answer: a.answer, receiptId: a.receiptId, createdAt: a.createdAt, updatedAt: a.updatedAt } });
+});
+
+route("POST", "connector/v1/acting/:id/receipt", async (ctx, [actId]) => {
+  const auth = appOf(ctx);
+  rateLimit(`acts-app:${auth.appId}`, 60, 60_000);
+  const body = parse(z.object({ receipt: z.object({ id, leaf: hex32, box: sealed(32 * KB) }) }), await readJson(ctx.req, 40 * KB));
+  const r = finishActForApp(ctx.db, auth, actId, body.receipt);
+  return json({ appId: auth.appId, act: { id: r.act.id, state: r.act.state }, receipt: { id: r.receipt.id, leaf: r.receipt.leaf, hour: r.receipt.hour } }, 201);
 });
 
 // ---- the AI self at work: drafts waiting for the owner, each sealed under the vault key

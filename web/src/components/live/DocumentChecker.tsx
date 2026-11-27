@@ -57,7 +57,14 @@ async function sources() {
   return { chain, period };
 }
 
-const RECEIPT_KIND: Record<string, string> = { payment: "A payment", approval: "An approval within limits", agreement: "A meeting agreed" };
+const RECEIPT_KIND: Record<string, string> = {
+  payment: "A payment",
+  approval: "An approval within limits",
+  agreement: "A meeting agreed",
+  mail: "Mail handled within thresholds",
+  calendar: "An invite answered within thresholds",
+  negotiation: "A step of a negotiation within ranges",
+};
 
 /** A receipt of the AI self: its signature, its proof to a sealed root, that root against the site's seals (and the chain's), and the identity statement of its self key. */
 async function checkReceiptDocument(text: string, chain: ChainInfo | null, period: number): Promise<State> {
@@ -97,7 +104,10 @@ async function checkReceiptDocument(text: string, chain: ChainInfo | null, perio
       const st = await fetch(`/api/identity/at/${body.selfKey}`, { cache: "no-store" });
       if (st.ok) {
         const statement = parseIdentityStatement(await st.text());
-        if (verifyIdentityStatement(statement).ok) attestedBy = `The self key ${body.selfKey}, whose signed identity statement names it ${statement.body.name}.`;
+        if (verifyIdentityStatement(statement).ok)
+          attestedBy = body.via
+            ? `The self key ${body.selfKey}, whose signed identity statement names it ${statement.body.name}, through the receipt key it gave a connected app.`
+            : `The self key ${body.selfKey}, whose signed identity statement names it ${statement.body.name}.`;
       }
     } catch {
       // No statement: the self key alone stands behind it.

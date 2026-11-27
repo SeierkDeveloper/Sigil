@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PROVIDER_INFO, SYNC_INFO, SYNC_KINDS, type SyncKind } from "@sigil/core";
+import { ACT_SCOPES, PROVIDER_INFO, SYNC_INFO, SYNC_KINDS, type SyncKind } from "@sigil/core";
 import { CodeBlock } from "@/components/CodeBlock";
 import { SyncIcon } from "@/components/icons";
 import { watchCommand, EXAMPLE_KEY } from "@/lib/connector";
@@ -10,6 +10,8 @@ import { formatDateTime, plural } from "@/lib/format";
 import { site } from "@/lib/site";
 import * as ops from "../ops";
 import * as sync from "../syncOps";
+import * as acting from "../actingOps";
+import { modelCaller } from "../selfOps";
 import { errorText, useVault } from "../context";
 import { SourceMark } from "../marks";
 import { Empty, Notice, PlateHead, Quiet } from "../ui";
@@ -44,7 +46,7 @@ export function SyncTab() {
       </div>
       {error ? <Notice kind="error">{error}</Notice> : null}
       {liveSync.lastError ? <Notice kind="error">The last sync stopped: {liveSync.lastError}</Notice> : null}
-      <Sources />
+      <Sources clients={clients} />
       <Connect clients={clients} />
       <Background />
     </div>
@@ -58,7 +60,20 @@ function sourceLine(s: sync.SyncSourceView): string {
   return `Last synced ${formatDateTime(last.at)}: ${plural(last.added, "new memory", "new memories")}, ${last.updated} changed, ${last.removed} removed.`;
 }
 
-function Sources() {
+/** What acting in a source did last, or what turning it on does. */
+function actLine(s: sync.SyncSourceView, google: string | null): string {
+  const a = s.state?.act;
+  const what = s.state?.kind === "calendar" ? "answers invites" : "replies";
+  if (a?.on) {
+    if (!a.last) return `Your self ${what} within your limits under Limits while this vault is open. Not looked yet.`;
+    if (a.last.error) return `Last look ${formatDateTime(a.last.at)}: ${a.last.error}`;
+    return `Last look ${formatDateTime(a.last.at)}: ${a.last.acted} on its own, ${a.last.waiting} waiting in Work, ${a.last.refused} refused.`;
+  }
+  if (!google) return "Acting here needs this site's Google client (SIGIL_GOOGLE_CLIENT_ID), which is not set. An AI app can still ask first, under Limits.";
+  return `Within your limits it ${what} from this device; the rest waits in Work. Google is asked once more, for permission to ${s.state?.kind === "calendar" ? "answer invites" : "send"}.`;
+}
+
+function Sources({ clients }: { clients: sync.SyncClients | null }) {
   const { api, vault, data, update, liveSync } = useVault();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +124,28 @@ function Sources() {
                     Into {folderName(s.folderId)}. {sourceLine(s)}
                     {app ? ` Kept in sync by ${app.name} while the vault is closed.` : " Kept in sync while this vault is open."}
                   </p>
+                  {kind && ACT_SCOPES[kind] && s.state && !s.state.via && !app ? (
+                    <label className="checkbox suggest-toggle sync-act" htmlFor={`sync-act-${s.id}`}>
+                      <input
+                        id={`sync-act-${s.id}`}
+                        type="checkbox"
+                        checked={s.state.act?.on === true}
+                        disabled={!!busy || (!s.state.act?.on && !clients?.google)}
+                        onChange={(e) =>
+                          void act(s.id, async () => {
+                            const next = e.target.checked
+                              ? await acting.enableActing(api, vault, data, s, { clientId: clients?.google ?? null, origin: window.location.origin })
+                              : await acting.disableActing(api, vault, data, s);
+                            update((d) => ({ ...d, sync: d.sync.map((x) => (x.id === s.id ? next : x)) }));
+                          })
+                        }
+                      />
+                      <span>
+                        Let your self act here
+                        <span className="field-hint">{actLine(s, clients?.google ?? null)}</span>
+                      </span>
+                    </label>
+                  ) : null}
                   {confirm === s.id ? (
                     <div className="subpanel">
                       <p className="small">Disconnect it? The sign-in is deleted from Sigil at once. The memories it made stay in {folderName(s.folderId)}.</p>
@@ -144,8 +181,17 @@ function Sources() {
                         onClick={() =>
                           void act(s.id, async () => {
                             const r = await sync.syncNow(api, vault, data, s);
-                            const fresh = await ops.loadVault(api, vault);
-                            update(() => ({ ...fresh, sync: fresh.sync.map((x) => (x.id === s.id ? r.source : x)) }));
+                            let fresh = await ops.loadVault(api, vault);
+                            let source = r.source;
+                            // Where the self may act, it looks at what waits for an answer right after the pass.
+                            if (acting.sourceActs(source)) {
+                              try {
+                                source = (await acting.actOnSource(api, vault, fresh, source, { model: modelCaller(fresh) })).source;
+                              } finally {
+                                fresh = await ops.loadVault(api, vault);
+                              }
+                            }
+                            update(() => ({ ...fresh, sync: fresh.sync.map((x) => (x.id === s.id ? source : x)) }));
                           })
                         }
                       >

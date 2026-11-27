@@ -35,6 +35,7 @@ import {
   sealSetting,
   STYLE_FOLDER,
   styleHints,
+  turnPastRanges,
   weekAgenda,
   type AnswerChannel,
   type DraftKind,
@@ -286,7 +287,9 @@ export async function holdPublicOnce(api: Api, vault: Unlocked, data: VaultData,
  * as drafts when the owner holds meet turns; and, when meetings are a limit,
  * a turn that agrees a time is sent on its own (with a receipt) only when the
  * time falls in the owner's free hours, and held otherwise. A turn that agrees
- * nothing yet is sent as usual when turns are not held.
+ * nothing yet is sent as usual when turns are not held. With negotiation on, a
+ * turn that names a price at or past the edge of a range, or a term the owner
+ * never agrees to, is held with the reason, whatever else is set.
  */
 export async function holdMeetsOnce(api: Api, vault: Unlocked, data: VaultData, known: DraftView[], deps: { model: ModelCaller }): Promise<DraftView[]> {
   if (!data.box) return [];
@@ -298,8 +301,9 @@ export async function holdMeetsOnce(api: Api, vault: Unlocked, data: VaultData, 
     if (seen.has(ref)) continue;
     const t = await composeTurn(api, data, m, deps);
     if (!t) continue;
-    const decision = t.done && limits.meetings.on ? meetingWithinLimits(limits, agreedTime(t.text, limits.meetings.timeZone)) : null;
-    if (!data.work.holdMeets && !t.done) {
+    const past = turnPastRanges(limits, t.text);
+    const decision = past ? ({ ok: false, reason: past } as const) : t.done && limits.meetings.on ? meetingWithinLimits(limits, agreedTime(t.text, limits.meetings.timeZone)) : null;
+    if (!data.work.holdMeets && !t.done && !past) {
       await sendTurn(api, m, data.box, t);
       continue;
     }

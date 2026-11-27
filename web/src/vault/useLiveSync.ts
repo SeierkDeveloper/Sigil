@@ -3,11 +3,15 @@
 // While the vault is open, it keeps live sync sources up to date: a pass soon
 // after opening, then every few minutes, one source after another. A source a
 // connector syncs in the background is left to it. Closing the vault stops this.
+// After a Gmail or Calendar source's pass, when the owner lets the self act
+// there, it looks at what waits for an answer and acts within the thresholds.
 
 import { useEffect, useRef, useState } from "react";
 import { ApiError, type Api } from "./api";
 import type { Unlocked, VaultData } from "./ops";
 import { syncNow } from "./syncOps";
+import { actOnSource, sourceActs, type ActView } from "./actingOps";
+import { modelCaller } from "./selfOps";
 import { republish } from "./publicOps";
 
 const EVERY_MS = 5 * 60_000;
@@ -44,6 +48,14 @@ export function useLiveSync(api: Api, vault: Unlocked, data: VaultData | null, s
               }),
           });
           setData((x) => (x ? { ...x, sync: x.sync.map((s) => (s.id === src.id ? r.source : s)) } : x));
+          if (sourceActs(r.source)) {
+            const now = latest.current ?? d;
+            const acted = await actOnSource(api, vault, now, r.source, { model: modelCaller(now) }).catch((err: Error & { source?: typeof r.source; outcome?: { acts: ActView[] } }) => {
+              if (err.source) setData((x) => (x ? { ...x, sync: x.sync.map((s) => (s.id === src.id ? err.source! : s)), acts: [...(err.outcome?.acts ?? []), ...x.acts] } : x));
+              throw err;
+            });
+            setData((x) => (x ? { ...x, sync: x.sync.map((s) => (s.id === src.id ? acted.source : s)), acts: [...acted.outcome.acts, ...x.acts.filter((a) => !acted.outcome.acts.some((b) => b.id === a.id))] } : x));
+          }
         } catch (err) {
           // Another device or tab saved a newer copy first: nothing went wrong, the next pass starts from it.
           if (err instanceof ApiError && err.code === "stale") continue;

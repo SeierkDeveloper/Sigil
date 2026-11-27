@@ -191,6 +191,17 @@ export function LogTab() {
       if (step.startsWith("drafted-")) return `Your AI self drafted ${what(step.slice(8))}, waiting for you`;
       if (step.startsWith("approved-")) return `You approved ${what(step.slice(9))}`;
       if (step.startsWith("discarded-")) return `You discarded ${what(step.slice(10))}`;
+      if (step.startsWith("act-")) {
+        const [, area, state] = step.split("-");
+        const where = area === "calendar" ? "an invite" : area === "negotiation" ? "a negotiation" : "mail";
+        if (state === "allowed") return `Your AI self took a step with ${where} on its own, within your limits`;
+        if (state === "waiting") return `A step with ${where} waits for you in Work`;
+        if (state === "refused") return `A step with ${where} was refused by your never-touch list`;
+        if (state === "approved") return `You approved a step with ${where}`;
+        if (state === "declined") return `You declined a step with ${where}`;
+        if (state === "done") return `A step with ${where} was carried out; its receipt is sealed`;
+        return `A step of your AI self with ${where}`;
+      }
       if (step === "learned") return "Your edit became a note under How I write";
       if (step === "lesson-edited") return "You changed a note under How I write";
       if (step === "lesson-deleted") return "You deleted a note under How I write";

@@ -3,7 +3,7 @@
 // other agreement waits in Work, even when the owner does not hold turns.
 
 import { beforeEach, describe, expect, it } from "vitest";
-import { cleanRules, formatVaultCode, type ModelCaller } from "@sigil/core";
+import { cleanRules, DEFAULT_LIMITS, formatVaultCode, type ModelCaller } from "@sigil/core";
 import { harness, signedUp, type Harness } from "./helpers";
 import * as ops from "../src/vault/ops";
 import * as self from "../src/vault/selfOps";
@@ -27,7 +27,7 @@ async function owner(name: string) {
 }
 
 /** Sam invites Robin to find a time; Robin's self answers the first turn with `robinSays`, under Robin's limits. */
-async function meeting(robinSays: string) {
+async function meeting(robinSays: string, extra: Partial<typeof DEFAULT_LIMITS> = {}) {
   const sam = await owner("Sam");
   const robin = await owner("Robin");
   await meet.inviteSelf(sam.b.api, sam.vault, { code: robin.code, purpose: "find_time", note: "30 minutes", label: "Robin", me: "Sam", folderIds: [], calendar: false, turnLimit: 4 });
@@ -35,7 +35,7 @@ async function meeting(robinSays: string) {
   await meet.acceptMeet(robin.b.api, robin.vault, r.meets[0], { label: "Sam", me: "Robin", folderIds: [], calendar: false });
   const s = await ops.loadVault(sam.b.api, sam.vault);
   expect(await meet.meetOnce(sam.b.api, sam.vault, s, { model: say("Does Monday morning work?") })).toBe(1);
-  await limits.saveLimits(robin.b.api, robin.vault, { v: 1, payments: { on: false, maxPerPayment: "" }, replies: { on: false, contacts: [] }, meetings: { on: true, days: [1, 2, 3, 4, 5], from: "09:00", to: "17:00", timeZone: "UTC" } });
+  await limits.saveLimits(robin.b.api, robin.vault, { ...DEFAULT_LIMITS, meetings: { on: true, days: [1, 2, 3, 4, 5], from: "09:00", to: "17:00", timeZone: "UTC" }, ...extra });
   r = await ops.loadVault(robin.b.api, robin.vault);
   expect(r.work.holdMeets).toBe(false);
   const made = await work.holdMeetsOnce(robin.b.api, robin.vault, r, r.drafts, { model: say(robinSays) });
@@ -67,5 +67,25 @@ describe("meetings within limits", () => {
     const { made, after } = await meeting("Which day suits you?");
     expect(made).toEqual([]);
     expect(after.meets[0].turns).toBe(2);
+  });
+
+  it("hold a turn that goes past the owner's ranges, even mid-conversation, and tell the self the ranges", async () => {
+    const ranges = { ...DEFAULT_LIMITS.ranges, on: true, prices: [{ label: "Workshop", side: "selling" as const, min: "500", max: "900", unit: "EUR" }], terms: { allowed: [], forbidden: ["exclusivity"] } };
+    let prompt = "";
+    const sam = await owner("Sam");
+    const robin = await owner("Robin");
+    await meet.inviteSelf(sam.b.api, sam.vault, { code: robin.code, purpose: "collab_fit", note: "A workshop", label: "Robin", me: "Sam", folderIds: [], calendar: false, turnLimit: 4 });
+    let r = await ops.loadVault(robin.b.api, robin.vault);
+    await meet.acceptMeet(robin.b.api, robin.vault, r.meets[0], { label: "Sam", me: "Robin", folderIds: [], calendar: false });
+    expect(await meet.meetOnce(sam.b.api, sam.vault, await ops.loadVault(sam.b.api, sam.vault), { model: say("Would 400 EUR work for the workshop?") })).toBe(1);
+    await limits.saveLimits(robin.b.api, robin.vault, { ...DEFAULT_LIMITS, ranges });
+    r = await ops.loadVault(robin.b.api, robin.vault);
+    const model: ModelCaller = { provider: "anthropic", model: "claude-opus-5-5", complete: async (req) => ((prompt = req.system ?? ""), "Fine, 450 EUR it is.") };
+    const made = await work.holdMeetsOnce(robin.b.api, robin.vault, r, r.drafts, { model });
+    expect(prompt).toContain("Workshop: start at 900 EUR, never below 500 EUR.");
+    expect(made).toHaveLength(1);
+    expect(made[0].state).toBe("waiting");
+    expect(made[0].record?.title).toContain("It names 450 EUR, at or past the edge of Workshop.");
+    expect((await ops.loadVault(robin.b.api, robin.vault)).meets[0].turns).toBe(1);
   });
 });
