@@ -20,8 +20,8 @@ test("an app asks before it acts, a step waits in Work, the owner says yes with 
   await openTab(page, "Limits");
   const inbox = page.getByRole("form", { name: "Inbox and calendar" });
   await inbox.getByLabel(/Answer mail on its own/).check();
-  await inbox.getByLabel("Senders").fill("sam@example.org");
-  await inbox.getByLabel("Never touch").fill("lawyer");
+  await inbox.getByLabel("Senders", { exact: true }).fill("sam@example.org");
+  await inbox.getByLabel("Words, addresses and domains").fill("lawyer");
   await inbox.getByRole("button", { name: "Save the thresholds" }).click();
   await expect(inbox.getByText("Thresholds saved.")).toBeVisible();
   await expect(inbox.locator(".plate-state")).toHaveText("1 of 2 on");
@@ -38,7 +38,9 @@ test("an app asks before it acts, a step waits in Work, the owner says yes with 
 
   // ---- the app may act
   const apps = page.getByRole("region", { name: "Apps that ask first" });
-  await apps.getByLabel("May act within your limits").check();
+  // The switch follows the server: it shows on once the app's thresholds are stored.
+  await apps.getByLabel("May act within your limits").click();
+  await expect(apps.getByLabel("May act within your limits")).toBeChecked();
   await expect(apps.locator(".plate-state")).toHaveText("1 app");
   await fitsPhone(page, "Limits");
 

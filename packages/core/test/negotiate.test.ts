@@ -40,7 +40,10 @@ describe("negotiating prices within a range", () => {
     expect(first).toMatchObject({ move: "counter", offer: { price: "1050" } });
     const second = negotiatePrice(day, { theirs: { price: "1000" }, ours: { price: "1050" }, round: 1 }, 3);
     expect(second).toMatchObject({ move: "counter", offer: { price: "1025" } });
-    expect(negotiatePrice(day, { theirs: { price: "1025" }, ours: { price: "1025" }, round: 2 }, 3)).toMatchObject({ move: "accept", offer: { price: "1025" } });
+    expect(negotiatePrice(day, { theirs: { price: "1025" }, ours: { price: "1025" }, round: 2 }, 3)).toMatchObject({ move: "accept", agree: true, offer: { price: "1025" } });
+    // A counter is not an agreement; accepting at the edge would be, once the owner says yes.
+    expect(negotiatePrice(day, { theirs: { price: "900" } }, 3).agree).toBeUndefined();
+    expect(negotiatePrice(day, { theirs: { price: "800" } }, 3)).toMatchObject({ move: "ask", agree: true });
     // Better than the opening price is accepted at once.
     expect(negotiatePrice(day, { theirs: { price: "1300" } }, 3)).toMatchObject({ move: "accept", offer: { price: "1300" } });
     expect(negotiatePrice(logo, { theirs: { price: "450" } }, 3)).toMatchObject({ move: "counter", offer: { price: "375" } });
@@ -125,6 +128,7 @@ describe("a negotiation", () => {
     const a = agreementText({ topic: "Consulting day", who: "Kim <kim@team.example>", me: "Sam", offer: { kind: "price", price: "1025", unit: "EUR" }, timeZone: "UTC" });
     expect(a.title).toBe("Consulting day: agreed with Kim");
     expect(a.text).toBe("Sam and Kim <kim@team.example> agree:\n\nThe price for Consulting day is 1025 EUR.");
+    expect(agreementText({ topic: "Call", who: "Kim", me: "", offer: { kind: "terms", terms: ["net 30"] }, timeZone: "UTC" }).text).toBe("Kim and I agree:\n\nThe terms for Call are: net 30.");
   });
 });
 

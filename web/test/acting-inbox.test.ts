@@ -292,6 +292,9 @@ describe("acting in the owner's own Gmail, from the device", () => {
 
     const data = await ops.loadVault(s.b.api, s.vault);
     const byWho = (w: string) => data.acts.find((a) => a.request?.who.includes(w))!;
+    // Counted from the steps themselves (the test's clock is ahead of the server's, so from long ago here).
+    const counted = { ...source, state: { ...source.state!, act: { ...source.state!.act!, since: "2000-01-01T00:00:00.000Z" } } };
+    expect(acting.sourceSteps(data.acts, counted)).toEqual({ acted: 2, waiting: 1, refused: 1 });
     expect(byWho("Stranger")).toMatchObject({ state: "waiting", request: { area: "mail", reason: "The other person is not one of the senders you listed." } });
     expect(byWho("Bank").state).toBe("refused");
     expect(byWho("Kim")).toMatchObject({ state: "done", alone: true, request: { area: "negotiation", offer: { price: "1050" } } });

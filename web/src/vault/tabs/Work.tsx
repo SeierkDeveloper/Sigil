@@ -135,7 +135,7 @@ function ActCard({ view }: { view: acting.ActView }) {
         ) : null}
         {r.offer?.price ? (
           <div>
-            <dt>On the table</dt>
+            <dt>{r.action === "agree" ? "It would agree to" : "It would offer"}</dt>
             <dd>
               {r.offer.price} {r.offer.unit}
               {r.offer.range ? `, ${r.offer.range}` : ""}
@@ -185,6 +185,8 @@ function ActCard({ view }: { view: acting.ActView }) {
   );
 }
 
+const sentence = (s: string) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
+
 const STEP_WORD: Record<acting.ActState, string> = { allowed: "Allowed", waiting: "Waiting", approved: "Approved", declined: "Declined", refused: "Refused", done: "Done" };
 
 /** Steps the self took alone, the ones you answered, and the ones it refused. */
@@ -202,7 +204,8 @@ function StepsSection({ acts }: { acts: acting.ActView[] }) {
       <ul className="list">
         {acts.slice(0, 50).map((a) => {
           const r = a.request;
-          const agreed = r?.area === "negotiation" && r.offer && (r.action === "agree" || a.state === "approved" || a.state === "done");
+          // An agreed price, time or terms: taken alone, or agreed with the owner's yes.
+          const agreed = r?.area === "negotiation" && !!r.offer && r.action === "agree" && (a.state === "done" || a.state === "approved");
           return (
             <li key={a.id} className="list-row" data-state={a.state} data-testid="act-done">
               <div className="list-row-main">
@@ -211,7 +214,7 @@ function StepsSection({ acts }: { acts: acting.ActView[] }) {
                 </p>
                 <p className="list-row-meta">
                   {formatDateTime(a.updatedAt)}. {byWhom(data, a.appId, r?.area)}
-                  {r?.who ? `, with ${r.who}` : ""}. {r ? (a.state === "refused" ? `Refused: ${r.reason}` : a.alone ? `Under: ${r.reason}` : r.reason) : ""}
+                  {r?.who ? `, with ${r.who}` : ""}. {r ? sentence(a.state === "refused" ? `Refused: ${r.reason}` : a.alone ? `Under: ${r.reason}` : r.reason) : ""}
                   {a.receiptId ? " Its receipt is under Limits." : ""}
                 </p>
               </div>

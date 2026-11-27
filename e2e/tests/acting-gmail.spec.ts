@@ -14,12 +14,12 @@ const READ = "https://www.googleapis.com/auth/gmail.readonly";
 const SEND = "https://www.googleapis.com/auth/gmail.send";
 
 async function playGoogle(context: BrowserContext, baseURL: string) {
-  const now = Date.now();
-  const at = (minutesAgo: number) => new Date(now - minutesAgo * 60_000).toISOString();
-  const threads: Record<string, unknown[]> = {
-    "18c2a1f3b4d5e601": [gmailMessage({ id: "s1", threadId: "18c2a1f3b4d5e601", from: "Sam <sam@example.org>", to: "me@example.org", subject: "Lunch", at: at(30), text: "CANARY-gmail-sam Are you free for lunch on Friday?" })],
-    "18c2a1f3b4d5e602": [gmailMessage({ id: "r1", threadId: "18c2a1f3b4d5e602", from: "Robin <robin@else.example>", to: "me@example.org", subject: "A partnership", at: at(20), text: "CANARY-gmail-robin Could we talk next week?" })],
-  };
+  // The self answers only mail that arrives after acting is turned on: these two always just arrived.
+  const at = () => new Date(Date.now() - 1000).toISOString();
+  const threads = (): Record<string, unknown[]> => ({
+    "18c2a1f3b4d5e601": [gmailMessage({ id: "s1", threadId: "18c2a1f3b4d5e601", from: "Sam <sam@example.org>", to: "me@example.org", subject: "Lunch", at: at(), text: "CANARY-gmail-sam Are you free for lunch on Friday?" })],
+    "18c2a1f3b4d5e602": [gmailMessage({ id: "r1", threadId: "18c2a1f3b4d5e602", from: "Robin <robin@else.example>", to: "me@example.org", subject: "A partnership", at: at(), text: "CANARY-gmail-robin Could we talk next week?" })],
+  });
   const consent: URL[] = [];
   const sent: { raw: string; threadId: string }[] = [];
   let signIns = 0;
@@ -33,8 +33,8 @@ async function playGoogle(context: BrowserContext, baseURL: string) {
     ],
     [/gmail\/v1\/users\/me\/profile$/, () => json({ emailAddress: "me@example.org", historyId: "100" })],
     [/gmail\/v1\/users\/me\/history$/, () => json({ history: [], historyId: "100" })],
-    [/gmail\/v1\/users\/me\/threads$/, () => json({ threads: Object.keys(threads).map((id) => ({ id })) })],
-    [/gmail\/v1\/users\/me\/threads\/[^/]+$/, (u) => json({ id: u.pathname.split("/").pop(), historyId: "100", messages: threads[u.pathname.split("/").pop()!] })],
+    [/gmail\/v1\/users\/me\/threads$/, () => json({ threads: Object.keys(threads()).map((id) => ({ id })) })],
+    [/gmail\/v1\/users\/me\/threads\/[^/]+$/, (u) => json({ id: u.pathname.split("/").pop(), historyId: "100", messages: threads()[u.pathname.split("/").pop()!] })],
     [
       /gmail\/v1\/users\/me\/messages\/send$/,
       (_u, init) => {
@@ -73,7 +73,7 @@ test("the self replies in the owner's Gmail within the thresholds, and a step pa
   await openTab(page, "Limits");
   const inbox = page.getByRole("form", { name: "Inbox and calendar" });
   await inbox.getByLabel(/Answer mail on its own/).check();
-  await inbox.getByLabel("Senders").fill("sam@example.org");
+  await inbox.getByLabel("Senders", { exact: true }).fill("sam@example.org");
   await inbox.getByRole("button", { name: "Save the thresholds" }).click();
   await expect(inbox.getByText("Thresholds saved.")).toBeVisible();
 
@@ -84,10 +84,10 @@ test("the self replies in the owner's Gmail within the thresholds, and a step pa
   const row = page.getByTestId("sync-row");
   await expect(row).toContainText("me@example.org");
   await expect(row.getByLabel(/Let your self act here/)).not.toBeChecked();
-  await expect(row).toContainText("Google is asked once more, for permission to send.");
+  await expect(row).toContainText("it replies to mail that arrives from now on");
 
   // Turning acting on asks Google again, for sending as well.
-  await row.getByLabel(/Let your self act here/).check();
+  await row.getByLabel(/Let your self act here/).click();
   await expect(row.getByLabel(/Let your self act here/)).toBeChecked();
   expect(google.consent.at(-1)!.searchParams.get("scope")).toBe(`${READ} ${SEND}`);
   await fitsPhone(page, "Sync, acting on");
@@ -95,7 +95,7 @@ test("the self replies in the owner's Gmail within the thresholds, and a step pa
   // The pass right after a sync looks at what waits for an answer. Whichever pass gets there first acts; a message is never answered twice.
   await row.getByRole("button", { name: "Sync now" }).click();
   await expect.poll(() => google.sent.length, { timeout: 30_000 }).toBe(1);
-  await expect(row).toContainText(/Last look .*on its own/);
+  await expect(row).toContainText("Since you turned it on: 1 on its own, 1 waiting in Work, 0 refused.");
   expect(google.sent.map((s) => s.threadId)).toEqual(["18c2a1f3b4d5e601"]);
   expect(google.body(google.sent[0].raw)).toMatch(/^Hi Sam,/);
 

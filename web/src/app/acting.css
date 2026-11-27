@@ -2,26 +2,21 @@
 
 /* Message kinds are chips like the free days, set in a wrapping row since their names are longer. */
 .limits-chip-row {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
 }
 
 .limits-chip {
-  flex: 1 1 auto;
-  min-width: 7.5rem;
-  padding: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
   letter-spacing: 0.04em;
-  text-transform: none;
+  text-align: center;
+  line-height: 1.35;
 }
 
-.limits-inline-check {
-  display: flex;
-  align-items: flex-end;
-}
-
-.limits-inline-check .suggest-toggle {
-  margin-bottom: 0;
+/* A single number in a band lines up with the left column of a pair. */
+.limits-number {
+  max-width: calc(50% - var(--space-3));
 }
 
 .limits-rounds {
@@ -104,6 +99,16 @@
   grid-column: 1 / -1;
 }
 
+/* An odd fact before the reason takes the whole row, so no cell stays empty. */
+.act-facts > div:nth-last-child(2):nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.act-card .draft-input + .field,
+.act-card .draft-input + .act-next {
+  margin-top: var(--space-5);
+}
+
 .act-card .draft-title svg {
   width: 1em;
   height: 1em;
@@ -158,12 +163,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .limits-chip {
-    min-width: calc(50% - var(--space-1));
+  .limits-chip-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .limits-inline-check {
-    align-items: flex-start;
+  .limits-number {
+    max-width: none;
   }
 }
 

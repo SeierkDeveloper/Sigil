@@ -54,7 +54,7 @@ describe("the changelog", () => {
     expect(text).toContain("check_action");
     expect(text).toContain("SIGIL_GOOGLE_CLIENT_ID");
     expect(text).not.toMatch(/\baudit(ed)?\b|\bsafe\b|%/i);
-    expect(text).not.toMatch(/[–—]/);
+    expect(text).not.toMatch(/[\u2013\u2014]/);
   });
 
   it("is newest first", () => {

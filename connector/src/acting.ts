@@ -203,7 +203,7 @@ export class ActingClient implements ActingTools {
     const state = hit ? "refused" : step.move === "ask" ? "waiting" : "allowed";
     const id = await this.record(config, state, {
       area: "negotiation",
-      action: step.move === "accept" ? "agree" : "counter",
+      action: step.agree ? "agree" : "counter",
       who: input.who,
       subject: input.topic,
       thread: input.thread ?? [],

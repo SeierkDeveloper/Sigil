@@ -257,6 +257,17 @@ export function clearAgreement(): void {
 
 // ---------------------------------------------------------------- acting in the owner's Google account
 
+/** The steps this vault took for one source since acting was turned on there: alone, waiting for the owner, refused. Read from the steps themselves, so every device counts the same. */
+export function sourceSteps(acts: ActView[], source: Pick<SyncSourceView, "id" | "state">): { acted: number; waiting: number; refused: number } {
+  const since = source.state?.act?.since ?? "";
+  const mine = acts.filter((a) => !a.appId && a.request?.ref.source === source.id && a.createdAt >= since);
+  return {
+    acted: mine.filter((a) => a.alone && (a.state === "done" || a.state === "allowed")).length,
+    waiting: mine.filter((a) => a.state === "waiting").length,
+    refused: mine.filter((a) => a.state === "refused").length,
+  };
+}
+
 /** Whether a source may act: Gmail or Calendar, acting on, and tokens that carry the scopes. */
 export function sourceActs(s: Pick<SyncSourceView, "state" | "paused" | "appId">): boolean {
   const st = s.state;
@@ -292,7 +303,13 @@ export async function enableActing(
     account = got.account || account;
   }
   const now = new Date(input.now ?? Date.now()).toISOString();
-  const next: SyncState = { ...st, tokens, account, act: { on: true, since: st.act?.on ? st.act.since : now, handled: st.act?.handled ?? [], last: st.act?.last ?? null } };
+  const fresh = !st.act?.on;
+  const next: SyncState = {
+    ...st,
+    tokens,
+    account,
+    act: { on: true, since: fresh ? now : st.act!.since, handled: st.act?.handled ?? [], last: fresh ? null : (st.act?.last ?? null) },
+  };
   return saveState(api, vault, data, source, next);
 }
 
@@ -372,7 +389,7 @@ async function handleMessage(api: Api, vault: Unlocked, data: VaultData, source:
   }
   const request = {
     area,
-    action: (step?.move === "accept" ? "agree" : step ? "counter" : "reply") as ActRequest["action"],
+    action: (step?.agree ? "agree" : step ? "counter" : "reply") as ActRequest["action"],
     who: m.from,
     subject: m.subject,
     thread: m.thread,

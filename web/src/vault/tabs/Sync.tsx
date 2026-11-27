@@ -61,16 +61,20 @@ function sourceLine(s: sync.SyncSourceView): string {
 }
 
 /** What acting in a source did last, or what turning it on does. */
-function actLine(s: sync.SyncSourceView, google: string | null): string {
+function actLine(s: sync.SyncSourceView, google: string | null, acts: acting.ActView[]): string {
   const a = s.state?.act;
   const what = s.state?.kind === "calendar" ? "answers invites" : "replies";
   if (a?.on) {
     if (!a.last) return `Your self ${what} within your limits under Limits while this vault is open. Not looked yet.`;
     if (a.last.error) return `Last look ${formatDateTime(a.last.at)}: ${a.last.error}`;
-    return `Last look ${formatDateTime(a.last.at)}: ${a.last.acted} on its own, ${a.last.waiting} waiting in Work, ${a.last.refused} refused.`;
+    const t = acting.sourceSteps(acts, s);
+    const last = a.last.acted + a.last.waiting + a.last.refused ? `${a.last.acted} on its own, ${a.last.waiting} waiting in Work, ${a.last.refused} refused` : "nothing new";
+    return `Last look ${formatDateTime(a.last.at)}: ${last}. Since you turned it on: ${t.acted} on its own, ${t.waiting} waiting in Work, ${t.refused} refused.`;
   }
   if (!google) return "Acting here needs this site's Google client (SIGIL_GOOGLE_CLIENT_ID), which is not set. An AI app can still ask first, under Limits.";
-  return `Within your limits it ${what} from this device; the rest waits in Work. Google is asked once more, for permission to ${s.state?.kind === "calendar" ? "answer invites" : "send"}.`;
+  return s.state?.kind === "calendar"
+    ? "Within your limits it answers the invites that wait for you, from this device; the rest waits in Work. Google is asked once more, for permission to answer invites."
+    : "Within your limits it replies to mail that arrives from now on, from this device; the rest waits in Work. Google is asked once more, for permission to send.";
 }
 
 function Sources({ clients }: { clients: sync.SyncClients | null }) {
@@ -142,7 +146,7 @@ function Sources({ clients }: { clients: sync.SyncClients | null }) {
                       />
                       <span>
                         Let your self act here
-                        <span className="field-hint">{actLine(s, clients?.google ?? null)}</span>
+                        <span className="field-hint">{actLine(s, clients?.google ?? null, data.acts)}</span>
                       </span>
                     </label>
                   ) : null}

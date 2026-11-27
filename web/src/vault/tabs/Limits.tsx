@@ -110,7 +110,7 @@ function LimitsForm() {
           />
         </div>
       </Band>
-      <Band label="Replies" hint="A reply drafted in Work to a contact you list here is approved on its own. This site sends no mail itself: an approved reply is ready to send, not sent.">
+      <Band label="Replies" hint="A reply you ask for in Work, to a contact you list here, is approved on its own and ready to send, not sent. To let your self send mail, see Inbox and calendar below.">
         {toggle("limits-reply", form.replies.on, (v) => setForm({ ...form, replies: { ...form.replies, on: v } }), "Approve replies to these contacts on its own", "Anyone else's reply waits for you.")}
         <div className="field">
           <label className="field-label" htmlFor="limits-contacts">
@@ -329,10 +329,8 @@ function InboxForm() {
           <legend className="field-label">About</legend>
           <div className="limits-chip-row">{MESSAGE_KINDS.map(kindToggle)}</div>
         </fieldset>
-        <div className="grid grid-2">
-          {number("limits-mail-day", "At most a day", mail.perDay, (v) => setMail({ ...mail, perDay: v }), 0, 500)}
-          <div className="field limits-inline-check">{toggle("limits-mail-start", mail.mayStart, (v) => setMail({ ...mail, mayStart: v }), "Also write first", "Off, it only replies.")}</div>
-        </div>
+        <div className="limits-number">{number("limits-mail-day", "At most a day", mail.perDay, (v) => setMail({ ...mail, perDay: v }), 0, 500)}</div>
+        {toggle("limits-mail-start", mail.mayStart, (v) => setMail({ ...mail, mayStart: v }), "Also write first to the senders you list", "Off, it only replies.")}
       </Band>
       <Band
         label="Invites"
@@ -354,7 +352,7 @@ function InboxForm() {
       <Band label="Never touch" hint="Words, addresses or @domains. A message, invite or offer that names one is refused: your self does not act on it, and it shows under Work.">
         <div className="field">
           <label className="field-label" htmlFor="limits-never">
-            Never touch
+            Words, addresses and domains
           </label>
           <textarea id="limits-never" className="textarea" rows={3} value={never} placeholder={"For example: lawyer, salary, @bank.example"} onChange={(e) => setNever(e.target.value)} />
         </div>

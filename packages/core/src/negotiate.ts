@@ -55,6 +55,8 @@ export interface NegotiationInput {
 
 export interface NegotiationStep {
   move: Move;
+  /** It accepts the other side's offer (now, or once the owner says yes): an agreed result. */
+  agree?: boolean;
   /** The offer it makes or accepts; for "ask", what it would offer if the owner says yes. */
   offer: NegotiationOffer | null;
   /** What it would say next, in plain words. */
@@ -121,8 +123,8 @@ export function negotiatePrice(range: PriceRange, input: Pick<NegotiationInput, 
   if (input.theirs?.price != null && theirs === null) return { move: "ask", offer: offer(open), say: `My price is ${fmt(open)}.`, reason: "Their offer is not a plain amount.", range: name };
   if (theirs === null) return { move: "counter", offer: offer(ours ?? open), say: `My price is ${fmt(ours ?? open)}.`, reason: "It opens at your opening price.", range: name };
   const last = ours ?? open;
-  if (better(theirs, last)) return { move: "accept", offer: offer(theirs), say: `${fmt(theirs)} works for me. Let us go ahead.`, reason: `Their offer of ${fmt(theirs)} meets ${ours ? "its last counter" : "your opening price"}.`, range: name };
-  if (theirs === edge) return { move: "ask", offer: offer(edge), say: `${fmt(edge)} works for me. Let us go ahead.`, reason: `Their offer of ${fmt(theirs)} is at the edge of your range.`, range: name };
+  if (better(theirs, last)) return { move: "accept", agree: true, offer: offer(theirs), say: `${fmt(theirs)} works for me. Let us go ahead.`, reason: `Their offer of ${fmt(theirs)} meets ${ours ? "its last counter" : "your opening price"}.`, range: name };
+  if (theirs === edge) return { move: "ask", agree: true, offer: offer(edge), say: `${fmt(edge)} works for me. Let us go ahead.`, reason: `Their offer of ${fmt(theirs)} is at the edge of your range.`, range: name };
   if (!better(theirs, edge)) return { move: "ask", offer: offer(edge), say: `I cannot do ${fmt(theirs)}. The best I can do is ${fmt(edge)}.`, reason: `Their offer of ${fmt(theirs)} is ${selling ? "below the lowest" : "above the most"} you set (${fmt(edge)}).`, range: name };
   if ((input.round ?? 0) >= maxRounds) {
     const next = roundToward(last + (theirs - last) / 2n, dec, selling);
@@ -134,7 +136,7 @@ export function negotiatePrice(range: PriceRange, input: Pick<NegotiationInput, 
     next = edge;
     return { move: "ask", offer: offer(next), say: `I can do ${fmt(next)}.`, reason: `Its next counter would reach the edge of your range (${fmt(edge)}).`, range: name };
   }
-  if (next === last) return { move: "ask", offer: offer(theirs), say: `${fmt(theirs)} works for me. Let us go ahead.`, reason: "The two offers are as close as the range allows.", range: name };
+  if (next === last) return { move: "ask", agree: true, offer: offer(theirs), say: `${fmt(theirs)} works for me. Let us go ahead.`, reason: "The two offers are as close as the range allows.", range: name };
   return { move: "counter", offer: offer(next), say: `I can do ${fmt(next)}.`, reason: `Inside your range: it moves halfway toward their ${fmt(theirs)}.`, range: name };
 }
 
@@ -207,7 +209,7 @@ export function negotiateTime(limits: SelfLimits, input: Pick<NegotiationInput, 
   const theirs = input.theirs?.time ? new Date(input.theirs.time) : null;
   if (theirs) {
     const problem = timeProblem(limits, theirs, minutes, busy, now);
-    if (!problem) return { move: "accept", offer: offer(theirs), say: `${formatSlot(theirs, zone)} works for me.`, reason: "The time fits your free hours and ranges.", range };
+    if (!problem) return { move: "accept", agree: true, offer: offer(theirs), say: `${formatSlot(theirs, zone)} works for me.`, reason: "The time fits your free hours and ranges.", range };
     const slot = nextFreeSlot(limits, minutes, busy, now, Math.max(now, theirs.getTime()));
     if (!slot) return { move: "ask", offer: null, say: "That time does not work for me. Could you suggest another?", reason: `${problem} No other time fits your ranges.`, range };
     if ((input.round ?? 0) >= limits.ranges.maxRounds) return { move: "ask", offer: offer(slot), say: `That time does not work for me. How about ${formatSlot(slot, zone)}?`, reason: `${problem} It already countered the most times you allow.`, range };
@@ -230,8 +232,8 @@ export function negotiateTerms(limits: SelfLimits, terms: string[]): Negotiation
   const bad = asked.map((t) => has(forbidden, t)).find(Boolean);
   if (bad) return { move: "ask", offer, say: `I cannot agree to ${bad}. The rest works for me.`, reason: `"${bad}" is a term you never agree to.`, range };
   const unknown = asked.filter((t) => !has(allowed, t));
-  if (unknown.length) return { move: "ask", offer, say: "Those terms work for me.", reason: `${unknown.map((t) => `"${t}"`).join(", ")} ${unknown.length === 1 ? "is" : "are"} not on your list of terms it may agree to.`, range };
-  return { move: "accept", offer, say: "Those terms work for me.", reason: "Every term is on your allowed list.", range };
+  if (unknown.length) return { move: "ask", agree: true, offer, say: "Those terms work for me.", reason: `${unknown.map((t) => `"${t}"`).join(", ")} ${unknown.length === 1 ? "is" : "are"} not on your list of terms it may agree to.`, range };
+  return { move: "accept", agree: true, offer, say: "Those terms work for me.", reason: "Every term is on your allowed list.", range };
 }
 
 // ---------------------------------------------------------------- one step
@@ -294,7 +296,7 @@ export function agreementText(input: { topic: string; who: string; me: string; o
         : `The terms for ${input.topic} are: ${(o.terms ?? []).join("; ")}.`;
   return {
     title: `${input.topic}: agreed with ${input.who.replace(/<[^<>]*>/g, "").trim() || input.who}`.slice(0, 200),
-    text: [`${input.me || "I"} and ${input.who} agree:`, "", what].join("\n"),
+    text: [input.me ? `${input.me} and ${input.who} agree:` : `${input.who} and I agree:`, "", what].join("\n"),
   };
 }
 
