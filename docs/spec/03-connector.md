@@ -13,6 +13,11 @@ A connector holds one app key and runs where the owner chooses (their own machin
 | `propose_memory` | A suggestion sealed to the vault's public key, after checking its tag | The owner turned suggestions on for the app | `propose` |
 | `ask_self` | The owner's AI self answers, with the owner's model key, from folders both granted and in its rules | The owner allowed the app to answer as the AI self | `ask`, with the question and answer sealed to the vault |
 
+| `get_thresholds` | The owner's thresholds for mail, invites and negotiation, in plain lines | The owner lets the app act (under Limits) | nothing |
+| `check_action` | Before mail or an invite: `allowed`, `needs-approval` (sealed to the vault and waiting in Work) or `refused`, decided on the connector's side against the thresholds; with an `id`, how the owner answered | The owner lets the app act | `work` (`act-<area>-<state>`) |
+| `report_action` | After acting: a receipt signed with the app's receipt key under the self key's delegation, sealed to the vault | A step that was allowed or approved | `identity` (`receipt`) and `work` |
+| `negotiate` | One step of a negotiation within the owner's ranges: `accept`, `counter` or `ask` (waiting in Work) | The owner lets the app act | `work` |
+
 An agent key (an app with an agent record) adds `remember` (logged `remember`), `recall` (reads as above), `forget` (`forget`), `leave_handoff` and `pick_up_handoffs` (`handoff`). Each is a switch the owner sets; the server refuses a call whose switch is off. No tool changes or deletes a memory unless the owner gave an agent write access to that folder.
 
 ## HTTP routes for an app key
@@ -26,6 +31,7 @@ All under `/api/connector/v1/`, with `Authorization: Bearer <token>`. They take 
 | `GET self`, `GET self/pending`, `POST self/questions/<id>/answer`, `POST self/asked` | The AI self's config wrapped for the app, ask link questions, answers, and the sealed note of an `ask_self` answer |
 | `GET public`, `GET public/pending`, `POST public/questions/<id>/answer` | The public AI self, when the owner picked this app to answer it |
 | `GET agent`, `POST remember`, `POST forget`, `GET handoffs`, `POST handoffs`, `POST handoffs/picked`, `GET spaces`, `POST spaces/<id>/memories`, `POST spaces/<id>/forget` | An agent's own memory, notes and team spaces |
+| `GET acting`, `POST acting`, `GET acting/<id>`, `POST acting/<id>/receipt` | The thresholds wrapped for the app and when the steps taken alone in the last two days happened (the app counts them from midnight in the owner's time zone); a step (allowed, waiting or refused, sealed to the vault); the owner's answer under the app's key; the receipt of a step carried out |
 | `GET sync`, `PUT sync/<id>`, `POST sync/<id>/memories`, `POST sync/<id>/delete` | Live sync sources the owner lets this app sync in the background: its copy of each, and writes only into the source's folder |
 
 A revoked key gets 401 on its next request.

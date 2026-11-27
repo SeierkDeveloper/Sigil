@@ -47,3 +47,31 @@ describe("receipts", () => {
     expect(toHex(fromHex32(receiptLeaf(r)))).toHaveLength(64);
   });
 });
+
+describe("receipts an app signs for the self key", () => {
+  it("check through the self key's delegation, and fail when either signature is wrong", async () => {
+    const { appReceiptKey, signDelegation, signDelegatedReceipt, checkDelegation } = await import("../src/receipts");
+    const self = await selfIdentityKey(VAULT);
+    const secret = Uint8Array.from({ length: 32 }, (_, i) => 200 - i);
+    const appKey = await appReceiptKey(secret);
+    // The app and the vault make the same key from the app's secret; it is not the self key.
+    expect((await appReceiptKey(secret)).address).toBe(appKey.address);
+    expect(appKey.address).not.toBe(self.address);
+    const via = signDelegation(self, { delegate: appKey.address, app: "app-0000000001", origin: "https://vault.example/", since: "2026-11-27T09:00:00.000Z" });
+    expect(checkDelegation(via)).toBe(true);
+    const r = signDelegatedReceipt(appKey, via, { kind: "mail", what: "Replied to Sam", limit: "Mail on its own", ref: { thread: "t1" }, origin: "https://vault.example", at: "2026-11-27T10:00:00.000Z" });
+    expect(r.body.selfKey).toBe(self.address);
+    const ok = checkReceipt({ receipt: r, seal: null });
+    expect(ok.ok).toBe(true);
+    expect(ok.checks[0].detail).toContain(`by the receipt key it gave a connected app (${appKey.address})`);
+    // Signed by any other key, or with a delegation from another self key, it fails.
+    const other = await selfIdentityKey(Uint8Array.from({ length: 32 }, () => 7));
+    const forged = signDelegation(other, { delegate: appKey.address, app: "app-0000000001", origin: "https://vault.example", since: "2026-11-27T09:00:00.000Z" });
+    expect(checkReceipt({ receipt: { ...r, body: { ...r.body, via: forged } }, seal: null }).ok).toBe(false);
+    expect(checkReceipt({ receipt: { ...r, body: { ...r.body, what: "Paid everything" } }, seal: null }).ok).toBe(false);
+    expect(() => signDelegatedReceipt(other, via, { kind: "mail", what: "x", limit: "y", ref: {}, origin: "" })).toThrow(/not the one/);
+    // A receipt from before the delegation does not check.
+    const early = signDelegatedReceipt(appKey, via, { kind: "mail", what: "Replied", limit: "Mail", ref: {}, origin: "", at: "2026-11-26T10:00:00.000Z" });
+    expect(checkReceipt({ receipt: early, seal: null }).ok).toBe(false);
+  });
+});

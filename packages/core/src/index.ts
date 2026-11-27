@@ -30,6 +30,8 @@ export * from "./sync/index";
 export * from "./identity";
 export * from "./limits";
 export * from "./receipts";
+export * from "./acting";
+export * from "./negotiate";
 export * from "./disclose";
 export * from "./emergency";
 export * from "./agreement";
@@ -47,5 +49,5 @@ export * from "./immunerun";
 export * from "./versions";
 
 /** The version of the Sigil open standard this code follows (docs/spec). */
-export const SPEC_VERSION = "1.5.0";
+export const SPEC_VERSION = "1.6.0";
 export * from "./you";

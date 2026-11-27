@@ -69,6 +69,20 @@ export const SYNC_INFO: Record<SyncKind, SyncKindInfo> = {
   },
 };
 
+/** What acting in an account adds to reading it: sending mail, and answering invites. */
+export const ACT_SCOPES: Partial<Record<SyncKind, string[]>> = {
+  gmail: ["https://www.googleapis.com/auth/gmail.send"],
+  calendar: ["https://www.googleapis.com/auth/calendar.events"],
+};
+
+/** Whether the tokens carry every scope acting in this kind of source needs. */
+export function canAct(kind: SyncKind, scope: string): boolean {
+  const want = ACT_SCOPES[kind];
+  if (!want) return false;
+  const have = scope.split(/[\s,]+/);
+  return want.every((s) => have.includes(s));
+}
+
 export const PROVIDER_INFO: Record<SyncProvider, { label: string; authorizeUrl: string; tokenUrl: string; env: string }> = {
   google: { label: "Google", authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth", tokenUrl: "https://oauth2.googleapis.com/token", env: "SIGIL_GOOGLE_CLIENT_ID" },
   slack: { label: "Slack", authorizeUrl: "https://slack.com/oauth/v2/authorize", tokenUrl: "https://slack.com/api/oauth.v2.access", env: "SIGIL_SLACK_CLIENT_ID" },
@@ -108,8 +122,9 @@ export function newPkce(): Pkce {
   return { verifier, challenge: pkceChallenge(verifier), state: randomId() };
 }
 
-export function authorizeUrl(opts: { kind: SyncKind; clientId: string; redirectUri: string; pkce: Pick<Pkce, "challenge" | "state"> }): string {
-  const info = SYNC_INFO[opts.kind];
+export function authorizeUrl(opts: { kind: SyncKind; clientId: string; redirectUri: string; pkce: Pick<Pkce, "challenge" | "state">; act?: boolean }): string {
+  const base = SYNC_INFO[opts.kind];
+  const info = opts.act && ACT_SCOPES[opts.kind] ? { ...base, scopes: [...base.scopes, ...ACT_SCOPES[opts.kind]!] } : base;
   const provider = PROVIDER_INFO[info.provider];
   const u = new URL(provider.authorizeUrl);
   u.searchParams.set("client_id", opts.clientId);

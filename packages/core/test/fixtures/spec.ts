@@ -72,6 +72,10 @@ import {
   receiptLeaf,
   receiptMessage,
   signReceipt,
+  appReceiptKey,
+  signDelegation,
+  signDelegatedReceipt,
+  delegationMessage,
   fieldClaim,
   EMERGENCY_AAD,
   EMERGENCY_OWNER_AAD,
@@ -265,6 +269,7 @@ export async function deterministic() {
     ...(await versionOneTwo(vault, signing)),
     ...(await versionOneThree()),
     ...(await versionOneFive(vault)),
+    ...(await versionOneSix(vault)),
   };
 }
 
@@ -281,6 +286,25 @@ async function versionOneFive(vault: Uint8Array) {
     salt: "07".repeat(32),
   });
   return { selfReceipt: { message: receiptMessage(receipt.body), signature: receipt.signature, leaf: receiptLeaf(receipt) } };
+}
+
+/** 1.6: a receipt an app's own key signs for the self key, under the self key's delegation. */
+async function versionOneSix(vault: Uint8Array) {
+  const self = await selfIdentityKey(vault);
+  const appKey = await appReceiptKey(new Uint8Array(32).fill(9));
+  const via = signDelegation(self, { delegate: appKey.address, app: "app-0000000001", origin: "https://vault.example", since: "2026-11-27T09:00:00.000Z" });
+  const receipt = signDelegatedReceipt(appKey, via, {
+    kind: "mail",
+    what: "Replied to A friend about a time to meet",
+    limit: "Mail on its own: replies to listed senders about times and meetings, up to 10 a day",
+    ref: { thread: "18c2f0a1b2c3d4e5" },
+    origin: "https://vault.example",
+    at: "2026-11-27T12:00:00.000Z",
+    salt: "08".repeat(32),
+  });
+  return {
+    delegatedReceipt: { delegate: appKey.address, delegation: delegationMessage(via), delegationSignature: via.signature, message: receiptMessage(receipt.body), signature: receipt.signature, leaf: receiptLeaf(receipt) },
+  };
 }
 
 /** 1.3: the memory immune system. */

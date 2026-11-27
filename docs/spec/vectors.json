@@ -1,6 +1,6 @@
 {
   "format": "sigil-spec-vectors",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "input": {
     "vaultKey": "01080f161d242b323940474e555c636a71787f868d949ba2a9b0b7bec5ccd3da",
     "folderKey": "020910171e252c333a41484f565d646b727980878e959ca3aab1b8bfc6cdd4db",
@@ -518,6 +518,14 @@
       "message": "sigil-self-receipt-v1\n{\"at\":\"2026-11-26T12:00:00.000Z\",\"kind\":\"payment\",\"limit\":\"Payments to listed recipients, within the wallet's caps on chain\",\"origin\":\"https://vault.example\",\"ref\":{\"chainId\":\"1\",\"tx\":\"0xabababababababababababababababababababababababababababababababab\",\"wallet\":\"0x00000000000000000000000000000000005E1F02\"},\"salt\":\"0707070707070707070707070707070707070707070707070707070707070707\",\"selfKey\":\"0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923\",\"what\":\"Paid 0.01 to A friend (0x1111111111111111111111111111111111111111)\"}",
       "signature": "0x767f68b55d62299927a609c76871042b95317d5e7a3337c9aa4df2b5e10c597d7b5ed42823a85c6e7ece14758a0d88a41d36f02ab4c817411dbff9c796ffeca71b",
       "leaf": "0x88387245edaf67a86cd0543d71c69ac4c9a7c0eebeb39db8a63714875e6b3cc4"
+    },
+    "delegatedReceipt": {
+      "delegate": "0xDb9B08F41E13F23e5D2c97F0ebECE3691bD9FBeF",
+      "delegation": "sigil-self-receipt-delegate-v1\n{\"app\":\"app-0000000001\",\"delegate\":\"0xDb9B08F41E13F23e5D2c97F0ebECE3691bD9FBeF\",\"origin\":\"https://vault.example\",\"selfKey\":\"0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923\",\"since\":\"2026-11-27T09:00:00.000Z\"}",
+      "delegationSignature": "0x7d67c9e0e9e9e683339b9876bc0079d5bc71b3fb3d8c40965f96b7f7e29926b60446cb49eea4e264c7972844690d4a871f67a851dc2ee25b0f8b42b6fa2588de1c",
+      "message": "sigil-self-receipt-v1\n{\"at\":\"2026-11-27T12:00:00.000Z\",\"kind\":\"mail\",\"limit\":\"Mail on its own: replies to listed senders about times and meetings, up to 10 a day\",\"origin\":\"https://vault.example\",\"ref\":{\"thread\":\"18c2f0a1b2c3d4e5\"},\"salt\":\"0808080808080808080808080808080808080808080808080808080808080808\",\"selfKey\":\"0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923\",\"via\":{\"app\":\"app-0000000001\",\"delegate\":\"0xDb9B08F41E13F23e5D2c97F0ebECE3691bD9FBeF\",\"origin\":\"https://vault.example\",\"selfKey\":\"0xDAD7d47b8899670E5A6c1A7338e006Ea89e4e923\",\"signature\":\"0x7d67c9e0e9e9e683339b9876bc0079d5bc71b3fb3d8c40965f96b7f7e29926b60446cb49eea4e264c7972844690d4a871f67a851dc2ee25b0f8b42b6fa2588de1c\",\"since\":\"2026-11-27T09:00:00.000Z\"},\"what\":\"Replied to A friend about a time to meet\"}",
+      "signature": "0x36125ebc10be111ced03323c8396ee1770a0438fb674d3d169f51b29b3289d011547233cf79b98103f4000e816b1fe93e8acb08920f1e1bec98346253ac286851b",
+      "leaf": "0x8a5da2308670ca08053759d86e234226b0e3218b42da47f2fbb84a6e3c097d16"
     }
   },
   "sealed": {

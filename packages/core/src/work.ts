@@ -182,6 +182,11 @@ export function plainReply(input: { message: string; from: string; subject?: str
   ].join("\n");
 }
 
+/** A short reply in the owner's own greeting and sign-off around a line the self settled on (an offer, a time). */
+export function styledReply(line: string, from: string, hints: StyleHints): string {
+  return [greet(hints.greeting, from), "", line, "", hints.signoff ?? "Best regards"].join("\n");
+}
+
 export interface ReplyPromptInput {
   name: string;
   tone: string;

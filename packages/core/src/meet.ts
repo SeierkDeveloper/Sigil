@@ -178,6 +178,8 @@ export interface MeetTurnInput {
   turn: number;
   turnLimit: number;
   now?: number;
+  /** The owner's ranges for times, prices and terms, as lines (negotiate.ts), when negotiating is on. */
+  ranges?: string[];
 }
 
 export interface MeetTurnOutput {
@@ -209,6 +211,7 @@ export function buildMeetPrompt(input: Omit<MeetTurnInput, "model" | "memories">
   ];
   if (rules.denyTopics.length) lines.push(`- Never discuss: ${rules.denyTopics.join("; ")}.`);
   if (rules.neverSay.length) lines.push(`- Never say or reveal any of these: ${rules.neverSay.map((p) => `"${p}"`).join(", ")}.`);
+  if (input.ranges?.length) lines.push("", ...input.ranges);
   const nonce = newNonce(randomBytes);
   lines.push("", "<memories>", UNTRUSTED_NOTE);
   for (const s of input.sources) lines.push(`<memory n="${s.n}" title="${stripHidden(s.title).replace(/"/g, "'")}" edited="${s.editedAt.slice(0, 10)}">`, wrapUntrusted(s.text, nonce).text, "</memory>");

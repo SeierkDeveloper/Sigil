@@ -59,6 +59,8 @@ export const AAD = {
   backupApp: (appId: string) => `sigil:backup-app:${appId}`,
   captureNote: (captureId: string) => `sigil:capture-note:${captureId}`,
   receipt: (receiptId: string) => `sigil:receipt:${receiptId}`,
+  appActing: (appId: string) => `sigil:app-acting:${appId}`,
+  actAnswer: (appId: string, actId: string) => `sigil:act-answer:${appId}:${actId}`,
 } as const;
 
 /** SHA-256 hex of a token. The server stores this and never the token itself. */

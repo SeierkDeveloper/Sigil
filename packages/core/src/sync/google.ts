@@ -86,9 +86,9 @@ const iso = (ms: number) => new Date(ms).toISOString();
 
 // ---------------------------------------------------------------- Gmail
 
-const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
+export const GMAIL = "https://gmail.googleapis.com/gmail/v1/users/me";
 
-interface GmailPart {
+export interface GmailPart {
   mimeType?: string;
   filename?: string;
   headers?: { name: string; value: string }[];
@@ -96,7 +96,7 @@ interface GmailPart {
   parts?: GmailPart[];
 }
 
-interface GmailMessage {
+export interface GmailMessage {
   id: string;
   threadId: string;
   labelIds?: string[];
@@ -104,7 +104,7 @@ interface GmailMessage {
   payload?: GmailPart;
 }
 
-interface GmailThread {
+export interface GmailThread {
   id: string;
   messages?: GmailMessage[];
 }
@@ -142,6 +142,15 @@ function partText(p: GmailPart | undefined, depth = 0): { plain: string | null; 
 
 function header(m: GmailMessage, name: string): string {
   return m.payload?.headers?.find((h) => h.name.toLowerCase() === name)?.value?.trim() ?? "";
+}
+
+/** A header of a message, by its name in lower case. */
+export const gmailHeader = header;
+
+/** The text of a message, quotes left out, as the sync keeps it. */
+export function gmailMessageText(m: GmailMessage): string {
+  const t = partText(m.payload);
+  return withoutQuotes(t.plain ?? (t.html ? htmlToText(t.html) : ""));
 }
 
 /** Quoted replies repeat the thread; they are left out, as in the Takeout import. */
@@ -278,15 +287,15 @@ export async function syncGmail(ctx: ProviderCtx): Promise<SyncBatch> {
 
 // ---------------------------------------------------------------- Calendar
 
-const CALENDAR = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+export const CALENDAR = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 
-interface CalendarTime {
+export interface CalendarTime {
   date?: string;
   dateTime?: string;
   timeZone?: string;
 }
 
-interface CalendarEvent {
+export interface CalendarEvent {
   id: string;
   iCalUID?: string;
   status?: string;

@@ -50,6 +50,30 @@ export interface SyncState {
    * only the connector syncs it. The vault never runs a pass for it.
    */
   via?: "connector";
+  /**
+   * Acting in this account (Gmail and Calendar only): on, from when, and the
+   * messages and invites already handled, so none is handled twice.
+   */
+  act?: SyncActState;
+}
+
+export interface SyncActState {
+  on: boolean;
+  since: string;
+  handled: string[];
+  last: { at: string; acted: number; waiting: number; refused: number; error: string | null } | null;
+}
+
+export function cleanActState(value: unknown): SyncActState | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const v = value as Record<string, unknown>;
+  const last = v.last && typeof v.last === "object" ? (v.last as Record<string, unknown>) : null;
+  return {
+    on: v.on === true,
+    since: typeof v.since === "string" && Number.isFinite(Date.parse(v.since)) ? v.since : new Date().toISOString(),
+    handled: (Array.isArray(v.handled) ? v.handled : []).map(String).slice(-500),
+    last: last ? { at: String(last.at), acted: Number(last.acted) || 0, waiting: Number(last.waiting) || 0, refused: Number(last.refused) || 0, error: last.error ? String(last.error) : null } : null,
+  };
 }
 
 export function cleanSyncState(value: unknown): SyncState | null {
@@ -69,6 +93,7 @@ export function cleanSyncState(value: unknown): SyncState | null {
     rev: Number.isInteger(v.rev) ? Number(v.rev) : 0,
     last: last ? { at: String(last.at), added: Number(last.added) || 0, updated: Number(last.updated) || 0, removed: Number(last.removed) || 0, error: last.error ? String(last.error) : null } : null,
     ...(v.via === "connector" ? { via: "connector" as const } : {}),
+    ...(cleanActState(v.act) ? { act: cleanActState(v.act) } : {}),
   };
 }
 

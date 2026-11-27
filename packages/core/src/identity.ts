@@ -72,11 +72,16 @@ export interface SelfKey {
 
 /** The self key, derived from the vault key on the device. The same vault always gives the same key. */
 export async function selfIdentityKey(vaultKey: Uint8Array): Promise<SelfKey> {
+  return deriveSecpKey(vaultKey, "sigil:self:identity:v1");
+}
+
+/** A secp256k1 key from a seed and a label: the first HKDF output that is a valid key (the counter is appended from 1 on). */
+export async function deriveSecpKey(seed: Uint8Array, label: string): Promise<SelfKey> {
   for (let i = 0; i < 16; i++) {
-    const secret = await hkdf(vaultKey, i === 0 ? "sigil:self:identity:v1" : `sigil:self:identity:v1:${i}`);
+    const secret = await hkdf(seed, i === 0 ? label : `${label}:${i}`);
     if (secp256k1.utils.isValidSecretKey(secret)) return { secret, address: addressFromPublicKey(secp256k1.getPublicKey(secret, false)) };
   }
-  throw new Error("No valid self key could be derived.");
+  throw new Error("No valid key could be derived.");
 }
 
 /** A 65-byte signature over a 32-byte digest, as r || s || v with v 27 or 28 and a low s, the way the contracts and wallets expect it. */

@@ -11,18 +11,42 @@
 //
 // The body carries 32 random bytes of salt: without the receipt itself, the
 // leaf in a seal cannot be linked to anything.
+//
+// An app the owner lets act within the thresholds (acting.ts) signs its
+// receipts with a key of its own, derived from the app's secret on the app's
+// machine, so the self key never leaves the owner's device. The body then
+// carries `via`: the self key's signed word, made in the vault, that this
+// key signs receipts for it on behalf of that app.
+//
+//   delegation  EIP-191 by the self key over
+//               "sigil-receipt-delegate-v1" \n canonical JSON of the delegation without its signature
 
 import { randomBytes } from "./crypto";
-import { checksumAddress, isEvmAddress, personalMessageHash, recoverDigest, sameAddress, signDigest, type SelfKey } from "./identity";
+import { checksumAddress, deriveSecpKey, isEvmAddress, personalMessageHash, recoverDigest, sameAddress, signDigest, type SelfKey } from "./identity";
 import { canonicalJson } from "./life";
 import { hex32, leafHash, fromHex32, verifyProof } from "./merkle";
 import { toHex } from "./encoding";
 
 export const RECEIPT_FORMAT = "sigil-self-receipt";
 
-export type ReceiptKind = "payment" | "approval" | "agreement";
+export type ReceiptKind = "payment" | "approval" | "agreement" | "mail" | "calendar" | "negotiation";
 
-export const RECEIPT_KINDS: readonly ReceiptKind[] = ["payment", "approval", "agreement"];
+export const RECEIPT_KINDS: readonly ReceiptKind[] = ["payment", "approval", "agreement", "mail", "calendar", "negotiation"];
+
+/** The self key's word that an app's own key signs receipts for it. Made and signed in the vault. */
+export interface ReceiptDelegation {
+  /** The self key, EIP-55. */
+  selfKey: string;
+  /** The app's receipt key, EIP-55. */
+  delegate: string;
+  /** The app's id in the vault. */
+  app: string;
+  origin: string;
+  /** From when, ISO time. */
+  since: string;
+  /** EIP-191 by the self key. */
+  signature: string;
+}
 
 export interface ReceiptBody {
   /** The self key that acted, EIP-55. */
@@ -40,6 +64,8 @@ export interface ReceiptBody {
   origin: string;
   /** 32 random bytes, hex: makes the leaf unlinkable without the receipt. */
   salt: string;
+  /** Set when an app's receipt key signed it for the self key. */
+  via?: ReceiptDelegation;
 }
 
 export interface Receipt {
@@ -84,7 +110,7 @@ export function cleanReceiptBody(value: Partial<ReceiptBody>): ReceiptBody {
   }
   const salt = String(value.salt ?? "");
   if (!/^[0-9a-f]{64}$/.test(salt)) throw new Error("A receipt carries 32 bytes of salt.");
-  return {
+  const body: ReceiptBody = {
     selfKey: checksumAddress(value.selfKey as string),
     kind: value.kind as ReceiptKind,
     what,
@@ -94,6 +120,51 @@ export function cleanReceiptBody(value: Partial<ReceiptBody>): ReceiptBody {
     origin: String(value.origin ?? "").replace(/\/$/, "").slice(0, 200),
     salt,
   };
+  if (value.via != null) body.via = cleanDelegation(value.via);
+  return body;
+}
+
+export function cleanDelegation(value: Partial<ReceiptDelegation>): ReceiptDelegation {
+  if (!isEvmAddress(value.selfKey) || !isEvmAddress(value.delegate)) throw new Error("A delegation names the self key and the app's receipt key.");
+  const since = new Date(String(value.since ?? ""));
+  if (!Number.isFinite(since.getTime())) throw new Error("A delegation has a time.");
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(String(value.app ?? ""))) throw new Error("A delegation names the app.");
+  if (!/^0x[0-9a-fA-F]{130}$/.test(String(value.signature ?? ""))) throw new Error("A delegation is signed by the self key.");
+  return {
+    selfKey: checksumAddress(value.selfKey as string),
+    delegate: checksumAddress(value.delegate as string),
+    app: String(value.app),
+    origin: String(value.origin ?? "").replace(/\/$/, "").slice(0, 200),
+    since: since.toISOString(),
+    signature: String(value.signature).toLowerCase(),
+  };
+}
+
+export function delegationMessage(d: Omit<ReceiptDelegation, "signature">): string {
+  const { selfKey, delegate, app, origin, since } = d;
+  return `${RECEIPT_FORMAT}-delegate-v1\n${canonicalJson({ selfKey, delegate, app, origin, since })}`;
+}
+
+/** The key an app signs receipts with: derived from the app's secret, so the app and the vault both make the same one. */
+export async function appReceiptKey(appSecret: Uint8Array): Promise<SelfKey> {
+  return deriveSecpKey(appSecret, "sigil:self:receipts:v1");
+}
+
+/** The self key's word that an app's receipt key signs for it. Signed in the vault. */
+export function signDelegation(self: SelfKey, input: { delegate: string; app: string; origin: string; since?: string }): ReceiptDelegation {
+  const base = { selfKey: self.address, delegate: checksumAddress(input.delegate), app: input.app, origin: input.origin.replace(/\/$/, ""), since: input.since ?? new Date().toISOString() };
+  return cleanDelegation({ ...base, signature: signDigest(self.secret, personalMessageHash(delegationMessage(base))) });
+}
+
+/** Whether a delegation is signed by the self key it names. */
+export function checkDelegation(d: ReceiptDelegation): boolean {
+  try {
+    const c = cleanDelegation(d);
+    const signer = recoverDigest(personalMessageHash(delegationMessage(c)), c.signature);
+    return !!signer && sameAddress(signer, c.selfKey);
+  } catch {
+    return false;
+  }
 }
 
 export function receiptMessage(body: ReceiptBody): string {
@@ -104,6 +175,13 @@ export function receiptMessage(body: ReceiptBody): string {
 export function signReceipt(self: SelfKey, input: Omit<ReceiptBody, "selfKey" | "salt" | "at"> & { at?: string; salt?: string }): Receipt {
   const body = cleanReceiptBody({ ...input, selfKey: self.address, at: input.at ?? new Date().toISOString(), salt: input.salt ?? toHex(randomBytes(32)) });
   return { format: RECEIPT_FORMAT, version: 1, body, signature: signDigest(self.secret, personalMessageHash(receiptMessage(body))) };
+}
+
+/** Signs a receipt with an app's receipt key, for the self key that gave it the delegation. On the app's machine. */
+export function signDelegatedReceipt(key: SelfKey, via: ReceiptDelegation, input: Omit<ReceiptBody, "selfKey" | "salt" | "at" | "via"> & { at?: string; salt?: string }): Receipt {
+  if (!sameAddress(key.address, via.delegate)) throw new Error("This key is not the one the delegation names.");
+  const body = cleanReceiptBody({ ...input, selfKey: via.selfKey, via, at: input.at ?? new Date().toISOString(), salt: input.salt ?? toHex(randomBytes(32)) });
+  return { format: RECEIPT_FORMAT, version: 1, body, signature: signDigest(key.secret, personalMessageHash(receiptMessage(body))) };
 }
 
 /** The bytes whose hash is the receipt's leaf in the seal. */
@@ -159,8 +237,22 @@ export function checkReceipt(shared: SharedReceipt): { ok: boolean; leaf: string
   }
   const same = canonicalJson(body) === canonicalJson(r.body);
   const signer = same ? recoverDigest(personalMessageHash(receiptMessage(body)), r.signature) : null;
-  const signed = !!signer && sameAddress(signer, body.selfKey);
-  checks.push({ name: "signature", ok: signed, detail: signed ? `Signed by the self key ${body.selfKey}.` : "The self key's signature does not match this receipt, or it was changed after signing." });
+  if (body.via) {
+    const vouched = checkDelegation(body.via) && sameAddress(body.via.selfKey, body.selfKey) && Date.parse(body.via.since) <= Date.parse(body.at);
+    const signed = vouched && !!signer && sameAddress(signer, body.via.delegate);
+    checks.push({
+      name: "signature",
+      ok: signed,
+      detail: signed
+        ? `Signed for the self key ${body.selfKey} by the receipt key it gave a connected app (${body.via.delegate}) on ${body.via.since.slice(0, 10)}.`
+        : !vouched
+          ? "The self key's word for the app key that signed this receipt does not check."
+          : "The app key's signature does not match this receipt, or it was changed after signing.",
+    });
+  } else {
+    const signed = !!signer && sameAddress(signer, body.selfKey);
+    checks.push({ name: "signature", ok: signed, detail: signed ? `Signed by the self key ${body.selfKey}.` : "The self key's signature does not match this receipt, or it was changed after signing." });
+  }
   const leaf = receiptLeaf({ ...r, body });
   if (shared.seal) {
     let proven = false;
