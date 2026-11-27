@@ -197,6 +197,38 @@ describe("the calls for the chain", () => {
     expect(JSON.stringify(seen)).not.toMatch(/private|secret|sign/i);
   });
 
+  it("cut the span that crosses 00:00 UTC with one bisection, however many spends the evening holds", async () => {
+    const wallet = "0x00000000000000000000000000000000005e1f02";
+    const latest = 1_000_000;
+    const midnight = 1_800_000_000; // a 00:00 UTC
+    // One block a second; block `latest` is 01:00 UTC, so 00:00 UTC is block latest - 3600.
+    const timeOf = (b: number) => midnight + 3600 - (latest - b);
+    const cut = latest - 3600;
+    const w = (n: bigint) => n.toString(16).padStart(64, "0");
+    // 400 spends in the hour before midnight, each in its own block, and 3 after it.
+    const blocks = [...Array.from({ length: 400 }, (_, i) => cut - 1 - i * 9), cut, cut + 1, latest - 2];
+    let blockReads = 0;
+    const fetcher = async (_url: string, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body));
+      if (body.method === "eth_getBlockByNumber") {
+        blockReads++;
+        return new Response(JSON.stringify({ result: { timestamp: `0x${timeOf(Number(BigInt(body.params[0]))).toString(16)}` } }));
+      }
+      const from = Number(BigInt(body.params[0].fromBlock));
+      const to = Number(BigInt(body.params[0].toBlock));
+      const logs = blocks
+        .filter((b) => from <= b && b <= to)
+        .sort((a, b) => a - b)
+        .map((b, i) => ({ topics: [EXECUTED_TOPIC, `0x${w(BigInt(i))}`, `0x${w(0x1111n)}`], data: `0x${w(5n)}${"0".repeat(64)}${"0".repeat(64)}${w(0n)}`, blockNumber: `0x${b.toString(16)}`, transactionHash: "0xab" }));
+      return new Response(JSON.stringify({ result: logs }));
+    };
+    const page = await id.readSpends({ chainId: "1", registry: wallet, rpcUrl: "https://rpc.example.org" }, wallet, { toBlock: latest, untilTime: midnight, fetcher, pauseMs: 0 });
+    expect(page.reached).toBe(true);
+    expect(page.spends.map((s) => s.block).sort((a, b) => a - b)).toEqual([cut, cut + 1, latest - 2]);
+    // One read for the span's first block, then a bisection over 100,000 blocks: never one read per spend.
+    expect(blockReads).toBeLessThanOrEqual(1 + Math.ceil(Math.log2(id.LOG_CHUNK)) + 1);
+  });
+
   it("read a token's decimals from the token, and refuse a token that does not answer (HeyResearch security review, M-1)", async () => {
     const chain = { chainId: "1", registry: "0x00000000000000000000000000000000005e1f01", rpcUrl: "https://rpc.example.org" };
     const usdg = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";

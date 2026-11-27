@@ -501,6 +501,18 @@ async function blockTime(chain: ChainConfig, block: number, fetcher: Fetch): Pro
   return Number(BigInt(r.result.timestamp));
 }
 
+/** The first block in [lo, hi] whose time is at or after `time`, or hi + 1 if none is. Block times never go down. */
+async function firstBlockAtOrAfter(chain: ChainConfig, lo: number, hi: number, time: number, fetcher: Fetch): Promise<number> {
+  let a = lo;
+  let b = hi + 1;
+  while (a < b) {
+    const m = Math.floor((a + b) / 2);
+    if ((await blockTime(chain, m, fetcher)) >= time) b = m;
+    else a = m + 1;
+  }
+  return a;
+}
+
 export interface SpendPage {
   spends: WalletSpend[];
   /** The oldest block read. */
@@ -532,13 +544,14 @@ export async function readSpends(
       .map(decodeSpendLog)
       .filter((s): s is WalletSpend => !!s)
       .reverse();
-    // The span that crosses untilTime is cut by block, not by time: each of its spends is kept
-    // only if its own block is at or after untilTime, so "since 00:00 UTC" means exactly that.
-    const crosses = opts.untilTime !== null && (await blockTime(chain, from, fetcher)) <= opts.untilTime;
+    // The span that crosses untilTime is cut at the first block at or after untilTime, so
+    // "since 00:00 UTC" means exactly that. That block is found once by bisection (about 17
+    // reads for a full span), however many spends the evening before holds.
+    const fromTime = opts.untilTime === null ? 0 : await blockTime(chain, from, fetcher);
+    const crosses = opts.untilTime !== null && fromTime <= opts.untilTime;
     if (crosses && got.length) {
-      const times = new Map<number, number>();
-      for (const b of new Set(got.map((s) => s.block))) times.set(b, await blockTime(chain, b, fetcher));
-      got = got.filter((s) => times.get(s.block)! >= opts.untilTime!);
+      const first = fromTime === opts.untilTime ? from : await firstBlockAtOrAfter(chain, from + 1, to, opts.untilTime!, fetcher);
+      got = got.filter((s) => s.block >= first);
     }
     spends.push(...got);
     if (crosses) return { spends, fromBlock: from, reached: true };
