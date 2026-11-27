@@ -214,7 +214,11 @@ export default async function TokenPage() {
                   </table>
                 </div>
               ) : (
-                <p className="small">No burn yet. The first one comes 30 min after the first trading fees reach the pot.</p>
+                <p className="small">
+                  {s && s.burnCount > 0
+                    ? "The list of burns is being read from the chain. Refresh in a moment to see every one."
+                    : "No burn yet. The first one comes 30 min after the first trading fees reach the pot."}
+                </p>
               )}
             </section>
           </>

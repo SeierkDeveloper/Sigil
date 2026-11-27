@@ -100,6 +100,8 @@ export async function register() {
       console.error("[sigil] seal job failed", err);
     }
   };
+  // The token page's numbers and burn list, read once at start so no visitor waits on the chain.
+  void import("./server/token").then((m) => m.readToken()).catch(() => {});
   const every = Math.min(serverConfig.sealSeconds * 1000, 5 * 60_000);
   const timer = setInterval(tick, every);
   timer.unref?.();
