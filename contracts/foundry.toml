@@ -8,3 +8,8 @@ optimizer_runs = 10000
 fuzz = { runs = 512 }
 # Invariant runs are kept modest so the whole suite stays quick on a laptop.
 invariant = { runs = 64, depth = 40, fail_on_revert = false }
+
+# CI: the same suite with far more fuzz and invariant runs than a laptop needs.
+[profile.ci]
+fuzz = { runs = 4096 }
+invariant = { runs = 256, depth = 64, fail_on_revert = false }

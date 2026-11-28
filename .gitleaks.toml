@@ -1,0 +1,13 @@
+# Leak scan settings: gitleaks' full default rule set, with the spec's fixed test
+# vectors and the unit tests' canary values allowed. Those are made-up keys that
+# exist only to be found by the tests; anything else that looks like a key fails CI.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Spec test vectors and unit test canaries"
+paths = [
+  '''^docs/spec/vectors\.json$''',
+  '''^packages/core/test/''',
+  '''^web/test/''',
+]

@@ -1,0 +1,160 @@
+# Every push and pull request runs the whole suite: the contracts (with deep fuzzing),
+# type checks and lint, every package's unit tests, the full build, the end-to-end
+# tests in a real browser against a local chain, and the production container.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+  FORCE_COLOR: 1
+
+jobs:
+  contracts:
+    name: Contracts (build, sizes, deep fuzz)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - name: Build, with contract sizes
+        run: forge build --sizes
+      - name: Tests, 4,096 fuzz runs and 256 invariant runs each
+        run: forge test -vvv
+        env:
+          FOUNDRY_PROFILE: ci
+      - name: Gas report
+        run: forge test --gas-report > gas-report.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gas-report
+          path: contracts/gas-report.txt
+
+  wallet-code:
+    name: Vault wallet code matches the contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Rebuild the creation code the vault deploys, and compare
+        run: |
+          (cd contracts && forge build)
+          node web/scripts/self-wallet-code.mjs
+          git diff --exit-code -- web/src/vault/selfWalletCode.ts
+
+  check:
+    name: Types and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm run lint
+
+  unit:
+    name: Unit tests (${{ matrix.workspace }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: ["@sigil/core", "@sigil/web", "sigil-connector", "sigil-extension", "@sigil/sdk"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Contract build (the web tests compare the vault's wallet code with it)
+        run: forge build
+        working-directory: contracts
+      - run: npm run test -w ${{ matrix.workspace }}
+
+  e2e:
+    name: End to end (browser, local chain)
+    needs: [check, unit, contracts]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Contract build
+        run: forge build
+        working-directory: contracts
+      - name: Build every package and the site
+        run: npm run build
+      - name: Browser for the tests
+        run: npx playwright install --with-deps chromium
+        working-directory: e2e
+      - name: End-to-end tests
+        run: npm run test -w @sigil/e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-report
+          path: |
+            e2e/playwright-report
+            e2e/test-results
+          retention-days: 7
+
+  container:
+    name: Production container starts and answers
+    needs: [check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image the site runs on
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: sigil:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            SIGIL_ORIGIN=http://localhost:3000
+            NEXT_PUBLIC_SITE_URL=http://localhost:3000
+      - name: Start it and check health and the main pages
+        run: |
+          docker run -d --name sigil -p 3000:3000 -e SIGIL_ORIGIN=http://localhost:3000 sigil:ci
+          for i in $(seq 1 60); do curl -fsS http://localhost:3000/api/health && break; sleep 2; done
+          curl -fsS http://localhost:3000/api/health
+          for p in / /vault /docs /security /changelog /roadmap /connector; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:3000$p")
+            echo "$p $code"; test "$code" = "200"
+          done
+      - name: Container log
+        if: always()
+        run: docker logs sigil || true
