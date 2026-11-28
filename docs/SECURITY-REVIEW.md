@@ -134,7 +134,7 @@ Oak Agent Kit's Acorn Audits ran a paid Sapling Review of `SigilSeal`, `SigilSel
 
 **L4 (low). A token that refuses a zero approve could fill the open-allowance list for good.** *Fix:* the owner can drop such an entry with `forgetApproval(token, spender)`.
 
-**Notes.** N20 (an approve is counted on the day it is given) and N21 (the refused-selector list is best effort for tokens without caps) are now said in the contract's comments. The other notes are documented behaviour or need no change. The wallet fixes apply to every wallet created from the vault from now on; the registry fix (L2) takes effect with the next registry deployment.
+**Notes.** N20 (an approve is counted on the day it is given) and N21 (the refused-selector list is best effort for tokens without caps) are now said in the contract's comments. The other notes are documented behaviour or need no change. The wallet fixes apply to every wallet created from the vault from now on. The registry with the L2 fix is live at `0x02Ad8D5D05c15460e9c4B663280a2B4e386Fa3EE` (28 Nov 2026), replacing `0x7e2b5084f9dD7918a896C202Ed3D480C38e2A5Bb`, on which no identity had been registered.
 
 ## Known and not fixed in this round
 

@@ -47,7 +47,13 @@ describe("the roadmap", () => {
 
 describe("the changelog", () => {
   it("leads with this release, in the site's words and without a fee split", () => {
-    const r = releases[0];
+    const fix = releases[0];
+    expect(fix).toMatchObject({ date: "2026-11-28", area: "Trust", title: "Every finding of the Oak Sapling Review fixed" });
+    const fixText = [fix.title, fix.summary, ...fix.items].join("\n");
+    expect(fixText).toContain("0x02Ad8D5D05c15460e9c4B663280a2B4e386Fa3EE");
+    expect(fixText).not.toMatch(/\baudit(ed)?\b|\bsafe\b|%/i);
+    expect(fixText).not.toMatch(/[\u2013\u2014]/);
+    const r = releases[1];
     expect(r).toMatchObject({ date: "2026-11-27", area: "AI self", title: "A self that acts: your inbox, your calendar and your negotiations" });
     const text = [r.title, r.summary, ...r.items].join("\n");
     expect(text).toContain("Stage 03 of the roadmap is done");

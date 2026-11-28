@@ -10,6 +10,22 @@ export interface Release {
 
 export const releases: Release[] = [
   {
+    date: "2026-11-28",
+    title: "Every finding of the Oak Sapling Review fixed",
+    area: "Trust",
+    summary:
+      "Oak Agent Kit's Sapling Review of the three contracts found no critical or high issues, and three medium and four low ones. All are fixed, each with a test, and live: in every wallet the vault creates from now on, and in a new registry.",
+    items: [
+      "A token that ever had caps stays capped across rule sets, so zero or left-out caps never free its other functions",
+      "Cancelling signed calls, unfreezing and changing the self key now stop every call signed before, not only the next one",
+      "A token transfer or approve counts only when the token says it succeeded",
+      "Dropping a recipient takes back the allowances the self key gave it, and a token cannot call back into the wallet while allowances are cleared",
+      "The owner can drop an allowance record a token refuses to reset",
+      "The registry of selves is redeployed at 0x02Ad8D5D05c15460e9c4B663280a2B4e386Fa3EE: a new owner accepts exactly the metadata that was offered",
+      "Findings and fixes are listed in docs/SECURITY-REVIEW.md, with one regression test per finding in contracts/test/OakSapling.t.sol",
+    ],
+  },
+  {
     date: "2026-11-27",
     title: "A self that acts: your inbox, your calendar and your negotiations",
     area: "AI self",
