@@ -152,7 +152,7 @@ contract SigilSelfRegistryTest is Test {
         assertEq(registry.identityOf(selfKey).owner, owner);
         assertEq(registry.pendingOwner(selfKey), stranger);
         vm.prank(stranger);
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
         SigilSelfRegistry.Identity memory id = registry.identityOf(selfKey);
         assertEq(id.owner, stranger);
         assertEq(id.wallet, address(0));
@@ -166,7 +166,7 @@ contract SigilSelfRegistryTest is Test {
         // Accepting twice does nothing more: nothing is pending.
         vm.prank(stranger);
         vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
     }
 
     /// N-5: while a transfer is pending the metadata cannot change, so the new owner accepts what
@@ -183,7 +183,7 @@ contract SigilSelfRegistryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SigilSelfRegistry.TransferPending.selector, selfKey));
         registry.setMetadata(selfKey, "ipfs://changed");
         vm.prank(stranger);
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
         assertEq(registry.identityOf(selfKey).metadataURI, before);
         // After a cancel the owner can change it again.
         vm.prank(stranger);
@@ -204,12 +204,12 @@ contract SigilSelfRegistryTest is Test {
         vm.stopPrank();
         vm.prank(stranger);
         vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
         vm.prank(owner);
         registry.cancelTransfer(selfKey);
         vm.prank(other);
         vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
         assertEq(registry.identityOf(selfKey).owner, owner);
         // Only the owner proposes or cancels.
         vm.prank(stranger);
@@ -226,7 +226,7 @@ contract SigilSelfRegistryTest is Test {
         assertEq(registry.pendingOwner(selfKey), address(0));
         vm.prank(stranger);
         vm.expectRevert(abi.encodeWithSelector(SigilSelfRegistry.IsRevoked.selector, selfKey));
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
     }
 
     function testFuzzOnlyTheProposedOwnerAccepts(address who) public {
@@ -236,7 +236,7 @@ contract SigilSelfRegistryTest is Test {
         registry.transferIdentity(selfKey, stranger);
         vm.prank(who);
         vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
-        registry.acceptIdentity(selfKey);
+        registry.acceptIdentity(selfKey, keccak256(bytes(URI)));
         assertEq(registry.identityOf(selfKey).owner, owner);
     }
 

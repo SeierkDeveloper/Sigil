@@ -116,6 +116,26 @@ HEY Research Lab (HeyResearch) reviewed `SigilSelfWallet`, `SigilSelfRegistry` a
 
 These changes moved the open standard to 1.4.0: part 7's wallet formats changed before anything was deployed, and two vectors were written again.
 
+## Oak Agent Kit Sapling Review of the contracts (November 2026)
+
+Oak Agent Kit's Acorn Audits ran a paid Sapling Review of `SigilSeal`, `SigilSelfRegistry` and `SigilSelfWallet` at commit `f106012` (834 lines): Sigil's own suite, property and invariant fuzzing (Forge, Medusa, Echidna), symbolic checks (Halmos), Slither, Aderyn, Semgrep, Mythril and Wake, and AI reviews whose every candidate was replayed as a test with a control. No critical or high issues; 3 medium, 4 low and 21 notes. Every finding below was checked against Oak's own evidence test after the fix: each replay that showed the issue now fails. `contracts/test/OakSapling.t.sol` keeps one regression test per finding.
+
+**M1 (medium). A zero per-call cap switched off the capped-token rule.** *Fix:* the wallet remembers every token that was ever given a limit (`_hasLimit`, kept across rule sets); on such a token only `transfer` and `approve` run, also when its caps are zero or left out of new rules, so nothing of it moves.
+
+**M2 (medium). Cancelling cancelled only the next signed call, and a self key that came back revived its old signatures.** *Fix:* `cancelSignedCalls`, `unfreeze` and now `setSelfKey` move the nonce by `SIGNED_WINDOW` (2^64), past every call that could have been signed ahead.
+
+**M3 (medium). A token call counted as done without checking its answer.** *Fix:* a self-key `transfer` or `approve` counts only when the token has code and returns true or nothing; otherwise the whole call reverts (`TokenCallRefused`) and nothing is counted.
+
+**L1 (low). A removed recipient kept its allowance.** *Fix:* `configure` and `setRecipient(r, false)` set back to zero every allowance the self key gave to an address that is no longer a recipient, and the self key may always set an allowance it gave back to zero, even for an address off the list.
+
+**L2 (low). `acceptIdentity` did not bind the metadata on offer.** *Fix:* `acceptIdentity(selfKey, expectedMetadataHash)` reverts with `MetadataNotAsOffered` unless the metadata URI is the one the new owner saw. Note N19 closed too: nothing can be accepted when nothing is pending.
+
+**L3 (low). `revokeApprovals` could be re-entered by a token.** *Fix:* one re-entry guard shared by `execute`, `executeWithSig`, `revokeApprovals`, `configure` and `setRecipient`.
+
+**L4 (low). A token that refuses a zero approve could fill the open-allowance list for good.** *Fix:* the owner can drop such an entry with `forgetApproval(token, spender)`.
+
+**Notes.** N20 (an approve is counted on the day it is given) and N21 (the refused-selector list is best effort for tokens without caps) are now said in the contract's comments. The other notes are documented behaviour or need no change. The wallet fixes apply to every wallet created from the vault from now on; the registry fix (L2) takes effect with the next registry deployment.
+
 ## Known and not fixed in this round
 
 - **Meet invites are not tied to the inviter's vault.** The invite is an anonymous sealed box, and the invitee takes the inviter's key from the server; a malicious node could pose as anyone. The inviter's side is safe. Compare the other vault's code out of band before accepting until the invite carries a fingerprint to compare.

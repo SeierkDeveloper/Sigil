@@ -358,14 +358,14 @@ contract SigilReviewTest is Test {
         // Nobody else can accept for the victim, mallory included.
         vm.prank(mallory);
         vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
-        reg.acceptIdentity(selfKey);
+        reg.acceptIdentity(selfKey, keccak256(bytes(uri)));
         vm.prank(attacker);
         vm.expectRevert(SigilSelfRegistry.NotPendingOwner.selector);
-        reg.acceptIdentity(selfKey);
+        reg.acceptIdentity(selfKey, keccak256(bytes(uri)));
 
         // When the new owner does accept, it owns the identity, and the old wallet claim is gone.
         vm.prank(victim);
-        reg.acceptIdentity(selfKey);
+        reg.acceptIdentity(selfKey, keccak256(bytes(uri)));
         SigilSelfRegistry.Identity memory id = reg.identityOf(selfKey);
         assertEq(id.owner, victim);
         assertEq(id.wallet, address(0));

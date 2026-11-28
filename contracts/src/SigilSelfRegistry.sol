@@ -55,6 +55,7 @@ contract SigilSelfRegistry {
     error BadSignature();
     error UriTooLong();
     error NotPendingOwner();
+    error MetadataNotAsOffered();
     error TransferPending(address selfKey);
     error AlreadyOwner();
 
@@ -121,11 +122,15 @@ contract SigilSelfRegistry {
 
     /// @notice The proposed owner takes the identity. The wallet entry is cleared: the new
     ///         owner names its own. The metadata stays until the new owner changes it.
-    function acceptIdentity(address selfKey) external {
+    /// @param expectedMetadataHash keccak256 of the metadata URI the new owner saw when it accepted.
+    ///        If the current owner changed it in between (cancel, change, offer again), the accept fails.
+    function acceptIdentity(address selfKey, bytes32 expectedMetadataHash) external {
         Identity storage id = _identities[selfKey];
         if (id.owner == address(0)) revert NotRegistered(selfKey);
         if (id.revokedAt != 0) revert IsRevoked(selfKey);
-        if (pendingOwner[selfKey] != msg.sender) revert NotPendingOwner();
+        address pending = pendingOwner[selfKey];
+        if (pending == address(0) || pending != msg.sender) revert NotPendingOwner();
+        if (keccak256(bytes(id.metadataURI)) != expectedMetadataHash) revert MetadataNotAsOffered();
         delete pendingOwner[selfKey];
         address previous = id.owner;
         id.owner = msg.sender;

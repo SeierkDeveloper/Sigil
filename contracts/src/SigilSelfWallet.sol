@@ -13,7 +13,8 @@ pragma solidity 0.8.28;
 ///        - native value stays within the cap per transaction and per day
 ///        - an ERC-20 transfer or approve names a listed recipient (never a contract or
 ///          token on the contract list) and stays within that token's caps;
-///          transferFrom and allowance increases are refused
+///          transferFrom, increaseAllowance and permit are refused on any target (a best-effort
+///          list for tokens without caps; a token with caps takes transfer and approve only)
 ///        - on a token that has caps, transfer and approve are the only calls: any other
 ///          function of it (transferAndCall, send, safeTransferFrom, ...) is refused, so
 ///          nothing moves that token around its caps. A token whose caps are set to zero
@@ -33,13 +34,18 @@ pragma solidity 0.8.28;
 ///      The self key can send a call itself, or sign it (EIP-712) for anyone to submit,
 ///      so it never needs gas of its own. A signed call names the gas its inner call
 ///      gets; a submitter who sends too little for that cannot make it run short. Replacing the rules with `configure` starts a
-///      new rule set: nothing from the old one carries over. A signed call is checked
+///      new rule set: nothing from the old one carries over, except the allowances the self key
+///      already gave. Those stay until `freeze` or `revokeApprovals` clears them, and the self
+///      key can always set one of them back to zero, even for an address no longer listed. A token
+///      that once had caps stays a capped token: with no caps in force, nothing of it moves. A signed call is checked
 ///      against the rules in force when it is sent, never those it was signed under; the
 ///      owner can cancel every signed call not yet sent with `cancelSignedCalls`, and
 ///      unfreezing and changing the self key cancel them too. Cancelling moves the nonce
 ///      past every call that could have been signed ahead, so none of them can come back. Spending per day is counted
 ///      per UTC calendar day (00:00 to 24:00 UTC), not over a rolling 24 hours, and is not
-///      reset by new rules.
+///      reset by new rules. An approve is counted on the day it is given, not the day its tokens
+///      are pulled: an allowance given on an earlier day can still be pulled on top of a full day
+///      of transfers, so the total over any span of days stays within days times the cap.
 ///      The same EIP-712 digest is computed in packages/core/src/identity.ts.
 contract SigilSelfWallet {
     struct SelectorRule {
@@ -105,6 +111,11 @@ contract SigilSelfWallet {
 
     Approval[] private _approvals;
     mapping(address token => mapping(address spender => bool)) private _approvalListed;
+    /// @dev Every token that was ever given a limit, kept across rule sets: on such a token only
+    ///      transfer and approve can run, within its caps, also when the caps are zero or left out.
+    mapping(address token => bool) private _hasLimit;
+    /// @dev Set while a self call or revokeApprovals runs, so a token cannot call back into either.
+    bool private _entered;
 
     event Executed(uint256 indexed nonce, address indexed target, uint256 value, bytes4 selector, address tokenTo, uint256 tokenAmount);
     event OwnerExecuted(address indexed target, uint256 value, bytes4 selector);
@@ -121,6 +132,7 @@ contract SigilSelfWallet {
     event Withdrawn(address indexed token, address indexed to, uint256 amount);
     event Received(address indexed from, uint256 amount);
     event SignedCallsCancelled(uint256 nonce);
+    event ApprovalForgotten(address indexed token, address indexed spender);
 
     error NotOwner();
     error NotSelf();
@@ -142,6 +154,14 @@ contract SigilSelfWallet {
     error TooManyOpenApprovals();
     error NotEnoughGas();
     error TokenCallRefused(address token, bytes ret);
+    error Reentered();
+
+    modifier noReentry() {
+        if (_entered) revert Reentered();
+        _entered = true;
+        _;
+        _entered = false;
+    }
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -164,14 +184,14 @@ contract SigilSelfWallet {
     // ------------------------------------------------------------------ the self key
 
     /// @notice A call made by the self key itself, within the rules.
-    function execute(address target, uint256 value, bytes calldata data) external returns (bytes memory) {
+    function execute(address target, uint256 value, bytes calldata data) external noReentry returns (bytes memory) {
         if (msg.sender != selfKey || selfKey == address(0)) revert NotSelf();
         return _selfCall(target, value, data, 0);
     }
 
     /// @notice A call the self key signed, submitted by anyone, within the rules.
     /// @param gas The gas the inner call gets, as signed. Zero: all the gas that is left.
-    function executeWithSig(address target, uint256 value, bytes calldata data, uint256 deadline, uint256 gas, bytes calldata signature) external returns (bytes memory) {
+    function executeWithSig(address target, uint256 value, bytes calldata data, uint256 deadline, uint256 gas, bytes calldata signature) external noReentry returns (bytes memory) {
         if (block.timestamp > deadline) revert Expired();
         if (selfKey == address(0) || _recover(executeDigest(target, value, data, nonce, deadline, gas), signature) != selfKey) revert BadSignature();
         return _selfCall(target, value, data, gas);
@@ -185,15 +205,15 @@ contract SigilSelfWallet {
         emit FrozenChanged(true, msg.sender);
         // A freeze always lands, even with little gas; the allowances it had no gas for stay
         // listed in openApprovals(), and revokeApprovals() clears them or reverts.
-        _revokeApprovals(false);
+        _revokeApprovals(false, false);
     }
 
     /// @notice Sets every allowance the self key gave back to zero. The owner or the self key.
     ///         An allowance a token refuses to reset stays listed. Reverts with NotEnoughGas
     ///         rather than stop part way, so a call that succeeds has tried every allowance.
-    function revokeApprovals() external {
+    function revokeApprovals() external noReentry {
         if (msg.sender != owner && msg.sender != selfKey) revert NotOwnerOrSelf();
-        _revokeApprovals(true);
+        _revokeApprovals(true, false);
     }
 
     // ------------------------------------------------------------------ the owner
@@ -205,6 +225,15 @@ contract SigilSelfWallet {
         emit FrozenChanged(false, msg.sender);
     }
 
+    /// @notice Drops one allowance from openApprovals() without calling the token, for a token that
+    ///         refuses to set it back to zero. The allowance itself stays on the token, as the owner's
+    ///         own decision; the owner can still change it with ownerExecute.
+    function forgetApproval(address token, address spender) external onlyOwner {
+        if (!_approvalListed[token][spender]) return;
+        _dropApproval(token, spender);
+        emit ApprovalForgotten(token, spender);
+    }
+
     /// @notice Cancels every call the self key signed and nobody has sent yet.
     function cancelSignedCalls() external onlyOwner {
         _cancelSigned();
@@ -213,7 +242,7 @@ contract SigilSelfWallet {
     /// @notice Replaces every rule at once: caps, expiry, recipients, contracts, selectors and token limits.
     /// @param recipients Who the self key may pay: native value and token transfers and approvals.
     /// @param targets The contracts the self key may call (tokens included). Never also a recipient.
-    function configure(uint256 perTxCap_, uint256 perDayCap_, uint64 expiresAt_, address[] calldata recipients, address[] calldata targets, SelectorRule[] calldata selectors, TokenLimit[] calldata tokens) external onlyOwner {
+    function configure(uint256 perTxCap_, uint256 perDayCap_, uint64 expiresAt_, address[] calldata recipients, address[] calldata targets, SelectorRule[] calldata selectors, TokenLimit[] calldata tokens) external onlyOwner noReentry {
         uint256 v = rulesVersion + 1;
         rulesVersion = v;
         perTxCap = perTxCap_;
@@ -234,8 +263,12 @@ contract SigilSelfWallet {
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokens[i].token == address(0)) revert ZeroAddress();
             _tokenLimits[v][tokens[i].token] = tokens[i];
+            _hasLimit[tokens[i].token] = true;
         }
         emit Configured(v, perTxCap_, perDayCap_, expiresAt_);
+        // Allowances the self key gave to an address that is not a recipient in the new rules are
+        // set back to zero now; one a token refuses stays in openApprovals() for freeze or revoke.
+        _revokeApprovals(false, true);
     }
 
     function setLimits(uint256 perTxCap_, uint256 perDayCap_, uint64 expiresAt_) external onlyOwner {
@@ -252,11 +285,13 @@ contract SigilSelfWallet {
         emit TargetChanged(target, allowed);
     }
 
-    function setRecipient(address recipient, bool allowed) external onlyOwner {
+    function setRecipient(address recipient, bool allowed) external onlyOwner noReentry {
         if (recipient == address(0)) revert ZeroAddress();
         if (allowed && _targets[rulesVersion][recipient]) revert RecipientAndContract(recipient);
         _recipients[rulesVersion][recipient] = allowed;
         emit RecipientChanged(recipient, allowed);
+        // A recipient taken off the list loses the allowances the self key gave it.
+        if (!allowed) _revokeApprovals(false, true);
     }
 
     function setSelector(address target, bytes4 selector, bool allowed) external onlyOwner {
@@ -268,6 +303,7 @@ contract SigilSelfWallet {
     function setTokenLimit(address token, uint128 perTx, uint128 perDay) external onlyOwner {
         if (token == address(0)) revert ZeroAddress();
         _tokenLimits[rulesVersion][token] = TokenLimit({token: token, perTx: perTx, perDay: perDay});
+        _hasLimit[token] = true;
         emit TokenLimitChanged(token, perTx, perDay);
     }
 
@@ -376,14 +412,21 @@ contract SigilSelfWallet {
             if (!_selectors[v][target][selector]) revert SelectorNotAllowed(target, selector);
             // A token with an entry in the limits (even one set to zero, which blocks it) takes
             // transfer and approve only, and those within its caps.
-            if (_tokenLimits[v][target].token == target && selector != TRANSFER && selector != APPROVE) {
+            if (_hasLimit[target] && selector != TRANSFER && selector != APPROVE) {
                 revert TokenMoveRefused(selector);
             }
             if (selector == TRANSFER || selector == APPROVE) {
                 (tokenTo, tokenAmount) = abi.decode(data[4:], (address, uint256));
-                _spendToken(v, target, tokenTo, tokenAmount);
+                // Setting an allowance the self key gave back to zero is always allowed, also for an
+                // address no longer listed and a token whose caps are gone: it only ever takes back.
+                if (!(selector == APPROVE && tokenAmount == 0 && _approvalListed[target][tokenTo])) {
+                    _spendToken(v, target, tokenTo, tokenAmount);
+                }
                 if (selector == APPROVE) _noteApproval(target, tokenTo, tokenAmount);
             } else if (selector == TRANSFER_FROM || selector == INCREASE_ALLOWANCE || selector == PERMIT) {
+                // Best effort for tokens without caps: these three known selectors are refused, but
+                // other allowance raisers (increaseApproval, approveAndCall, ...) are not known here.
+                // A token with caps is covered in full above: only transfer and approve run on it.
                 revert TokenMoveRefused(selector);
             }
         }
@@ -446,10 +489,13 @@ contract SigilSelfWallet {
     /// @dev Sets each listed allowance to zero with a bounded amount of gas and without copying
     ///      more than one word back, so no token can make it fail. One that refuses stays listed.
     ///      strict: revert when the gas runs out instead of stopping with allowances left untried.
-    function _revokeApprovals(bool strict) private {
+    ///      onlyDropped: try only the allowances whose spender is no longer a recipient.
+    function _revokeApprovals(bool strict, bool onlyDropped) private {
+        uint256 v = rulesVersion;
         uint256 i = _approvals.length;
         while (i > 0) {
             i--;
+            if (onlyDropped && _recipients[v][_approvals[i].spender]) continue;
             if (gasleft() < REVOKE_GAS + 30_000) {
                 if (strict) revert NotEnoughGas();
                 break;
