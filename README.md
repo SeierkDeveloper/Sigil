@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-0d0e10?style=for-the-badge&labelColor=0b0c0e)](LICENSE)
 [![Encryption](https://img.shields.io/badge/AES--256--GCM-client--side-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-encryption-model)
 [![MCP](https://img.shields.io/badge/MCP-connector-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#the-connector)
-[![Tests](https://img.shields.io/badge/tests-698%20%2B%2058%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
+[![Tests](https://img.shields.io/badge/tests-887%20%2B%2062%20e2e-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#tests)
 [![CI](https://img.shields.io/github/actions/workflow/status/SeierkDeveloper/Sigil/ci.yml?branch=main&style=for-the-badge&label=CI&labelColor=0b0c0e)](https://github.com/SeierkDeveloper/Sigil/actions/workflows/ci.yml)
 [![Security](https://img.shields.io/github/actions/workflow/status/SeierkDeveloper/Sigil/security.yml?branch=main&style=for-the-badge&label=security&labelColor=0b0c0e)](https://github.com/SeierkDeveloper/Sigil/actions/workflows/security.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-0d0e10?style=for-the-badge&labelColor=0b0c0e)](#repository)
@@ -792,8 +792,10 @@ The logo, favicon and app icons are made from `web/brand/sigil-logo.png` with `n
 
 ## Tests
 
+Every push runs all of these on GitHub ([CI](.github/workflows/ci.yml): the contracts with 4,096 fuzz runs each, every package, the full build, the browser tests against a local chain and the production container), plus [security checks](.github/workflows/security.yml): CodeQL, Slither, a leak scan of the whole history and npm audit.
+
 ```sh
-npm run test:unit       # 623: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
+npm run test:unit       # 786: cryptography, sealed boxes, the ask link relay, sharing, search by meaning,
                         #      the AI self and its rules, briefs, contradictions, expiry, every import
                         #      parser with fixtures, seals, server, connector, extension, SDK, Shamir
                         #      split and combine, sealed shares and bundles, the legacy heartbeat and
@@ -823,12 +825,12 @@ npm run test:unit       # 623: cryptography, sealed boxes, the ask link relay, s
                         #      route, the memory immune system's rules against attacks and ordinary mail,
                         #      its wrapper, strains and sealed record, the getting-started guide, and the
                         #      sign-in of a live sync source on the owner's computer
-npm run test:contracts  # 92: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
+npm run test:contracts  # 101: SigilSeal, SigilSelfRegistry and SigilSelfWallet, with fuzzing of the
                         #     wallet's caps, freeze, expiry and signatures (used once, not in their
                         #     malleable form, not on another chain), an invariant run of random payments
                         #     against the caps, entries checked by their data, and the standard's vectors
                         #     signed in TypeScript and accepted by both new contracts
-npm run test:e2e        # 58: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
+npm run test:e2e        # 62: sign up, import (ChatGPT, Claude, Takeout, Obsidian), connect, read, revoke,
                         #     the inbox, the Self card, search by meaning, sharing, Sign in with Sigil,
                         #     the AI self test chat, an ask link answered across two browsers, the
                         #     weekly brief, contradictions, expiry, merging every group, the site,
