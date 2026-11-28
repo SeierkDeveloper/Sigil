@@ -6,7 +6,8 @@ import { expect, test } from "@playwright/test";
 import type { Server } from "node:http";
 import { createWithWallet, installWallet, writeMemory, openTab } from "./helpers";
 
-const EXAMPLE_PORT = 3211;
+// Its own port: 3210-3212 are the test nodes (see playwright.config.ts).
+const EXAMPLE_PORT = 3213;
 let example: Server;
 
 test.beforeAll(async () => {
