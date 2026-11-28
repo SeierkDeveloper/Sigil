@@ -270,8 +270,12 @@ export default function Security() {
                 every call by the self key, freeze, expiry, payments only to listed recipients, calls only to listed contracts and functions, token caps with
                 recipients only, and native caps per call and per UTC day; it refuses token moves it cannot cap, and a freeze sets the allowances the self gave back to
                 zero. The owner can always freeze, change the rules and withdraw. Both are tested with Foundry, with fuzzing of the caps and the freeze, and have
-                been live on chain since 26 Nov 2026. The HeyResearch security review of the three contracts found one medium and two low issues and five notes; all are fixed, and the
-                findings and fixes are listed in <code>docs/SECURITY-REVIEW.md</code>.
+                been live on chain since 26 Nov 2026. The HeyResearch security review of the three contracts found one medium and two low issues and five notes. The medium, both lows
+                and four notes are fixed, and the fifth note is documented in the contract. The full review is public as{" "}
+                <a href="https://github.com/SeierkDeveloper/Sigil/security/advisories/GHSA-fqh9-xcrq-cgpg" target="_blank" rel="noopener noreferrer">
+                  advisory GHSA-fqh9-xcrq-cgpg
+                </a>
+                , and the fixes are listed in <code>docs/SECURITY-REVIEW.md</code>.
               </li>
               <li>
                 <strong>Drafts.</strong> Each draft of your AI self is an envelope under your vault key; the server knows its kind and state. Nothing is sent on its
