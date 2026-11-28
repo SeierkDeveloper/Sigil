@@ -269,8 +269,8 @@ export default function Security() {
                 refuses high-s signatures; a revoked key stays revoked, and a new owner takes a key only by accepting it. <code>SigilSelfWallet</code> checks, for
                 every call by the self key, freeze, expiry, payments only to listed recipients, calls only to listed contracts and functions, token caps with
                 recipients only, and native caps per call and per UTC day; it refuses token moves it cannot cap, and a freeze sets the allowances the self gave back to
-                zero. The owner can always freeze, change the rules and withdraw. Both are tested with Foundry, with fuzzing of the caps and the freeze, and are not
-                deployed. The HeyResearch security review of the three contracts found one medium and two low issues and five notes; all are fixed, and the
+                zero. The owner can always freeze, change the rules and withdraw. Both are tested with Foundry, with fuzzing of the caps and the freeze, and have
+                been live on chain since 26 Nov 2026. The HeyResearch security review of the three contracts found one medium and two low issues and five notes; all are fixed, and the
                 findings and fixes are listed in <code>docs/SECURITY-REVIEW.md</code>.
               </li>
               <li>

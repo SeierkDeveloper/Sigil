@@ -616,7 +616,7 @@ It proves that whoever could open the vault signed in each listed hour and that 
 Every request a connected app makes is written to your read log with a random salt. When an hour ends, all of that hour's entries become leaves of one Merkle tree, and its root is the seal for that hour.
 
 - **Verify any entry in your browser.** The vault's read log has a Verify button on each entry: it rebuilds the path from the entry to the hour's root.
-- **On chain, when switched on.** `contracts/src/SigilSeal.sol` records hourly roots so nobody, Sigil included, could change them later. It is written and tested (16 Foundry tests, including fuzzing and a shared test vector that proves the browser and the contract compute seals the same way) and is not deployed yet. The AI self's registry and wallet are next to it, with 76 tests of their own, including the proofs of the HeyResearch security review adapted to the fixes, also not deployed. While `SIGIL_ANCHOR` is off, every seal is labelled *Local*.
+- **On chain, when switched on.** `contracts/src/SigilSeal.sol` records hourly roots so nobody, Sigil included, could change them later. It is written and tested (16 Foundry tests, including fuzzing and a shared test vector that proves the browser and the contract compute seals the same way) and has been live on chain since 26 Nov 2026. The AI self's registry and wallet are next to it, with tests of their own, including the proofs of the HeyResearch security review adapted to the fixes, and are live too. While `SIGIL_ANCHOR` is off, every seal is labelled *Local*.
 
 ---
 
