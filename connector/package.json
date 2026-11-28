@@ -48,9 +48,9 @@
   },
   "devDependencies": {
     "@sigil/core": "*",
-    "@types/node": "^26.6.6",
+    "@types/node": "^26.6.10",
     "esbuild": "^0.28.2",
     "typescript": "^5.9.3",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.2"
   }
 }
