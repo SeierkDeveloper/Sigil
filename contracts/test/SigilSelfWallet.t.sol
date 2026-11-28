@@ -39,6 +39,17 @@ contract TestToken {
     }
 }
 
+/// A token that answers false instead of reverting.
+contract FalseToken {
+    function transfer(address, uint256) external pure returns (bool) {
+        return false;
+    }
+
+    function approve(address, uint256) external pure returns (bool) {
+        return false;
+    }
+}
+
 /// A contract the self may call.
 contract Shop {
     uint256 public orders;
@@ -492,14 +503,7 @@ contract SigilSelfWalletTest is Test {
         vm.prank(owner);
         w.configure(0, 0, 0, new address[](0), targets, sels, new SigilSelfWallet.TokenLimit[](0));
         vm.prank(relayer);
-        w.executeWithSig(
-            shopAt,
-            0,
-            data,
-            1_900_000_000,
-            100_000,
-            hex"4788b9bb807b9d67b86782501dc5ddddc08cf6835b56b0c2df1064703d673fd77c6e03aaab6374472730b020835fc4767fd833fb232480abbfced96258f5b5a61b"
-        );
+        w.executeWithSig(shopAt, 0, data, 1_900_000_000, 100_000, hex"4788b9bb807b9d67b86782501dc5ddddc08cf6835b56b0c2df1064703d673fd77c6e03aaab6374472730b020835fc4767fd833fb232480abbfced96258f5b5a61b");
         assertEq(Shop(shopAt).orders(), 3);
     }
 
@@ -507,7 +511,10 @@ contract SigilSelfWalletTest is Test {
     /// sets exactly the rules the vault shows: recipients apart from contracts and tokens.
     function testConfigureVectorFromTypeScript() public {
         vm.prank(owner);
-        (bool ok,) = address(wallet).call(hex"c2dd807700000000000000000000000000000000000000000000000000b1a2bc2ec5000000000000000000000000000000000000000000000000000002c68af0bb140000000000000000000000000000000000000000000000000000000000006bfdff0000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000002000000000000000000000000222222222222222222222222222222222222222200000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000000000003000000000000000000000000222222222222222222222222222222222222222221603f43000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333a9059cbb000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333095ea7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000ee6b280");
+        (bool ok,) = address(wallet)
+            .call(
+                hex"c2dd807700000000000000000000000000000000000000000000000000b1a2bc2ec5000000000000000000000000000000000000000000000000000002c68af0bb140000000000000000000000000000000000000000000000000000000000006bfdff0000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000000000012000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000260000000000000000000000000000000000000000000000000000000000000000100000000000000000000000011111111111111111111111111111111111111110000000000000000000000000000000000000000000000000000000000000002000000000000000000000000222222222222222222222222222222222222222200000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000000000003000000000000000000000000222222222222222222222222222222222222222221603f43000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333a9059cbb000000000000000000000000000000000000000000000000000000000000000000000000000000003333333333333333333333333333333333333333095ea7b300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000033333333333333333333333333333333333333330000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000ee6b280"
+            );
         assertTrue(ok);
         address friendAt = 0x1111111111111111111111111111111111111111;
         address shopAt = 0x2222222222222222222222222222222222222222;
@@ -605,8 +612,11 @@ contract SigilSelfWalletTest is Test {
         vm.assume(target != friend && target != address(shop) && target != address(token) && target != address(wallet));
         vm.prank(selfKey);
         // A call with no data goes only to recipients; a call with data only to listed contracts.
-        if (data.length == 0) vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.RecipientNotAllowed.selector, target));
-        else vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, target));
+        if (data.length == 0) {
+            vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.RecipientNotAllowed.selector, target));
+        } else {
+            vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TargetNotAllowed.selector, target));
+        }
         wallet.execute(target, value, data);
     }
 
@@ -637,7 +647,7 @@ contract SigilSelfWalletTest is Test {
         bytes memory sig = _sign(selfPk, friend, 0.25 ether, "", 0, deadline);
         vm.prank(owner);
         wallet.cancelSignedCalls();
-        assertEq(wallet.nonce(), 1);
+        assertEq(wallet.nonce(), wallet.SIGNED_WINDOW());
         vm.prank(relayer);
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
         wallet.executeWithSig(friend, 0.25 ether, "", deadline, 0, sig);
@@ -685,5 +695,128 @@ contract SigilSelfWalletTest is Test {
         uint256 deadline = block.timestamp + 1 hours;
         vm.expectRevert(SigilSelfWallet.BadSignature.selector);
         wallet.executeWithSig(friend, uint256(amount) % 1 ether, "", deadline, 0, abi.encodePacked(r, s, v));
+    }
+
+    // ---------------------------------------------------------------- Oak Sapling Review, mediums
+
+    /// M-1: a token whose caps are set to zero is blocked, not freed from the token guard.
+    function testZeroCapsBlockATokenCompletely() public {
+        vm.startPrank(owner);
+        wallet.setSelector(address(token), TestToken.transferAndCall.selector, true);
+        wallet.setTokenLimit(address(token), 0, 0);
+        vm.stopPrank();
+        bytes memory other = abi.encodeWithSelector(TestToken.transferAndCall.selector, friend, 1_000e18, "");
+        vm.prank(selfKey);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TokenMoveRefused.selector, TestToken.transferAndCall.selector));
+        wallet.execute(address(token), 0, other);
+        vm.prank(selfKey);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TokenNotAllowed.selector, address(token)));
+        wallet.execute(address(token), 0, abi.encodeWithSelector(TestToken.transfer.selector, friend, 1));
+        assertEq(token.balanceOf(friend), 0);
+    }
+
+    /// M-1, the same through configure: a zero entry in a new rule set blocks the token.
+    function testZeroCapsInConfigureBlockAToken() public {
+        address[] memory recipients = new address[](1);
+        recipients[0] = friend;
+        address[] memory targets = new address[](1);
+        targets[0] = address(token);
+        SigilSelfWallet.SelectorRule[] memory sels = new SigilSelfWallet.SelectorRule[](1);
+        sels[0] = SigilSelfWallet.SelectorRule(address(token), TestToken.transferAndCall.selector);
+        SigilSelfWallet.TokenLimit[] memory limits = new SigilSelfWallet.TokenLimit[](1);
+        limits[0] = SigilSelfWallet.TokenLimit(address(token), 0, 0);
+        vm.prank(owner);
+        wallet.configure(1 ether, 3 ether, 0, recipients, targets, sels, limits);
+        vm.prank(selfKey);
+        vm.expectRevert(abi.encodeWithSelector(SigilSelfWallet.TokenMoveRefused.selector, TestToken.transferAndCall.selector));
+        wallet.execute(address(token), 0, abi.encodeWithSelector(TestToken.transferAndCall.selector, friend, 1, ""));
+    }
+
+    /// M-2: cancelling stops every call signed ahead, not only the next one.
+    function testCancellingStopsEveryCallSignedAhead() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes[] memory sigs = new bytes[](3);
+        for (uint256 i = 0; i < 3; i++) {
+            sigs[i] = _sign(selfPk, friend, 0.1 ether, "", i, deadline);
+        }
+        vm.prank(owner);
+        wallet.cancelSignedCalls();
+        for (uint256 i = 0; i < 3; i++) {
+            vm.prank(relayer);
+            vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+            wallet.executeWithSig(friend, 0.1 ether, "", deadline, 0, sigs[i]);
+        }
+        assertEq(friend.balance, 0);
+        // A call signed after the cancel, at the new nonce, works.
+        uint256 n = wallet.nonce();
+        vm.prank(relayer);
+        wallet.executeWithSig(friend, 0.1 ether, "", deadline, 0, _sign(selfPk, friend, 0.1 ether, "", n, deadline));
+        assertEq(friend.balance, 0.1 ether);
+    }
+
+    /// M-2: unfreezing stops calls signed ahead too.
+    function testUnfreezingStopsEveryCallSignedAhead() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory later = _sign(selfPk, friend, 0.1 ether, "", 1, deadline);
+        vm.startPrank(owner);
+        wallet.freeze();
+        wallet.unfreeze();
+        vm.stopPrank();
+        for (uint256 i = 0; i < 2; i++) {
+            vm.prank(selfKey);
+            wallet.execute(friend, 1, "");
+        }
+        vm.prank(relayer);
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, 0.1 ether, "", deadline, 0, later);
+    }
+
+    /// M-2: switching the self key away and back never revives its old signatures.
+    function testSwitchingBackToAKeyDoesNotReviveItsSignatures() public {
+        uint256 deadline = block.timestamp + 1 hours;
+        bytes memory old = _sign(selfPk, friend, 0.1 ether, "", 0, deadline);
+        vm.startPrank(owner);
+        wallet.setSelfKey(address(0));
+        wallet.setSelfKey(selfKey);
+        vm.stopPrank();
+        vm.prank(relayer);
+        vm.expectRevert(SigilSelfWallet.BadSignature.selector);
+        wallet.executeWithSig(friend, 0.1 ether, "", deadline, 0, old);
+        assertEq(friend.balance, 0);
+    }
+
+    /// M-3: a token that answers false fails the call, and nothing counts as spent or approved.
+    function testATokenThatAnswersFalseFailsTheCall() public {
+        FalseToken bad = new FalseToken();
+        vm.startPrank(owner);
+        wallet.setTarget(address(bad), true);
+        wallet.setSelector(address(bad), FalseToken.transfer.selector, true);
+        wallet.setSelector(address(bad), FalseToken.approve.selector, true);
+        wallet.setTokenLimit(address(bad), 100e18, 250e18);
+        vm.stopPrank();
+        uint256 before = wallet.tokenRemainingToday(address(bad));
+        vm.prank(selfKey);
+        vm.expectPartialRevert(SigilSelfWallet.TokenCallRefused.selector);
+        wallet.execute(address(bad), 0, abi.encodeWithSelector(FalseToken.transfer.selector, friend, 50e18));
+        assertEq(wallet.tokenRemainingToday(address(bad)), before);
+        vm.prank(selfKey);
+        vm.expectPartialRevert(SigilSelfWallet.TokenCallRefused.selector);
+        wallet.execute(address(bad), 0, abi.encodeWithSelector(FalseToken.approve.selector, friend, 50e18));
+        assertEq(wallet.openApprovals().length, 0);
+        assertEq(wallet.nonce(), 0);
+    }
+
+    /// M-3: a "token" with no code is refused, so a transfer to nothing never counts.
+    function testATokenWithNoCodeIsRefused() public {
+        address ghost = makeAddr("ghost-token");
+        vm.startPrank(owner);
+        wallet.setTarget(ghost, true);
+        wallet.setSelector(ghost, TestToken.transfer.selector, true);
+        wallet.setTokenLimit(ghost, 100e18, 250e18);
+        vm.stopPrank();
+        vm.prank(selfKey);
+        vm.expectPartialRevert(SigilSelfWallet.TokenCallRefused.selector);
+        wallet.execute(ghost, 0, abi.encodeWithSelector(TestToken.transfer.selector, friend, 1e18));
+        assertEq(wallet.tokenRemainingToday(ghost), 250e18);
     }
 }

@@ -16,7 +16,10 @@ pragma solidity 0.8.28;
 ///          transferFrom and allowance increases are refused
 ///        - on a token that has caps, transfer and approve are the only calls: any other
 ///          function of it (transferAndCall, send, safeTransferFrom, ...) is refused, so
-///          nothing moves that token around its caps
+///          nothing moves that token around its caps. A token whose caps are set to zero
+///          is blocked: no call to it goes through at all
+///        - a token transfer or approve counts only when the token says it succeeded: a
+///          token that returns false, or has no code, fails the whole call
 ///      Recipients and contracts are two lists, and no address is on both: a contract
 ///      the self may call (a router, a token) can never be paid by the self key, so
 ///      nothing it pays can be swept out of a contract by someone else.
@@ -33,7 +36,8 @@ pragma solidity 0.8.28;
 ///      new rule set: nothing from the old one carries over. A signed call is checked
 ///      against the rules in force when it is sent, never those it was signed under; the
 ///      owner can cancel every signed call not yet sent with `cancelSignedCalls`, and
-///      unfreezing cancels them too. Spending per day is counted
+///      unfreezing and changing the self key cancel them too. Cancelling moves the nonce
+///      past every call that could have been signed ahead, so none of them can come back. Spending per day is counted
 ///      per UTC calendar day (00:00 to 24:00 UTC), not over a rolling 24 hours, and is not
 ///      reset by new rules.
 ///      The same EIP-712 digest is computed in packages/core/src/identity.ts.
@@ -54,16 +58,16 @@ contract SigilSelfWallet {
         uint192 spent;
     }
 
-    bytes32 public constant DOMAIN_TYPEHASH =
-        keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
-    bytes32 public constant EXECUTE_TYPEHASH =
-        keccak256("Execute(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline,uint256 gas)");
+    bytes32 public constant DOMAIN_TYPEHASH = keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)");
+    bytes32 public constant EXECUTE_TYPEHASH = keccak256("Execute(address target,uint256 value,bytes data,uint256 nonce,uint256 deadline,uint256 gas)");
     bytes32 private constant NAME_HASH = keccak256("SigilSelfWallet");
     bytes32 private constant VERSION_HASH = keccak256("2");
     /// @notice At most this many allowances the self key gave can be open at once.
     uint256 public constant MAX_OPEN_APPROVALS = 16;
     /// @dev Gas given to each token when an allowance is set back to zero, so one token cannot stop a freeze.
     uint256 private constant REVOKE_GAS = 100_000;
+    /// @dev How far a cancel moves the nonce: further than any call could have been signed ahead.
+    uint256 public constant SIGNED_WINDOW = 1 << 64;
     uint256 private constant HALF_N = 0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0;
 
     bytes4 private constant TRANSFER = 0xa9059cbb; // transfer(address,uint256)
@@ -82,7 +86,8 @@ contract SigilSelfWallet {
     uint64 public expiresAt;
     /// @notice Starts at 1 and goes up with every `configure`; lists of an older rule set no longer count.
     uint256 public rulesVersion;
-    /// @notice Used by signed calls; goes up with every call the self key makes, and when the owner cancels signed calls.
+    /// @notice Used by signed calls; goes up by one with every call the self key makes, and jumps
+    ///         by SIGNED_WINDOW when signed calls are cancelled (cancelSignedCalls, unfreeze, setSelfKey).
     uint256 public nonce;
 
     Spend private _native;
@@ -136,6 +141,7 @@ contract SigilSelfWallet {
     error RecipientAndContract(address account);
     error TooManyOpenApprovals();
     error NotEnoughGas();
+    error TokenCallRefused(address token, bytes ret);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -207,15 +213,7 @@ contract SigilSelfWallet {
     /// @notice Replaces every rule at once: caps, expiry, recipients, contracts, selectors and token limits.
     /// @param recipients Who the self key may pay: native value and token transfers and approvals.
     /// @param targets The contracts the self key may call (tokens included). Never also a recipient.
-    function configure(
-        uint256 perTxCap_,
-        uint256 perDayCap_,
-        uint64 expiresAt_,
-        address[] calldata recipients,
-        address[] calldata targets,
-        SelectorRule[] calldata selectors,
-        TokenLimit[] calldata tokens
-    ) external onlyOwner {
+    function configure(uint256 perTxCap_, uint256 perDayCap_, uint64 expiresAt_, address[] calldata recipients, address[] calldata targets, SelectorRule[] calldata selectors, TokenLimit[] calldata tokens) external onlyOwner {
         uint256 v = rulesVersion + 1;
         rulesVersion = v;
         perTxCap = perTxCap_;
@@ -234,6 +232,7 @@ contract SigilSelfWallet {
             _selectors[v][selectors[i].target][selectors[i].selector] = true;
         }
         for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i].token == address(0)) revert ZeroAddress();
             _tokenLimits[v][tokens[i].token] = tokens[i];
         }
         emit Configured(v, perTxCap_, perDayCap_, expiresAt_);
@@ -265,15 +264,20 @@ contract SigilSelfWallet {
         emit SelectorChanged(target, selector, allowed);
     }
 
+    /// @notice Caps for a token. Zero caps block it: no transfer, approve or other call of it goes through.
     function setTokenLimit(address token, uint128 perTx, uint128 perDay) external onlyOwner {
+        if (token == address(0)) revert ZeroAddress();
         _tokenLimits[rulesVersion][token] = TokenLimit({token: token, perTx: perTx, perDay: perDay});
         emit TokenLimitChanged(token, perTx, perDay);
     }
 
     /// @notice Moves the wallet to a new self key. Zero leaves it with none: only the owner can act.
+    ///         Every call signed before, by any key, is cancelled: switching back to an
+    ///         earlier key never brings its old signatures back.
     function setSelfKey(address newKey) external onlyOwner {
         emit SelfKeyChanged(selfKey, newKey);
         selfKey = newKey;
+        _cancelSigned();
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -370,7 +374,11 @@ contract SigilSelfWallet {
             if (data.length < 4) revert SelectorNotAllowed(target, bytes4(0));
             selector = bytes4(data[0:4]);
             if (!_selectors[v][target][selector]) revert SelectorNotAllowed(target, selector);
-            if (_tokenLimits[v][target].perTx != 0 && selector != TRANSFER && selector != APPROVE) revert TokenMoveRefused(selector);
+            // A token with an entry in the limits (even one set to zero, which blocks it) takes
+            // transfer and approve only, and those within its caps.
+            if (_tokenLimits[v][target].token == target && selector != TRANSFER && selector != APPROVE) {
+                revert TokenMoveRefused(selector);
+            }
             if (selector == TRANSFER || selector == APPROVE) {
                 (tokenTo, tokenAmount) = abi.decode(data[4:], (address, uint256));
                 _spendToken(v, target, tokenTo, tokenAmount);
@@ -400,6 +408,14 @@ contract SigilSelfWallet {
             (ok, ret) = target.call{value: value, gas: gas}(data);
         }
         if (!ok) revert CallFailed(ret);
+        // A token transfer or approve counts only when the token says so: no code, a short
+        // answer or false fails the call, and nothing is counted as spent or approved.
+        if (selector == TRANSFER || selector == APPROVE) {
+            if (target.code.length == 0) revert TokenCallRefused(target, ret);
+            if (ret.length != 0 && (ret.length < 32 || abi.decode(ret, (uint256)) != 1)) {
+                revert TokenCallRefused(target, ret);
+            }
+        }
         emit Executed(n, target, value, selector, tokenTo, tokenAmount);
         return ret;
     }
@@ -461,7 +477,7 @@ contract SigilSelfWallet {
     }
 
     function _cancelSigned() private {
-        uint256 n = nonce + 1;
+        uint256 n = nonce + SIGNED_WINDOW;
         nonce = n;
         emit SignedCallsCancelled(n);
     }
