@@ -13,7 +13,7 @@
     "vectors": "SIGIL_WRITE_VECTORS=1 vitest run test/spec.test.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.11.0",
+    "@anthropic-ai/sdk": "^1.14.0",
     "@noble/ciphers": "^2.4.0",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
@@ -23,10 +23,10 @@
   },
   "devDependencies": {
     "@huggingface/tokenizers": "^0.2.0",
-    "@types/node": "^26.6.6",
+    "@types/node": "^26.6.10",
     "onnxruntime-web": "^1.31.1",
     "typescript": "^5.9.3",
-    "viem": "^2.58.1",
-    "vitest": "^5.1.1"
+    "viem": "^2.58.6",
+    "vitest": "^5.1.2"
   }
 }
